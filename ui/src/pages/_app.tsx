@@ -7,7 +7,10 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 
 import '../../public/style.css'
 
-import { Container, Row, Col } from 'react-bootstrap'
+import Container from 'react-bootstrap/Container'
+import Row from 'react-bootstrap/Row'
+import Col from 'react-bootstrap/Col'
+
 import moment from 'moment'
 import axios from 'axios'
 import { createLogger, ConsoleFormattedStream } from 'browser-bunyan'

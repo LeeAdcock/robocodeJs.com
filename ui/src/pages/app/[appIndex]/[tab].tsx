@@ -1,5 +1,9 @@
 import React from 'react'
-import { Container, Row, Col, Tab, Nav } from 'react-bootstrap'
+import Container from 'react-bootstrap/Container'
+import Row from 'react-bootstrap/Row'
+import Col from 'react-bootstrap/Col'
+import Tab from 'react-bootstrap/Tab'
+import Nav from 'react-bootstrap/Nav'
 import Logs from '../../../components/logs'
 import Toolbar from '../../../components/toolbar'
 import { colors } from '../../../util/colors'
@@ -106,7 +110,9 @@ const AppEditorPage = (props: any) => {
 
   const selectedTankApp: TankApp = props.apps[parseInt(appIndex as string)]
 
-  return selectedTankApp===null ? <></> : (
+  return selectedTankApp === null ? (
+    <></>
+  ) : (
     <>
       <Container
         className="h-100"
@@ -120,7 +126,7 @@ const AppEditorPage = (props: any) => {
               appIndex={parseInt(appIndex as string)}
               apps={props.apps}
               removeTank={props.removeTank}
-              removeApp={(removeAppIndex) => {
+              removeApp={removeAppIndex => {
                 props.removeApp(removeAppIndex)
                 router.push('/')
               }}

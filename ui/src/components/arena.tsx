@@ -2,7 +2,8 @@ import React from 'react'
 import { TankApp } from '@battletank/lib'
 import { generateTerrain } from '../util/terraformer'
 import { colors } from '../util/colors'
-import { Popover, OverlayTrigger } from 'react-bootstrap'
+import Popover from 'react-bootstrap/Popover'
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
 import Link from 'next/link'
 
 // Convenience method to calculate a unqiue id

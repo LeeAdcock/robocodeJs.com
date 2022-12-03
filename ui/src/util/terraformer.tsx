@@ -1,7 +1,7 @@
 const seed = Math.floor(Math.random() * 10)
 import React from 'react'
-import { OverlayTrigger, Tooltip } from 'react-bootstrap'
-
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
+import Tooltip from 'react-bootstrap/Tooltip'
 /*
   These functions build the randomized terrain for the arena. The resulting output
   is an array containing both a list of foreground svg sprites and a list of background

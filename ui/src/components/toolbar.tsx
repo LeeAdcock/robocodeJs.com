@@ -1,5 +1,10 @@
 import React from 'react'
-import { Button, ButtonGroup, ButtonToolbar, OverlayTrigger, Tooltip } from 'react-bootstrap'
+import Button from 'react-bootstrap/Button'
+import ButtonGroup from 'react-bootstrap/ButtonGroup'
+import ButtonToolbar from 'react-bootstrap/ButtonToolbar'
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
+import Tooltip from 'react-bootstrap/Tooltip'
+
 import { FaCode, FaDownload, FaTrash, FaPlusSquare, FaMinusSquare } from 'react-icons/fa'
 import { TankApp } from '@battletank/lib'
 

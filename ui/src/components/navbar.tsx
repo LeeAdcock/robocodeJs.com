@@ -1,5 +1,9 @@
 import React from 'react'
-import { Navbar, Nav, NavDropdown, OverlayTrigger, Tooltip } from 'react-bootstrap'
+import Navbar from 'react-bootstrap/Navbar'
+import Nav from 'react-bootstrap/Nav'
+import NavDropdown from 'react-bootstrap/NavDropdown'
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
+import Tooltip from 'react-bootstrap/Tooltip'
 import {
   FaCloudUploadAlt,
   FaSlack,
