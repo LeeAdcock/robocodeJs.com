@@ -12,7 +12,7 @@ import moment from 'moment'
 import axios from 'axios'
 import { createLogger, ConsoleFormattedStream } from 'browser-bunyan'
 
-import { Simulation, Compiler, TankApp, Tank, Stats } from 'battle-bots'
+import { Simulation, Compiler, TankApp, Tank, Stats } from '@battletank/lib'
 
 import RingBuffer from '../util/ringBuffer'
 import Arena from '../components/arena'

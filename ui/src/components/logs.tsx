@@ -1,7 +1,7 @@
 import React from 'react'
 import { Navbar, NavDropdown, Form, FormControl, Container, Row, Col } from 'react-bootstrap'
 import Moment from 'react-moment'
-import { TankApp } from 'battle-bots'
+import { TankApp } from '@battletank/lib'
 
 export default class Logs extends React.Component<
   {

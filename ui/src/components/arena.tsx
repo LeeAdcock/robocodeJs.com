@@ -1,5 +1,5 @@
 import React from 'react'
-import { TankApp } from 'battle-bots'
+import { TankApp } from '@battletank/lib'
 import { generateTerrain } from '../util/terraformer'
 import { colors } from '../util/colors'
 import { Popover, OverlayTrigger } from 'react-bootstrap'

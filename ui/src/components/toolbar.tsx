@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button, ButtonGroup, ButtonToolbar, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { FaCode, FaDownload, FaTrash, FaPlusSquare, FaMinusSquare } from 'react-icons/fa'
-import { TankApp } from 'battle-bots'
+import { TankApp } from '@battletank/lib'
 
 export default class NavBar extends React.Component<
   {
