@@ -3,7 +3,7 @@ import yargs from 'yargs'
 import cliProgress from 'cli-progress'
 import { hideBin } from 'yargs/helpers'
 import colors from 'colors'
-import { Simulation } from 'battle-bots'
+import { Simulation } from '@battletank/lib'
 import fs from 'fs'
 
 import { init } from './util'

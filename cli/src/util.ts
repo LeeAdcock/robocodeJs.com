@@ -1,4 +1,4 @@
-import { TankApp, Compiler, Tank } from 'battle-bots'
+import { TankApp, Compiler, Tank } from '@battletank/lib'
 import * as fs from 'fs'
 
 // Class to capture the last log message and make it

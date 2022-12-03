@@ -251,19 +251,21 @@ Options:
 
 `git clone https://github.com/LeeAdcock/battletank.io`
 
+First build the `lib` component as described below.
+
+In the `ui` folder run:
+
 `npm run install` - Install dependencies to your local environmnt.
-
-`npm run build:lib` - Build the simulation library.
-
-`npm run link` - Link the simulation library for use by the web application.
 
 ### Development
 
+In the `ui` folder run:
+
 `npm run dev` - Run application at `http://localhost:8080/Lee/battlebots` with automatic rebuilding on file change.
 
-`npm run build:ui` - Compile and package the production application to local folder `./docs`.
+`npm run build` - Build the simulation library.
 
-`npm run lint:ui` - Code cleanup and linting.
+`npm run lint` - Code cleanup and linting.
 
 ### Deploying
 
@@ -275,13 +277,19 @@ TBD
 
 `git clone https://github.com/LeeAdcock/battletank.io`
 
+In the `lib` folder run:
+
 `npm run install` - Install dependencies to your local environmnt.
+
+`npm run build` - Build the simulation library.
 
 ### Development
 
-`npm run build:lib` - Build the simulation library.
+In the `lib` folder run:
 
-`npm run lint:lib` - Code cleanup and linting.
+`npm run build` - Build the simulation library.
+
+`npm run lint` - Code cleanup and linting.
 
 ## Command Line Interface
 
@@ -289,17 +297,19 @@ TBD
 
 `git clone https://github.com/LeeAdcock/battletank.io`
 
+First build the `lib` component as described above.
+
+In the `cli` folder run:
+
 `npm run install` - Install dependencies to your local environmnt.
-
-`npm run build:lib` - Build the simulation library.
-
-`npm run link` - Link the simulation library for use by the web application.
 
 ### Development
 
-`npm run build:cli` - Compile and package the production application to local folder `./docs`.
+In the `cli` folder run:
 
-`npm run lint:cli` - Code cleanup and linting.
+`npm run build` - Compile and package command line interface.
+
+`npm run lint` - Code cleanup and linting.
 
 ### Running
 
