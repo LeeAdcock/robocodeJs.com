@@ -5,13 +5,13 @@
   "author": "lee@katieandlee.com",
   "scripts": {
     "clean": "rm -rf .next",
-    "preinstall": "npm link @battletank/lib",
+    "postinstall": "npm link @battletank/lib",
     "deploy": "npm run clean && npm run build",
     "build": "NODE_ENV=production && tsc && npx next build && npx next export",
     "lint": "prettier --loglevel warn --write \"./src/**/*.{ts,tsx}\" && prettier --loglevel warn --write \"./public/samples/*.js\" && (eslint ./src/ --ext .js,.jsx,.ts,.tsx)",
-    "start": "(cd ui && ws -d ./../docs -p 8080 -r '/Lee/battlebots/(.*) -> /$1')",
+    "start": "(ws -d ./../docs -p 8080 -r '/Lee/battlebots/(.*) -> /$1')",
     "watch": "nodemon -e tsx,ts,css -w \"./src/\" -x \"npm run clean && npm run build\"",
-    "dev": "(cd ui && next dev -p 8080)"
+    "dev": "(next dev -p 8080)"
   },
   "devDependencies": {
     "@types/node": "^13.13.52",

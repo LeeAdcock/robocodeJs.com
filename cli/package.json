@@ -4,7 +4,7 @@
   "description": "Battle bot programming game",
   "author": "lee@katieandlee.com",
   "scripts": {
-    "preinstall": "npm link battletank-lib",
+    "postinstall": "npm link battletank-lib",
     "build": "./node_modules/typescript/bin/tsc",
     "postbuild": "npm link",
     "lint": "prettier --loglevel warn --write \"./cli/src/**/*.{ts,tsx}\" && eslint ./src/ --ext .js,.jsx,.ts,.tsx"
