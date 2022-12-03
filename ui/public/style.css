@@ -1,0 +1,109 @@
+html,body {
+  height:100%;
+}
+
+@keyframes fade-in {
+  0% {
+      opacity: 0;
+  }
+  100% {
+      opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  0% {
+      opacity: 1;
+  }
+  100% {
+      opacity: 0;
+  }
+}
+
+.accordion a {
+  color:black
+}
+.accordion .btn a {
+  color: white
+}
+
+.navbar-brand,
+.nav-link,
+.btn {
+  color: white !important;
+}
+.nav-tabs .nav-link {
+  color:black !important;
+}
+
+.bg-light .nav-link {
+  color: black !important;
+}
+
+div.dark {
+  color: #FCFFE0;
+  background: black;
+}
+.dark .accordion a {
+  color:#FCFFE0
+}
+.dark .accordion .card-body {
+  color: #FCFFE0;
+  background-color: black !important
+}
+.dark .accordion .card-body .table {
+  color: #FCFFE0;
+  background-color: black !important
+}
+.dark .accordion .card-header {
+  background-color: #6c757d !important
+}
+.dark .navbar-brand,
+.dark .nav-link,
+.dark .btn {
+  color: #FCFFE0 !important;
+}
+
+.dark input {
+  background-color: #FCFFE0 !important;
+  color: #6c757d !important
+}
+.dark .dropdown-menu,
+.dark .bg-light {
+  background-color: #6c757d !important
+}
+
+.dark .nav-link.active {
+    background-color: inherit;
+    color: #FCFFE0 !important;
+}
+
+.logs { 
+  color: darkgray;
+}
+
+.logs .date {
+  color: green
+} 
+
+.logs .message {
+  color: black
+} 
+
+.dark .logs { 
+  color: #FCFFE0;
+}
+
+.dark .logs .date {
+  color: inherit
+} 
+
+.dark .logs .level { 
+  color: #FCFFE0
+}
+.dark .logs .name { 
+  color: lightgray
+}
+.dark .logs .message { 
+  color: rgba(164, 161, 181, 0.8)
+}

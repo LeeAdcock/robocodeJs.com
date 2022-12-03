@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "rootDir": ".",
+    "allowJs": false,
+    "types": [
+    ],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "target": "es2017",
+    "pretty": true,
+    "noEmitOnError": true,
+    "experimentalDecorators": true,
+    "sourceMap": true,
+    "emitDecoratorMetadata": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "esModuleInterop": true,
+    "removeComments": true,
+    "noUnusedLocals": true
+  },
+  "formatCodeOptions": {
+    "identSize": 2,
+    "tabSize": 2
+  },
+  "exclude": ["node_modules"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "pages/_app.tsx"
+  ]
+}
