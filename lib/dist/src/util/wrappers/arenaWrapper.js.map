@@ -1,1 +1,0 @@
-{"version":3,"file":"arenaWrapper.js","sourceRoot":"","sources":["../../../../src/util/wrappers/arenaWrapper.ts"],"names":[],"mappings":";;;AAKO,MAAM,kBAAkB,GAAG,CAAC,mBAA6B,EAAE,kBAA4B,EAAE,EAAE,CAEhG,CAAC;IACC,QAAQ,EAAE,kBAAkB;IAC5B,SAAS,EAAE,mBAAmB;CAC/B,CAAC,CAAA;AALS,QAAA,kBAAkB,sBAK3B"}
