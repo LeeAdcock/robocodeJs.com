@@ -1,6 +1,6 @@
 module.exports = {
-  assetPrefix: '/Lee/battlebots/',
-  basePath: '/Lee/battlebots',
+  assetPrefix: '',
+  basePath: '',
 
   webpack(config, options) {
     return config

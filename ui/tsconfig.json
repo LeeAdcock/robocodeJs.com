@@ -3,8 +3,7 @@
     "jsx": "preserve",
     "rootDir": ".",
     "allowJs": false,
-    "types": [
-    ],
+    "types": [],
     "lib": [
       "dom",
       "dom.iterable",
@@ -28,13 +27,16 @@
     "strictPropertyInitialization": true,
     "esModuleInterop": true,
     "removeComments": true,
-    "noUnusedLocals": true
+    "noUnusedLocals": true,
+    "incremental": true
   },
   "formatCodeOptions": {
     "identSize": 2,
     "tabSize": 2
   },
-  "exclude": ["node_modules"],
+  "exclude": [
+    "node_modules"
+  ],
   "include": [
     "**/*.ts",
     "**/*.tsx",
