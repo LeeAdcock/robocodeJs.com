@@ -1,5 +1,8 @@
-import { createLogger, ConsoleFormattedStream } from 'browser-bunyan'
-import App from '../../types/tankApp'
+import { createLogger } from 'browser-bunyan'
+import { TankApp } from '../..'
+import Arena from '../../types/arena'
+import Tank from '../../types/tank'
+import { v4 as uuidv4 } from 'uuid';
 
 /*
   This creates "monkey-patched" console wrapper so that logging
@@ -8,34 +11,27 @@ import App from '../../types/tankApp'
   user interface.
 */
 
-// Convenience method to calculate a unqiue id
-const getTankId = (appIndex: number, tankIndex: number) => (appIndex + 1) * 10 + (tankIndex + 1)
-
 // Create a console logger for the provided tank
 export const createConsoleWrapper = (
-  apps: App[],
-  appIndex: number,
-  tankIndex: number,
-  buffer: any,
-  writeToConsole: boolean,
+  arena:Arena,
+  app: TankApp,
+  tank: Tank
 ) => {
-  const app = apps[appIndex]
 
   const streams = [
     {
       level: 'TRACE',
-      stream: buffer,
+      stream: {write: (entry) => { arena.emitter.emit("log", {...entry, time: arena.clock.time, id: uuidv4() }) } },
     },
   ]
 
-  if (writeToConsole)
-    streams.push({
-      level: 'TRACE',
-      stream: new ConsoleFormattedStream(),
-    })
+  // Convenience to create a readable id
+  const tankId =
+      (arena.processes.map(process => process.app.id).indexOf(app.id) + 1) * 10 +
+      ((arena.processes.find(process => process.app.id===app.id)?.tanks.map(tank=>tank.id).indexOf(tank.id) || 0) + 1)
 
   const wrappedConsole = createLogger({
-    name: app.name + ' <' + getTankId(appIndex, tankIndex) + '>',
+    name: app.name + ' <' + tankId + '>',
     streams,
   })
 

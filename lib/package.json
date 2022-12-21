@@ -1,7 +1,7 @@
 {
   "name": "@battletank/lib",
   "version": "0.0.01",
-  "description": "Battle bot programming game",
+  "description": "Battle bot simulation environment library",
   "author": "lee@katieandlee.com",
   "scripts": {
     "build": "./node_modules/typescript/bin/tsc",
@@ -11,16 +11,18 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "devDependencies": {
-    "@types/node": "^13.13.52",
+    "@types/node": "^18.11.10",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^2.34.0",
     "@typescript-eslint/parser": "^2.34.0",
     "eslint": "^7.32.0",
     "prettier": "^2.4.1",
     "tsc": "^2.0.3",
-    "typescript": "^4.3.2"
+    "typescript": "^4.9.3"
   },
   "dependencies": {
+    "browser-bunyan": "^1.5.2",
     "moment": "^2.25.3",
-    "browser-bunyan": "^1.5.2"
+    "uuid": "^9.0.0"
   }
 }

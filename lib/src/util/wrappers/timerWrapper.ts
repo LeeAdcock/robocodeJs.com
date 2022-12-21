@@ -1,4 +1,5 @@
-import TankApp from '../../types/tankApp'
+import Arena from '../../types/arena'
+import Tank from '../../types/tank'
 
 /*
   This creates "monkey-patched" wrappers for the timer related
@@ -25,11 +26,11 @@ export class TimersContainer {
   timerMap: Map<number, Timer> = new Map<number, Timer>()
 }
 
-export const timerTick = (apps: TankApp[], time: number) => {
-  lastTime = time
+export const timerTick = (arena:Arena) => {
+  const time = arena.clock.time
 
-  apps.forEach(app =>
-    app.tanks
+  arena.processes.forEach(process =>
+    process.tanks
       .filter(tank => tank.health > 0)
       .forEach(tank => {
         Object.entries(tank.timers.intervalMap).forEach(entry => {
@@ -58,12 +59,10 @@ export const timerTick = (apps: TankApp[], time: number) => {
 
 // Create timer and interval wrapper functions for the provided tank
 export const createTimerWrappers = (
-  apps: TankApp[],
-  appIndex: number,
-  tankIndex: number,
-  tankLogger,
+  tank: Tank,
+  tankLogger
 ) => {
-  const tank = apps[appIndex].tanks[tankIndex]
+
   return {
     setIntervalWrapper: (func, interval) => {
       const timerId = Math.floor(Math.random() * 100000)

@@ -1,7 +1,8 @@
 import Point from './point'
+import { v4 as uuidv4 } from 'uuid';
 
 export default class Bullet extends Point {
-  id: number = Math.random()
+  id: string = uuidv4()
   origin: Point = new Point()
   speed: number = 15
   orientation: number = 0

@@ -1,5 +1,7 @@
-import App from '../types/tankApp'
 import { Event } from '../types/event'
+import Arena from '../types/arena'
+import Process from '../types/process'
+import Tank from '../types/tank'
 import { createTimerWrappers } from './wrappers/timerWrapper'
 import { createConsoleWrapper } from './wrappers/consoleWrapper'
 import { createTankWrapper } from './wrappers/tankWrapper'
@@ -15,30 +17,24 @@ export default {
   // Initialize a tank with its application logic, compiles the app source code
   // within a sandboxed environment.
   compile: (
-    apps: App[],
-    appIndex: number,
-    tankIndex: number,
-    arenaWidthProvider: Function,
-    arenaHeightProvider: Function,
-    buffer: any,
-    writeToConsole: boolean,
-    timeProvider: Function,
+    arena: Arena,
+    process: Process,
+    tank: Tank
   ) => {
-    const app = apps[appIndex]
-    const tank = app.tanks[tankIndex]
+    const app = process.app
 
     // Custom console logger visible to the applicaton
-    const consoleWrapper = createConsoleWrapper(apps, appIndex, tankIndex, buffer, writeToConsole)
+    const consoleWrapper = createConsoleWrapper(arena, app, tank)
 
     // Arena object visible to the application
-    const arenaWrapper = createArenaWrapper(arenaHeightProvider, arenaWidthProvider)
+    const arenaWrapper = createArenaWrapper(arena)
 
     // Tank object visible to the applicaton
-    const tankWrapper = createTankWrapper(apps, appIndex, tankIndex, consoleWrapper)
+    const tankWrapper = createTankWrapper(arena, process, tank, consoleWrapper)
 
     // Clock object visible to the applicaton
     const clockWrapper = {
-      getTime: timeProvider,
+      getTime: () => arena.clock.time,
       on: (event, handler) => {
         if (event === Event.TICK) tankWrapper.on(event, handler)
       },
@@ -46,7 +42,7 @@ export default {
 
     // Custom timer implementations visible to the applicaton
     const { setTimeoutWrapper, clearTimeoutWrapper, setIntervalWrapper, clearIntervalWrapper } =
-      createTimerWrappers(apps, appIndex, tankIndex, consoleWrapper)
+      createTimerWrappers(tank, consoleWrapper)
 
     // Build and execute the tank logic in a sandboxed environment
     try {

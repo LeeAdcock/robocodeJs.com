@@ -1,0 +1,31 @@
+{
+  "name": "@battletank/server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./dist/src/index.js",
+  "scripts": {
+    "postinstall": "npm link @battletank/lib",
+    "build": "tsc",
+    "dev": "fuser -k 8080/tcp & nodemon --watch src -e ts,ejs --exec npm run dev:start",
+    "dev:start": "npm-run-all build start",
+    "start": "node .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "eventsource": "^2.0.2",
+    "express": "^4.18.2",
+    "google-auth-library": "^8.7.0",
+    "request": "^2.88.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.14",
+    "@types/node": "^18.11.10",
+    "nodemon": "^2.0.20",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^4.9.3"
+  }
+}

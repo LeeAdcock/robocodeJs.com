@@ -1,4 +1,3 @@
-import Tank from './tank'
 
 export default class App {
   constructor() {
@@ -142,10 +141,10 @@ export default class App {
       nouns[Math.floor(Math.random() * (nouns.length - 1))]
   }
 
+  id: string | null = null
+
   name: string | null = null
 
   source: string = ''
-  recompile: boolean = true
 
-  tanks: Tank[] = [new Tank(), new Tank()]
 }

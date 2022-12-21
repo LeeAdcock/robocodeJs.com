@@ -5,6 +5,7 @@
     "rootDir": ".",
     "allowJs": false,
     "types": [
+      "node"
     ],
     "lib": [
       "dom",

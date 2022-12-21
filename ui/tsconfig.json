@@ -1,45 +1,27 @@
 {
   "compilerOptions": {
-    "jsx": "preserve",
-    "rootDir": ".",
-    "allowJs": false,
-    "types": [],
+    "target": "es5",
     "lib": [
       "dom",
       "dom.iterable",
       "esnext"
     ],
+    "allowJs": true,
     "skipLibCheck": true,
-    "strict": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "moduleResolution": "node",
-    "module": "commonjs",
-    "target": "es2017",
-    "pretty": true,
-    "noEmitOnError": true,
-    "experimentalDecorators": true,
-    "sourceMap": true,
-    "emitDecoratorMetadata": true,
-    "strictNullChecks": true,
-    "strictPropertyInitialization": true,
-    "esModuleInterop": true,
-    "removeComments": true,
-    "noUnusedLocals": true,
-    "incremental": true
+    "noEmit": true,
+    "jsx": "react-jsx"
   },
-  "formatCodeOptions": {
-    "identSize": 2,
-    "tabSize": 2
-  },
-  "exclude": [
-    "node_modules"
-  ],
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "pages/_app.tsx"
+    "src"
   ]
 }

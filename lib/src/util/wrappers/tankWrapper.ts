@@ -1,5 +1,8 @@
-import App from '../../types/tankApp'
 import Bullet from '../../types/bullet'
+import Arena from '../../types/arena'
+import Process from '../../types/process'
+import Tank from '../../types/tank'
+
 import { Event } from '../../types/event'
 
 /*
@@ -13,9 +16,6 @@ const normalizeAngle = (x: number): number => {
   while (x < 0) x += 360
   return Math.floor(x)
 }
-
-// Convenience method to calculate a unqiue id
-const getTankId = (appIndex: number, tankIndex: number) => (appIndex + 1) * 10 + (tankIndex + 1)
 
 // Convenience method to create a promise that resolves/rejects
 // when specific conditions are met.
@@ -33,9 +33,12 @@ const waitUntil = (
   })
 
 // Create timer and interval wrapper functions for the provided tank
-export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: number, tankLogger) => {
-  const app = apps[appIndex]
-  const tank = apps[appIndex].tanks[tankIndex]
+export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, tankLogger) => {
+
+  // Convenience to create a readable id
+  const tankId =
+      (arena.processes.map(process => process.app.id).indexOf(process.app.id) + 1) * 10 +
+      ((arena.processes.find(process => process.app.id===process.app.id)?.tanks.map(tank=>tank.id).indexOf(tank.id) || 0) + 1)
 
   // Tank object visible to the bot application
   const tankWrapper = {
@@ -78,15 +81,36 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
             }, 0)
     },
 
-    setName: name => (app.name = name),
+    setName: name => {
+      // todo sanitize name
+      if(process.app.name !== name) {
+        process.app.name = name,
+        arena.emitter.emit("event", {
+          type:"appRenamed",
+          appId: process.app.id,
+          tankId: tank.id,
+          name: name,
+        })
+      }
+    },
 
-    getId: () => getTankId(appIndex, tankIndex),
+    getId: () => tankId,
 
     getHealth: () => tank.health / 100,
 
     setOrientation: d => {
       const target = normalizeAngle(d)
       tank.bodyOrientationTarget = target
+      // todo only if this is an actual change
+      arena.emitter.emit("event", {
+        type:"tankTurn",
+        time: arena.clock.time,
+        id:tank.id,
+        x: tank.x,
+        y: tank.y,
+        bodyOrientationTarget: tank.bodyOrientationTarget,
+        bodyOrientation:tank.bodyOrientation,
+        bodyOrientationVelocity:tank.bodyOrientationVelocity})
       tankLogger.trace('Turning to ' + tank.bodyOrientationTarget + '°')
       if (tank.bodyOrientationTarget === tank.bodyOrientation) return Promise.resolve()
       return waitUntil(
@@ -103,6 +127,16 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
     turn: d => {
       const target = normalizeAngle(tank.bodyOrientation + d)
       tank.bodyOrientationTarget = target
+      // todo only if this is an actual change
+      arena.emitter.emit("event", {
+        type:"tankTurn",
+        time: arena.clock.time,
+        id:tank.id,
+        x: tank.x,
+        y: tank.y,
+        bodyOrientationTarget: tank.bodyOrientationTarget,
+        bodyOrientation:tank.bodyOrientation,
+        bodyOrientationVelocity:tank.bodyOrientationVelocity})
       tankLogger.trace('Turning to ' + tank.bodyOrientationTarget + '°')
       if (tank.bodyOrientationTarget === tank.bodyOrientation) return Promise.resolve()
       return waitUntil(
@@ -114,6 +148,18 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
 
     setSpeed: d => {
       tank.speedTarget = Math.min(d, tank.speedMax)
+      // todo only if this is an actual change
+      arena.emitter.emit("event", {
+        type:"tankAccelerate",
+        time: arena.clock.time,
+        id:tank.id,
+        x: tank.x,
+        y: tank.y,
+        speed: tank.speed,
+        speedTarget: tank.speedTarget,
+        speedAcceleration: tank.speedAcceleration,
+        speedMax: tank.speedMax
+      })
       tankLogger.trace(d === 0 ? 'Stopping' : 'Accelerating to ' + tank.speedTarget)
       return waitUntil(
         () => tank.speed === Math.min(d, tank.speedMax),
@@ -134,11 +180,11 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
       }
       tankLogger.trace('Sending message "' + x + '"')
       tank.stats.messagesSent += 1
-      apps.forEach((otherApp, otherAppIndex) => {
-        otherApp.tanks
-          .filter(otherTank => tank.health > 0)
+      arena.processes.forEach(otherProcess => {
+        otherProcess.tanks
+          .filter(otherTank => otherTank.health > 0)
           .forEach((otherTank, otherTankIndex) => {
-            if (otherAppIndex !== appIndex || otherTankIndex !== tankIndex) {
+            if (otherTank.id !== tank.id) {
               otherTank.stats.messagesReceived += 1
               if (otherTank.handlers[Event.RECEIVED]) {
                 otherTank.handlers[Event.RECEIVED](x)
@@ -152,6 +198,15 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
       setOrientation: d => {
         const target = normalizeAngle(d)
         tank.radarOrientationTarget = target
+        // todo only if this is an actual change
+        arena.emitter.emit("event", {
+          type:"radarTurn",
+          time: arena.clock.time,
+          id:tank.id,
+          radarOrientationTarget: tank.radarOrientationTarget,
+          radarOrientation:tank.radarOrientation,
+          radarOrientationVelocity:tank.radarOrientationVelocity
+        })
         tankLogger.trace('Turning radar to ' + tank.radarOrientationTarget + '°')
         if (tank.radarOrientationTarget === tank.radarOrientation) return Promise.resolve()
         return waitUntil(
@@ -168,6 +223,15 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
       turn: d => {
         const target = normalizeAngle(tank.radarOrientation + d)
         tank.radarOrientationTarget = target
+        // todo only if this is an actual change
+        arena.emitter.emit("event", {
+          type:"radarTurn",
+          time: arena.clock.time,
+          id:tank.id,
+          radarOrientationTarget: tank.radarOrientationTarget,
+          radarOrientation:tank.radarOrientation,
+          radarOrientationVelocity:tank.radarOrientationVelocity
+        })
         tankLogger.trace('Turning radar to ' + tank.radarOrientationTarget + '°')
         if (tank.radarOrientationTarget === tank.radarOrientation) return Promise.resolve()
         return waitUntil(
@@ -196,17 +260,20 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
         if (tank.radarCharged < 100) return Promise.reject('Radar not ready')
         tankLogger.trace('Scanning')
         tank.radarCharged = 0
-        tank.radarOn = true
-        setTimeout(() => (tank.radarOn = false), 100)
+        arena.emitter.emit("event", {
+          type:"radarScan",
+          time: arena.clock.time,
+          id:tank.id,
+        })
 
         tank.stats.scansCompleted += 1
 
         const found: any[] = []
-        apps.forEach((otherApp, otherAppIndex) => {
-          otherApp.tanks.forEach((otherTank, otherTankIndex) => {
+        arena.processes.forEach(otherProcess => {
+          otherProcess.tanks.forEach(otherTank => {
             if (
               otherTank.health > 0 &&
-              (otherAppIndex !== appIndex || otherTankIndex !== tankIndex)
+              (otherTank.id !== tank.id)
             ) {
               const distance = Math.sqrt(
                 Math.pow(otherTank.x - tank.x, 2) + Math.pow(otherTank.y - tank.y, 2),
@@ -227,12 +294,12 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
                 }
                 otherTank.stats.timesDetected += 1
                 found.push({
-                  id: getTankId(otherAppIndex, otherTankIndex),
+                  id: otherTank.id,
                   speed: otherTank.speed,
                   orientation: otherTank.bodyOrientation,
                   distance,
                   angle,
-                  friendly: appIndex === otherAppIndex,
+                  friendly: otherProcess.app.id === process.app.id,
                 })
               }
             }
@@ -253,6 +320,15 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
       setOrientation: d => {
         const target = normalizeAngle(d)
         tank.turretOrientationTarget = normalizeAngle(d)
+        // todo only if this is an actual change
+        arena.emitter.emit("event", {
+          type:"turretTurn",
+          time: arena.clock.time,
+          id:tank.id,
+          turretOrientationTarget: tank.turretOrientationTarget,
+          turretOrientation:tank.turretOrientation,
+          turretOrientationVelocity:tank.turretOrientationVelocity
+        })
         tankLogger.trace('Turning turret to ' + tank.turretOrientationTarget + '°')
         if (tank.turretOrientationTarget === tank.turretOrientation) return Promise.resolve()
         return waitUntil(
@@ -269,6 +345,15 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
       turn: d => {
         const target = normalizeAngle(tank.turretOrientation + d)
         tank.turretOrientationTarget = target
+        // todo only if this is an actual change
+        arena.emitter.emit("event", {
+          type:"turretTurn",
+          time: arena.clock.time,
+          id:tank.id,
+          turretOrientationTarget: tank.turretOrientationTarget,
+          turretOrientation:tank.turretOrientation,
+          turretOrientationVelocity:tank.turretOrientationVelocity
+        })
         tankLogger.trace('Turning turret to ' + tank.turretOrientationTarget + '°')
         if (tank.turretOrientationTarget === tank.turretOrientation) return Promise.resolve()
         return waitUntil(
@@ -312,6 +397,16 @@ export const createTankWrapper = (apps: App[], appIndex: number, tankIndex: numb
         tank.bullets.push(bullet)
         tank.turretLoaded = 0
 
+        arena.emitter.emit("event", {
+          type:"bulletFired",
+          time: arena.clock.time,
+          id: bullet.id,
+          tankId: tank.id,
+          x:bullet.origin.x,
+          y:bullet.origin.y,
+          speed: bullet.speed,
+          orientation: bullet.orientation
+        })
         return new Promise(resolve => {
           bullet.callback = resolve
         })
