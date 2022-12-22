@@ -2,7 +2,6 @@ import Bullet from '../../types/bullet'
 import Arena from '../../types/arena'
 import Process from '../../types/process'
 import Tank from '../../types/tank'
-
 import { Event } from '../../types/event'
 
 /*
@@ -26,7 +25,7 @@ const waitUntil = (
 ) =>
   new Promise(function (resolve, reject) {
     ;(function waitForFoo() {
-      if (successCondition()) return resolve(null)
+      if (successCondition()) return resolve(undefined)
       if (failureCondition && failureCondition()) return reject(msg)
       setTimeout(waitForFoo, 50)
     })()
@@ -42,7 +41,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
 
   // Tank object visible to the bot application
   const tankWrapper = {
-    __raw__: tank,
+
     // Enables the registration of event handlers
     on: (event: Event, handler) => {
       if (!Object.keys(Event).includes(event)) throw new Error('Invalid event type.')
@@ -101,6 +100,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
     setOrientation: d => {
       const target = normalizeAngle(d)
       tank.bodyOrientationTarget = target
+      console.log("orient", d)
       // todo only if this is an actual change
       arena.emitter.emit("event", {
         type:"tankTurn",
@@ -115,7 +115,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
       if (tank.bodyOrientationTarget === tank.bodyOrientation) return Promise.resolve()
       return waitUntil(
         () => tank.bodyOrientation === target,
-        () => tank.bodyOrientationTarget !== target || tank.health <= 0,
+        () => !arena.running || tank.bodyOrientationTarget !== target || tank.health <= 0,
         'Orientation change cancelled',
       )
     },
@@ -141,12 +141,13 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
       if (tank.bodyOrientationTarget === tank.bodyOrientation) return Promise.resolve()
       return waitUntil(
         () => tank.bodyOrientation === target,
-        () => tank.bodyOrientationTarget !== target || tank.health <= 0,
+        () => !arena.running || tank.bodyOrientationTarget !== target || tank.health <= 0,
         'Turn cancelled',
       )
     },
 
     setSpeed: d => {
+      console.log("set speed", d)
       tank.speedTarget = Math.min(d, tank.speedMax)
       // todo only if this is an actual change
       arena.emitter.emit("event", {
@@ -163,7 +164,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
       tankLogger.trace(d === 0 ? 'Stopping' : 'Accelerating to ' + tank.speedTarget)
       return waitUntil(
         () => tank.speed === Math.min(d, tank.speedMax),
-        () => tank.speedTarget !== Math.min(d, tank.speedMax) || tank.health <= 0,
+        () => !arena.running || tank.speedTarget !== Math.min(d, tank.speedMax) || tank.health <= 0,
         'Speed change cancelled',
       )
     },
@@ -211,7 +212,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
         if (tank.radarOrientationTarget === tank.radarOrientation) return Promise.resolve()
         return waitUntil(
           () => tank.radarOrientation === target % 360,
-          () => tank.radarOrientationTarget !== target % 360,
+          () => !arena.running || tank.radarOrientationTarget !== target % 360,
           'Radar orientation change cancelled',
         )
       },
@@ -236,7 +237,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
         if (tank.radarOrientationTarget === tank.radarOrientation) return Promise.resolve()
         return waitUntil(
           () => tank.radarOrientation === target,
-          () => tank.radarOrientationTarget !== target || tank.health <= 0,
+          () => !arena.running || tank.radarOrientationTarget !== target || tank.health <= 0,
           'Radar turn chancelled',
         )
       },
@@ -248,7 +249,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
           () => {
             // Reject if the value decreases, or bot dies
             peakValue = Math.max(peakValue, tank.radarCharged)
-            return tank.health <= 0 || tank.radarCharged < peakValue
+            return !arena.running || tank.health <= 0 || tank.radarCharged < peakValue
           },
           'Radar already scanned',
         )
@@ -333,7 +334,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
         if (tank.turretOrientationTarget === tank.turretOrientation) return Promise.resolve()
         return waitUntil(
           () => tank.turretOrientation === target % 360,
-          () => tank.turretOrientationTarget !== target % 360 || tank.health <= 0,
+          () => !arena.running || tank.turretOrientationTarget !== target % 360 || tank.health <= 0,
           'Turret orientation change cancelled',
         )
       },
@@ -358,7 +359,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
         if (tank.turretOrientationTarget === tank.turretOrientation) return Promise.resolve()
         return waitUntil(
           () => tank.turretOrientation === target,
-          () => tank.turretOrientationTarget !== target || tank.health <= 0,
+          () => !arena.running || tank.turretOrientationTarget !== target || tank.health <= 0,
           'Turret turn cancelled',
         )
       },
@@ -370,7 +371,7 @@ export const createTankWrapper = (arena: Arena, process: Process, tank: Tank, ta
           () => {
             // Reject if the value decreases, or bot dies
             peakValue = Math.max(peakValue, tank.turretLoaded)
-            return tank.health <= 0 || tank.turretLoaded < peakValue
+            return !arena.running || tank.health <= 0 || tank.turretLoaded < peakValue
           },
           'Turret already fired',
         )

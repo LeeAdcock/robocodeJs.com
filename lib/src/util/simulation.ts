@@ -155,7 +155,7 @@ export default {
             if (tank.speed < tank.speedTarget) tank.speed += tank.speedAcceleration
             if (Math.abs(tank.speed - tank.speedTarget) < tank.speedAcceleration)
               tank.speed = tank.speedTarget
-            tank.speed = Math.min(tank.speedMax, tank.speed)
+            tank.speed = Math.max(-tank.speedMax, Math.min(tank.speedMax, tank.speed))
 
           } else {
             tank.speedTarget = 0
