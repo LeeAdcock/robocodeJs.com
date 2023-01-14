@@ -93,9 +93,7 @@ export default function AppPage(props) {
                                     src={
                                         '/sprites/tank_' +
                                         colors[
-                                            props.arena.apps
-                                                .map((app) => app.id)
-                                                .indexOf(app.id)
+                                            props.arena.apps.findIndex((otherApp) => otherApp.id === app.id)
                                         ] +
                                         '.png'
                                     }
@@ -112,7 +110,7 @@ export default function AppPage(props) {
                         <Toolbar
                             appName={app?.name}
                             code={code}
-                            doDelete={() => {}}
+                            doDelete={() => {/*todo*/}}
                             doSave={() => setDoSave(true)}
                             doExecute={doExecute}
                             doClean={doClean}

@@ -4,7 +4,7 @@ module.exports = function (app) {
     app.use(
         '/api',
         createProxyMiddleware({
-            target: 'https://port-8080-battletank-io-lee508578.preview.codeanywhere.com/',
+            target: 'https://leeadcock-stunning-space-umbrella-jq66qrwgw52pv99-8080.preview.app.github.dev/',
             changeOrigin: true,
         })
     )

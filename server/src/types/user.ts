@@ -1,4 +1,10 @@
-import { Arena, TankApp } from '@battletank/lib'
+import Arena from './arena'
+import TankApp from './app'
+
+export interface Auth {
+  source: string
+  id: string
+}
 
 export default class User {
   id: string = ""
@@ -7,4 +13,6 @@ export default class User {
   name: string | undefined;
   picture: string | undefined;
   email: string | undefined;
+
+  auths: Auth[] = [];
 }

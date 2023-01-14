@@ -7,8 +7,11 @@ import {OAuth2Client} from 'google-auth-library';
 
 import User from './types/user';
 
-import { Simulation, Arena, TankApp, Tank, Compiler } from '@battletank/lib'
-
+import Simulation from './util/simulation'
+import Arena from './types/arena'
+import TankApp from './types/app'
+import Tank from './types/tank'
+import Compiler from './util/compiler'
 
 // TODO externalize these
 const users:User[]= []
@@ -17,34 +20,46 @@ const app = express();
 app.use(bodyParser.json({}));
 app.use(bodyParser.raw({ type: "application/octet-stream" }));
 app.use(cookieParser())
+app.use(express.static('public'))
+
 
 // auth
 app.use((req, res, next) => {
+  if(req.path==="/health")
+    return next()
+
   const googleClientId = '344303216827-jtutvdqjp24q0or2fpqf5mihja138sem.apps.googleusercontent.com';
   const client = new OAuth2Client(googleClientId);
   client.verifyIdToken({
       idToken: req.cookies.auth,
-      audience: googleClientId
+      //audience: googleClientId
   }).then(verification => {
-    (req as any).userId = verification.getPayload()?.sub
 
-    const user = users.find(user => user.id === req.params.userId)
+    let user = users.find(user => user.auths.find(auth => auth.source==='google' && auth.id === req.params.userId))
     if(!user) {
-      const user = new User()
+      user = new User()
       const payload = verification.getPayload()
       if(payload) {
-        user.id = payload.sub
+        user.id = uuidv4()
         user.name = payload.name
         user.picture = payload.picture
         user.email = payload.email
+        user.auths = [
+          {
+            source:"google",
+            id: payload.sub
+          }
+        ]
         users.push(user)
       } else {
         res.status(401);
         res.send('Access forbidden');
       }
     }
+    (req as any).userId = user.id
+ 
     next()
-  }).catch(() => {
+  }).catch((e) => {
     res.status(401);
     res.send('Access forbidden');
   })
@@ -53,15 +68,20 @@ app.use((req, res, next) => {
 const port = 8080; // default port to listen
 
 // Health
-app.get("/api/health", (req, res) => {
+app.get("/health", (req, res) => {
   res.json({ status: "ok", });
 });
 
 // Log in
-app.get("/api/login", (req, res) => {
+app.get("/api/user", (req, res) => {
   const user = users.find(user => user.id === (req as any).userId)
   if(user) {
-    res.json({id: user.id});
+    res.json({
+      id: user.id,
+      name: user.name,
+      picture: user.picture,
+      apps: user.apps.map(app => ({ id: app.id, name: app.name }))
+    });
   } else {
     res.status(401);
     res.send('Access forbidden');
@@ -239,15 +259,15 @@ app.get("/api/user/:userId/arena/", (req, res) => {
         speedTarget: tank.speedTarget,
         speedAcceleration: tank.speedAcceleration,
         speedMax: tank.speedMax,
-        bodyOrientation: tank.bodyOrientation,
-        bodyOrientationTarget: tank.bodyOrientationTarget,
-        bodyOrientationVelocity:tank.bodyOrientationVelocity,
-        turretOrientation:tank.turretOrientation,
-        turretOrientationTarget:tank.turretOrientationTarget,
-        turretOrientationVelocity:tank.radarOrientationVelocity,
-        radarOrientation:tank.radarOrientation,
-        radarOrientationTarget:tank.radarOrientationTarget,
-        radarOrientationVelocity:tank.radarOrientationVelocity,
+        bodyOrientation: tank.orientation,
+        bodyOrientationTarget: tank.orientationTarget,
+        bodyOrientationVelocity:tank.orientation,
+        turretOrientation:tank.turret.orientation,
+        turretOrientationTarget:tank.turret.orientationTarget,
+        turretOrientationVelocity:tank.turret.radar.orientationVelocity,
+        radarOrientation:tank.turret.radar.orientation,
+        radarOrientationTarget:tank.turret.radar.orientationTarget,
+        radarOrientationVelocity:tank.turret.radar.orientationVelocity,
         health: tank.health,
         bullets: tank.bullets.map(bullet => ({
           id: bullet.id,
@@ -351,12 +371,12 @@ app.put("/api/user/:userId/arena/app/:appId", (req, res) => {
       type: "arenaPlaceTank",
       id: tank.id,
       appId: process.app.id,
-      bodyOrientation: tank.bodyOrientation,
-      bodyOrientationVelocity: tank.bodyOrientationVelocity,
-      turretOrientation: tank.turretOrientation,
-      turretOrientationVelocity: tank.turretOrientationVelocity,
-      radarOrientation: tank.radarOrientation,
-      radarOrientationVelocity: tank.radarOrientationVelocity,
+      bodyOrientation: tank.orientation,
+      bodyOrientationVelocity: tank.orientationVelocity,
+      turretOrientation: tank.turret.orientation,
+      turretOrientationVelocity: tank.turret.orientationVelocity,
+      radarOrientation: tank.turret.radar.orientation,
+      radarOrientationVelocity: tank.turret.radar.orientationVelocity,
       speed: tank.speed,
       speedMax: tank.speedMax,
       x: tank.x,
@@ -412,12 +432,12 @@ app.post("/api/user/:userId/arena/restart", (req, res) => {
         type: "arenaPlaceTank",
         id: tank.id,
         appId: process.app.id,
-        bodyOrientation: tank.bodyOrientation,
-        bodyOrientationVelocity: tank.bodyOrientationVelocity,
-        turretOrientation: tank.turretOrientation,
-        turretOrientationVelocity: tank.turretOrientationVelocity,
-        radarOrientation: tank.radarOrientation,
-        radarOrientationVelocity: tank.radarOrientationVelocity,
+        bodyOrientation: tank.orientation,
+        bodyOrientationVelocity: tank.orientationVelocity,
+        turretOrientation: tank.turret.orientation,
+        turretOrientationVelocity: tank.turret.orientationVelocity,
+        radarOrientation: tank.turret.radar.orientation,
+        radarOrientationVelocity: tank.turret.radar.orientationVelocity,
         speed: tank.speed,
         speedMax: tank.speedMax,
         x: tank.x,
@@ -520,12 +540,12 @@ app.get("/api/user/:userId/arena/events", (req, res) => {
         type: "arenaPlaceTank",
         id: tank.id,
         appId: process.app.id,
-        bodyOrientation: tank.bodyOrientation,
-        bodyOrientationVelocity: tank.bodyOrientationVelocity,
-        turretOrientation: tank.turretOrientation,
-        turretOrientationVelocity: tank.turretOrientationVelocity,
-        radarOrientation: tank.radarOrientation,
-        radarOrientationVelocity: tank.radarOrientationVelocity,
+        bodyOrientation: tank.orientation,
+        bodyOrientationVelocity: tank.orientationVelocity,
+        turretOrientation: tank.turret.orientation,
+        turretOrientationVelocity: tank.turret.orientationVelocity,
+        radarOrientation: tank.turret.radar.orientation,
+        radarOrientationVelocity: tank.turret.radar.orientationVelocity,
         speed: tank.speed,
         speedMax: tank.speedMax,
         x: tank.x,

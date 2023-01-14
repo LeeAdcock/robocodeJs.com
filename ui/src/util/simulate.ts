@@ -36,7 +36,7 @@ export default (
                     tank.speedAcceleration
                 )
                     tank.speed = tank.speedTarget
-                tank.speed = Math.min(tank.speedMax, tank.speed)
+                tank.speed = Math.max(-tank.speedMax, Math.min(tank.speedMax, tank.speed))
 
                 // Convenience method for manging rotating towards a target orientation
                 // with a maximum rotational velocity.

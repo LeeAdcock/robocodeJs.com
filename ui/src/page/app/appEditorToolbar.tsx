@@ -5,7 +5,7 @@ import ButtonToolbar from 'react-bootstrap/ButtonToolbar'
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
 import Tooltip from 'react-bootstrap/Tooltip'
 
-import { FaCode, FaDownload, FaTrash, FaSave, FaPlay } from 'react-icons/fa'
+import { FaCode, FaDownload, FaTrash, FaSave, FaHammer } from 'react-icons/fa'
 
 interface EditorToolbarProps {
     code: string
@@ -41,7 +41,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                         placement={'bottom'}
                         overlay={
                             <Tooltip id={`reformat`}>
-                                Execute code (Ctrl-Space)
+                                Compile code (Ctrl-Space)
                             </Tooltip>
                         }
                     >
@@ -50,7 +50,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                             size="sm"
                             onClick={() => props.doExecute()}
                         >
-                            <FaPlay />
+                            <FaHammer />
                         </Button>
                     </OverlayTrigger>
                     <OverlayTrigger

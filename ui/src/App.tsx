@@ -20,14 +20,14 @@ import PointInTime from './types/pointInTime'
 import Simulate from './util/simulate'
 import ArenaLogPage from './page/arena/arenaLogsPage'
 
-declare var google: any
+declare const google: any
 
 interface NavProps {
     user: User
     arena: Arena
     isPaused: boolean
-    doLogin: Function
-    doCreateApp: Function
+    doLogin: () => void
+    doCreateApp: () => void
 }
 const Nav = (props: NavProps) => {
     const navigate = useNavigate()
@@ -46,7 +46,7 @@ const Nav = (props: NavProps) => {
             doRestart={() =>
                 axios.post(`/api/user/${props.user.id}/arena/restart`)
             }
-            doSave={() => {}}
+            doSave={() => {/* todo */}}
             doCreateApp={() => {
                 axios.post(`/api/user/${props.user.id}/app`).then((res) => {
                     const appId = res.data.appId
@@ -81,11 +81,11 @@ function App() {
         // prompt to authenticate
         google.accounts.id.initialize({
             client_id:
-                '344303216827-jtutvdqjp24q0or2fpqf5mihja138sem.apps.googleusercontent.com',
+                '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
             callback: (response) => {
                 document.cookie = 'auth=' + response.credential + '; path=/'
                 axios
-                    .get(`/api/login`)
+                    .get(`/api/user`)
                     .then((res) =>
                         axios
                             .get(`/api/user/${res.data.id}`)
@@ -112,7 +112,7 @@ function App() {
         // On window open, try to authenticate
         window.onload = function () {
             axios
-                .get(`/api/login`)
+                .get(`/api/user`)
                 .then((res) => {
                     // already authenticated
                     axios
@@ -145,7 +145,7 @@ function App() {
         }
         if (user) {
             eventSource = new EventSource(
-                `https://port-3000-battletank-io-lee508578.preview.codeanywhere.com/api/user/${user.id}/arena/events`
+                `https://leeadcock-stunning-space-umbrella-jq66qrwgw52pv99-3000.preview.app.github.dev/api/user/${user.id}/arena/events`
             )
 
             eventSource.onmessage = (message) => {

@@ -38,7 +38,7 @@ export default function ArenaLogsPage(props: ArenaLogsPageProps) {
             eventSource = undefined
         }
         eventSource = new EventSource(
-            `https://port-3000-battletank-io-lee508578.preview.codeanywhere.com/api/user/${userId}/arena/logs`
+            `https://leeadcock-stunning-space-umbrella-jq66qrwgw52pv99-3000.preview.app.github.dev/api/user/${userId}/arena/logs`
         )
 
         eventSource.onmessage = (message) => {
