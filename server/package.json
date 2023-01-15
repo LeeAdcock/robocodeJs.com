@@ -1,13 +1,13 @@
 {
   "name": "@battletank/server",
-  "version": "1.2.7",
+  "version": "1.2.9",
   "description": "",
   "main": "./dist/src/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "fuser -k 8080/tcp & nodemon --watch src -e ts,ejs --exec npm run dev:start",
     "dev:start": "npm-run-all build start",
-    "lint": "npx eslint src --fix",
+    "lint": "npx prettier --write src && npx eslint src --fix",
     "start": "node ./dist/src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "package": "npm version patch && npm shrinkwrap && zip -r artifact-${npm_package_version}.zip ./ -x '*.git' -x '*artifact*zip*' -x '*artifact.zip*' -x '*node_modules*'"
@@ -32,6 +32,7 @@
     "eslint": "^8.31.0",
     "nodemon": "^2.0.20",
     "npm-run-all": "^4.1.5",
+    "prettier": "2.8.3",
     "typescript": "^4.9.3"
   },
   "engines": {

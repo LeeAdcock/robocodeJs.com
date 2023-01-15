@@ -1,4 +1,3 @@
-
 export default class Clock {
-  time = 0
+  time = 0;
 }

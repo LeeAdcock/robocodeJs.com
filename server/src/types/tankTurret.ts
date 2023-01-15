@@ -1,9 +1,8 @@
-import Bullet from './bullet';
-import { Event } from './event';
-import { Orientated } from './orientated';
-import Tank, { normalizeAngle, waitUntil } from './tank';
+import Bullet from "./bullet";
+import { Event } from "./event";
+import { Orientated } from "./orientated";
+import Tank, { normalizeAngle, waitUntil } from "./tank";
 import { TankRadar } from "./tankRadar";
-
 
 export class TankTurret implements Orientated {
   constructor(tank: Tank) {
@@ -12,7 +11,7 @@ export class TankTurret implements Orientated {
     this.orientationTarget = this.orientation;
     this.orientationVelocity = 2;
     this.radar = new TankRadar(tank);
-    this.loaded = 0
+    this.loaded = 0;
   }
 
   public orientation: number;
@@ -27,47 +26,55 @@ export class TankTurret implements Orientated {
     const target = normalizeAngle(d);
     this.orientationTarget = normalizeAngle(d);
     // todo only if this is an actual change
-    this.tank.arena.emitter.emit("event", {
+    this.tank.arena.emit("event", {
       type: "turretTurn",
-      time: this.tank.arena.clock.time,
+      time: this.tank.arena.getTime(),
       id: this.tank.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
-      turretOrientationVelocity: this.orientationVelocity
+      turretOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
-    if (this.orientationTarget === this.orientation)
-      return Promise.resolve();
+    this.tank.logger.trace("Turning turret to " + this.orientationTarget + "°");
+    if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target % 360,
-      () => !this.tank.arena.running || this.orientationTarget !== target % 360 || this.tank.health <= 0,
-      'Turret orientation change cancelled'
+      () =>
+        !this.tank.arena.isRunning() ||
+        this.orientationTarget !== target % 360 ||
+        this.tank.health <= 0,
+      "Turret orientation change cancelled"
     );
   }
 
-  getOrientation() { return normalizeAngle(this.orientation); }
+  getOrientation() {
+    return normalizeAngle(this.orientation);
+  }
 
-  isTurning() { return this.orientation !== this.orientationTarget; }
+  isTurning() {
+    return this.orientation !== this.orientationTarget;
+  }
 
   turn(d: number) {
     const target = normalizeAngle(this.orientation + d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.arena.emitter.emit("event", {
+    this.tank.arena.emit("event", {
       type: "turretTurn",
-      time: this.tank.arena.clock.time,
+      time: this.tank.arena.getTime(),
       id: this.tank.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
-      turretOrientationVelocity: this.orientationVelocity
+      turretOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
-    if (this.orientationTarget === this.orientation)
-      return Promise.resolve();
+    this.tank.logger.trace("Turning turret to " + this.orientationTarget + "°");
+    if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target,
-      () => !this.tank.arena.running || this.orientationTarget !== target || this.tank.health <= 0,
-      'Turret turn cancelled'
+      () =>
+        !this.tank.arena.isRunning() ||
+        this.orientationTarget !== target ||
+        this.tank.health <= 0,
+      "Turret turn cancelled"
     );
   }
 
@@ -78,18 +85,23 @@ export class TankTurret implements Orientated {
       () => {
         // Reject if the value decreases, or bot dies
         peakValue = Math.max(peakValue, this.loaded);
-        return !this.tank.arena.running || this.tank.health <= 0 || this.loaded < peakValue;
+        return (
+          !this.tank.arena.isRunning() ||
+          this.tank.health <= 0 ||
+          this.loaded < peakValue
+        );
       },
-      'Turret already fired'
+      "Turret already fired"
     );
   }
 
-  isReady() { return this.loaded >= 100; }
+  isReady() {
+    return this.loaded >= 100;
+  }
 
   fire() {
-    if (this.loaded < 100)
-      return Promise.reject('Turret not ready');
-    this.tank.logger.trace('Turret firing');
+    if (this.loaded < 100) return Promise.reject("Turret not ready");
+    this.tank.logger.trace("Turret firing");
 
     this.tank.stats.shotsFired += 1;
 
@@ -106,17 +118,17 @@ export class TankTurret implements Orientated {
     this.tank.bullets.push(bullet);
     this.loaded = 0;
 
-    this.tank.arena.emitter.emit("event", {
+    this.tank.arena.emit("event", {
       type: "bulletFired",
-      time: this.tank.arena.clock.time,
+      time: this.tank.arena.getTime(),
       id: bullet.id,
       tankId: this.tank.id,
       x: bullet.origin.x,
       y: bullet.origin.y,
       speed: bullet.speed,
-      orientation: bullet.orientation
+      orientation: bullet.orientation,
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       bullet.callback = resolve;
     });
   }

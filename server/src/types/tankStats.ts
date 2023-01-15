@@ -1,4 +1,3 @@
-
 export class TankStats {
   distanceTraveled = 0;
   scansCompleted = 0;

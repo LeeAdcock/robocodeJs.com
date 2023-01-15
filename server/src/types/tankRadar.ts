@@ -1,16 +1,14 @@
-import { Event } from './event';
-import { Orientated } from './orientated';
-import Tank, { normalizeAngle, waitUntil } from './tank';
-
+import { Event } from "./event";
+import { Orientated } from "./orientated";
+import Tank, { normalizeAngle, waitUntil } from "./tank";
 
 export class TankRadar implements Orientated {
-
   constructor(tank: Tank) {
     this.tank = tank;
     this.orientation = Math.random() * 360;
     this.orientationTarget = this.orientation;
     this.orientationVelocity = 2;
-    this.charged = 0
+    this.charged = 0;
   }
 
   public orientation: number;
@@ -24,47 +22,53 @@ export class TankRadar implements Orientated {
     const target = normalizeAngle(d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.arena.emitter.emit("event", {
+    this.tank.arena.emit("event", {
       type: "radarTurn",
-      time: this.tank.arena.clock.time,
+      time: this.tank.arena.getTime(),
       id: this.tank.id,
       radarOrientationTarget: this.orientationTarget,
       radarOrientation: this.orientation,
-      radarOrientationVelocity: this.orientationVelocity
+      radarOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning radar to ' + this.orientationTarget + '°');
-    if (this.orientationTarget === this.orientation)
-      return Promise.resolve();
+    this.tank.logger.trace("Turning radar to " + this.orientationTarget + "°");
+    if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target % 360,
-      () => !this.tank.arena.running || this.orientationTarget !== target % 360,
-      'Radar orientation change cancelled'
+      () =>
+        !this.tank.arena.isRunning() || this.orientationTarget !== target % 360,
+      "Radar orientation change cancelled"
     );
   }
 
-  getOrientation() { return normalizeAngle(this.orientation); }
+  getOrientation() {
+    return normalizeAngle(this.orientation);
+  }
 
-  isTurning() { return this.orientation !== this.orientationTarget; }
+  isTurning() {
+    return this.orientation !== this.orientationTarget;
+  }
 
   turn(d: number) {
     const target = normalizeAngle(this.orientation + d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.arena.emitter.emit("event", {
+    this.tank.arena.emit("event", {
       type: "radarTurn",
-      time: this.tank.arena.clock.time,
+      time: this.tank.arena.getTime(),
       id: this.tank.id,
       radarOrientationTarget: this.orientationTarget,
       radarOrientation: this.orientation,
-      radarOrientationVelocity: this.orientationVelocity
+      radarOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning radar to ' + this.orientationTarget + '°');
-    if (this.orientationTarget === this.orientation)
-      return Promise.resolve();
+    this.tank.logger.trace("Turning radar to " + this.orientationTarget + "°");
+    if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target,
-      () => !this.tank.arena.running || this.orientationTarget !== target || this.tank.health <= 0,
-      'Radar turn chancelled'
+      () =>
+        !this.tank.arena.isRunning() ||
+        this.orientationTarget !== target ||
+        this.tank.health <= 0,
+      "Radar turn chancelled"
     );
   }
 
@@ -75,44 +79,55 @@ export class TankRadar implements Orientated {
       () => {
         // Reject if the value decreases, or bot dies
         peakValue = Math.max(peakValue, this.charged);
-        return !this.tank.arena.running || this.tank.health <= 0 || this.charged < peakValue;
+        return (
+          !this.tank.arena.isRunning() ||
+          this.tank.health <= 0 ||
+          this.charged < peakValue
+        );
       },
-      'Radar already scanned'
+      "Radar already scanned"
     );
   }
 
-  isReady() { return this.charged >= 100; }
+  isReady() {
+    return this.charged >= 100;
+  }
 
   scan() {
-    if (this.charged < 100)
-      return Promise.reject('Radar not ready');
-    this.tank.logger.trace('Scanning');
+    if (this.charged < 100) return Promise.reject("Radar not ready");
+    this.tank.logger.trace("Scanning");
     this.charged = 0;
-    this.tank.arena.emitter.emit("event", {
+    this.tank.arena.emit("event", {
       type: "radarScan",
-      time: this.tank.arena.clock.time,
+      time: this.tank.arena.getTime(),
       id: this.tank.id,
     });
 
     this.tank.stats.scansCompleted += 1;
 
     const found: any[] = [];
-    this.tank.arena.processes.forEach(otherProcess => {
-      otherProcess.tanks.forEach(otherTank => {
-        if (otherTank.health > 0 &&
-          (otherTank.id !== this.tank.id)) {
+    this.tank.arena.getProcesses().forEach((otherProcess) => {
+      otherProcess.tanks.forEach((otherTank) => {
+        if (otherTank.health > 0 && otherTank.id !== this.tank.id) {
           const distance = Math.sqrt(
-            Math.pow(otherTank.x - this.tank.x, 2) + Math.pow(otherTank.y - this.tank.y, 2)
+            Math.pow(otherTank.x - this.tank.x, 2) +
+              Math.pow(otherTank.y - this.tank.y, 2)
           );
           const angle: number = normalizeAngle(
-            Math.atan2(otherTank.y - this.tank.y, otherTank.x - this.tank.x) * (180 / Math.PI) - 90
+            Math.atan2(otherTank.y - this.tank.y, otherTank.x - this.tank.x) *
+              (180 / Math.PI) -
+              90
           );
           const radarAngle: number = normalizeAngle(
-            this.tank.getOrientation() + this.tank.turret.getOrientation() + this.getOrientation()
+            this.tank.getOrientation() +
+              this.tank.turret.getOrientation() +
+              this.getOrientation()
           );
-          if (distance < 300 &&
+          if (
+            distance < 300 &&
             Math.abs(normalizeAngle(angle - radarAngle + 180) - 180) <
-            (500 - distance) * (0.5 / 10)) {
+              (500 - distance) * (0.5 / 10)
+          ) {
             if (otherTank.handlers[Event.DETECTED]) {
               otherTank.handlers[Event.DETECTED]();
             }
@@ -123,7 +138,8 @@ export class TankRadar implements Orientated {
               orientation: otherTank.getOrientation(),
               distance,
               angle,
-              friendly: otherProcess.app.id === this.tank.process.app.id,
+              friendly:
+                otherProcess.app.getId() === this.tank.process.app.getId(),
             });
           }
         }
@@ -138,5 +154,4 @@ export class TankRadar implements Orientated {
 
     return Promise.resolve(found);
   }
-
 }
