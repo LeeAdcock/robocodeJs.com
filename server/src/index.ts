@@ -11,7 +11,7 @@ import Simulation from './util/simulation'
 import Arena from './types/arena'
 import TankApp from './types/app'
 import Tank from './types/tank'
-import Compiler from './util/compiler'
+import Process from './types/process'
 
 // TODO externalize these
 const users:User[]= []
@@ -20,12 +20,11 @@ const app = express();
 app.use(bodyParser.json({}));
 app.use(bodyParser.raw({ type: "application/octet-stream" }));
 app.use(cookieParser())
-app.use(express.static('public'))
-
+app.use('/', express.static('./dist/public'))
 
 // auth
 app.use((req, res, next) => {
-  if(req.path==="/health")
+  if(!req.path.startsWith("/api"))
     return next()
 
   const googleClientId = '344303216827-jtutvdqjp24q0or2fpqf5mihja138sem.apps.googleusercontent.com';
@@ -203,7 +202,7 @@ app.post("/api/user/:userId/app/:appId/compile", (req, res) => {
   }
 
   user.arena.processes.filter(process => process.app.id === app.id).forEach(process => process.tanks.forEach(tank => {
-    Compiler.compile(user.arena, process, tank)
+    tank.execute(process)
   }))
 
   res.status(200);
@@ -350,10 +349,7 @@ app.put("/api/user/:userId/arena/app/:appId", (req, res) => {
     name: app.name
   })
 
-  const process = {
-    app,
-    tanks:[] as Tank[]
-  }
+  const process = new Process(app)
   user.arena.processes.push(process)
 
   const tankCount = 5 // todo pull from arena
@@ -364,7 +360,7 @@ app.put("/api/user/:userId/arena/app/:appId", (req, res) => {
 
     process.tanks.push(tank)
 
-    Compiler.compile(user.arena, process, tank)
+    tank.execute(process)
 
     // Emit new tank event
     user.arena.emitter.emit("event", {
@@ -415,7 +411,7 @@ app.post("/api/user/:userId/arena/restart", (req, res) => {
       name: process.app.name
     })
 
-    process.tanks = []
+    process.reset()
 
     const tankCount = req.body.tankCount || 5 // todo validate, or pull from arena
 
@@ -424,8 +420,6 @@ app.post("/api/user/:userId/arena/restart", (req, res) => {
       const tank = new Tank(user.arena, process)
 
       process.tanks.push(tank)
-
-      Compiler.compile(user.arena, process, tank)
 
       // Emit new tank event
       user.arena.emitter.emit("event", {
@@ -444,7 +438,7 @@ app.post("/api/user/:userId/arena/restart", (req, res) => {
         y: tank.y
       })
 
-      Compiler.compile(user.arena, process, tank)
+      tank.execute(process)
     }
   })
   res.status(200);

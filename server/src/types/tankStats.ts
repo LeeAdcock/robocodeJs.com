@@ -1,13 +1,13 @@
 
 export class TankStats {
-  distanceTraveled: number = 0;
-  scansCompleted: number = 0;
-  scansDetected: number = 0;
-  shotsFired: number = 0;
-  shotsHit: number = 0;
-  messagesSent: number = 0;
-  messagesReceived: number = 0;
-  timesCollided: number = 0;
-  timesHit: number = 0;
-  timesDetected: number = 0;
+  distanceTraveled = 0;
+  scansCompleted = 0;
+  scansDetected = 0;
+  shotsFired = 0;
+  shotsHit = 0;
+  messagesSent = 0;
+  messagesReceived = 0;
+  timesCollided = 0;
+  timesHit = 0;
+  timesDetected = 0;
 }

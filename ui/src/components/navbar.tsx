@@ -76,7 +76,7 @@ export default function NavBar(props: NavBarProps) {
                             textDecoration: 'none!important',
                         }}
                     >
-                        battletank.io
+                        robocode.io
                     </span>
                 </Navbar.Brand>
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -144,12 +144,12 @@ export default function NavBar(props: NavBarProps) {
                                             </Link>
                                         </NavDropdown.Item>
                                     ))}
-                                    <NavDropdown.Divider />
+                                    { props.apps && props.apps.length && <NavDropdown.Divider /> }
                                     <NavDropdown.Item
                                         disabled={props.apps?.length >= 9}
                                         onClick={() => props.doCreateApp()}
                                     >
-                                        Create new tank application
+                                        Create new application
                                     </NavDropdown.Item>
                                     <NavDropdown.Item
                                         onClick={() => {
@@ -159,7 +159,7 @@ export default function NavBar(props: NavBarProps) {
                                             )
                                         }}
                                     >
-                                        View sample Bots applications
+                                        View sample applications
                                     </NavDropdown.Item>
                                 </NavDropdown>
                                 <Navbar.Text>|</Navbar.Text>

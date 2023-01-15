@@ -1,16 +1,16 @@
 {
   "name": "@battletank/server",
-  "version": "1.0.0",
+  "version": "1.2.7",
   "description": "",
   "main": "./dist/src/index.js",
   "scripts": {
-    "postinstall": "npm link @battletank/lib",
     "build": "tsc",
     "dev": "fuser -k 8080/tcp & nodemon --watch src -e ts,ejs --exec npm run dev:start",
     "dev:start": "npm-run-all build start",
-    "start": "node .",
+    "lint": "npx eslint src --fix",
+    "start": "node ./dist/src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "package": "npm shrinkwrap && zip -r artifact.zip ./ -x '*.git' -x '*artifact.zip*' -x '*node_modules*'"
+    "package": "npm version patch && npm shrinkwrap && zip -r artifact-${npm_package_version}.zip ./ -x '*.git' -x '*artifact*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
   "author": "",
   "license": "ISC",
@@ -27,8 +27,15 @@
   "devDependencies": {
     "@types/express": "^4.17.14",
     "@types/node": "^18.11.10",
+    "@typescript-eslint/eslint-plugin": "^5.48.1",
+    "@typescript-eslint/parser": "^5.48.1",
+    "eslint": "^8.31.0",
     "nodemon": "^2.0.20",
     "npm-run-all": "^4.1.5",
     "typescript": "^4.9.3"
+  },
+  "engines": {
+    "npm": ">=8.19.0 <9.0.0",
+    "node": ">=16.18.0 <17.0.0"
   }
 }

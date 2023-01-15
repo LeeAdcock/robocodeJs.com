@@ -8,6 +8,9 @@ import { Event } from './event'
 import { Orientated } from './orientated'
 import { TankStats } from './tankStats'
 import { TankTurret } from './tankTurret'
+import ivm from 'isolated-vm';
+
+import compiler from '../util/compiler'
 
 // Convenience function that ensures an angle is between 0 and 360
 export const normalizeAngle = (x: number): number => {
@@ -19,12 +22,12 @@ export const normalizeAngle = (x: number): number => {
 // Convenience method to create a promise that resolves/rejects
 // when specific conditions are met.
 export const waitUntil = (
-  successCondition: Function,
-  failureCondition: Function | null = null,
-  msg: String | null = null,
+  successCondition: () => boolean,
+  failureCondition: (() => boolean) | null = null,
+  msg: string | null = null,
 ) => {
   return new Promise<void>(function (resolve, reject) {
-    ;(function waitForFoo() {
+    (function waitForFoo() {
       if (successCondition()) return resolve(undefined)
       if (failureCondition && failureCondition()) {
         try {
@@ -81,28 +84,32 @@ export default class Tank implements Point, Orientated {
     this.orientationTarget = this.orientation
     this.turret = new TankTurret(this)
 
+    this.context = process.sandbox.createContextSync();
+    compiler.init(arena, process, this)
+    compiler.execute(process, this)
   }
 
+  public context: ivm.Context
   public turret: TankTurret
 
-  public orientation: number = 0
-  public orientationTarget: number = 0
-  public orientationVelocity: number = 10
+  public orientation = 0
+  public orientationTarget = 0
+  public orientationVelocity = 10
 
   public x: number
   public y: number
 
   public id: string = uuidv4()
-  public speed: number = 0
-  public speedTarget: number = 0
-  public speedAcceleration: number = 2
-  public speedMax: number = 5
-  public needsStarting: boolean = true
+  public speed = 0
+  public speedTarget = 0
+  public speedAcceleration = 2
+  public speedMax = 5
+  public needsStarting = true
   public handlers: any = {}
   public bullets: Bullet[] = []
-  public health: number = 100
-  public stats: any = new TankStats()
-  public timers: any = new TimersContainer()
+  public health = 100
+  public stats: TankStats = new TankStats()
+  public timers: TimersContainer = new TimersContainer()
   public logger: any
   public process: Process
   public arena: Arena
@@ -162,6 +169,10 @@ export default class Tank implements Point, Orientated {
     getId() { return this.id }
 
     getHealth() { this.health / 100 }
+
+    execute(process) {
+      compiler.execute(process, this)
+    }
 
     setOrientation(d:number) {
       const target = normalizeAngle(d)

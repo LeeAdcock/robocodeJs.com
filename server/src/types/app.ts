@@ -145,6 +145,6 @@ export default class App {
 
   name: string | null = null
 
-  source: string = ''
+  source = ''
 
 }

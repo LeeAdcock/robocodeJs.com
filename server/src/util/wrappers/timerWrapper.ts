@@ -10,20 +10,25 @@ import Tank from '../../types/tank'
 
 // The current time increment, based on what was provided during the last
 // clock tick. Used for scheduling newly created timers.
-let lastTime: number = 0
+const lastTime = 0
 
 class Timer {
   func: Function | null = null
   logger: any
-  interval: number = 0
+  interval = 0
 
-  started: number = 0
+  started = 0
   lastFired: number | null = 0
 }
 
 export class TimersContainer {
   intervalMap: Map<number, Timer> = new Map<number, Timer>()
   timerMap: Map<number, Timer> = new Map<number, Timer>()
+
+  reset = () => {
+    this.intervalMap = new Map<number, Timer>()
+    this.timerMap = new Map<number, Timer>()
+  }
 }
 
 export const timerTick = (arena:Arena) => {

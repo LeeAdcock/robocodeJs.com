@@ -7,7 +7,7 @@ export interface Auth {
 }
 
 export default class User {
-  id: string = ""
+  id = ""
   apps: TankApp[] = []
   arena: Arena = new Arena()
   name: string | undefined;

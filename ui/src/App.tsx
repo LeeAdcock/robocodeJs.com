@@ -15,7 +15,6 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
-import React from 'react'
 import PointInTime from './types/pointInTime'
 import Simulate from './util/simulate'
 import ArenaLogPage from './page/arena/arenaLogsPage'
@@ -144,8 +143,9 @@ function App() {
             eventSource = undefined
         }
         if (user) {
+            // todo externalize the server
             eventSource = new EventSource(
-                `https://leeadcock-stunning-space-umbrella-jq66qrwgw52pv99-3000.preview.app.github.dev/api/user/${user.id}/arena/events`
+                `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
             )
 
             eventSource.onmessage = (message) => {
