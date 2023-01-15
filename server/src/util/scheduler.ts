@@ -1,5 +1,5 @@
-import Arena from "../../types/arena";
-import Tank from "../../types/tank";
+import Arena from "../types/arena";
+import Tank from "../types/tank";
 
 /*
   This creates "monkey-patched" wrappers for the timer related

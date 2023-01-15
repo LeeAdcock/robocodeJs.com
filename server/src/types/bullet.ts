@@ -11,5 +11,5 @@ export default class Bullet implements Point {
 
   exploded = false;
 
-  callback: any;
+  callback: ((...arg: any[]) => void) | null = null;
 }

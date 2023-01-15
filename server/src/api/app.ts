@@ -105,9 +105,12 @@ app.post("/api/user/:userId/app/:appId/compile", (req, res) => {
     return;
   }
 
-  arenaService.getForUser(user.getId()).forEach((arena) => {
-    arena.execute(app.getId());
-  });
+  arenaService
+    .getForUser(user.getId())
+    .filter((arena) => arena.isRunning())
+    .forEach((arena) => {
+      arena.execute(app.getId());
+    });
 
   res.status(200);
   res.send({

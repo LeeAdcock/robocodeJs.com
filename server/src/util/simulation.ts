@@ -1,5 +1,5 @@
 import { Event } from "../types/event";
-import { timerTick } from "./wrappers/timerWrapper";
+import { timerTick } from "./scheduler";
 import Arena from "../types/arena";
 
 /*

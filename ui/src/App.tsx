@@ -282,6 +282,15 @@ function App() {
                             tanks: [],
                         }
                         apps.push(newApp)
+                    } else if (data.type === 'arenaRemoveTank') {
+                        apps.filter((app) => app.id === data.appId).forEach(app => {
+                            const removedTank = app.tanks.find(
+                                (tank) => tank.id === data.id
+                            )
+                            if (removedTank) {
+                                app.tanks = app.tanks.slice(app.tanks.indexOf(removedTank), 1)
+                            }
+                        })
                     } else if (data.type === 'arenaPlaceTank') {
                         apps.filter((app) => app.id === data.appId).forEach(
                             (app) => {

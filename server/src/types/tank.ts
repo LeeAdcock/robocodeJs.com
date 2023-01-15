@@ -2,7 +2,7 @@ import Bullet from "./bullet";
 import Point from "./point";
 import Arena from "./arena";
 import Process from "./process";
-import { TimersContainer } from "../util/wrappers/timerWrapper";
+import { TimersContainer } from "../util/scheduler";
 import { v4 as uuidv4 } from "uuid";
 import { Event } from "./event";
 import { Orientated } from "./orientated";
@@ -42,6 +42,33 @@ export const waitUntil = (
 };
 
 export default class Tank implements Point, Orientated {
+  private context: ivm.Context | null = null;
+  public turret: TankTurret;
+
+  public orientation = 0;
+  public orientationTarget = 0;
+  public orientationVelocity = 10;
+
+  public x: number;
+  public y: number;
+
+  public id: string = uuidv4();
+  public speed = 0;
+  public speedTarget = 0;
+  public speedAcceleration = 2;
+  public speedMax = 5;
+  public handlers: any = {};
+  public bullets: Bullet[] = [];
+  public health = 100;
+  public stats: TankStats = new TankStats();
+  public timers: TimersContainer = new TimersContainer();
+  public logger: any;
+  public process: Process;
+  public arena: Arena;
+
+  public needsStarting = true;
+  public appCrashed = false;
+
   constructor(arena: Arena, process: Process) {
     this.arena = arena;
     this.process = process;
@@ -85,37 +112,16 @@ export default class Tank implements Point, Orientated {
     this.orientationTarget = this.orientation;
     this.turret = new TankTurret(this);
 
-    this.context = process.sandbox.createContextSync();
     compiler.init(arena, process, this);
     compiler.execute(process, this);
   }
 
-  public context: ivm.Context;
-  public turret: TankTurret;
-
-  public orientation = 0;
-  public orientationTarget = 0;
-  public orientationVelocity = 10;
-
-  public x: number;
-  public y: number;
-
-  public id: string = uuidv4();
-  public speed = 0;
-  public speedTarget = 0;
-  public speedAcceleration = 2;
-  public speedMax = 5;
-  public handlers: any = {};
-  public bullets: Bullet[] = [];
-  public health = 100;
-  public stats: TankStats = new TankStats();
-  public timers: TimersContainer = new TimersContainer();
-  public logger: any;
-  public process: Process;
-  public arena: Arena;
-
-  public needsStarting = true;
-  public appCrashed = false;
+  getContext = (): ivm.Context => {
+    if (!this.context) {
+      this.context = this.process.getSandbox().createContextSync();
+    }
+    return this.context;
+  };
 
   // Enables the registration of event handlers
   on(event: Event, handler) {

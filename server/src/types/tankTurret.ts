@@ -5,6 +5,13 @@ import Tank, { normalizeAngle, waitUntil } from "./tank";
 import { TankRadar } from "./tankRadar";
 
 export class TankTurret implements Orientated {
+  public orientation: number;
+  public orientationTarget: number;
+  public orientationVelocity: number;
+  public radar: TankRadar;
+  public loaded: number;
+  private tank: Tank;
+
   constructor(tank: Tank) {
     this.tank = tank;
     this.orientation = Math.random() * 360;
@@ -13,14 +20,6 @@ export class TankTurret implements Orientated {
     this.radar = new TankRadar(tank);
     this.loaded = 0;
   }
-
-  public orientation: number;
-  public orientationTarget: number;
-  public orientationVelocity: number;
-
-  public radar: TankRadar;
-  public loaded: number;
-  private tank: Tank;
 
   setOrientation(d: number) {
     const target = normalizeAngle(d);

@@ -6,17 +6,11 @@ import User, { UserId } from "./user";
 export type AppId = string & {};
 
 export default class App {
-  setName(name: string) {
-    this.name = name;
-    const arenas = arenaService.getForApp(this.getId());
-    arenas.forEach((arena) =>
-      arena.emit("event", {
-        type: "appRenamed",
-        appId: this.getId(),
-        name: name,
-      })
-    );
-  }
+  private id: AppId;
+  private name: string;
+  private userId: UserId;
+  private source = "";
+
   constructor(user: User) {
     this.userId = user.getId();
     this.id = uuidv4();
@@ -161,16 +155,24 @@ export default class App {
       nouns[Math.floor(Math.random() * (nouns.length - 1))];
   }
 
-  private id: AppId;
-  private name: string;
-  private userId: UserId;
-  private source = "";
+  getId = () => this.id;
+  getUserId = () => this.userId;
 
   getSource = () => this.source;
-  getUserId = () => this.userId;
-  getId = () => this.id;
-  getName = () => this.name;
   setSource = (source: string) => {
     this.source = source;
+  };
+
+  getName = () => this.name;
+  setName = (name: string) => {
+    this.name = name;
+    const arenas = arenaService.getForApp(this.getId());
+    arenas.forEach((arena) =>
+      arena.emit("event", {
+        type: "appRenamed",
+        appId: this.getId(),
+        name: name,
+      })
+    );
   };
 }

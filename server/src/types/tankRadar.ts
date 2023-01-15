@@ -3,6 +3,13 @@ import { Orientated } from "./orientated";
 import Tank, { normalizeAngle, waitUntil } from "./tank";
 
 export class TankRadar implements Orientated {
+  public orientation: number;
+  public orientationTarget: number;
+  public orientationVelocity: number;
+
+  public charged: number;
+  private tank: Tank;
+
   constructor(tank: Tank) {
     this.tank = tank;
     this.orientation = Math.random() * 360;
@@ -10,13 +17,6 @@ export class TankRadar implements Orientated {
     this.orientationVelocity = 2;
     this.charged = 0;
   }
-
-  public orientation: number;
-  public orientationTarget: number;
-  public orientationVelocity: number;
-
-  public charged: number;
-  private tank: Tank;
 
   setOrientation(d: number) {
     const target = normalizeAngle(d);

@@ -18,5 +18,9 @@
         "@typescript-eslint"
     ],
     "rules": {
+        "@typescript-eslint/member-ordering": [
+          "error",
+          { "default": ["signature", "field", "constructor", "method"] }
+        ]
+      }
     }
-}
