@@ -59,7 +59,7 @@ export const timerTick = (arena: Arena) => {
 };
 
 // Create timer and interval wrapper functions for the provided tank
-export const createTimerWrappers = (tank: Tank) => {
+export const scheduleFactory = (tank: Tank) => {
   return {
     setInterval: (func: () => void, interval: number, arena: Arena) => {
       const timerId = Math.floor(Math.random() * 100000);

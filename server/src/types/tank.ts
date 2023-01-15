@@ -2,7 +2,7 @@ import Bullet from "./bullet";
 import Point from "./point";
 import Arena from "./arena";
 import Process from "./process";
-import { TimersContainer } from "../util/scheduler";
+import { TimersContainer } from "../util/scheduleFactory";
 import { v4 as uuidv4 } from "uuid";
 import { Event } from "./event";
 import { Orientated } from "./orientated";

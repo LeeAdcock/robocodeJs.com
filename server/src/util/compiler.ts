@@ -2,7 +2,7 @@ import Arena from "../types/arena";
 import Process from "../types/process";
 import Tank from "../types/tank";
 import { Event } from "../types/event";
-import { createTimerWrappers } from "./scheduler";
+import { scheduleFactory } from "./scheduleFactory";
 import ivm from "isolated-vm";
 import { createLogger } from "browser-bunyan";
 import { v4 as uuidv4 } from "uuid";
@@ -505,7 +505,7 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
     exposeTankTurret(tank, process.getSandbox());
 
     // Expose scheduler / timers
-    const scheduler = createTimerWrappers(tank);
+    const scheduler = scheduleFactory(tank);
     tank
       .getContext()
       .global.setSync("_setInterval", (func: () => void, interval: number) => {
