@@ -13,8 +13,8 @@ export default (
     arenaHeight: number
 ) => {
     // Then handle movement and interactions
-    apps.forEach((app, appIndex) => {
-        app.tanks.forEach((tank, tankIndex) => {
+    apps.forEach((app) => {
+        app.tanks.forEach((tank) => {
             if (tank.health > 0) {
                 // Update the location
                 tank.x =
@@ -26,6 +26,9 @@ export default (
                     tank.speed *
                         Math.cos(-tank.bodyOrientation * (Math.PI / 180))
 
+                tank.x = Math.max(16, Math.min(arenaWidth - 16, tank.x))
+                tank.y = Math.max(16, Math.min(arenaHeight - 16, tank.y))
+
                 // Manage acceleration / deceleration
                 if (tank.speed > tank.speedTarget)
                     tank.speed -= tank.speedAcceleration
@@ -35,7 +38,7 @@ export default (
                     Math.abs(tank.speed - tank.speedTarget) <
                     tank.speedAcceleration
                 )
-                    tank.speed = tank.speedTarget
+                tank.speed = tank.speedTarget
                 tank.speed = Math.max(-tank.speedMax, Math.min(tank.speedMax, tank.speed))
 
                 // Convenience method for manging rotating towards a target orientation
@@ -53,6 +56,7 @@ export default (
                 }
 
                 // Record the tank's path
+                // TODO is this working?
                 if (
                     normalizeAngle(
                         tank.bodyOrientation - tank.bodyOrientationTarget
@@ -100,7 +104,7 @@ export default (
             }
 
             // Move our bullets
-            tank.bullets.forEach((bullet, bulletIndex, bullets) => {
+            tank.bullets.forEach((bullet) => {
                 if (!bullet.explodedAt) {
                     bullet.x =
                         bullet.x +

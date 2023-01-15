@@ -8,13 +8,13 @@ For each app you create, you'll add bots to the arena that are running your code
 
 Here are some simple bot applications that demonstrate concepts you may wish to integrate what you build.
 
-- [Lighthouse](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/lighthouse.js) A stationary bot that turns as it scans for others, then adjusting its turret for maximum accuracy before firing.
-- [Magnetic](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/magnetic.js) Demonstrating advanced multi-bot communication, these bots us secure communication to share their location and cluster together.
-- [Pathfinder](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/pathfinder.js) With a predefined set of waypoints, this bot navigates continuously around the arena.
-- [Spirograph](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/spirograph.js) This bot makes slow looping turns through the arena, scanning straight ahead and firing if it detects something.
-- [Stately](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/stately.js) Using a simple state machin, this bot shifts between different modes of operation.
-- [Chronometer](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/chronometer.js) This bot demonstrates the use of one-shot timers and scheduled interval timers.
-- [ReturnFire](https://github.com/LeeAdcock/battletank.io/blob/master/public/samples/returnfire.js) Although stationary, this bot quickly turns to face any enemy bots who collide or hit it, then returns fire.
+- [Lighthouse](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/lighthouse.js) A stationary bot that turns as it scans for others, then adjusting its turret for maximum accuracy before firing.
+- [Magnetic](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/magnetic.js) Demonstrating advanced multi-bot communication, these bots us secure communication to share their location and cluster together.
+- [Pathfinder](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/pathfinder.js) With a predefined set of waypoints, this bot navigates continuously around the arena.
+- [Spirograph](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/spirograph.js) This bot makes slow looping turns through the arena, scanning straight ahead and firing if it detects something.
+- [Stately](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/stately.js) Using a simple state machin, this bot shifts between different modes of operation.
+- [Chronometer](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/chronometer.js) This bot demonstrates the use of one-shot timers and scheduled interval timers.
+- [ReturnFire](https://raw.githubusercontent.com/LeeAdcock/battletank.io/main/ui/public/samples/returnfire.js) Although stationary, this bot quickly turns to face any enemy bots who collide or hit it, then returns fire.
 
 # Bot Development
 

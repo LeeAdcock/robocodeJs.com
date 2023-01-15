@@ -58,6 +58,10 @@ export default function AppPage(props) {
                 headers: { 'content-type': 'application/octet-stream' },
             })
             .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`))
+            .then((resp) => {
+                app.name = resp.data.name
+                setApp(app)
+            })
     }
 
     const doClean = () => {

@@ -38,7 +38,7 @@ export default function ArenaLogsPage(props: ArenaLogsPageProps) {
             eventSource = undefined
         }
         eventSource = new EventSource(
-            `https://leeadcock-stunning-space-umbrella-jq66qrwgw52pv99-3000.preview.app.github.dev/api/user/${userId}/arena/logs`
+            `${window.location.protocol}//${window.location.host}/api/user/${userId}/arena/logs`
         )
 
         eventSource.onmessage = (message) => {

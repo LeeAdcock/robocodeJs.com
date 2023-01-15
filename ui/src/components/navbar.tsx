@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom'
 import TankApp from '../types/tankApp'
 import User from '../types/user'
 import Arena from '../types/arena'
+import { useNavigate } from "react-router-dom";
 
 const titleCase = (str: string) =>
     str
@@ -38,7 +39,9 @@ const AppLink = function (props: AppLinkProps) {
                     src={'/sprites/tank_' + colors[appIndex] + '.png'}
                     style={{ height: '1em', marginRight: '5px' }}
                 />
-                {titleCase(props.app.name || 'Unknown')}
+                <span style={{color:"black"}}>
+                    {titleCase(props.app.name || 'Unknown')}
+                </span>
             </>
         )
     }
@@ -49,15 +52,18 @@ interface NavBarProps {
     user: User
     arena: Arena
     isPaused: boolean
-    doPause: Function
-    doResume: Function
-    doRestart: Function
-    doSave: Function
-    doCreateApp: Function
-    doLogin: Function
+    doPause: () => void
+    doResume: () => void
+    doRestart: () => void
+    doSave: () => void
+    doCreateApp: () => void
+    doLogin: () => void
 }
 
 export default function NavBar(props: NavBarProps) {
+
+    const navigate = useNavigate();
+
     return (
         <>
             <Navbar
@@ -102,9 +108,47 @@ export default function NavBar(props: NavBarProps) {
                         {props.user && (
                             <>
                                 <NavDropdown
+                                    title="Apps"
+                                    id="basic-nav-dropdown"
+                                >
+                                    {props.apps?.map((app) => (
+                                        <NavDropdown.Item key={app.id}
+                                            onClick={()=>navigate(`/user/${props.user.id}/app/${app.id}`)}
+                                        >
+                                            <AppLink
+                                                arena={props.arena}
+                                                app={app}
+                                            />
+                                        </NavDropdown.Item>
+                                    ))}
+                                    { props.apps && props.apps.length > 0 && <NavDropdown.Divider /> }
+                                    <NavDropdown.Item
+                                        disabled={props.apps?.length >= 9}
+                                        onClick={() => props.doCreateApp()}
+                                    >
+                                        Create new application
+                                    </NavDropdown.Item>
+                                    <NavDropdown.Item
+                                        onClick={() => {
+                                            window.open(
+                                                'https://github.com/LeeAdcock/battletank.io/tree/main/ui/public/samples',
+                                                '_new'
+                                            )
+                                        }}
+                                    >
+                                        View sample applications
+                                    </NavDropdown.Item>
+                                </NavDropdown>
+                                <Navbar.Text>|</Navbar.Text>
+                                <NavDropdown
                                     title="Arena"
                                     id="basic-nav-dropdown"
                                 >
+                                    <NavDropdown.Item
+                                        onClick={() => navigate(`/user/${props.user.id}/arena/logs`)}
+                                    >
+                                        View Logs
+                                    </NavDropdown.Item>
                                     <NavDropdown.Item
                                         onClick={() => props.doRestart()}
                                     >
@@ -125,44 +169,7 @@ export default function NavBar(props: NavBarProps) {
                                         </NavDropdown.Item>
                                     )}
                                 </NavDropdown>
-                                <Navbar.Text>|</Navbar.Text>
-                                <NavDropdown
-                                    title="Apps"
-                                    id="basic-nav-dropdown"
-                                >
-                                    {props.apps?.map((app, appIndex) => (
-                                        <NavDropdown.Item key={app.id}>
-                                            <Link
-                                                to={{
-                                                    pathname: `/user/${props.user.id}/app/${app.id}`,
-                                                }}
-                                            >
-                                                <AppLink
-                                                    arena={props.arena}
-                                                    app={app}
-                                                />
-                                            </Link>
-                                        </NavDropdown.Item>
-                                    ))}
-                                    { props.apps && props.apps.length && <NavDropdown.Divider /> }
-                                    <NavDropdown.Item
-                                        disabled={props.apps?.length >= 9}
-                                        onClick={() => props.doCreateApp()}
-                                    >
-                                        Create new application
-                                    </NavDropdown.Item>
-                                    <NavDropdown.Item
-                                        onClick={() => {
-                                            window.open(
-                                                'https://github.com/LeeAdcock/battletank.io/tree/master/docs/samples',
-                                                '_new'
-                                            )
-                                        }}
-                                    >
-                                        View sample applications
-                                    </NavDropdown.Item>
-                                </NavDropdown>
-                                <Navbar.Text>|</Navbar.Text>
+                                <Navbar.Text>|</Navbar.Text>                                
                             </>
                         )}
                         <Nav.Link
