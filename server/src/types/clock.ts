@@ -1,3 +1,3 @@
-export default class Clock {
-  time = 0;
+export default interface Clock {
+  time;
 }

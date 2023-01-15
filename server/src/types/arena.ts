@@ -16,7 +16,7 @@ export default class Arena {
   private userId: UserId;
   private height = 750;
   private width = 750;
-  private clock: Clock = new Clock();
+  private clock: Clock = { time: 0 };
   private emitter: EventEmitter = new EventEmitter();
   private processes: Process[] = [];
   private running = false;

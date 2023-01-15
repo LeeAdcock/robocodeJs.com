@@ -1,9 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-
-export interface Auth {
-  source: string;
-  id: string;
-}
+import { UserAuth } from "./userAuth";
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type UserId = string & {};
@@ -14,7 +10,7 @@ export default class User {
   private picture: string | undefined;
   private email: string | undefined;
 
-  private auths: Auth[] = [];
+  private auths: UserAuth[] = [];
 
   constructor(
     name: string | undefined,
@@ -39,7 +35,7 @@ export default class User {
     return this.email;
   }
 
-  addAuth(auth: Auth) {
+  addAuth(auth: UserAuth) {
     this.auths.push(auth);
   }
   getAuths() {

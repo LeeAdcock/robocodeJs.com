@@ -1,4 +1,5 @@
 import Bullet from "./bullet";
+import { v4 as uuidv4 } from "uuid";
 import { Event } from "./event";
 import { Orientated } from "./orientated";
 import Tank, { normalizeAngle, waitUntil } from "./tank";
@@ -108,12 +109,18 @@ export class TankTurret implements Orientated {
       this.tank.handlers[Event.FIRED]();
     }
 
-    const bullet = new Bullet();
-    bullet.x = this.tank.x;
-    bullet.y = this.tank.y;
-    bullet.origin.x = this.tank.x;
-    bullet.origin.y = this.tank.y;
-    bullet.orientation = this.tank.getOrientation() + this.orientation;
+    const bullet: Bullet = {
+      id: uuidv4(),
+      exploded: false,
+      x: this.tank.x,
+      y: this.tank.y,
+      origin: {
+        x: this.tank.x,
+        y: this.tank.y,
+      },
+      orientation: this.tank.getOrientation() + this.orientation,
+      speed: 15,
+    };
     this.tank.bullets.push(bullet);
     this.loaded = 0;
 

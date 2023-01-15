@@ -1,15 +1,17 @@
 import Point from "./point";
-import { v4 as uuidv4 } from "uuid";
 
-export default class Bullet implements Point {
-  id: string = uuidv4();
-  origin: Point = { x: 0, y: 0 };
-  x = 0;
-  y = 0;
-  speed = 15;
-  orientation = 0;
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type BulletId = string & {};
 
-  exploded = false;
+export default interface Bullet extends Point {
+  id: BulletId;
+  origin: Point;
+  x;
+  y;
+  speed;
+  orientation;
 
-  callback: ((...arg: any[]) => void) | null = null;
+  exploded: boolean;
+
+  callback?: (value: unknown) => void;
 }
