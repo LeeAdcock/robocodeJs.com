@@ -93,7 +93,7 @@ export default function AppPage(props) {
                     >
                         {app && props.arena && (
                             <>
-                                <img
+                                { props.arena.apps.includes(app.id) && <img
                                     src={
                                         '/sprites/tank_' +
                                         colors[
@@ -105,7 +105,7 @@ export default function AppPage(props) {
                                         height: '1em',
                                         marginRight: '5px',
                                     }}
-                                />
+                                /> }
                                 {titleCase(app?.name)}
                             </>
                         )}

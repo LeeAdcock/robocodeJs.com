@@ -98,7 +98,6 @@ function App() {
     const doReloadArena = () => {
         return new Promise((resolve) => {
             axios.get(`/api/user/${user.id}/arena`).then((res) => {
-                console.log('reload', res.data)
                 setTime(res.data.clock.time)
                 setArena(res.data)
                 setPaused(!res.data.running)

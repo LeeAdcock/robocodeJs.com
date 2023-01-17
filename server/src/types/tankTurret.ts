@@ -26,9 +26,9 @@ export class TankTurret implements Orientated {
     const target = normalizeAngle(d);
     this.orientationTarget = normalizeAngle(d);
     // todo only if this is an actual change
-    this.tank.arena.emit("event", {
+    this.tank.env.emit("event", {
       type: "turretTurn",
-      time: this.tank.arena.getTime(),
+      time: this.tank.env.getTime(),
       id: this.tank.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
@@ -39,7 +39,7 @@ export class TankTurret implements Orientated {
     return waitUntil(
       () => this.orientation === target % 360,
       () =>
-        !this.tank.arena.isRunning() ||
+        !this.tank.env.isRunning() ||
         this.orientationTarget !== target % 360 ||
         this.tank.health <= 0,
       "Turret orientation change cancelled"
@@ -58,9 +58,9 @@ export class TankTurret implements Orientated {
     const target = normalizeAngle(this.orientation + d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.arena.emit("event", {
+    this.tank.env.emit("event", {
       type: "turretTurn",
-      time: this.tank.arena.getTime(),
+      time: this.tank.env.getTime(),
       id: this.tank.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
@@ -71,7 +71,7 @@ export class TankTurret implements Orientated {
     return waitUntil(
       () => this.orientation === target,
       () =>
-        !this.tank.arena.isRunning() ||
+        !this.tank.env.isRunning() ||
         this.orientationTarget !== target ||
         this.tank.health <= 0,
       "Turret turn cancelled"
@@ -86,7 +86,7 @@ export class TankTurret implements Orientated {
         // Reject if the value decreases, or bot dies
         peakValue = Math.max(peakValue, this.loaded);
         return (
-          !this.tank.arena.isRunning() ||
+          !this.tank.env.isRunning() ||
           this.tank.health <= 0 ||
           this.loaded < peakValue
         );
@@ -124,9 +124,9 @@ export class TankTurret implements Orientated {
     this.tank.bullets.push(bullet);
     this.loaded = 0;
 
-    this.tank.arena.emit("event", {
+    this.tank.env.emit("event", {
       type: "bulletFired",
-      time: this.tank.arena.getTime(),
+      time: this.tank.env.getTime(),
       id: bullet.id,
       tankId: this.tank.id,
       x: bullet.origin.x,

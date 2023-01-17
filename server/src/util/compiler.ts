@@ -1,11 +1,11 @@
-import Arena from "../types/arena";
-import Process from "../types/process";
 import Tank from "../types/tank";
 import { Event } from "../types/event";
 import { scheduleFactory } from "./scheduleFactory";
 import ivm from "isolated-vm";
 import { createLogger } from "browser-bunyan";
 import { v4 as uuidv4 } from "uuid";
+import Environment, { Process } from "../types/environment";
+import appService from "../services/AppService";
 
 function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   // Expose getOrientation
@@ -480,18 +480,24 @@ const execute = (process: Process, tank: Tank) => {
   tank.handlers = {};
   tank.timers.reset();
   try {
-    process
-      .getSandbox()
-      .compileScriptSync(process.app.getSource())
-      .runSync(tank.getContext(), { timeout: 5000 });
+    appService.get(process.getAppId()).then(app => {
+      if(app) {
+        process
+          .getSandbox()
+          .compileScriptSync(app.getSource())
+          .runSync(tank.getContext(), { timeout: 5000 });
+      }
+    })
   } catch (e) {
     tank.logger.error(e);
     tank.appCrashed = true;
+    console.log(e)
+
   }
 };
 
 // Initialize a tank.getContext() within the isolated sandbox
-const init = (arena: Arena, process: Process, tank: Tank) => {
+const init = (env: Environment, process: Process, tank: Tank) => {
   try {
     tank.getContext().global.setSync("_ivm", ivm);
 
@@ -509,7 +515,7 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
     tank
       .getContext()
       .global.setSync("_setInterval", (func: () => void, interval: number) => {
-        scheduler.setInterval(func, interval, arena);
+        scheduler.setInterval(func, interval, env);
       });
     tank.getContext().global.setSync("_clearInterval", (id: number) => {
       scheduler.clearInterval(id);
@@ -527,7 +533,7 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
     tank
       .getContext()
       .global.setSync("_setTimeout", (func: () => void, interval: number) => {
-        scheduler.setTimeout(func, interval, arena);
+        scheduler.setTimeout(func, interval, env);
       });
     tank.getContext().global.setSync("_clearTimeout", (id: number) => {
       scheduler.clearTimeout(id);
@@ -548,7 +554,7 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
       .getContext()
       .global.setSync(
         "_clock_getTime",
-        () => new ivm.ExternalCopy(arena.getTime())
+        () => new ivm.ExternalCopy(env.getTime())
       );
     process
       .getSandbox()
@@ -571,13 +577,13 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
       .getContext()
       .global.setSync(
         "_arena_getWidth",
-        () => new ivm.ExternalCopy(arena.getWidth())
+        () => new ivm.ExternalCopy(env.getArena().getWidth())
       );
     tank
       .getContext()
       .global.setSync(
         "_arena_getHeight",
-        () => new ivm.ExternalCopy(arena.getHeight())
+        () => new ivm.ExternalCopy(env.getArena().getHeight())
       );
     process
       .getSandbox()
@@ -596,9 +602,9 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
         level: "TRACE",
         stream: {
           write: (entry) => {
-            arena.emit("log", {
+            env.emit("log", {
               ...entry,
-              time: arena.getTime(),
+              time: env.getTime(),
               id: uuidv4(),
             });
           },
@@ -606,26 +612,33 @@ const init = (arena: Arena, process: Process, tank: Tank) => {
       },
     ];
     const tankId =
-      (arena
+      (env
         .getProcesses()
-        .map((process) => process.app.getId())
-        .indexOf(process.app.getId()) +
+        .map((p) => p.getAppId())
+        .indexOf(process.getAppId()) +
         1) *
         10 +
-      ((arena
+      ((env
         .getProcesses()
-        .find((process) => process.app.getId() === process.app.getId())
+        .find((p) => p.getAppId() === process.getAppId())
         ?.tanks.map((tank) => tank.id)
         .indexOf(tank.id) || 0) +
         1);
 
     tank.logger = createLogger({
-      name: process.app.getName() + " <" + tankId + ">",
+      name: "<" + tankId + ">",
       streams,
     });
+    appService.get(process.getAppId()).then(app => {
+      if(app) {
+        tank.logger = createLogger({
+          name: app.getName() + " <" + tankId + ">",
+          streams,
+        });
+      }
+    })
 
     tank.getContext().global.setSync("_log", (msg: any, ...msgs: any[]) => {
-      console.log(msg, ...msgs);
       tank.logger.info(msg, ...msgs);
     });
     // TODO better log-level support

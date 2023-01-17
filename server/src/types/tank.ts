@@ -1,7 +1,5 @@
 import Bullet from "./bullet";
 import Point from "./point";
-import Arena from "./arena";
-import Process from "./process";
 import { TimersContainer } from "../util/scheduleFactory";
 import { v4 as uuidv4 } from "uuid";
 import { Event } from "./event";
@@ -11,6 +9,8 @@ import { TankTurret } from "./tankTurret";
 import ivm from "isolated-vm";
 
 import compiler from "../util/compiler";
+import Environment, { Process } from "./environment";
+import appService from "../services/AppService";
 
 // Convenience function that ensures an angle is between 0 and 360
 export const normalizeAngle = (x: number): number => {
@@ -33,7 +33,7 @@ export const waitUntil = (
         try {
           return reject(msg);
         } catch (e) {
-          console.log("3>", e);
+          // discard if we can't reject
         }
       }
       setTimeout(waitForFoo, 50);
@@ -64,22 +64,22 @@ export default class Tank implements Point, Orientated {
   public timers: TimersContainer = new TimersContainer();
   public logger: any;
   public process: Process;
-  public arena: Arena;
+  public env: Environment;
 
   public needsStarting = true;
   public appCrashed = false;
 
-  constructor(arena: Arena, process: Process) {
-    this.arena = arena;
+  constructor(env: Environment, process: Process) {
+    this.env = env;
     this.process = process;
 
     let overallClosestTank: number | null = null;
     do {
-      this.x = 16 + (arena.getWidth() - 32) * Math.random();
-      this.y = 16 + (arena.getHeight() - 32) * Math.random();
+      this.x = 16 + (env.getArena().getWidth() - 32) * Math.random();
+      this.y = 16 + (env.getArena().getHeight() - 32) * Math.random();
 
       // Keep iterating if we placed this tank too close to another
-      overallClosestTank = arena
+      overallClosestTank = env
         .getProcesses()
         .reduce(
           (closestDistanceForTankApp: number | null, curProcess: Process) => {
@@ -112,7 +112,7 @@ export default class Tank implements Point, Orientated {
     this.orientationTarget = this.orientation;
     this.turret = new TankTurret(this);
 
-    compiler.init(arena, process, this);
+    compiler.init(env, process, this);
     compiler.execute(process, this);
   }
 
@@ -172,10 +172,17 @@ export default class Tank implements Point, Orientated {
 
   setName(name) {
     // todo sanitize name
-    if (this.process.app.getName() !== name) {
-      this.process.app.setName(name);
-    }
-  }
+    appService.get(this.process.getAppId()).then(app => {
+      if (app && app.getName() !== name) {
+        app.setName(name);
+        this.env.emit("event", {
+          type: "appRenamed",
+          appId: app.getId(),
+          name: name,
+        });
+      }        
+    })
+}
 
   getId() {
     return this.id;
@@ -191,6 +198,7 @@ export default class Tank implements Point, Orientated {
     } catch (e) {
       this.logger.error(e);
       this.appCrashed = true;
+      console.log(e)
     }
   }
 
@@ -198,9 +206,9 @@ export default class Tank implements Point, Orientated {
     const target = normalizeAngle(d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.arena.emit("event", {
+    this.env.emit("event", {
       type: "tankTurn",
-      time: this.arena.getTime(),
+      time: this.env.getTime(),
       id: this.id,
       x: this.x,
       y: this.y,
@@ -213,7 +221,7 @@ export default class Tank implements Point, Orientated {
     return waitUntil(
       () => this.orientation === target,
       () =>
-        !this.arena.isRunning() ||
+        !this.env.isRunning() ||
         this.orientationTarget !== target ||
         this.health <= 0,
       "Orientation change cancelled"
@@ -232,9 +240,9 @@ export default class Tank implements Point, Orientated {
     const target = normalizeAngle(this.orientation + d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.arena.emit("event", {
+    this.env.emit("event", {
       type: "tankTurn",
-      time: this.arena.getTime(),
+      time: this.env.getTime(),
       id: this.id,
       x: this.x,
       y: this.y,
@@ -247,7 +255,7 @@ export default class Tank implements Point, Orientated {
     return waitUntil(
       () => this.orientation === target,
       () =>
-        !this.arena.isRunning() ||
+        !this.env.isRunning() ||
         this.orientationTarget !== target ||
         this.health <= 0,
       "Turn cancelled"
@@ -257,9 +265,9 @@ export default class Tank implements Point, Orientated {
   setSpeed(d: number) {
     this.speedTarget = Math.min(d, this.speedMax);
     // todo only if this is an actual change
-    this.arena.emit("event", {
+    this.env.emit("event", {
       type: "tankAccelerate",
-      time: this.arena.getTime(),
+      time: this.env.getTime(),
       id: this.id,
       x: this.x,
       y: this.y,
@@ -278,7 +286,7 @@ export default class Tank implements Point, Orientated {
     return waitUntil(
       () => this.speed === Math.min(d, this.speedMax),
       () =>
-        !this.arena.isRunning() ||
+        !this.env.isRunning() ||
         this.speedTarget !== Math.min(d, this.speedMax) ||
         this.health <= 0,
       "Speed change cancelled"
@@ -303,7 +311,7 @@ export default class Tank implements Point, Orientated {
     }
     this.logger.trace('Sending message "' + x + '"');
     this.stats.messagesSent += 1;
-    this.arena.getProcesses().forEach((otherProcess) => {
+    this.env.getProcesses().forEach((otherProcess) => {
       otherProcess.tanks
         .filter((otherTank) => otherTank.health > 0)
         .forEach((otherTank) => {

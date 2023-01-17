@@ -1,4 +1,4 @@
-import Arena from "../types/arena";
+import Environment from "../types/environment";
 import Tank from "../types/tank";
 
 /*
@@ -27,10 +27,10 @@ export class TimersContainer {
   };
 }
 
-export const timerTick = (arena: Arena) => {
-  const time = arena.getTime();
+export const timerTick = (env: Environment) => {
+  const time = env.getTime();
 
-  arena.getProcesses().forEach((process) =>
+  env.getProcesses().forEach((process) =>
     process.tanks
       .filter((tank) => tank.health > 0)
       .forEach((tank) => {
@@ -61,12 +61,12 @@ export const timerTick = (arena: Arena) => {
 // Create timer and interval wrapper functions for the provided tank
 export const scheduleFactory = (tank: Tank) => {
   return {
-    setInterval: (func: () => void, interval: number, arena: Arena) => {
+    setInterval: (func: () => void, interval: number, env: Environment) => {
       const timerId = Math.floor(Math.random() * 100000);
       tank.logger.trace("Created interval", timerId);
       tank.timers.intervalMap[timerId] = {
         func,
-        started: arena.getTime(),
+        started: env.getTime(),
         interval,
         logger: tank.logger,
       };
@@ -78,7 +78,7 @@ export const scheduleFactory = (tank: Tank) => {
       delete tank.timers.intervalMap[timerId];
     },
 
-    setTimeout: (func: () => void, interval: number, arena: Arena) => {
+    setTimeout: (func: () => void, interval: number, env: Environment) => {
       const timerId = Math.floor(Math.random() * 100000);
       tank.logger.trace("Created timer", timerId);
       const wrappedFunc = () => {
@@ -89,7 +89,7 @@ export const scheduleFactory = (tank: Tank) => {
       tank.timers.timerMap[timerId] = {
         func: wrappedFunc,
         interval,
-        started: arena.getTime(),
+        started: env.getTime(),
         logger: tank.logger,
       };
       return timerId;

@@ -1,6 +1,6 @@
 import { Event } from "../types/event";
 import { timerTick } from "./scheduleFactory";
-import Arena from "../types/arena";
+import Environment from "../types/environment";
 
 /*
   These functions calculate the changes and interaction between active
@@ -16,27 +16,27 @@ const normalizeAngle = (x: number): number => {
 
 export default {
   // Handles all object movement
-  run: (arena: Arena) => {
+  run: (env: Environment) => {
     // Process any tanks whose software crashed
-    arena.getProcesses().forEach((process) => {
+    env.getProcesses().forEach((process) => {
       process.tanks
         .filter((tank) => tank.health > 0 && tank.appCrashed)
         .forEach((tank) => {
           tank.health = 0;
-          arena.emit("event", {
+          env.emit("event", {
             type: "tankDamaged",
             id: tank.id,
-            time: arena.getTime(),
+            time: env.getTime(),
             health: tank.health,
           });
         });
     });
 
     // First execute all timers
-    timerTick(arena);
+    timerTick(env);
 
     // Then execute the tank's tick handlers
-    arena.getProcesses().forEach((process) => {
+    env.getProcesses().forEach((process) => {
       process.tanks
         .filter((tank) => tank.health > 0)
         .forEach((tank) => {
@@ -50,7 +50,7 @@ export default {
     });
 
     // Then handle movement and interactions
-    arena.getProcesses().forEach((process) => {
+    env.getProcesses().forEach((process) => {
       process.tanks.forEach((tank) => {
         if (tank.health > 0) {
           if (tank.needsStarting === true) {
@@ -67,7 +67,7 @@ export default {
           let collided = false;
 
           // Detect if we have collided with another tank
-          arena.getProcesses().forEach((otherProcess) =>
+          env.getProcesses().forEach((otherProcess) =>
             otherProcess.tanks.forEach((otherTank) => {
               if (otherTank.health > 0 && otherTank.id !== tank.id) {
                 const distance = Math.sqrt(
@@ -88,14 +88,14 @@ export default {
                     tank.handlers[Event.COLLIDED]({
                       angle,
                       friendly:
-                        otherProcess.app.getId() === process.app.getId(),
+                        otherProcess.getAppId() === process.getAppId(),
                     });
                   }
                   if (otherTank.handlers[Event.COLLIDED]) {
                     otherTank.handlers[Event.COLLIDED]({
                       angle: normalizeAngle(180 + angle),
                       friendly:
-                        otherProcess.app.getId() === process.app.getId(),
+                        otherProcess.getAppId() === process.getAppId(),
                     });
                   }
                 }
@@ -104,7 +104,7 @@ export default {
           );
 
           // Detect if we have been hit by another tank's bullets
-          arena.getProcesses().forEach((otherProcess) =>
+          env.getProcesses().forEach((otherProcess) =>
             otherProcess.tanks.forEach((otherTank) => {
               if (otherTank.id !== tank.id) {
                 otherTank.bullets
@@ -138,15 +138,15 @@ export default {
                       bullet.exploded = true;
                       if (bullet.callback) bullet.callback({ id: tank.id });
 
-                      arena.emit("event", {
+                      env.emit("event", {
                         type: "tankDamaged",
                         id: tank.id,
-                        time: arena.getTime(),
+                        time: env.getTime(),
                         health: tank.health,
                       });
-                      arena.emit("event", {
+                      env.emit("event", {
                         type: "bulletExploded",
-                        time: arena.getTime(),
+                        time: env.getTime(),
                         id: bullet.id,
                         tankId: tank.id,
                         x: bullet.x,
@@ -161,9 +161,9 @@ export default {
           // Detect if we are at the edge of the arena
           if (
             newX < 16 ||
-            newX > arena.getWidth() - 16 ||
+            newX > env.getArena().getWidth() - 16 ||
             newY < 16 ||
-            newY > arena.getHeight() - 16
+            newY > env.getArena().getHeight() - 16
           ) {
             collided = true;
             tank.stats.timesCollided += 1;
@@ -200,16 +200,16 @@ export default {
             tank.speed = 0;
             tank.health -= 1;
             // Handle a collision
-            arena.emit("event", {
+            env.emit("event", {
               type: "tankStop",
-              time: arena.getTime(),
+              time: env.getTime(),
               id: tank.id,
               x: tank.x,
               y: tank.y,
             });
-            arena.emit("event", {
+            env.emit("event", {
               type: "tankDamaged",
-              time: arena.getTime(),
+              time: env.getTime(),
               id: tank.id,
               health: tank.health,
             });
@@ -257,17 +257,17 @@ export default {
               bullet.speed * Math.cos(-bullet.orientation * (Math.PI / 180));
             if (
               newX > 0 &&
-              newX < arena.getWidth() &&
+              newX < env.getArena().getWidth() &&
               newY > 0 &&
-              newY < arena.getHeight()
+              newY < env.getArena().getHeight()
             ) {
               bullet.x = newX;
               bullet.y = newY;
             } else {
               // Went outside the arena, get rid of it
-              arena.emit("event", {
+              env.emit("event", {
                 type: "bulletRemoved",
-                time: arena.getTime(),
+                time: env.getTime(),
                 id: bullet.id,
                 tankId: tank.id,
               });

@@ -1,26 +1,57 @@
-import User from "../types/user";
-import arenaService from "../services/ArenaService";
+import User, { UserId } from "../types/user";
+import { v4 as uuidv4 } from "uuid";
+import arenaService from "./ArenaService";
+import pool from "../util/db";
+
+pool.query(`
+  CREATE TABLE IF NOT EXISTS account (
+    id UUID,
+    name text,
+    picture text,
+    email text
+  )
+`);
 
 class UserService {
-  users: User[] = [];
   create = (
     name: string | undefined,
     picture: string | undefined,
     email: string | undefined
-  ): User => {
-    const user = new User(name, picture, email);
-    arenaService.create(user);
-
-    this.put(user);
-
-    return user;
+  ): Promise<User> => {
+    const userId = uuidv4();
+    const user = new User(userId, name, picture, email);
+    return pool
+      .query({
+        text: "INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)",
+        values: [
+          user.getId(),
+          user.getName(),
+          user.getPicture(),
+          user.getEmail(),
+        ],
+      })
+      .then(() =>
+        arenaService.create(user.getId()).then(() => Promise.resolve(user))
+      );
   };
-  authenticate = (source: string, id: string) =>
-    this.users.find((user) =>
-      user.getAuths().find((auth) => auth.source === source && auth.id === id)
-    );
-  get = (userId: string) => this.users.find((user) => user.getId() === userId);
-  put = (user: User) => this.users.push(user);
+
+  get = (userId: UserId): Promise<User | undefined> => {
+    return pool
+      .query({
+        text: "SELECT account.name, account.picture, account.email FROM account WHERE id=$1",
+        values: [userId],
+      })
+      .then((res) => {
+        return res.rowCount === 0
+          ? undefined
+          : new User(
+              userId,
+              res.rows[0].name,
+              res.rows[0].picture,
+              res.rows[0].email
+            );
+      });
+  };
 }
 
 export default new UserService();

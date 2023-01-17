@@ -17,17 +17,19 @@ export default (
         app.tanks.forEach((tank) => {
             if (tank.health > 0) {
                 // Update the location
-                tank.x =
+                const newTankX =
                     tank.x +
                     tank.speed *
                         Math.sin(-tank.bodyOrientation * (Math.PI / 180))
-                tank.y =
+                const newTankY =
                     tank.y +
                     tank.speed *
                         Math.cos(-tank.bodyOrientation * (Math.PI / 180))
 
-                tank.x = Math.max(16, Math.min(arenaWidth - 16, tank.x))
-                tank.y = Math.max(16, Math.min(arenaHeight - 16, tank.y))
+                if(newTankX > 16 && newTankY > 16 && newTankX < arenaWidth-16 && newTankY < arenaHeight - 16) {
+                    tank.x = newTankX
+                    tank.y = newTankY    
+                }
 
                 // Manage acceleration / deceleration
                 if (tank.speed > tank.speedTarget)

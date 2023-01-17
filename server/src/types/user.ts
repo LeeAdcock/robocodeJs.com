@@ -1,6 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
-import { UserAuth } from "./userAuth";
-
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type UserId = string & {};
 
@@ -10,14 +7,13 @@ export default class User {
   private picture: string | undefined;
   private email: string | undefined;
 
-  private auths: UserAuth[] = [];
-
   constructor(
+    id: UserId,
     name: string | undefined,
     picture: string | undefined,
     email: string | undefined
   ) {
-    this.id = uuidv4();
+    this.id = id;
     this.name = name;
     this.picture = picture;
     this.email = email;
@@ -33,12 +29,5 @@ export default class User {
   }
   getEmail() {
     return this.email;
-  }
-
-  addAuth(auth: UserAuth) {
-    this.auths.push(auth);
-  }
-  getAuths() {
-    return this.auths;
   }
 }
