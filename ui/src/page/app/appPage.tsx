@@ -9,12 +9,12 @@ import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
 import Col from 'react-bootstrap/Col'
 import { colors } from '../../util/colors'
+import { useNavigate } from 'react-router-dom'
 
 let debounceSaveTimer
-const debounce = (func, timeout, doSave) => {
+const debounce = (func: () => void, timeout: number) => {
     clearTimeout(debounceSaveTimer)
-    if (doSave) func()
-    else debounceSaveTimer = setTimeout(func, timeout)
+    debounceSaveTimer = setTimeout(func, timeout)
 }
 
 const titleCase = (str: string) =>
@@ -29,9 +29,10 @@ const titleCase = (str: string) =>
 export default function AppPage(props) {
     const [code, setCode] = useState('')
     const [app, setApp] = useState(null as any)
-    const [doSave, setDoSave] = useState(false)
     const { userId, appId } = useParams()
 
+    const navigate = useNavigate()
+    
     useEffect(() => {
         axios
             .get(`/api/user/${userId}/app/${appId}/source`)
@@ -47,10 +48,9 @@ export default function AppPage(props) {
                 axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
                     headers: { 'content-type': 'application/octet-stream' },
                 }),
-            30000,
-            doSave
+            30000
         )
-    }, [code, doSave])
+    }, [code])
 
     const doExecute = () => {
         axios
@@ -58,10 +58,14 @@ export default function AppPage(props) {
                 headers: { 'content-type': 'application/octet-stream' },
             })
             .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`))
-            .then((resp) => {
-                app.name = resp.data.name
-                setApp(app)
-            })
+        .then((resp) => setApp({...app, name: resp.data.name}))
+    }
+
+    const doDelete = () => {
+        axios
+            .delete(`/api/user/${userId}/app/${appId}`)
+            .then(props.doDelete)
+            .then(() => navigate(`/user/${userId}`))
     }
 
     const doClean = () => {
@@ -93,7 +97,7 @@ export default function AppPage(props) {
                     >
                         {app && props.arena && (
                             <>
-                                { props.arena.apps.includes(app.id) && <img
+                                { props.arena.apps.map(a=>a.id).includes(app.id) && <img
                                     src={
                                         '/sprites/tank_' +
                                         colors[
@@ -114,8 +118,7 @@ export default function AppPage(props) {
                         <Toolbar
                             appName={app?.name}
                             code={code}
-                            doDelete={() => {/*todo*/}}
-                            doSave={() => setDoSave(true)}
+                            doDelete={doDelete}
                             doExecute={doExecute}
                             doClean={doClean}
                         />
@@ -124,7 +127,6 @@ export default function AppPage(props) {
             </Container>
             <Editor
                 code={code}
-                doSave={() => setDoSave(true)}
                 onChange={setCode}
                 doExecute={doExecute}
                 doClean={doClean}

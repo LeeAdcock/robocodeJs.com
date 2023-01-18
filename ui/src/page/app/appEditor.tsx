@@ -17,10 +17,9 @@ const debounce = (func, timeout) => {
 
 interface CodeEditorProps {
     code: string
-    onChange: Function
-    doSave: Function
-    doClean: Function
-    doExecute: Function
+    onChange: (source) => void
+    doClean: () => void
+    doExecute: () => void
 }
 
 export default function CodeEditor(props: CodeEditorProps) {
@@ -61,11 +60,6 @@ export default function CodeEditor(props: CodeEditorProps) {
                 {
                     name: 'save',
                     bindKey: { win: 'Ctrl-S', mac: 'Cmd-S' },
-                    exec: () => props.doSave(),
-                },
-                {
-                    name: 'execute',
-                    bindKey: { win: 'Ctrl-Space', mac: 'Cmd-Space' },
                     exec: () => props.doExecute(),
                 },
                 {
@@ -76,7 +70,6 @@ export default function CodeEditor(props: CodeEditorProps) {
             ]}
             onChange={(source) => {
                 debounce(() => compile(source), 5000)
-                console.log('onChange', source)
                 props.onChange(source)
             }}
             fontSize={12}

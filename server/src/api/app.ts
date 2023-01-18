@@ -7,6 +7,7 @@ import environmentService from "../services/EnvironmentService";
 
 import Arena from "../types/arena";
 import { AuthenticatedRequest } from "../middleware/auth";
+import arenaMemberService from "../services/ArenaMemberService";
 
 const app = express();
 
@@ -59,7 +60,7 @@ app.get("/api/user/:userId/app/:appId", async (req, res) => {
 
   res.json({
     id: app.getId(),
-    name: app.getName()
+    name: app.getName(),
   });
 });
 
@@ -85,10 +86,20 @@ app.put("/api/user/:userId/app/:appId/source", async (req, res) => {
   // TODO validate the source code first?
   return app.setSource(req.body.toString("utf-8")).then(() => {
     res.status(200);
-    res.send();  
-    console.log("source saved", req.body.toString("utf-8"))
+    res.send();
+  }).then(() =>
+  {
+    arenaMemberService.getForApp(app.getId()).then(members => {
+      members.forEach(member => {
+        environmentService.getByArenaId(member.getAppId()).then(env => {
+          if(env) {
+            env.processes.filter(process => process.getAppId() == member.getAppId())
+            .forEach(process => process.tanks.forEach(tank => tank.execute(process)))
+          }
+        })
+      })
+    })
   })
-
 });
 
 // Execute app source code
@@ -151,4 +162,42 @@ app.get("/api/user/:userId/app/:appId/source", async (req, res) => {
   res.status(200);
   res.send(app.getSource());
 });
+
+// Delete an app
+app.delete("/api/user/:userId/app/:appId", async (req, res) => {
+  const user = await userService.get(req.params.userId);
+  if (!user) {
+    res.status(404);
+    res.send("Invalid user id");
+    return;
+  }
+  if (user.getId() !== (req as unknown as AuthenticatedRequest).user.getId()) {
+    res.status(401);
+    res.send("Unauthorized");
+    return;
+  }
+
+  const app = await appService.get(req.params.appId);
+  if (!app) {
+    res.status(404);
+    res.send("Invalid user id");
+    return;
+  }
+
+  const memberships = await arenaMemberService.getForApp(app.getId());
+  return Promise.all(
+    memberships.map((membership) =>
+      environmentService
+        .getByArenaId(membership.getArenaId())
+        .then((env) => (env ? env.removeApp(app.getId()) : Promise.resolve()))
+        .then(() => membership.delete())
+    )
+  )
+    .then(() => app.delete())
+    .then(() => {
+      res.status(200);
+      res.send()
+    })
+});
+
 export default app;

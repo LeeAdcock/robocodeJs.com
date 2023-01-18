@@ -256,7 +256,6 @@ function App() {
                         else {
                             messageArena.apps = []
                         }
-                        console.log('restart!')
                     } else if (data.type === 'arenaPaused') {
                         setPaused(true)
                     } else if (data.type === 'arenaResumed') {
@@ -449,7 +448,12 @@ function App() {
                             />
                             <Route
                                 path="user/:userId/app/:appId"
-                                element={<AppPage arena={arena} />}
+                                element={<AppPage arena={arena} doDelete={() => {
+                                    // todo
+                                    axios
+                                        .get(`/api/user/${user.id}`)
+                                        .then((res) => setUser(res.data))
+                                }}/>}
                             />
                             <Route
                                 path="user/:userId/arena/logs"

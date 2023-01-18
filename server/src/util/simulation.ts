@@ -87,15 +87,13 @@ export default {
                   if (tank.handlers[Event.COLLIDED]) {
                     tank.handlers[Event.COLLIDED]({
                       angle,
-                      friendly:
-                        otherProcess.getAppId() === process.getAppId(),
+                      friendly: otherProcess.getAppId() === process.getAppId(),
                     });
                   }
                   if (otherTank.handlers[Event.COLLIDED]) {
                     otherTank.handlers[Event.COLLIDED]({
                       angle: normalizeAngle(180 + angle),
-                      friendly:
-                        otherProcess.getAppId() === process.getAppId(),
+                      friendly: otherProcess.getAppId() === process.getAppId(),
                     });
                   }
                 }

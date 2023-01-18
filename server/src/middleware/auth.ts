@@ -1,6 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 import userService from "../services/UserService";
-import authService from "../services/AuthService";
+import authService from "../services/IdentityService";
 import User from "../types/user";
 
 export type AuthenticatedRequest = Request & { user: User };
@@ -21,16 +21,15 @@ export default async (req, res, next) => {
         return authService.get("google", payload.sub).then((userAuth) => {
           if (userAuth) {
             // We recognize this user
-            userService.get(userAuth.getUserId()).then((user) => {
+            return userService.get(userAuth.getUserId()).then((user) => {
               if (!user) {
                 // Should not be possbile to recognize their auth but not have
                 // a user record for them.
-                res.status(500);
-                return;
+                throw new Error("Missing account.")                
               }
               (req as AuthenticatedRequest).user = user;
               return next();
-            });
+            })
           } else {
             // Create this user
             return userService

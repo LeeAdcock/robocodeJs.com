@@ -8,7 +8,10 @@ pool.query(`
     id UUID,
     userId UUID,
     source text,
-    name text
+    name text,
+    deleted boolean default false,
+    createdTimestamp timestamp default CURRENT_TIMESTAMP,
+    updatedTimestamp timestamp default CURRENT_TIMESTAMP
   )
 `);
 
@@ -27,7 +30,7 @@ export class AppService {
   get = (appId: AppId): Promise<TankApp | undefined> => {
     return pool
       .query({
-        text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source" FROM app WHERE id=$1',
+        text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source" FROM app WHERE id=$1 AND NOT deleted',
         values: [appId],
       })
       .then((res) => {
@@ -42,7 +45,7 @@ export class AppService {
   getForUser = (userId: UserId): Promise<TankApp[]> => {
     return pool
       .query({
-        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source" FROM app WHERE userId=$1',
+        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source" FROM app WHERE userId=$1 AND NOT deleted',
         values: [userId],
       })
       .then((res) =>
@@ -54,7 +57,6 @@ export class AppService {
         })
       );
   };
-
 }
 
 export default new AppService();

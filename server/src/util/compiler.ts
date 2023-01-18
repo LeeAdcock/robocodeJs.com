@@ -476,24 +476,23 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
 }
 
 // Execute the tank code
-const execute = (process: Process, tank: Tank) => {
+const execute = (process: Process, tank: Tank) : Promise<unknown> => {
   tank.handlers = {};
   tank.timers.reset();
-  try {
-    appService.get(process.getAppId()).then(app => {
-      if(app) {
-        process
+  return appService.get(process.getAppId())
+    .then((app) => {
+      if (app) {
+        try {
+          process
           .getSandbox()
           .compileScriptSync(app.getSource())
           .runSync(tank.getContext(), { timeout: 5000 });
+        } catch(e) {
+          tank.logger.error(e);
+          tank.appCrashed = true;
+        }
       }
     })
-  } catch (e) {
-    tank.logger.error(e);
-    tank.appCrashed = true;
-    console.log(e)
-
-  }
 };
 
 // Initialize a tank.getContext() within the isolated sandbox
@@ -629,14 +628,6 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       name: "<" + tankId + ">",
       streams,
     });
-    appService.get(process.getAppId()).then(app => {
-      if(app) {
-        tank.logger = createLogger({
-          name: app.getName() + " <" + tankId + ">",
-          streams,
-        });
-      }
-    })
 
     tank.getContext().global.setSync("_log", (msg: any, ...msgs: any[]) => {
       tank.logger.info(msg, ...msgs);

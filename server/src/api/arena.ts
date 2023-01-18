@@ -15,25 +15,25 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
   const user = await userService.get(req.params.userId);
   if (!user) {
     res.status(404);
-    res.send('Invalid user id');
-    return
+    res.send("Invalid user id");
+    return;
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena = (await arenaService.getForUser(user.getId()))[0]
-  const env = await environmentService.get(arena)
+  const arena = await arenaService.getDefaultForUser(user.getId());
+  const env = await environmentService.get(arena);
 
   res.status(200);
   res.send({
     height: arena.getHeight(),
     width: arena.getWidth(),
     running: env.isRunning(),
-    clock: { time: env.getTime()},
-    apps: env.getProcesses().map(process => ({
+    clock: { time: env.getTime() },
+    apps: env.getProcesses().map((process) => ({
       id: process.getAppId(),
       //name: process.appId.getName(),
       //userId: process.app.getUserId(),
-      tanks: process.tanks.map(tank => ({
+      tanks: process.tanks.map((tank) => ({
         id: tank.id,
         x: tank.x,
         y: tank.y,
@@ -43,24 +43,24 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
         speedMax: tank.speedMax,
         bodyOrientation: tank.orientation,
         bodyOrientationTarget: tank.orientationTarget,
-        bodyOrientationVelocity:tank.orientation,
-        turretOrientation:tank.turret.orientation,
-        turretOrientationTarget:tank.turret.orientationTarget,
-        turretOrientationVelocity:tank.turret.radar.orientationVelocity,
-        radarOrientation:tank.turret.radar.orientation,
-        radarOrientationTarget:tank.turret.radar.orientationTarget,
-        radarOrientationVelocity:tank.turret.radar.orientationVelocity,
+        bodyOrientationVelocity: tank.orientation,
+        turretOrientation: tank.turret.orientation,
+        turretOrientationTarget: tank.turret.orientationTarget,
+        turretOrientationVelocity: tank.turret.radar.orientationVelocity,
+        radarOrientation: tank.turret.radar.orientation,
+        radarOrientationTarget: tank.turret.radar.orientationTarget,
+        radarOrientationVelocity: tank.turret.radar.orientationVelocity,
         health: tank.health,
-        bullets: tank.bullets.map(bullet => ({
+        bullets: tank.bullets.map((bullet) => ({
           id: bullet.id,
           x: bullet.x,
           y: bullet.y,
-          exploded: bullet.exploded
-        }))
-      }))
-    }))
+          exploded: bullet.exploded,
+        })),
+      })),
+    })),
   });
-})
+});
 
 // Remove an app from an arena
 app.delete("/api/user/:userId/arena/app/:appId", async (req, res) => {
@@ -77,14 +77,19 @@ app.delete("/api/user/:userId/arena/app/:appId", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
-  const appIds = await arenaMemberService.getForArena(arena.getId());
-  if (!appIds.includes(req.params.appId)) {
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
+  const members = await arenaMemberService.getForArena(arena.getId());
+
+  const member = members.find(
+    (member) => member.getAppId() === req.params.appId
+  );
+  if (!member) {
     res.status(404);
     res.send("Invalid app id");
     return;
   }
-  return arenaMemberService.delete(req.params.appId, arena.getId()).then(() => {
+  (await environmentService.getByArenaId(arena.getId()))?.removeApp(req.params.appId)
+  return member.delete().then(() => {
     res.status(200);
     res.send();
   });
@@ -113,7 +118,19 @@ app.put("/api/user/:userId/arena/app/:appId", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
+
+  const members = await arenaMemberService.getForArena(arena.getId());
+  if (members.length > 4) {
+    if (!app) {
+      res.status(400);
+      res.send("Arena limit reached");
+      return;
+    }
+  }
+
+  const env = await environmentService.get(arena);
+  env.addApp(app);
   return arenaMemberService.create(arena.getId(), app.getId()).then(() => {
     res.status(201);
     res.send();
@@ -134,7 +151,7 @@ app.post("/api/user/:userId/arena/restart", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
   return environmentService
     .get(arena)
     .then((env) => env.restart())
@@ -158,7 +175,7 @@ app.post("/api/user/:userId/arena/pause", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
 
   return environmentService
     .get(arena)
@@ -183,7 +200,7 @@ app.post("/api/user/:userId/arena/resume", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
   return environmentService
     .get(arena)
     .then((env) => env.resume())
@@ -212,7 +229,7 @@ app.get("/api/user/:userId/arena/events", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
   return environmentService.get(arena).then((env) => {
     env.addListener("event", listener);
     req.on("close", () => {
@@ -242,7 +259,7 @@ app.get("/api/user/:userId/arena/logs", async (req, res) => {
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = (await arenaService.getForUser(user.getId()))[0];
+  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
   return environmentService.get(arena).then((env) => {
     env.addListener("log", listener);
 

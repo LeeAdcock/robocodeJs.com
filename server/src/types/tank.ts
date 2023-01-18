@@ -113,7 +113,7 @@ export default class Tank implements Point, Orientated {
     this.turret = new TankTurret(this);
 
     compiler.init(env, process, this);
-    compiler.execute(process, this);
+    this.execute(process)
   }
 
   getContext = (): ivm.Context => {
@@ -172,7 +172,7 @@ export default class Tank implements Point, Orientated {
 
   setName(name) {
     // todo sanitize name
-    appService.get(this.process.getAppId()).then(app => {
+    appService.get(this.process.getAppId()).then((app) => {
       if (app && app.getName() !== name) {
         app.setName(name);
         this.env.emit("event", {
@@ -180,9 +180,9 @@ export default class Tank implements Point, Orientated {
           appId: app.getId(),
           name: name,
         });
-      }        
-    })
-}
+      }
+    });
+  }
 
   getId() {
     return this.id;
@@ -192,13 +192,13 @@ export default class Tank implements Point, Orientated {
     this.health / 100;
   }
 
-  execute(process) {
+  execute(process): Promise<unknown> {
     try {
-      compiler.execute(process, this);
+      return compiler.execute(process, this);
     } catch (e) {
       this.logger.error(e);
       this.appCrashed = true;
-      console.log(e)
+      return Promise.resolve()
     }
   }
 
@@ -276,13 +276,9 @@ export default class Tank implements Point, Orientated {
       speedAcceleration: this.speedAcceleration,
       speedMax: this.speedMax,
     });
-    try {
-      this.logger.trace(
-        d === 0 ? "Stopping" : "Accelerating to " + this.speedTarget
-      );
-    } catch (e) {
-      console.log(e);
-    }
+    this.logger.trace(
+      d === 0 ? "Stopping" : "Accelerating to " + this.speedTarget
+    );
     return waitUntil(
       () => this.speed === Math.min(d, this.speedMax),
       () =>

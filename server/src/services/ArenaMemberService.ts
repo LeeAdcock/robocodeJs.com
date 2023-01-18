@@ -6,6 +6,7 @@ import ArenaMember from "../types/arenaMember";
 pool.query(`
   CREATE TABLE IF NOT EXISTS arena_member (
     arenaId UUID,
+    createdTimestamp timestamp default CURRENT_TIMESTAMP,
     appId UUID
   )
 `);
@@ -21,31 +22,26 @@ export class ArenaMemberService {
       .then(() => Promise.resolve(member));
   };
 
-  delete = (appId: AppId, arenaId: ArenaId): Promise<undefined> => {
-    return pool
-      .query({
-        text: "DELETE FROM arena_member WHERE arenaId=$1 AND appId=$2",
-        values: [arenaId, appId],
-      })
-      .then((_) => undefined);
-  };
-
-  getForApp = (appId: AppId): Promise<ArenaId[]> => {
+  getForApp = (appId: AppId): Promise<ArenaMember[]> => {
     return pool
       .query({
         text: 'SELECT arena_member.arenaId as "arenaId" FROM arena_member WHERE appId=$1',
         values: [appId],
       })
-      .then((res) => res.rows.map((row) => row.arenaId));
+      .then((res) =>
+        res.rows.map((row) => new ArenaMember(appId, row.arenaId))
+      );
   };
 
-  getForArena = (arenaId: ArenaId): Promise<AppId[]> => {
+  getForArena = (arenaId: ArenaId): Promise<ArenaMember[]> => {
     return pool
       .query({
         text: 'SELECT arena_member.appId as "appId" FROM arena_member WHERE arenaId=$1',
         values: [arenaId],
       })
-      .then((res) => res.rows.map((row) => row.appId));
+      .then((res) =>
+        res.rows.map((row) => new ArenaMember(row.appId, arenaId))
+      );
   };
 }
 

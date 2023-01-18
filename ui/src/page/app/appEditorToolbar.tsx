@@ -10,10 +10,9 @@ import { FaCode, FaDownload, FaTrash, FaSave, FaHammer } from 'react-icons/fa'
 interface EditorToolbarProps {
     code: string
     appName: string
-    doSave: Function
-    doDelete: Function
-    doClean: Function
-    doExecute: Function
+    doDelete: () => void
+    doClean: () => void
+    doExecute: () => void
 }
 
 export default function EditorToolbar(props: EditorToolbarProps) {
@@ -25,23 +24,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                         placement={'bottom'}
                         overlay={
                             <Tooltip id={`reformat`}>
-                                Save code (Ctrl-S)
-                            </Tooltip>
-                        }
-                    >
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => props.doSave()}
-                        >
-                            <FaSave />
-                        </Button>
-                    </OverlayTrigger>
-                    <OverlayTrigger
-                        placement={'bottom'}
-                        overlay={
-                            <Tooltip id={`reformat`}>
-                                Compile code (Ctrl-Space)
+                                Save
                             </Tooltip>
                         }
                     >
@@ -50,7 +33,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                             size="sm"
                             onClick={() => props.doExecute()}
                         >
-                            <FaHammer />
+                            <FaSave />
                         </Button>
                     </OverlayTrigger>
                     <OverlayTrigger

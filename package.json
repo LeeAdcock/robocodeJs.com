@@ -1,0 +1,25 @@
+{
+  "name": "battletank.io",
+  "version": "1.0.0",
+  "description": "Welcome to Battlebots, [a browser-based programming game](https://battletank.io) for creating Javascript artificial intellegence that enables your bots compete for fame and glory! Brainstorm your own winning strategy, program your bot, and set it lose in the arena in teams of one or more to defeat your competition.",
+  "script": "index.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeeAdcock/battletank.io.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LeeAdcock/battletank.io/issues"
+  },
+  "homepage": "https://github.com/LeeAdcock/battletank.io#readme",
+  "dependencies": {
+    "forever": "^4.0.3",
+    "http-proxy": "^1.18.1",
+    "node-http-proxy": "^0.2.4"
+  }
+}

@@ -6,7 +6,8 @@ import Arena, { ArenaId } from "../types/arena";
 pool.query(`
   CREATE TABLE IF NOT EXISTS arena (
     id UUID,
-    userId UUID
+    userId UUID,
+    createdTimestamp timestamp default CURRENT_TIMESTAMP
   )
 `);
 
@@ -38,10 +39,14 @@ export class ArenaService {
   getForUser = (userId: UserId): Promise<Arena[]> => {
     return pool
       .query({
-        text: 'SELECT arena.id as "arenaId" FROM arena WHERE userId=$1',
+        text: 'SELECT arena.id as "arenaId" FROM arena WHERE userId=$1 ORDER BY createdTimestamp',
         values: [userId],
       })
       .then((res) => res.rows.map((row) => new Arena(row.arenaId, userId)));
+  };
+
+  getDefaultForUser = (userId: UserId): Promise<Arena> => {
+    return this.getForUser(userId).then((arenas) => arenas[0]);
   };
 }
 

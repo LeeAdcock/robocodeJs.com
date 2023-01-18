@@ -8,7 +8,8 @@ pool.query(`
     id UUID,
     name text,
     picture text,
-    email text
+    email text,
+    createdTimestamp timestamp default CURRENT_TIMESTAMP
   )
 `);
 

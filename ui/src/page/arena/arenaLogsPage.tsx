@@ -44,7 +44,6 @@ export default function ArenaLogsPage(props: ArenaLogsPageProps) {
         eventSource.onmessage = (message) => {
             setLogEntries((oldLogs) => {
                 const logEntry = JSON.parse(message.data) as LogEntry
-                console.log('log', logEntry)
                 oldLogs.logs[oldLogs.index] = logEntry
                 return {
                     logs: oldLogs.logs,

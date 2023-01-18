@@ -1,4 +1,4 @@
-import pool from "../util/db"
+import pool from "../util/db";
 import { UserId } from "./user";
 import nameFactory from "../util/nameFactory";
 
@@ -20,26 +20,35 @@ export default class App {
   getId = () => this.id;
   getUserId = () => this.userId;
 
-  getSource = () => this.source || '';
-  setSource = (source: string) : Promise<undefined> => {
+  getSource = () => this.source || "";
+  setSource = (source: string): Promise<undefined> => {
     this.source = source;
     return pool
       .query({
-        text: "UPDATE app SET source=$2 WHERE id=$1",
+        text: "UPDATE app SET source=$2, updatedTimestamp=CURRENT_TIMESTAMP WHERE id=$1",
         values: [this.getId(), source],
       })
-      .then((_) => undefined);
+      .then(() => undefined);
   };
 
-  getName = () => this.name || 'Unnamed';
-  setName = (name: string) : Promise<undefined> => {
+  getName = () => this.name || "Unnamed";
+  setName = (name: string): Promise<undefined> => {
     this.name = name;
     // todo debounce
     return pool
       .query({
-        text: "UPDATE app SET name=$2 WHERE id=$1",
+        text: "UPDATE app SET name=$2, updatedTimestamp=CURRENT_TIMESTAMP WHERE id=$1",
         values: [this.getId(), name],
       })
-      .then((_) => undefined);
-    };
+      .then(() => undefined);
+  };
+
+  delete = (): Promise<undefined> => {
+    return pool
+      .query({
+        text: "UPDATE app SET deleted=true, updatedTimestamp=CURRENT_TIMESTAMP WHERE id=$1",
+        values: [this.getId()],
+      })
+      .then(() => undefined);
+  };
 }
