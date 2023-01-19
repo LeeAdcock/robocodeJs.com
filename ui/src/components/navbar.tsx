@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom'
 import TankApp from '../types/tankApp'
 import User from '../types/user'
 import Arena from '../types/arena'
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom'
 
 const titleCase = (str: string) =>
     str
@@ -39,7 +39,7 @@ const AppLink = function (props: AppLinkProps) {
                     src={'/sprites/tank_' + colors[appIndex] + '.png'}
                     style={{ height: '1em', marginRight: '5px' }}
                 />
-                <span style={{color:"black"}}>
+                <span style={{ color: 'black' }}>
                     {titleCase(props.app.name || 'Unknown')}
                 </span>
             </>
@@ -61,8 +61,7 @@ interface NavBarProps {
 }
 
 export default function NavBar(props: NavBarProps) {
-
-    const navigate = useNavigate();
+    const navigate = useNavigate()
 
     return (
         <>
@@ -82,7 +81,7 @@ export default function NavBar(props: NavBarProps) {
                             textDecoration: 'none!important',
                         }}
                     >
-                        robocode.io
+                        robocodeJs
                     </span>
                 </Navbar.Brand>
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -112,8 +111,13 @@ export default function NavBar(props: NavBarProps) {
                                     id="basic-nav-dropdown"
                                 >
                                     {props.apps?.map((app) => (
-                                        <NavDropdown.Item key={app.id}
-                                            onClick={()=>navigate(`/user/${props.user.id}/app/${app.id}`)}
+                                        <NavDropdown.Item
+                                            key={app.id}
+                                            onClick={() =>
+                                                navigate(
+                                                    `/user/${props.user.id}/app/${app.id}`
+                                                )
+                                            }
                                         >
                                             <AppLink
                                                 arena={props.arena}
@@ -121,7 +125,9 @@ export default function NavBar(props: NavBarProps) {
                                             />
                                         </NavDropdown.Item>
                                     ))}
-                                    { props.apps && props.apps.length > 0 && <NavDropdown.Divider /> }
+                                    {props.apps && props.apps.length > 0 && (
+                                        <NavDropdown.Divider />
+                                    )}
                                     <NavDropdown.Item
                                         disabled={props.apps?.length >= 9}
                                         onClick={() => props.doCreateApp()}
@@ -131,7 +137,7 @@ export default function NavBar(props: NavBarProps) {
                                     <NavDropdown.Item
                                         onClick={() => {
                                             window.open(
-                                                'https://github.com/LeeAdcock/battletank.io/tree/main/ui/public/samples',
+                                                'https://github.com/LeeAdcock/robocodeJs.com/tree/main/ui/public/samples',
                                                 '_new'
                                             )
                                         }}
@@ -145,7 +151,11 @@ export default function NavBar(props: NavBarProps) {
                                     id="basic-nav-dropdown"
                                 >
                                     <NavDropdown.Item
-                                        onClick={() => navigate(`/user/${props.user.id}/arena/logs`)}
+                                        onClick={() =>
+                                            navigate(
+                                                `/user/${props.user.id}/arena/logs`
+                                            )
+                                        }
                                     >
                                         View Logs
                                     </NavDropdown.Item>
@@ -169,12 +179,12 @@ export default function NavBar(props: NavBarProps) {
                                         </NavDropdown.Item>
                                     )}
                                 </NavDropdown>
-                                <Navbar.Text>|</Navbar.Text>                                
+                                <Navbar.Text>|</Navbar.Text>
                             </>
                         )}
                         <Nav.Link
                             target="_new"
-                            href="https://github.com/LeeAdcock/battletank.io/blob/master/README.md"
+                            href="https://github.com/LeeAdcock/robocodeJs.com/blob/master/README.md"
                         >
                             Docs
                         </Nav.Link>

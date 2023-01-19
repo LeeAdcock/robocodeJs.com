@@ -84,22 +84,27 @@ app.put("/api/user/:userId/app/:appId/source", async (req, res) => {
     return;
   }
   // TODO validate the source code first?
-  return app.setSource(req.body.toString("utf-8")).then(() => {
-    res.status(200);
-    res.send();
-  }).then(() =>
-  {
-    arenaMemberService.getForApp(app.getId()).then(members => {
-      members.forEach(member => {
-        environmentService.getByArenaId(member.getAppId()).then(env => {
-          if(env) {
-            env.processes.filter(process => process.getAppId() == member.getAppId())
-            .forEach(process => process.tanks.forEach(tank => tank.execute(process)))
-          }
-        })
-      })
+  return app
+    .setSource(req.body.toString("utf-8"))
+    .then(() => {
+      res.status(200);
+      res.send();
     })
-  })
+    .then(() => {
+      arenaMemberService.getForApp(app.getId()).then((members) => {
+        members.forEach((member) => {
+          environmentService.getByArenaId(member.getAppId()).then((env) => {
+            if (env) {
+              env.processes
+                .filter((process) => process.getAppId() == member.getAppId())
+                .forEach((process) =>
+                  process.tanks.forEach((tank) => tank.execute(process))
+                );
+            }
+          });
+        });
+      });
+    });
 });
 
 // Execute app source code
@@ -196,8 +201,8 @@ app.delete("/api/user/:userId/app/:appId", async (req, res) => {
     .then(() => app.delete())
     .then(() => {
       res.status(200);
-      res.send()
-    })
+      res.send();
+    });
 });
 
 export default app;

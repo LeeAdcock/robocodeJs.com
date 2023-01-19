@@ -119,7 +119,7 @@ export class TankTurret implements Orientated {
         y: this.tank.y,
       },
       orientation: this.tank.getOrientation() + this.orientation,
-      speed: 15,
+      speed: 25,
     };
     this.tank.bullets.push(bullet);
     this.loaded = 0;

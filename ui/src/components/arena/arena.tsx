@@ -10,6 +10,9 @@ import TankPathSvg from './arenaTankPath'
 
 const ArenaStyle = React.memo(() => (
     <defs>
+        <clipPath id="trim-extra">
+            <rect x="0" y="0" width="750" height="750" />
+        </clipPath>
         <pattern
             id="grass"
             width="32"
@@ -90,12 +93,18 @@ export default function ArenaSvg(props: ArenaSvgProps) {
             width="100%"
             height="100%"
             viewBox="0 0 750 750"
-            preserveAspectRatio="xMidYMid slice"
+            preserveAspectRatio="xMidYMid meet"
             xmlns="http://www.w3.org/2000/svg"
-            style={{ border: '2px solid black' }}
+            style={{
+                border: '2px solid rgb(33,37,41)',
+                backgroundColor: 'rgb(77,82,86)',
+            }}
         >
             <ArenaStyle />
-            <g filter={props.darkMode ? 'url(#darkMode)' : undefined}>
+            <g
+                clip-path="url(#trim-extra)"
+                filter={props.darkMode ? 'url(#darkMode)' : undefined}
+            >
                 <TerrainSvg>
                     <g name="craters">
                         {apps.map((app) =>
@@ -140,6 +149,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                                         key={tank.id}
                                         tankIndex={tankIndex}
                                         appIndex={appIndex}
+                                        appName={app.name}
                                         id={tank.id}
                                         health={tank.health}
                                         bodyOrientation={tank.bodyOrientation}
@@ -165,6 +175,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                                         key={tank.id}
                                         tankIndex={tankIndex}
                                         appIndex={appIndex}
+                                        appName={app.name}
                                         id={tank.id}
                                         health={tank.health}
                                         bodyOrientation={tank.bodyOrientation}

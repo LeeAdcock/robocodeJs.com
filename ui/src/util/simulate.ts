@@ -26,9 +26,14 @@ export default (
                     tank.speed *
                         Math.cos(-tank.bodyOrientation * (Math.PI / 180))
 
-                if(newTankX > 16 && newTankY > 16 && newTankX < arenaWidth-16 && newTankY < arenaHeight - 16) {
+                if (
+                    newTankX > 16 &&
+                    newTankY > 16 &&
+                    newTankX < arenaWidth - 16 &&
+                    newTankY < arenaHeight - 16
+                ) {
                     tank.x = newTankX
-                    tank.y = newTankY    
+                    tank.y = newTankY
                 }
 
                 // Manage acceleration / deceleration
@@ -40,8 +45,11 @@ export default (
                     Math.abs(tank.speed - tank.speedTarget) <
                     tank.speedAcceleration
                 )
-                tank.speed = tank.speedTarget
-                tank.speed = Math.max(-tank.speedMax, Math.min(tank.speedMax, tank.speed))
+                    tank.speed = tank.speedTarget
+                tank.speed = Math.max(
+                    -tank.speedMax,
+                    Math.min(tank.speedMax, tank.speed)
+                )
 
                 // Convenience method for manging rotating towards a target orientation
                 // with a maximum rotational velocity.
@@ -66,6 +74,7 @@ export default (
                 ) {
                     if (!tank.path) {
                         tank.path = new Array(10)
+                        tank.pathIndex = 0
                     }
                     const lastPoint =
                         tank.path[tank.pathIndex - (1 % tank.path.length)]

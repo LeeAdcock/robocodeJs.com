@@ -6,6 +6,7 @@ import TankApp from "./app";
 import Simulation from "../util/simulation";
 import ivm from "isolated-vm";
 import Arena from "./arena";
+import compiler from "../util/compiler";
 
 import appService from "../services/AppService";
 
@@ -21,7 +22,10 @@ export class Process {
   constructor(env: Environment, appId: AppId) {
     this.appId = appId;
     for (let x = 0; x < 5; x++) {
-      this.tanks.push(new Tank(env, this));
+      const tank = new Tank(env, this);
+      this.tanks.push(tank);
+      compiler.init(env, this, tank);
+      tank.execute(process);
     }
   }
 
@@ -131,12 +135,11 @@ export default class Environment {
   execute(appId: AppId): Promise<unknown> {
     return Promise.all(
       this.processes
-      .filter((process) => process.getAppId() === appId)
-      .map((process) =>
-        Promise.all(process.tanks.map((tank) =>
-          tank.execute(process)
-        ))
-      ))
+        .filter((process) => process.getAppId() === appId)
+        .map((process) =>
+          Promise.all(process.tanks.map((tank) => tank.execute(process)))
+        )
+    );
   }
 
   // Run the game
@@ -229,6 +232,8 @@ export default class Environment {
             const tank = new Tank(this, process);
 
             process.tanks.push(tank);
+            compiler.init(this, process, tank);
+            tank.execute(process);
 
             // Emit new tank event
             this.emitter.emit("event", {
@@ -246,12 +251,10 @@ export default class Environment {
               x: tank.x,
               y: tank.y,
             });
-
-            tank.execute(process);
           }
         }
-      })
-    })
+      });
+    });
   }
 
   addApp(app: TankApp) {
@@ -292,8 +295,10 @@ export default class Environment {
     );
 
     if (process) {
-      const i = this.processes.findIndex((process) => process.getAppId() === appId)
-      this.processes.splice(i,1);
+      const i = this.processes.findIndex(
+        (process) => process.getAppId() === appId
+      );
+      this.processes.splice(i, 1);
 
       process.tanks.forEach((tank) => {
         // Emit removed tank event

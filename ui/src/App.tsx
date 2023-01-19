@@ -18,7 +18,9 @@ import { useNavigate } from 'react-router-dom'
 import PointInTime from './types/pointInTime'
 import Simulate from './util/simulate'
 import ArenaLogPage from './page/arena/arenaLogsPage'
+import EventEmitter from 'events'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any
 
 interface NavProps {
@@ -45,7 +47,9 @@ const Nav = (props: NavProps) => {
             doRestart={() =>
                 axios.post(`/api/user/${props.user.id}/arena/restart`)
             }
-            doSave={() => {/* todo */}}
+            doSave={() => {
+                /* todo */
+            }}
             doCreateApp={() => {
                 axios.post(`/api/user/${props.user.id}/app`).then((res) => {
                     const appId = res.data.appId
@@ -66,6 +70,7 @@ const Nav = (props: NavProps) => {
 }
 
 let eventSource: EventSource | undefined
+const emitter = new EventEmitter()
 
 function App() {
     const [user, setUser] = useState(null as unknown as User)
@@ -99,6 +104,18 @@ function App() {
         return new Promise((resolve) => {
             axios.get(`/api/user/${user.id}/arena`).then((res) => {
                 setTime(res.data.clock.time)
+                console.log(res.data)
+                res.data.apps.forEach((app) =>
+                    app.tanks.forEach((tank) => {
+                        tank.path = Array<PointInTime>(20)
+                        tank.path[0] = {
+                            x: tank.x,
+                            y: tank.y,
+                            time,
+                        }
+                        tank.pathIndex = 1
+                    })
+                )
                 setArena(res.data)
                 setPaused(!res.data.running)
                 resolve(res.data)
@@ -153,6 +170,7 @@ function App() {
                     const data = JSON.parse(message.data)
                     let apps = messageArena.apps
                     console.log('message', data)
+                    emitter.emit(data.type, data)
                     if (
                         data.type === 'tick' &&
                         messageArena.clock.time !== data.time
@@ -281,14 +299,19 @@ function App() {
                         }
                         apps.push(newApp)
                     } else if (data.type === 'arenaRemoveTank') {
-                        apps.filter((app) => app.id === data.appId).forEach(app => {
-                            const removedTank = app.tanks.find(
-                                (tank) => tank.id === data.id
-                            )
-                            if (removedTank) {
-                                app.tanks = app.tanks.slice(app.tanks.indexOf(removedTank), 1)
+                        apps.filter((app) => app.id === data.appId).forEach(
+                            (app) => {
+                                const removedTank = app.tanks.find(
+                                    (tank) => tank.id === data.id
+                                )
+                                if (removedTank) {
+                                    app.tanks = app.tanks.slice(
+                                        app.tanks.indexOf(removedTank),
+                                        1
+                                    )
+                                }
                             }
-                        })
+                        )
                     } else if (data.type === 'arenaPlaceTank') {
                         apps.filter((app) => app.id === data.appId).forEach(
                             (app) => {
@@ -410,95 +433,98 @@ function App() {
     }, [user])
 
     return (
-        <Container
-            fluid
-            style={{
-                height: '100%',
-                paddingTop: 'calc(var(--bs-gutter-x) * .5)',
-                paddingBottom: 'calc(var(--bs-gutter-x) * .5)',
-            }}
-        >
-            <Row style={{ height: '100%' }}>
-                <Col style={{ position: 'relative', height: '100%' }}>
-                    <Router>
-                        <Nav
-                            user={user}
-                            arena={arena}
-                            isPaused={isPaused}
-                            doLogin={doLogin}
-                            doCreateApp={() => {
-                                // todo
-                                axios
-                                    .get(`/api/user/${user.id}`)
-                                    .then((res) => setUser(res.data))
-                            }}
-                        />
-
-                        <Routes>
-                            <Route
-                                path="/"
-                                element={
-                                    <MarkdownPage path="./docs/index.md" />
-                                }
-                            />
-                            <Route path="user/:userId" element={<>user</>} />
-                            <Route
-                                path="user/:userId/arena"
-                                element={<>user arena</>}
-                            />
-                            <Route
-                                path="user/:userId/app/:appId"
-                                element={<AppPage arena={arena} doDelete={() => {
-                                    // todo
-                                    axios
-                                        .get(`/api/user/${user.id}`)
-                                        .then((res) => setUser(res.data))
-                                }}/>}
-                            />
-                            <Route
-                                path="user/:userId/arena/logs"
-                                element={<ArenaLogPage arena={arena} />}
-                            />
-                        </Routes>
-                    </Router>
-                </Col>
-                <Col style={{ position: 'relative' }}>
-                    {user && (
-                        <div
-                            style={{
-                                position: 'absolute',
-                                top: '10px',
-                                left: '22px',
-                            }}
-                        >
-                            <ArenaToolbar
-                                isPaused={isPaused}
-                                doPause={() =>
-                                    axios.post(
-                                        `/api/user/${user.id}/arena/pause`
-                                    )
-                                }
-                                doResume={() =>
-                                    axios.post(
-                                        `/api/user/${user.id}/arena/resume`
-                                    )
-                                }
-                                doRestart={() =>
-                                    axios.post(
-                                        `/api/user/${user.id}/arena/restart`
-                                    )
-                                }
-                            />
-                        </div>
-                    )}
-                    <ArenaSvg
-                        darkMode={false}
+        <>
+            <div
+                style={{
+                    position: 'absolute',
+                    height: '100%',
+                    width: '50%',
+                    top: 0,
+                    left: 0,
+                    padding: '10px 5px 10px 10px',
+                }}
+            >
+                <Router>
+                    <Nav
+                        user={user}
                         arena={arena}
-                        time={time}
-                    ></ArenaSvg>
-                </Col>
-            </Row>
-        </Container>
+                        isPaused={isPaused}
+                        doLogin={doLogin}
+                        doCreateApp={() => {
+                            // todo
+                            axios
+                                .get(`/api/user/${user.id}`)
+                                .then((res) => setUser(res.data))
+                        }}
+                    />
+
+                    <Routes>
+                        <Route
+                            path="/"
+                            element={<MarkdownPage path="./docs/index.md" />}
+                        />
+                        <Route path="user/:userId" element={<>user</>} />
+                        <Route
+                            path="user/:userId/arena"
+                            element={<>user arena</>}
+                        />
+                        <Route
+                            path="user/:userId/app/:appId"
+                            element={
+                                <AppPage
+                                    arena={arena}
+                                    doDelete={() => {
+                                        // todo
+                                        axios
+                                            .get(`/api/user/${user.id}`)
+                                            .then((res) => setUser(res.data))
+                                    }}
+                                    emitter={emitter}
+                                />
+                            }
+                        />
+                        <Route
+                            path="user/:userId/arena/logs"
+                            element={<ArenaLogPage arena={arena} />}
+                        />
+                    </Routes>
+                </Router>
+            </div>
+            <div
+                style={{
+                    position: 'absolute',
+                    height: '100%',
+                    width: '50%',
+                    top: 0,
+                    left: '50%',
+                    padding: '10px 10px 10px 5px',
+                }}
+            >
+                {user && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '22px',
+                            left: '22px',
+                        }}
+                    >
+                        <ArenaToolbar
+                            isPaused={isPaused}
+                            doPause={() =>
+                                axios.post(`/api/user/${user.id}/arena/pause`)
+                            }
+                            doResume={() =>
+                                axios.post(`/api/user/${user.id}/arena/resume`)
+                            }
+                            doRestart={() =>
+                                axios.post(`/api/user/${user.id}/arena/restart`)
+                            }
+                        />
+                    </div>
+                )}
+                <ArenaSvg darkMode={false} arena={arena} time={time}></ArenaSvg>
+            </div>
+        </>
     )
 }
 

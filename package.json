@@ -1,7 +1,7 @@
 {
-  "name": "battletank.io",
+  "name": "robocodeJs.com",
   "version": "1.0.0",
-  "description": "Welcome to Battlebots, [a browser-based programming game](https://battletank.io) for creating Javascript artificial intellegence that enables your bots compete for fame and glory! Brainstorm your own winning strategy, program your bot, and set it lose in the arena in teams of one or more to defeat your competition.",
+  "description": "Welcome to Battlebots, [a browser-based programming game](https://robocodeJs.com) for creating Javascript artificial intellegence that enables your bots compete for fame and glory! Brainstorm your own winning strategy, program your bot, and set it lose in the arena in teams of one or more to defeat your competition.",
   "script": "index.js",
   "main": "index.js",
   "scripts": {
@@ -9,14 +9,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LeeAdcock/battletank.io.git"
+    "url": "git+https://github.com/LeeAdcock/robocodeJs.com.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/LeeAdcock/battletank.io/issues"
+    "url": "https://github.com/LeeAdcock/robocodeJs.com/issues"
   },
-  "homepage": "https://github.com/LeeAdcock/battletank.io#readme",
+  "homepage": "https://github.com/LeeAdcock/robocodeJs.com#readme",
   "dependencies": {
     "forever": "^4.0.3",
     "http-proxy": "^1.18.1",

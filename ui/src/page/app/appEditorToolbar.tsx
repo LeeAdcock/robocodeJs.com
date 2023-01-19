@@ -22,11 +22,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                 <ButtonGroup style={{ marginRight: '5px' }}>
                     <OverlayTrigger
                         placement={'bottom'}
-                        overlay={
-                            <Tooltip id={`reformat`}>
-                                Save
-                            </Tooltip>
-                        }
+                        overlay={<Tooltip id={`reformat`}>Save</Tooltip>}
                     >
                         <Button
                             variant="secondary"

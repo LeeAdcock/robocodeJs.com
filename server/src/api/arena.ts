@@ -23,6 +23,12 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
   const arena = await arenaService.getDefaultForUser(user.getId());
   const env = await environmentService.get(arena);
 
+  const members = await arenaMemberService.getForArena(arena.getId());
+
+  const apps = await Promise.all(
+    members.map((member) => appService.get(member.getAppId()))
+  );
+
   res.status(200);
   res.send({
     height: arena.getHeight(),
@@ -31,8 +37,8 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
     clock: { time: env.getTime() },
     apps: env.getProcesses().map((process) => ({
       id: process.getAppId(),
-      //name: process.appId.getName(),
-      //userId: process.app.getUserId(),
+      name: apps.find((app) => app?.getId() === process.appId)?.getName(),
+      userId: apps.find((app) => app?.getId() === process.appId)?.getUserId(),
       tanks: process.tanks.map((tank) => ({
         id: tank.id,
         x: tank.x,
@@ -43,7 +49,7 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
         speedMax: tank.speedMax,
         bodyOrientation: tank.orientation,
         bodyOrientationTarget: tank.orientationTarget,
-        bodyOrientationVelocity: tank.orientation,
+        bodyOrientationVelocity: tank.orientationVelocity,
         turretOrientation: tank.turret.orientation,
         turretOrientationTarget: tank.turret.orientationTarget,
         turretOrientationVelocity: tank.turret.radar.orientationVelocity,
@@ -88,7 +94,9 @@ app.delete("/api/user/:userId/arena/app/:appId", async (req, res) => {
     res.send("Invalid app id");
     return;
   }
-  (await environmentService.getByArenaId(arena.getId()))?.removeApp(req.params.appId)
+  (await environmentService.getByArenaId(arena.getId()))?.removeApp(
+    req.params.appId
+  );
   return member.delete().then(() => {
     res.status(200);
     res.send();

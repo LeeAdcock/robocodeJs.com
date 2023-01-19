@@ -25,11 +25,11 @@ export default async (req, res, next) => {
               if (!user) {
                 // Should not be possbile to recognize their auth but not have
                 // a user record for them.
-                throw new Error("Missing account.")                
+                throw new Error("Missing account.");
               }
               (req as AuthenticatedRequest).user = user;
               return next();
-            })
+            });
           } else {
             // Create this user
             return userService

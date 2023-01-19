@@ -32,7 +32,23 @@ export default function AppPage(props) {
     const { userId, appId } = useParams()
 
     const navigate = useNavigate()
-    
+
+    const listener = (event) => {
+        setApp((app) => {
+            if (event.appId === appId && app) {
+                app.name = event.name
+                return { ...app, name: event.name }
+            }
+            return app
+        })
+    }
+    useEffect(() => {
+        props.emitter.addListener('appRenamed', listener)
+    })
+    useEffect(() => {
+        props.emitter.removeListener('appRenamed', listener)
+    }, [])
+
     useEffect(() => {
         axios
             .get(`/api/user/${userId}/app/${appId}/source`)
@@ -58,7 +74,7 @@ export default function AppPage(props) {
                 headers: { 'content-type': 'application/octet-stream' },
             })
             .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`))
-        .then((resp) => setApp({...app, name: resp.data.name}))
+            .then((resp) => setApp({ ...app, name: resp.data.name }))
     }
 
     const doDelete = () => {
@@ -97,19 +113,26 @@ export default function AppPage(props) {
                     >
                         {app && props.arena && (
                             <>
-                                { props.arena.apps.map(a=>a.id).includes(app.id) && <img
-                                    src={
-                                        '/sprites/tank_' +
-                                        colors[
-                                            props.arena.apps.findIndex((otherApp) => otherApp.id === app.id)
-                                        ] +
-                                        '.png'
-                                    }
-                                    style={{
-                                        height: '1em',
-                                        marginRight: '5px',
-                                    }}
-                                /> }
+                                {props.arena.apps
+                                    .map((a) => a.id)
+                                    .includes(app.id) && (
+                                    <img
+                                        src={
+                                            '/sprites/tank_' +
+                                            colors[
+                                                props.arena.apps.findIndex(
+                                                    (otherApp) =>
+                                                        otherApp.id === app.id
+                                                )
+                                            ] +
+                                            '.png'
+                                        }
+                                        style={{
+                                            height: '1em',
+                                            marginRight: '5px',
+                                        }}
+                                    />
+                                )}
                                 {titleCase(app?.name)}
                             </>
                         )}

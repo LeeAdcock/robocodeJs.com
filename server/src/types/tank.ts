@@ -111,9 +111,6 @@ export default class Tank implements Point, Orientated {
     this.orientation = Math.random() * 360;
     this.orientationTarget = this.orientation;
     this.turret = new TankTurret(this);
-
-    compiler.init(env, process, this);
-    this.execute(process)
   }
 
   getContext = (): ivm.Context => {
@@ -174,12 +171,12 @@ export default class Tank implements Point, Orientated {
     // todo sanitize name
     appService.get(this.process.getAppId()).then((app) => {
       if (app && app.getName() !== name) {
-        app.setName(name);
         this.env.emit("event", {
           type: "appRenamed",
           appId: app.getId(),
           name: name,
         });
+        return app.setName(name);
       }
     });
   }
@@ -198,7 +195,7 @@ export default class Tank implements Point, Orientated {
     } catch (e) {
       this.logger.error(e);
       this.appCrashed = true;
-      return Promise.resolve()
+      return Promise.resolve();
     }
   }
 
