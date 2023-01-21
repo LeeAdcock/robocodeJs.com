@@ -7,7 +7,8 @@ pool.query(`
   CREATE TABLE IF NOT EXISTS arena (
     id UUID,
     userId UUID,
-    createdTimestamp timestamp default CURRENT_TIMESTAMP
+    createdTimestamp timestamp default CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
   )
 `);
 

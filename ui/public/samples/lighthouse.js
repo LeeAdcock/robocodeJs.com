@@ -14,7 +14,7 @@ clock.on(Event.TICK, async () => {
     const targets = await bot.radar.scan()
 
     // Only if we see an enemy bot
-    if (targets.length > 0 && !target[0].friendly) {
+    if (targets.length > 0 && !targets[0].friendly) {
       // Turn the turret for a more accurate shot
       return bot.turret.setOrientation(targets[0].angle - bot.getOrientation()).then(() => {
         if (bot.turret.isReady()) bot.turret.fire()

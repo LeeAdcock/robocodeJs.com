@@ -7,4 +7,6 @@ interface Clock {
 export default interface Arena {
     apps: TankApp[]
     clock: Clock
+    height: number
+    width: number
 }

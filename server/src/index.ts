@@ -1,6 +1,8 @@
 import express from "express";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
+import path from "path";
+
 import auth from "./middleware/auth";
 
 import healthEndpoints from "./api/health";
@@ -22,6 +24,10 @@ app.use(healthEndpoints);
 app.use(userEndpoints);
 app.use(appEndpoints);
 app.use(arenaEndpoints);
+
+app.all('*', function(req, res){
+  res.sendFile(path.resolve(__dirname+"/../public/index.html"));
+});
 
 const port = 8080;
 app.listen(port, () => {

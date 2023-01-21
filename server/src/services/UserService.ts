@@ -9,7 +9,8 @@ pool.query(`
     name text,
     picture text,
     email text,
-    createdTimestamp timestamp default CURRENT_TIMESTAMP
+    createdTimestamp timestamp default CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
   )
 `);
 

@@ -11,7 +11,8 @@ pool.query(`
     name text,
     deleted boolean default false,
     createdTimestamp timestamp default CURRENT_TIMESTAMP,
-    updatedTimestamp timestamp default CURRENT_TIMESTAMP
+    updatedTimestamp timestamp default CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
   )
 `);
 

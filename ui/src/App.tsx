@@ -1,9 +1,6 @@
 import './App.css'
 import ArenaSvg from './components/arena/arena'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
-import Container from 'react-bootstrap/Container'
-import Row from 'react-bootstrap/Row'
-import Col from 'react-bootstrap/Col'
 import TankApp from './types/tankApp'
 import Arena from './types/arena'
 import AppPage from './page/app/appPage'
@@ -27,7 +24,6 @@ interface NavProps {
     user: User
     arena: Arena
     isPaused: boolean
-    doLogin: () => void
     doCreateApp: () => void
 }
 const Nav = (props: NavProps) => {
@@ -38,7 +34,6 @@ const Nav = (props: NavProps) => {
             apps={props.user?.apps}
             arena={props.arena}
             user={props.user}
-            doLogin={props.doLogin}
             isPaused={props.isPaused}
             doPause={() => axios.post(`/api/user/${props.user.id}/arena/pause`)}
             doResume={() =>
@@ -81,24 +76,20 @@ function App() {
     const [time, setTime] = useState(0)
     const [isPaused, setPaused] = useState(true)
 
-    const doLogin = () => {
-        // prompt to authenticate
-        google.accounts.id.initialize({
-            client_id:
-                '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
-            callback: (response) => {
-                document.cookie = 'auth=' + response.credential + '; path=/'
-                axios
-                    .get(`/api/user`)
-                    .then((res) =>
-                        axios
-                            .get(`/api/user/${res.data.id}`)
-                            .then((res) => setUser(res.data))
-                    )
-            },
-        })
-        google.accounts.id.prompt()
-    }
+    // Reset the experience if the user session expires
+    useEffect(() => {
+        const interval = setInterval(() => {
+            axios.get(`/api/user`).catch(() => {
+                setUser(null as unknown as User)
+                setArena({
+                    clock: { time: 0 },
+                    apps: [] as TankApp[],
+                } as Arena)
+                setPaused(true)
+            }).catch(() => google.accounts.id.prompt())
+        }, 30000);
+        return () => clearInterval(interval);
+      }, []);
 
     const doReloadArena = () => {
         return new Promise((resolve) => {
@@ -124,6 +115,26 @@ function App() {
     }
 
     useEffect(() => {
+        google.accounts.id.initialize({
+            client_id:
+                '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
+            callback: (response) => {
+                document.cookie = 'auth=' + response.credential + '; path=/'
+                axios
+                    .get(`/api/user`)
+                    .then((res) =>
+                        axios
+                            .get(`/api/user/${res.data.id}`)
+                            .then((res) => setUser(res.data))
+                            .then(() => google.accounts.id.cancel())
+                    )
+            },
+        })
+        google.accounts.id.renderButton(
+            document.getElementById("GoogleLoginButton"),
+            { theme: "outline", size: "medium" }  // customization attributes
+        );
+
         // On window open, try to authenticate
         window.onload = function () {
             axios
@@ -134,7 +145,7 @@ function App() {
                         .get(`/api/user/${res.data.id}`)
                         .then((res) => setUser(res.data))
                 })
-                .catch(doLogin)
+                .catch()
         }
 
         // pause on lost focus
@@ -449,7 +460,6 @@ function App() {
                         user={user}
                         arena={arena}
                         isPaused={isPaused}
-                        doLogin={doLogin}
                         doCreateApp={() => {
                             // todo
                             axios
@@ -458,36 +468,48 @@ function App() {
                         }}
                     />
 
-                    <Routes>
-                        <Route
-                            path="/"
-                            element={<MarkdownPage path="./docs/index.md" />}
-                        />
-                        <Route path="user/:userId" element={<>user</>} />
-                        <Route
-                            path="user/:userId/arena"
-                            element={<>user arena</>}
-                        />
-                        <Route
-                            path="user/:userId/app/:appId"
-                            element={
-                                <AppPage
-                                    arena={arena}
-                                    doDelete={() => {
-                                        // todo
-                                        axios
-                                            .get(`/api/user/${user.id}`)
-                                            .then((res) => setUser(res.data))
-                                    }}
-                                    emitter={emitter}
-                                />
-                            }
-                        />
-                        <Route
-                            path="user/:userId/arena/logs"
-                            element={<ArenaLogPage arena={arena} />}
-                        />
-                    </Routes>
+                    <div
+                        style={{
+                            height: 'calc(100% - 77px)',
+                            overflow: 'scroll',
+                            margin: '10px',
+                        }}
+                    >
+                        <Routes>
+                            <Route
+                                path="/"
+                                element={<MarkdownPage path="./docs/index.md" />}
+                            />
+                            <Route
+                                path="/privacy"
+                                element={<MarkdownPage path="./docs/privacy.md" />}
+                            />
+                            <Route path="user/:userId" element={<>user</>} />
+                            <Route
+                                path="user/:userId/arena"
+                                element={<>user arena</>}
+                            />
+                            <Route
+                                path="user/:userId/app/:appId"
+                                element={
+                                    <AppPage
+                                        arena={arena}
+                                        doDelete={() => {
+                                            // todo
+                                            axios
+                                                .get(`/api/user/${user.id}`)
+                                                .then((res) => setUser(res.data))
+                                        }}
+                                        emitter={emitter}
+                                    />
+                                }
+                            />
+                            <Route
+                                path="user/:userId/arena/logs"
+                                element={<ArenaLogPage arena={arena} />}
+                            />
+                        </Routes>
+                    </div>
                 </Router>
             </div>
             <div

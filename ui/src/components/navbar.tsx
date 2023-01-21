@@ -57,7 +57,6 @@ interface NavBarProps {
     doRestart: () => void
     doSave: () => void
     doCreateApp: () => void
-    doLogin: () => void
 }
 
 export default function NavBar(props: NavBarProps) {
@@ -193,7 +192,7 @@ export default function NavBar(props: NavBarProps) {
                 <Navbar.Collapse className="justify-content-end">
                     <Nav>
                         {props.user && (
-                            <Nav.Link href={`/user/${props.user?.id}`}>
+                            <Nav.Link>
                                 <OverlayTrigger
                                     placement={'bottom'}
                                     overlay={
@@ -214,9 +213,8 @@ export default function NavBar(props: NavBarProps) {
                             </Nav.Link>
                         )}
                         {!props.user && (
-                            <Nav.Link onClick={() => props.doLogin()}>
-                                Login
-                            </Nav.Link>
+                            <div id="GoogleLoginButton">
+                            </div>
                         )}
                     </Nav>
                 </Navbar.Collapse>

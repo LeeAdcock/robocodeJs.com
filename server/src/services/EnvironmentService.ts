@@ -2,17 +2,31 @@ import Arena from "../types/arena";
 import Environment, { ArenaId, Process } from "../types/environment";
 import arenaMemberService from "./ArenaMemberService";
 
-const store: Map<ArenaId, Environment> = new Map();
-
 export class EnvironmentService {
+
+  store: Map<ArenaId, Environment> = new Map();
+
+  constructor() {
+    // Garbage collection
+    setInterval(() => {
+      const threshold = new Date().getTime() - (30 * 60 * 1000); // thirty minutes ago
+      (Object.entries(this.store) as [ArenaId, Environment][]).forEach(([arenaId, env]) => {
+        if (env.stoppedAt && threshold > env.stoppedAt.getTime()) {
+          this.store.delete(arenaId)
+          env.dispose()
+        }
+      })
+    }, 10000)
+  }
+
   get = (arena: Arena): Promise<Environment> => {
-    let env: Environment = store[arena.getId()];
+    let env: Environment = this.store[arena.getId()];
     if (env) {
       return Promise.resolve(env);
     }
 
     env = new Environment(arena);
-    store[arena.getId()] = env;
+    this.store[arena.getId()] = env;
     return arenaMemberService
       .getForArena(arena.getId())
       .then((members) =>
@@ -25,10 +39,10 @@ export class EnvironmentService {
   };
 
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {
-    return Promise.resolve(store[arenaId]);
+    return Promise.resolve(this.store[arenaId]);
   };
 
-  has = (arenaId: ArenaId): boolean => store[arenaId] !== undefined;
+  has = (arenaId: ArenaId): boolean => this.store.has(arenaId);
 }
 
 export default new EnvironmentService();

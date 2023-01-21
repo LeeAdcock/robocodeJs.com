@@ -25,7 +25,7 @@ export class Process {
       const tank = new Tank(env, this);
       this.tanks.push(tank);
       compiler.init(env, this, tank);
-      tank.execute(process);
+      tank.execute(this);
     }
   }
 
@@ -39,6 +39,7 @@ export class Process {
           this.tanks.forEach((tank) => {
             tank.appCrashed = true;
             tank.logger.error(new Error(msg));
+            console.log(msg)
           });
           this.sandbox?.dispose();
         },
@@ -47,7 +48,8 @@ export class Process {
     return this.sandbox;
   };
 
-  reset() {
+  dispose() {
+    this.tanks.forEach(tank => tank.getContext().release())
     this.tanks = [];
     this.sandbox?.dispose();
     this.sandbox = null;
@@ -58,12 +60,17 @@ export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
   private clock: Clock = { time: 0 };
+  public stoppedAt: Date | null = null
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
 
   constructor(arena: Arena) {
     this.arena = arena;
     this.emitter = new EventEmitter();
+  }
+
+  dispose = () => {
+    this.processes.forEach(process => process.dispose())
   }
 
   isRunning = () => this.running;
@@ -200,6 +207,7 @@ export default class Environment {
       type: "arenaPaused",
     });
     this.running = false;
+    this.stoppedAt = new Date()
   }
   async restart() {
     this.emitter.emit("event", {
@@ -216,7 +224,7 @@ export default class Environment {
         });
       });
 
-      process.reset();
+      process.dispose();
 
       appService.get(process.getAppId()).then((app) => {
         if (app) {

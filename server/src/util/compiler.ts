@@ -279,6 +279,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
         } catch (e) {
           tank.logger.error(e);
           tank.appCrashed = true;
+          console.log(e)
         }
       });
     });
@@ -489,6 +490,7 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
       } catch (e) {
         tank.logger.error(e);
         tank.appCrashed = true;
+        console.log(e)
       }
     }
   });
@@ -669,6 +671,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
   } catch (e) {
     tank.logger.error(e);
     tank.appCrashed = true;
+    console.log(e)
   }
 };
 

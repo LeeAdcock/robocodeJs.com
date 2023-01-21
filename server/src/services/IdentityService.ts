@@ -7,7 +7,8 @@ pool.query(`
     userId UUID,
     source text,
     sourceId text,
-    createdTimestamp timestamp default CURRENT_TIMESTAMP
+    createdTimestamp timestamp default CURRENT_TIMESTAMP,
+    PRIMARY KEY (source, sourceId)
   )
 `);
 

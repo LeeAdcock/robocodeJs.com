@@ -6,8 +6,9 @@ import ArenaMember from "../types/arenaMember";
 pool.query(`
   CREATE TABLE IF NOT EXISTS arena_member (
     arenaId UUID,
+    appId UUID,
     createdTimestamp timestamp default CURRENT_TIMESTAMP,
-    appId UUID
+    PRIMARY KEY (arenaId, appId)
   )
 `);
 

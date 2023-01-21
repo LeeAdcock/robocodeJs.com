@@ -254,10 +254,10 @@ export default {
               bullet.y +
               bullet.speed * Math.cos(-bullet.orientation * (Math.PI / 180));
             if (
-              newX > 0 &&
-              newX < env.getArena().getWidth() &&
-              newY > 0 &&
-              newY < env.getArena().getHeight()
+              newX > -32 &&
+              newX < env.getArena().getWidth() + 32 &&
+              newY > -32 &&
+              newY < env.getArena().getHeight() + 32
             ) {
               bullet.x = newX;
               bullet.y = newY;

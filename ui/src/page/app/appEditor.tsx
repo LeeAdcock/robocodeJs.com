@@ -76,12 +76,12 @@ export default function CodeEditor(props: CodeEditorProps) {
             showGutter={true}
             highlightActiveLine={true}
             value={props.code}
-            height="calc(100% - 120px)"
+            height="calc(100% - 51px)"
             width="100%"
             setOptions={{
                 enableBasicAutocompletion: true,
-                enableLiveAutocompletion: false,
-                enableSnippets: false,
+                enableLiveAutocompletion: true,
+                enableSnippets: true,
                 showLineNumbers: true,
                 tabSize: 2,
                 printMargin: false,

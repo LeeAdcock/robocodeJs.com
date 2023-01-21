@@ -189,12 +189,13 @@ export default class Tank implements Point, Orientated {
     this.health / 100;
   }
 
-  execute(process): Promise<unknown> {
+  execute(process: Process): Promise<unknown> {
     try {
       return compiler.execute(process, this);
     } catch (e) {
       this.logger.error(e);
       this.appCrashed = true;
+      console.log(e)
       return Promise.resolve();
     }
   }

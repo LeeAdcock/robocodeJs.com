@@ -8,10 +8,10 @@ import BulletSvg from './arenaBullet'
 import TankSvg from './arenaTank'
 import TankPathSvg from './arenaTankPath'
 
-const ArenaStyle = React.memo(() => (
+const ArenaStyle = React.memo((props: {width:number, height:number}) => (
     <defs>
         <clipPath id="trim-extra">
-            <rect x="0" y="0" width="750" height="750" />
+            <rect x="0" y="0" width={props.width || 750} height={props.height || 750} />
         </clipPath>
         <pattern
             id="grass"
@@ -20,6 +20,14 @@ const ArenaStyle = React.memo(() => (
             patternUnits="userSpaceOnUse"
         >
             <image href={'/sprites/tileGrass1.png'} height="32" width="32" />
+        </pattern>
+        <pattern
+            id="ocean"
+            width="32"
+            height="32"
+            patternUnits="userSpaceOnUse"
+        >
+            <image href={'/sprites/ocean.png'} height="32" width="32" />
         </pattern>
         <pattern id="sand" width="32" height="32" patternUnits="userSpaceOnUse">
             <image href={'/sprites/tileSand1.png'} height="32" width="32" />
@@ -97,12 +105,18 @@ export default function ArenaSvg(props: ArenaSvgProps) {
             xmlns="http://www.w3.org/2000/svg"
             style={{
                 border: '2px solid rgb(33,37,41)',
-                backgroundColor: 'rgb(77,82,86)',
             }}
         >
-            <ArenaStyle />
+            <ArenaStyle width={props.arena.width} height={props.arena.height}/>
+            <rect
+            x="-100%"
+            y="-100%"
+            height="300%"
+            width="300%"
+            fill="url(#ocean)"
+            />
             <g
-                clip-path="url(#trim-extra)"
+                clipPath="url(#trim-extra)"
                 filter={props.darkMode ? 'url(#darkMode)' : undefined}
             >
                 <TerrainSvg>

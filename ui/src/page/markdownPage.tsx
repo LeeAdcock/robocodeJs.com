@@ -21,14 +21,6 @@ export default function MarkdownPage(props: MarkdownPageProps) {
     }, [md])
 
     return (
-        <div
-            style={{
-                height: 'calc(100% - 77px)',
-                overflow: 'scroll',
-                margin: '10px',
-            }}
-        >
-            {parse(html)}
-        </div>
+        <>{parse(html)}</>
     )
 }
