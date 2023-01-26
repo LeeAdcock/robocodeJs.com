@@ -324,6 +324,7 @@ const treePlanter = (x, y, isDead) => {
                     'rotate(' + Math.floor(Math.random() * 180) + ')',
                     'translate(-16,-16)',
                 ].join(' ')}
+                filter="url(#shadow)"
                 height={32 + Math.floor(Math.random() * 32)}
                 width={32 + Math.floor(Math.random() * 32)}
             />

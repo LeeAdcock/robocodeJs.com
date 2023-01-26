@@ -73,6 +73,9 @@ const ArenaStyle = React.memo((props: {width:number, height:number}) => (
                 />
             </feComponentTransfer>
         </filter>
+        <filter id='shadow' color-interpolation-filters="sRGB">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" flood-opacity="0.5"/>
+        </filter>       
         <pattern
             id="shadedRelief"
             patternUnits="userSpaceOnUse"
@@ -100,7 +103,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         <svg
             width="100%"
             height="100%"
-            viewBox="0 0 750 750"
+            viewBox="-10 -10 770 770"
             preserveAspectRatio="xMidYMid meet"
             xmlns="http://www.w3.org/2000/svg"
             style={{
@@ -109,11 +112,11 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         >
             <ArenaStyle width={props.arena.width} height={props.arena.height}/>
             <rect
-            x="-100%"
-            y="-100%"
-            height="300%"
-            width="300%"
-            fill="url(#ocean)"
+                x="-100%"
+                y="-100%"
+                height="300%"
+                width="300%"
+                fill="url(#ocean)"
             />
             <g
                 clipPath="url(#trim-extra)"

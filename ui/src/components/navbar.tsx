@@ -100,11 +100,11 @@ export default function NavBar(props: NavBarProps) {
                                 </a>
                             </Link>
                         </Navbar.Text>
-                        <Navbar.Text style={{ marginLeft: '10px' }}>
-                            |
-                        </Navbar.Text>
                         {props.user && (
                             <>
+                                <Navbar.Text style={{ marginLeft: '10px' }}>
+                                    |
+                                </Navbar.Text>
                                 <NavDropdown
                                     title="Apps"
                                     id="basic-nav-dropdown"
@@ -178,15 +178,8 @@ export default function NavBar(props: NavBarProps) {
                                         </NavDropdown.Item>
                                     )}
                                 </NavDropdown>
-                                <Navbar.Text>|</Navbar.Text>
                             </>
                         )}
-                        <Nav.Link
-                            target="_new"
-                            href="https://github.com/LeeAdcock/robocodeJs.com/blob/master/README.md"
-                        >
-                            Docs
-                        </Nav.Link>
                     </Nav>
                 </Navbar.Collapse>
                 <Navbar.Collapse className="justify-content-end">
