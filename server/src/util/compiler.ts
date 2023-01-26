@@ -6,6 +6,7 @@ import { createLogger } from "browser-bunyan";
 import { v4 as uuidv4 } from "uuid";
 import Environment, { Process } from "../types/environment";
 import appService from "../services/AppService";
+import { ErrorCodes } from "../types/ErrorCodes";
 
 function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   // Expose getOrientation
@@ -32,7 +33,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
         tank.turret.radar
           .setOrientation(arg)
           .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+          .catch(reject);
       }
     );
   isolate
@@ -64,10 +65,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_radar_turn",
       (arg: number, resolve: () => void, reject: () => void) => {
-        tank.turret.radar
-          .turn(arg)
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.radar.turn(arg).then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -84,10 +82,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_radar_scan",
       (resolve: (result: []) => void, reject: () => void) => {
-        tank.turret.radar
-          .scan()
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.radar.scan().then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -104,10 +99,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_radar_onReady",
       (resolve: (result: void) => void, reject: () => void) => {
-        tank.turret.radar
-          .onReady()
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.radar.onReady().then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -156,10 +148,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_turret_setOrientation",
       (arg: number, resolve: () => void, reject: () => void) => {
-        tank.turret
-          .setOrientation(arg)
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.setOrientation(arg).then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -191,10 +180,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_turret_turn",
       (arg: number, resolve: () => void, reject: () => void) => {
-        tank.turret
-          .turn(arg)
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.turn(arg).then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -212,10 +198,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_turret_fire",
       (resolve: () => void, reject: () => void) => {
-        tank.turret
-          .fire()
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.fire().then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -232,10 +215,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_turret_onReady",
       (resolve: (result: void) => void, reject: () => void) => {
-        tank.turret
-          .onReady()
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turret.onReady().then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -277,9 +257,9 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
             );
           });
         } catch (e) {
-          tank.logger.error(e);
+          tank.logger.error(`${ErrorCodes.E013}: ${e}`);
           tank.appCrashed = true;
-          console.log(e)
+          console.log(e);
         }
       });
     });
@@ -328,10 +308,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_setSpeed",
       (arg: number, resolve: () => void, reject: () => void) => {
-        tank
-          .setSpeed(arg)
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.setSpeed(arg).then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -363,10 +340,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_setOrientation",
       (arg: number, resolve: () => void, reject: () => void) => {
-        tank
-          .setOrientation(arg)
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.setOrientation(arg).then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -425,10 +399,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .global.setSync(
       "_bot_turn",
       (arg: number, resolve: () => void, reject: () => void) => {
-        tank
-          .turn(arg)
-          .then(resolve, reject)
-          .catch((e) => tank.logger.error(e));
+        tank.turn(arg).then(resolve, reject).catch(reject);
       }
     );
   isolate
@@ -488,9 +459,9 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
           .compileScriptSync(app.getSource())
           .runSync(tank.getContext(), { timeout: 5000 });
       } catch (e) {
-        tank.logger.error(e);
+        tank.logger.error(`${ErrorCodes.E017}: ${e}`);
         tank.appCrashed = true;
-        console.log(e)
+        console.log(e);
       }
     }
   });
@@ -669,9 +640,9 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       )
       .runSync(tank.getContext(), {});
   } catch (e) {
-    tank.logger.error(e);
+    tank.logger.error(`${ErrorCodes.E018}: ${e}`);
     tank.appCrashed = true;
-    console.log(e)
+    console.log(e);
   }
 };
 

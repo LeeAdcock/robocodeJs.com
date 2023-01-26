@@ -1,14 +1,14 @@
 import Clock from "./clock";
 import { EventEmitter } from "events";
-import { AppId } from "./app";
+import TankApp, { AppId } from "./app";
 import Tank from "./tank";
-import TankApp from "./app";
-import Simulation from "../util/simulation";
 import ivm from "isolated-vm";
 import Arena from "./arena";
 import compiler from "../util/compiler";
 
+import Simulation from "../util/simulation";
 import appService from "../services/AppService";
+import { ErrorCodes } from "./ErrorCodes";
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type ArenaId = string & {};
@@ -19,14 +19,8 @@ export class Process {
 
   private sandbox: ivm.Isolate | null = null;
 
-  constructor(env: Environment, appId: AppId) {
+  constructor(appId: AppId) {
     this.appId = appId;
-    for (let x = 0; x < 5; x++) {
-      const tank = new Tank(env, this);
-      this.tanks.push(tank);
-      compiler.init(env, this, tank);
-      tank.execute(this);
-    }
   }
 
   getAppId = () => this.appId;
@@ -38,8 +32,8 @@ export class Process {
         onCatastrophicError: (msg) => {
           this.tanks.forEach((tank) => {
             tank.appCrashed = true;
-            tank.logger.error(new Error(msg));
-            console.log(msg)
+            tank.logger.error(new Error(`${ErrorCodes.E001}: ${msg}`));
+            console.log(msg);
           });
           this.sandbox?.dispose();
         },
@@ -49,7 +43,7 @@ export class Process {
   };
 
   dispose() {
-    this.tanks.forEach(tank => tank.getContext().release())
+    this.tanks.forEach((tank) => tank.getContext().release());
     this.tanks = [];
     this.sandbox?.dispose();
     this.sandbox = null;
@@ -60,7 +54,7 @@ export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
   private clock: Clock = { time: 0 };
-  public stoppedAt: Date | null = null
+  public stoppedAt: Date | null = null;
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
 
@@ -70,8 +64,8 @@ export default class Environment {
   }
 
   dispose = () => {
-    this.processes.forEach(process => process.dispose())
-  }
+    this.processes.forEach((process) => process.dispose());
+  };
 
   isRunning = () => this.running;
   getTime = () => this.clock.time;
@@ -207,7 +201,7 @@ export default class Environment {
       type: "arenaPaused",
     });
     this.running = false;
-    this.stoppedAt = new Date()
+    this.stoppedAt = new Date();
   }
   async restart() {
     this.emitter.emit("event", {
@@ -266,10 +260,14 @@ export default class Environment {
   }
 
   addApp(app: TankApp) {
-    const process = new Process(this, app.getId());
+    const process = new Process(app.getId());
     this.processes.push(process);
 
-    process.tanks.forEach((tank) => {
+    for (let x = 0; x < 5; x++) {
+      const tank = new Tank(this, process);
+      process.tanks.push(tank);
+
+      compiler.init(this, process, tank);
       tank.execute(process);
 
       // Emit new tank event
@@ -288,7 +286,7 @@ export default class Environment {
         x: tank.x,
         y: tank.y,
       });
-    });
+    }
   }
 
   removeApp(appId: AppId) {

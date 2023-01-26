@@ -11,6 +11,7 @@ import ivm from "isolated-vm";
 import compiler from "../util/compiler";
 import Environment, { Process } from "./environment";
 import appService from "../services/AppService";
+import { ErrorCodes } from "./ErrorCodes";
 
 // Convenience function that ensures an angle is between 0 and 360
 export const normalizeAngle = (x: number): number => {
@@ -152,7 +153,7 @@ export default class Tank implements Point, Orientated {
                 result
                   .then(() => eventPromiseMap.delete(event))
                   .catch((e) => {
-                    this.logger.warn(e);
+                    this.logger.warn(`${ErrorCodes.W001}: ${e}`);
                     eventPromiseMap.delete(event);
                   });
               }
@@ -160,9 +161,11 @@ export default class Tank implements Point, Orientated {
               const endTime = new Date();
               const duration = endTime.getTime() - startTime.getTime();
               if (duration > 25)
-                this.logger.warn("Handler " + event + " took a long time");
+                this.logger.warn(
+                  `${ErrorCodes.W002}: Handler ${event} took a long time`
+                );
             } catch (e) {
-              this.logger.error(e);
+              this.logger.error(`${ErrorCodes.E003}: ${e}`);
             }
           }, 0);
   }
@@ -193,9 +196,9 @@ export default class Tank implements Point, Orientated {
     try {
       return compiler.execute(process, this);
     } catch (e) {
-      this.logger.error(e);
+      this.logger.error(`${ErrorCodes.E004}: ${e}`);
       this.appCrashed = true;
-      console.log(e)
+      console.log(e);
       return Promise.resolve();
     }
   }

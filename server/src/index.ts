@@ -25,8 +25,8 @@ app.use(userEndpoints);
 app.use(appEndpoints);
 app.use(arenaEndpoints);
 
-app.all('*', function(req, res){
-  res.sendFile(path.resolve(__dirname+"/../public/index.html"));
+app.all("*", function (req, res) {
+  res.sendFile(path.resolve(__dirname + "/../public/index.html"));
 });
 
 const port = 8080;
