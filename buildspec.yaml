@@ -13,3 +13,4 @@ artifacts:
   base-directory: server
   files:
     - 'dist/**/*'
+    - '.ebextensions/**/*'
