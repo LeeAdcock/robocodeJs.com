@@ -9,9 +9,6 @@ phases:
     commands:
       - (cd ui && npm run build)
       - (cd server && npm run build)
-  post_build:
-    commands:
-      - (cd server && npm run package)
 artifacts:
   files:
-    - 'server/*.zip'
+    - 'server/dist/**/*'
