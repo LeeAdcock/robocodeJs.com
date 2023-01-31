@@ -30,7 +30,7 @@
   },
   "scripts": {
     "start": "fuser -k 3000/tcp & react-scripts start",
-    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build && rm -fr ../server/dist/public && mv build ../server/dist/public",
+    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build && rm -fr ../server/dist/public && mkdir ../server/dist/ -p && mv build ../server/dist/public",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts src --fix ; prettier --write src"
