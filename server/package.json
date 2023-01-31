@@ -10,7 +10,7 @@
     "lint": "npx prettier --write src && npx eslint src --fix",
     "start": "node ./dist/src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "package": "npm version patch && npm shrinkwrap && zip -r robocodejs-${npm_package_version}.zip ./ -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
+    "package": "npm version patch && npm shrinkwrap && zip -r robocodejs-${npm_package_version}.zip ./ -x '*src*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
   "author": "",
   "license": "ISC",
