@@ -12,7 +12,6 @@ phases:
   post_build:
     commands:
       - (cd server && npm run package)
-      - (cd server export VERSION=$(npm pkg get version))
 artifacts:
   files:
-    - 'server/robocodejs$Env:VERSION.zip'
+    - 'server/*.zip'
