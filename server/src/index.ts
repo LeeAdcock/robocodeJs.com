@@ -17,7 +17,7 @@ app.use("/api", [
   bodyParser.json({}),
   bodyParser.raw({ type: "application/octet-stream" }),
   cookieParser(),
-  auth,
+  auth(true),
 ]);
 app.use("/", express.static("./dist/public"));
 

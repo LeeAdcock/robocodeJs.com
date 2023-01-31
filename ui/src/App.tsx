@@ -98,7 +98,6 @@ function App() {
         return new Promise((resolve) => {
             axios.get(`/api/user/${user.id}/arena`).then((res) => {
                 setTime(res.data.clock.time)
-                console.log(res.data)
                 res.data.apps.forEach((app) =>
                     app.tanks.forEach((tank) => {
                         tank.path = Array<PointInTime>(20)

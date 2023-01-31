@@ -2,6 +2,9 @@ import User, { UserId } from "../types/user";
 import { v4 as uuidv4 } from "uuid";
 import arenaService from "./ArenaService";
 import pool from "../util/db";
+import appService from "./AppService";
+import arenaMemberService from "./ArenaMemberService";
+import environmentService from "./EnvironmentService";
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS account (
@@ -34,7 +37,48 @@ class UserService {
         ],
       })
       .then(() =>
-        arenaService.create(user.getId()).then(() => Promise.resolve(user))
+        arenaService
+          .create(user.getId())
+          .then((arena) =>
+            Promise.all(
+              [
+                appService.create(user.getId())
+                .then((app) => {
+                  app.setName("My First Bot")
+                  app.setSource(`
+// Set the bot's name
+bot.setName('My First Bot')
+
+// Begin accelerating
+bot.setSpeed(2)
+
+// Fire when turret is ready
+function fireIfReady() {
+  if(bot.turret.isReady()) {
+    bot.turret.fire()
+  }
+}
+clock.on(Event.TICK, fireIfReady)
+
+// After firing, turn to the right
+function turnRight() {
+  bot.turn(10)  
+}
+bot.on(Event.FIRED, turnRight)
+              `).then(() => arenaMemberService.create(arena.getId(), app.getId()))              
+            }),
+            appService.create(user.getId())
+            .then((app) => {
+              app.setName("Target Practice")
+              app.setSource(`
+// Set the bot's name
+bot.setName('Target Practice')
+`).then(() => arenaMemberService.create(arena.getId(), app.getId()))
+            })
+          ])
+            .then(()=>environmentService.get(arena).then(env=>env.resume()))
+            .then(() => user)
+          )
       );
   };
 

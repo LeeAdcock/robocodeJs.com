@@ -1,5 +1,7 @@
 import express from "express";
 import Classifier from 'ml-classify-text'
+import auth, { AuthenticatedRequest } from "../middleware/auth";
+import cookieParser from "cookie-parser";
 
 const turret = [
   'fire',
@@ -47,6 +49,18 @@ const bot = [
   'Can the bot turn faster?',
 ]
 
+const logs = [
+  'how do I view the logs?',
+  'how do I get the logs?',
+  'where are the logs?',
+  'can i get the logs?',
+  'how do I view the console?',
+  'how do I get the console?',
+  'where is the console?',
+  'can i get to the console?',
+  'where does console.log go',
+]
+
 const clock = [
   'how to set an interval timer?',
   'how to set an timeout timer?',
@@ -54,6 +68,8 @@ const clock = [
   'how to stop a timer?',
   'how to stop an interval?',
   'what is the clock?',
+  'how does the clock work?',
+  'how do timers work?',
   'what time is it?',
   'what is the time?',
   'what is a clock tick?',
@@ -63,7 +79,7 @@ const clock = [
 
 const classifier = new Classifier()
 classifier.train(turret, 'turret')
-classifier.train(radar, 'radar')
+classifier.train(logs, 'logs')
 classifier.train(radar, 'radar')
 classifier.train(bot, 'bot')
 classifier.train(clock, 'clock')
@@ -71,7 +87,7 @@ classifier.train(clock, 'clock')
 const app = express();
 
 // Get current user
-app.get("/ask", async (req, res) => {
+app.get("/ask", [cookieParser(), auth(false), async (req, res) => {
   if(req.query.question) {
     const predictions = classifier.predict(req.query.question)
     if(predictions.length) {
@@ -84,12 +100,19 @@ app.get("/ask", async (req, res) => {
           return res.send({answer:"/dev#radar"})
         case "turret":
           return res.send({answer:"/dev#turret"})
+        case "logs": {
+          const user = (req as unknown as AuthenticatedRequest).user
+          if(user)
+            return res.send({answer:`/user/${user.getId()}/arena/logs`})
+          else
+            return res.send({answer:"/dev#consolelogging"})
+        }
         default:
           return res.send({answer:"/help"})
         }
     }
   }
    return res.send({answer:"/help"})
-  });
+  }]);
 
 export default app;

@@ -5,7 +5,7 @@ import User from "../types/user";
 
 export type AuthenticatedRequest = Request & { user: User };
 
-export default async (req, res, next) => {
+export default (required: boolean) => async (req, res, next) => {
   const googleClientId =
     "344303216827-jtutvdqjp24q0or2fpqf5mihja138sem.apps.googleusercontent.com";
   const client = new OAuth2Client(googleClientId);
@@ -45,9 +45,13 @@ export default async (req, res, next) => {
       }
     })
     .catch((e) => {
-      console.log(e)
-      res.clearCookie("auth");
-      res.status(401);
-      res.send("Access forbidden");
+      if(required) {
+        console.log(e)
+        res.clearCookie("auth");
+        res.status(401);
+        res.send("Access forbidden");
+      } else {
+        next()
+      }
     });
 };
