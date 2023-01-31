@@ -1,0 +1,13 @@
+phases:
+  install:
+    commands:
+      - yum install gcc72 gcc72-c++
+      - (cd ui && npm i)
+      - (cd server && npm i)
+  build:
+    commands:
+      - (cd ui && npm run build)
+      - (cd server && npm run build)
+  post_build:
+    commands:
+      - (cd server && npm run package)

@@ -79,17 +79,20 @@ function App() {
     // Reset the experience if the user session expires
     useEffect(() => {
         const interval = setInterval(() => {
-            axios.get(`/api/user`).catch(() => {
-                setUser(null as unknown as User)
-                setArena({
-                    clock: { time: 0 },
-                    apps: [] as TankApp[],
-                } as Arena)
-                setPaused(true)
-            }).catch(() => google.accounts.id.prompt())
-        }, 30000);
-        return () => clearInterval(interval);
-      }, []);
+            axios
+                .get(`/api/user`)
+                .catch(() => {
+                    setUser(null as unknown as User)
+                    setArena({
+                        clock: { time: 0 },
+                        apps: [] as TankApp[],
+                    } as Arena)
+                    setPaused(true)
+                })
+                .catch(() => google.accounts.id.prompt())
+        }, 30000)
+        return () => clearInterval(interval)
+    }, [])
 
     const doReloadArena = () => {
         return new Promise((resolve) => {
@@ -120,20 +123,18 @@ function App() {
                 '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
             callback: (response) => {
                 document.cookie = 'auth=' + response.credential + '; path=/'
-                axios
-                    .get(`/api/user`)
-                    .then((res) =>
-                        axios
-                            .get(`/api/user/${res.data.id}`)
-                            .then((res) => setUser(res.data))
-                            .then(() => google.accounts.id.cancel())
-                    )
+                axios.get(`/api/user`).then((res) =>
+                    axios
+                        .get(`/api/user/${res.data.id}`)
+                        .then((res) => setUser(res.data))
+                        .then(() => google.accounts.id.cancel())
+                )
             },
         })
         google.accounts.id.renderButton(
-            document.getElementById("GoogleLoginButton"),
-            { theme: "outline", size: "medium" }  // customization attributes
-        );
+            document.getElementById('GoogleLoginButton'),
+            { theme: 'outline', size: 'medium' } // customization attributes
+        )
 
         // On window open, try to authenticate
         window.onload = function () {
@@ -476,14 +477,11 @@ function App() {
                         }}
                     >
                         <Routes>
-                            <Route
-                                path="/"
-                                element={<MarkdownPage path="./docs/index.md" />}
-                            />
-                            <Route
-                                path="/privacy"
-                                element={<MarkdownPage path="./docs/privacy.md" />}
-                            />
+                            <Route path="/" element={<MarkdownPage path="index"/> }/>
+                            <Route path="/privacy" element={<MarkdownPage path="privacy"/> }/>
+                            <Route path="/examples" element={<MarkdownPage path="examples"/> }/>
+                            <Route path="/dev" element={<MarkdownPage path="dev"/> }/>
+
                             <Route path="user/:userId" element={<>user</>} />
                             <Route
                                 path="user/:userId/arena"
@@ -498,7 +496,9 @@ function App() {
                                             // todo
                                             axios
                                                 .get(`/api/user/${user.id}`)
-                                                .then((res) => setUser(res.data))
+                                                .then((res) =>
+                                                    setUser(res.data)
+                                                )
                                         }}
                                         emitter={emitter}
                                     />
@@ -506,8 +506,9 @@ function App() {
                             />
                             <Route
                                 path="user/:userId/arena/logs"
-                                element={<ArenaLogPage arena={arena} />}
+                                element={<ArenaLogPage />}
                             />
+
                         </Routes>
                     </div>
                 </Router>

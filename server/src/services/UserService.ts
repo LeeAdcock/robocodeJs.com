@@ -20,8 +20,9 @@ class UserService {
     picture: string | undefined,
     email: string | undefined
   ): Promise<User> => {
-    const userId = uuidv4();
+    const userId:UserId = uuidv4();
     const user = new User(userId, name, picture, email);
+    console.log("creating user", userId)
     return pool
       .query({
         text: "INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)",

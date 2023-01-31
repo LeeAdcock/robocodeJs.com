@@ -8,10 +8,15 @@ import BulletSvg from './arenaBullet'
 import TankSvg from './arenaTank'
 import TankPathSvg from './arenaTankPath'
 
-const ArenaStyle = React.memo((props: {width:number, height:number}) => (
+const ArenaStyle = React.memo((props: { width: number; height: number }) => (
     <defs>
         <clipPath id="trim-extra">
-            <rect x="0" y="0" width={props.width || 750} height={props.height || 750} />
+            <rect
+                x="0"
+                y="0"
+                width={props.width || 750}
+                height={props.height || 750}
+            />
         </clipPath>
         <pattern
             id="grass"
@@ -73,9 +78,9 @@ const ArenaStyle = React.memo((props: {width:number, height:number}) => (
                 />
             </feComponentTransfer>
         </filter>
-        <filter id='shadow' color-interpolation-filters="sRGB">
-            <feDropShadow dx="0" dy="0" stdDeviation="3" flood-opacity="0.5"/>
-        </filter>       
+        <filter id="shadow" color-interpolation-filters="sRGB">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" flood-opacity="0.5" />
+        </filter>
         <pattern
             id="shadedRelief"
             patternUnits="userSpaceOnUse"
@@ -110,12 +115,12 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                 border: '2px solid rgb(33,37,41)',
             }}
         >
-            <ArenaStyle width={props.arena.width} height={props.arena.height}/>
+            <ArenaStyle width={props.arena.width} height={props.arena.height} />
             <rect
-                x="-100%"
-                y="-100%"
-                height="300%"
-                width="300%"
+                x="-200%"
+                y="-200%"
+                height="500%"
+                width="500%"
                 fill="url(#ocean)"
             />
             <g

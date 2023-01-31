@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 
 import Logs from './logs'
-import User from './../../types/user'
-import Arena from './../../types/arena'
 
 let eventSource: EventSource | undefined
 
@@ -21,13 +19,9 @@ interface LogEntries {
     index: number
 }
 
-interface ArenaLogsPageProps {
-    arena: Arena
-}
-
-export default function ArenaLogsPage(props: ArenaLogsPageProps) {
+export default function ArenaLogsPage() {
     const [logEntries, setLogEntries] = useState({
-        logs: new Array(50) as LogEntry[],
+        logs: new Array(500) as LogEntry[],
         index: 0,
     } as LogEntries)
     const { userId } = useParams()
@@ -47,7 +41,7 @@ export default function ArenaLogsPage(props: ArenaLogsPageProps) {
                 oldLogs.logs[oldLogs.index] = logEntry
                 return {
                     logs: oldLogs.logs,
-                    index: (oldLogs.index + 1) % 50,
+                    index: (oldLogs.index + 1) % oldLogs.logs.length,
                 }
             })
         }

@@ -4,6 +4,7 @@ import Nav from 'react-bootstrap/Nav'
 import NavDropdown from 'react-bootstrap/NavDropdown'
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
 import Tooltip from 'react-bootstrap/Tooltip'
+import Form from 'react-bootstrap/Form'
 import { FaSyncAlt, FaPauseCircle, FaPlayCircle } from 'react-icons/fa'
 import { colors } from '../util/colors'
 import { Link } from 'react-router-dom'
@@ -11,6 +12,7 @@ import TankApp from '../types/tankApp'
 import User from '../types/user'
 import Arena from '../types/arena'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 
 const titleCase = (str: string) =>
     str
@@ -69,6 +71,7 @@ export default function NavBar(props: NavBarProps) {
                 variant="dark"
                 expand="sm"
                 style={{ padding: '10px' }}
+                className="topNavBar"
             >
                 <Navbar.Brand className="nav-item">
                     <span
@@ -100,16 +103,34 @@ export default function NavBar(props: NavBarProps) {
                                 </a>
                             </Link>
                         </Navbar.Text>
+                        <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
+                            |
+                        </Navbar.Text>
+                        <Navbar.Text>
+                            <Link
+                                to={{
+                                    pathname: '/dev',
+                                }}
+                            >
+                                <a
+                                    className="nav-link"
+                                    style={{ padding: '0px' }}
+                                >
+                                    Docs
+                                </a>
+                            </Link>
+                        </Navbar.Text>
+                        <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
+                            |
+                        </Navbar.Text>
+                                           
                         {props.user && (
                             <>
-                                <Navbar.Text style={{ marginLeft: '10px' }}>
-                                    |
-                                </Navbar.Text>
                                 <NavDropdown
                                     title="Apps"
                                     id="basic-nav-dropdown"
                                 >
-                                    {props.apps?.map((app) => (
+                                    {props.apps?.sort((a,b)=>a.name.localeCompare(b.name)).map((app) => (
                                         <NavDropdown.Item
                                             key={app.id}
                                             onClick={() =>
@@ -134,17 +155,14 @@ export default function NavBar(props: NavBarProps) {
                                         Create new application
                                     </NavDropdown.Item>
                                     <NavDropdown.Item
-                                        onClick={() => {
-                                            window.open(
-                                                'https://github.com/LeeAdcock/robocodeJs.com/tree/main/ui/public/samples',
-                                                '_new'
-                                            )
-                                        }}
+                                        onClick={() => navigate("/examples")}
                                     >
-                                        View sample applications
+                                        View example applications
                                     </NavDropdown.Item>
                                 </NavDropdown>
-                                <Navbar.Text>|</Navbar.Text>
+                                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
+                                    |
+                                </Navbar.Text>
                                 <NavDropdown
                                     title="Arena"
                                     id="basic-nav-dropdown"
@@ -178,10 +196,37 @@ export default function NavBar(props: NavBarProps) {
                                         </NavDropdown.Item>
                                     )}
                                 </NavDropdown>
+                                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
+                                    |
+                                </Navbar.Text>
                             </>
                         )}
                     </Nav>
+                    <Nav>
+                        <Form>
+                        <Form.Control
+                            size="sm"
+                            type="search"
+                            placeholder="How do I..."
+                            aria-label="Search"
+                            onKeyDown={event =>
+                                {
+                                    if(event.key==='Enter')
+                                    {
+                                        event.preventDefault();
+                                        axios
+                                        .get(`/ask?question=${event.currentTarget.value}`)
+                                        .then((res) => {
+                                            navigate(res.data.answer)
+                                        })
+                                    }
+                                }
+                            }
+                        />
+                        </Form>
+                    </Nav>
                 </Navbar.Collapse>
+
                 <Navbar.Collapse className="justify-content-end">
                     <Nav>
                         {props.user && (
@@ -205,12 +250,10 @@ export default function NavBar(props: NavBarProps) {
                                 </OverlayTrigger>
                             </Nav.Link>
                         )}
-                        {!props.user && (
-                            <div id="GoogleLoginButton">
-                            </div>
-                        )}
+                        {!props.user && <div id="GoogleLoginButton"></div>}
                     </Nav>
                 </Navbar.Collapse>
+       
             </Navbar>
         </>
     )

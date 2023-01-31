@@ -33,7 +33,7 @@ export default function AppPage(props) {
 
     const navigate = useNavigate()
 
-    const listener = (event) => {
+    const appRenamedListener = (event) => {
         setApp((app) => {
             if (event.appId === appId && app) {
                 app.name = event.name
@@ -43,11 +43,11 @@ export default function AppPage(props) {
         })
     }
     useEffect(() => {
-        props.emitter.addListener('appRenamed', listener)
+        props.emitter.addListener('appRenamed', appRenamedListener)
+        return () => {
+            props.emitter.removeListener('appRenamed', appRenamedListener)
+        }
     })
-    useEffect(() => {
-        props.emitter.removeListener('appRenamed', listener)
-    }, [])
 
     useEffect(() => {
         axios
@@ -61,8 +61,11 @@ export default function AppPage(props) {
     useEffect(() => {
         debounce(
             () =>
-                axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
-                    headers: { 'content-type': 'application/octet-stream' },
+                setCode((code) => {
+                    axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
+                        headers: { 'content-type': 'application/octet-stream' },
+                    })
+                    return code
                 }),
             30000
         )
@@ -74,7 +77,6 @@ export default function AppPage(props) {
                 headers: { 'content-type': 'application/octet-stream' },
             })
             .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`))
-            .then((resp) => setApp({ ...app, name: resp.data.name }))
     }
 
     const doDelete = () => {

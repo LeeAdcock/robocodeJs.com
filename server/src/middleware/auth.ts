@@ -44,7 +44,9 @@ export default async (req, res, next) => {
         });
       }
     })
-    .catch(() => {
+    .catch((e) => {
+      console.log(e)
+      res.clearCookie("auth");
       res.status(401);
       res.send("Access forbidden");
     });

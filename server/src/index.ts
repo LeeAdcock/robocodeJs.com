@@ -9,6 +9,7 @@ import healthEndpoints from "./api/health";
 import userEndpoints from "./api/user";
 import appEndpoints from "./api/app";
 import arenaEndpoints from "./api/arena";
+import helpEndpoints from "./api/help";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api", [
 app.use("/", express.static("./dist/public"));
 
 app.use(healthEndpoints);
+app.use(helpEndpoints);
 app.use(userEndpoints);
 app.use(appEndpoints);
 app.use(arenaEndpoints);

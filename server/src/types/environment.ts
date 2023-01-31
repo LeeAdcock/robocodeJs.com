@@ -26,7 +26,7 @@ export class Process {
   getAppId = () => this.appId;
 
   getSandbox = (): ivm.Isolate => {
-    if (!this.sandbox) {
+    if (!this.sandbox || this.sandbox.isDisposed) {
       this.sandbox = new ivm.Isolate({
         memoryLimit: 8,
         onCatastrophicError: (msg) => {
@@ -54,7 +54,7 @@ export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
   private clock: Clock = { time: 0 };
-  public stoppedAt: Date | null = null;
+  public stoppedAt: Date = new Date();
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
 
@@ -263,6 +263,7 @@ export default class Environment {
     const process = new Process(app.getId());
     this.processes.push(process);
 
+    console.log("add app")
     for (let x = 0; x < 5; x++) {
       const tank = new Tank(this, process);
       process.tanks.push(tank);

@@ -11,3 +11,70 @@ code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
         monospace;
 }
+
+.topNavBar .nav-link {
+    color: white !important;
+    text-decoration: underline;
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+}
+
+.markdown {
+    padding-top: 10px;
+}
+
+.markdown p, ul {
+    padding-left: 20px;
+}
+
+.markdown h1 {
+    font-size: 1.4em;
+    background: url('../public/sprites/tileGrass1.png');
+    padding-left: 5px;
+
+}
+
+.markdown h1::before{
+    content: '';
+    background: url('../public/sprites/tank_red.png') left center no-repeat;
+    vertical-align: middle;
+    background-size: 16px auto;
+    padding-left: 20px;
+
+}
+
+.markdown h2 {
+    font-size: 1.2em;
+    font-weight: bold;
+    padding-left: 20px;
+}
+
+.markdown h3 {
+    font-size: 1em;
+    font-weight: bold;
+    padding-left: 20px;
+}
+
+.markdown h4 {
+    font-size: 1em;
+    font-weight: bold;
+    padding-left: 20px;
+}
+
+.markdown code {
+    color: green;
+}
+
+.markdown ul {
+    list-style-type: square;
+}
+
+.markdown pre {
+    margin-left: 20px;
+    border-left: 3px solid #AA6C39;
+    padding-left: 10px;
+}
+
+.markdown a {
+    color: #AA6C39;
+}

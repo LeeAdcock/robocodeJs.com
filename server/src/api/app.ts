@@ -132,17 +132,14 @@ app.post("/api/user/:userId/app/:appId/compile", async (req, res) => {
     arenas
       .filter((arena) => environmentService.has(arena.getId()))
       .map((arena) =>
-        environmentService
-          .get(arena)
-          .then((env) => env.execute(app.getId()))
-          .then(() => {
-            res.status(200);
-            res.send({
-              name: app.getName(),
-            });
-          })
+        environmentService.get(arena).then((env) => env.execute(app.getId()))
       )
-  );
+  ).then(() => {
+    res.status(200);
+    res.send({
+      name: app.getName(),
+    });
+  });
 });
 
 // Get app source code
