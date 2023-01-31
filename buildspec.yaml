@@ -10,5 +10,6 @@ phases:
       - (cd ui && npm run build)
       - (cd server && npm run build)
 artifacts:
+  base-directory: server
   files:
-    - 'server/dist/**/*'
+    - 'dist/**/*'
