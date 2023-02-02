@@ -241,7 +241,6 @@ app.get("/api/user/:userId/arena/events", async (req, res) => {
   return environmentService.get(arena).then((env) => {
     env.addListener("event", listener);
     req.on("close", () => {
-      console.log("closed connection");
       env.removeListener("event", listener);
       res.end();
     });

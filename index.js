@@ -6,7 +6,7 @@ const port = 5000;
 
 http.createServer(function(req, res) {
     let target;
-    if (req.url.startsWith("/api") || req.url.startsWith("/health") || req.url.startsWith("/ask") ) {
+    if (req.url.startsWith("/api") || req.url.startsWith("/health")) {
       target = 'http://localhost:8080'; //api
     } else {
       target = 'http://localhost:3000' // ui

@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from "../middleware/auth";
 
 const app = express();
 
+
 // Get current user
 app.get("/api/user", async (req, res) => {
   const user = (req as unknown as AuthenticatedRequest).user;

@@ -18,7 +18,6 @@ export default function MarkdownPage(props: MarkdownPageProps) {
     const location = useLocation();
     
     const scrollToSection = () => {
-        console.log("Scroll!")
         const header = document.getElementById(location.hash.substring(1))
         const offsetTop = (header?.offsetTop || 0) - (header?.offsetHeight || 0) - 77
         if(offsetTop && divRef.current?.parentElement) {
@@ -27,7 +26,6 @@ export default function MarkdownPage(props: MarkdownPageProps) {
     }
 
     useEffect(() => {
-        console.log("add listener")
         return () => {            
             window.removeEventListener('hashchange', scrollToSection, false)
         }

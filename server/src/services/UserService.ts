@@ -18,12 +18,15 @@ pool.query(`
 `);
 
 class UserService {
+  static demoUserId:UserId = "c8c62d4b-37bc-45af-a86a-0e9d654aef13"
+
   create = (
     name: string | undefined,
     picture: string | undefined,
-    email: string | undefined
+    email: string | undefined,
+    demo = false
   ): Promise<User> => {
-    const userId:UserId = uuidv4();
+    const userId:UserId = demo ? UserService.demoUserId : uuidv4();
     const user = new User(userId, name, picture, email);
     console.log("creating user", userId)
     return pool
@@ -81,6 +84,15 @@ bot.setName('Target Practice')
           )
       );
   };
+
+  getDemoUser = (): Promise<User> => {
+    return this.get(UserService.demoUserId).then(user => {
+      if(!user) {
+        return this.create("demo", undefined, undefined, true)
+      }
+      return user
+    })
+  }
 
   get = (userId: UserId): Promise<User | undefined> => {
     return pool

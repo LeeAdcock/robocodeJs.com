@@ -215,7 +215,7 @@ export default function NavBar(props: NavBarProps) {
                                     {
                                         event.preventDefault();
                                         axios
-                                        .get(`/ask?question=${event.currentTarget.value}`)
+                                        .get(`/api/ask?question=${event.currentTarget.value}`)
                                         .then((res) => {
                                             navigate(res.data.answer)
                                         })

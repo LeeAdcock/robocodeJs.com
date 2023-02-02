@@ -47,6 +47,7 @@ const bot = [
   'how do I turn left?',
   'How do I turn right?',
   'Can the bot turn faster?',
+  'How do I turn?',
 ]
 
 const logs = [
@@ -87,7 +88,7 @@ classifier.train(clock, 'clock')
 const app = express();
 
 // Get current user
-app.get("/ask", [cookieParser(), auth(false), async (req, res) => {
+app.get("/api/ask", [cookieParser(), auth(false), async (req, res) => {
   if(req.query.question) {
     const predictions = classifier.predict(req.query.question)
     if(predictions.length) {
