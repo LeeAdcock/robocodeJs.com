@@ -4,20 +4,19 @@ import environmentService from "./EnvironmentService";
 import userService from "./UserService";
 import Environment from "../types/environment";
 
-let _locked = false
+let _locked = false;
 
-const getDemoEnvironment = async ():Promise<Environment> => {
+const getDemoEnvironment = async (): Promise<Environment> => {
+  const user = await userService.getDemoUser();
 
-    const user = await userService.getDemoUser()
+  const arena = await arenaService.getDefaultForUser(user.getId());
+  if (!arena) throw new Error("missing arena");
 
-    const arena = await arenaService.getDefaultForUser(user.getId())
-    if(!arena) throw new Error("missing arena")
+  const apps = await appService.getForUser(user.getId());
 
-    const apps = await appService.getForUser(user.getId())
-
-    const app1 = apps[0]
-    await app1.setName("Demo Bot 1")
-    await app1.setSource(`
+  const app1 = apps[0];
+  await app1.setName("Demo Bot 1");
+  await app1.setSource(`
         bot.turret.setOrientation(0)
         bot.radar.setOrientation(0)
 
@@ -56,19 +55,19 @@ const getDemoEnvironment = async ():Promise<Environment> => {
         }
         
         })   
-    `)
+    `);
 
-    const env = await environmentService.get(arena)
-    if(!env.isRunning()) {
-        _locked = true
-        await env.restart().then(() => {
-            env.resume()
-            _locked = false
-        })
-    }
-    return env
-}
+  const env = await environmentService.get(arena);
+  if (!env.isRunning() && !_locked) {
+    _locked = true;
+    await env.restart().then(() => {
+      env.resume();
+      _locked = false;
+    });
+  }
+  return env;
+};
 
 export default {
-    getDemoEnvironment,
-}
+  getDemoEnvironment,
+};
