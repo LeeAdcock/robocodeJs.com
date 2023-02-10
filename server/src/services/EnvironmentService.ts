@@ -40,10 +40,7 @@ export class EnvironmentService {
           })
         ).then(() => env)
       )
-      .then(() => {
-        env.restart();
-        return env;
-      });
+      .then(() => env.restart().then(() => env));
   };
 
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {

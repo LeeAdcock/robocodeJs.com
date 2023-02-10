@@ -69,7 +69,11 @@ export default class Logs extends React.Component<
                             className="bg-light justify-content-end"
                             style={{ padding: '4px 0px' }}
                         >
-                            <NavDropdown title="Bots" id="nav-dropdown" style={{paddingRight:"20px"}}>
+                            <NavDropdown
+                                title="Bots"
+                                id="nav-dropdown"
+                                style={{ paddingRight: '20px' }}
+                            >
                                 {names.map((name) => (
                                     <NavDropdown.Item
                                         key={name}
@@ -131,7 +135,11 @@ export default class Logs extends React.Component<
                                     Deselect All
                                 </NavDropdown.Item>
                             </NavDropdown>
-                            <NavDropdown title="Levels" id="nav-dropdown" style={{paddingRight:"20px"}}>
+                            <NavDropdown
+                                title="Levels"
+                                id="nav-dropdown"
+                                style={{ paddingRight: '20px' }}
+                            >
                                 {[
                                     'TRACE',
                                     'DEBUG',

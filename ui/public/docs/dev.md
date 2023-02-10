@@ -21,7 +21,7 @@ Virtual markers can be created in the arena that provide simplified calculations
 
 - `arena.getMarker(x, y) : marker`
 
-The marker returned has several convenience methods:
+The `marker` object returned has several convenience methods:
 
 - `marker.getX() : number`
 - `marker.getY() : number`

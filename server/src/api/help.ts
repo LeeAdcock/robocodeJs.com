@@ -3,6 +3,25 @@ import Classifier from "ml-classify-text";
 import auth, { AuthenticatedRequest } from "../middleware/auth";
 import cookieParser from "cookie-parser";
 
+const arena = [
+  "how do I create a marker?",
+  "how do I get a marker?",
+  "How do I calculate distance?",
+  "How do I get distance?",
+  "how do I calculate angle?",
+  "how do I get angle?",
+  "how do I calculate bearing?",
+  "how do I get bearing?",
+  "how do I calculate orientation?",
+  "how do I get orientation?",
+  "how do i get arena size?",
+  "what is the arena size?",
+  "how big is the arena?",
+  "which direction is up?",
+  "which direction is 0 degress?",
+  "which direction is north?",
+];
+
 const turret = [
   "fire",
   "How do I fire?",
@@ -79,6 +98,7 @@ const clock = [
 ];
 
 const classifier = new Classifier();
+classifier.train(arena, "arena");
 classifier.train(turret, "turret");
 classifier.train(logs, "logs");
 classifier.train(radar, "radar");
@@ -96,6 +116,8 @@ app.get("/api/ask", [
       const predictions = classifier.predict(req.query.question);
       if (predictions.length) {
         switch (predictions[0]["_label"]) {
+          case "arena":
+            return res.send({ answer: "/dev#arena" });
           case "clock":
             return res.send({ answer: "/dev#clock" });
           case "bot":

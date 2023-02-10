@@ -23,7 +23,8 @@ code {
     padding-top: 10px;
 }
 
-.markdown p, ul {
+.markdown p,
+ul {
     padding-left: 20px;
 }
 
@@ -31,16 +32,14 @@ code {
     font-size: 1.4em;
     background: url('../public/sprites/tileGrass1.png');
     padding-left: 5px;
-
 }
 
-.markdown h1::before{
+.markdown h1::before {
     content: '';
     background: url('../public/sprites/tank_red.png') left center no-repeat;
     vertical-align: middle;
     background-size: 16px auto;
     padding-left: 20px;
-
 }
 
 .markdown h2 {
@@ -71,10 +70,10 @@ code {
 
 .markdown pre {
     margin-left: 20px;
-    border-left: 3px solid #AA6C39;
+    border-left: 3px solid #aa6c39;
     padding-left: 10px;
 }
 
 .markdown a {
-    color: #AA6C39;
+    color: #aa6c39;
 }

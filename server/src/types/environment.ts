@@ -77,7 +77,7 @@ export default class Environment {
     listener: (...args: any[]) => void
   ) => {
     this.emitter.addListener(eventName, listener);
-    console.log("listening!");
+
     if (eventName === "event") {
       this.processes.forEach((process) => {
         appService.get(process.getAppId()).then((app) => {
@@ -209,25 +209,29 @@ export default class Environment {
     this.stoppedAt = new Date();
   }
 
-  async restart() {
+  restart(): Promise<void> {
     this.emitter.emit("event", {
       type: "arenaRestart",
     });
 
-    this.processes.forEach((process) => {
-      process.tanks.forEach((tank) => {
-        // Emit removed tank event
-        this.emitter.emit("event", {
-          type: "arenaRemoveTank",
-          id: tank.id,
-          appId: process.getAppId(),
+    // Restart each process
+    return Promise.all(
+      this.processes.map((process) => {
+        process.tanks.forEach((tank) => {
+          // Emit removed tank event
+          this.emitter.emit("event", {
+            type: "arenaRemoveTank",
+            id: tank.id,
+            appId: process.getAppId(),
+          });
         });
-      });
 
-      process.dispose();
+        process.dispose();
 
-      appService.get(process.getAppId()).then((app) => {
-        if (app) {
+        // Restart each tank
+        return appService.get(process.getAppId()).then((app) => {
+          if (!app) return;
+
           this.emitter.emit("event", {
             type: "arenaPlaceApp",
             id: process.getAppId(),
@@ -235,33 +239,37 @@ export default class Environment {
           });
 
           const tankCount = 5;
+          return Promise.all(
+            [...Array(tankCount)].map(() => {
+              const tank = new Tank(this, process);
 
-          for (let tankIndex = 0; tankIndex < tankCount; tankIndex++) {
-            const tank = new Tank(this, process);
-
-            process.tanks.push(tank);
-            compiler.init(this, process, tank);
-            tank.execute(process);
-
-            // Emit new tank event
-            this.emitter.emit("event", {
-              type: "arenaPlaceTank",
-              id: tank.id,
-              appId: process.getAppId(),
-              bodyOrientation: tank.orientation,
-              bodyOrientationVelocity: tank.orientationVelocity,
-              turretOrientation: tank.turret.orientation,
-              turretOrientationVelocity: tank.turret.orientationVelocity,
-              radarOrientation: tank.turret.radar.orientation,
-              radarOrientationVelocity: tank.turret.radar.orientationVelocity,
-              speed: tank.speed,
-              speedMax: tank.speedMax,
-              x: tank.x,
-              y: tank.y,
-            });
-          }
-        }
-      });
+              process.tanks.push(tank);
+              compiler.init(this, process, tank);
+              return tank.execute(process).then(() => {
+                // Emit new tank event
+                this.emitter.emit("event", {
+                  type: "arenaPlaceTank",
+                  id: tank.id,
+                  appId: process.getAppId(),
+                  bodyOrientation: tank.orientation,
+                  bodyOrientationVelocity: tank.orientationVelocity,
+                  turretOrientation: tank.turret.orientation,
+                  turretOrientationVelocity: tank.turret.orientationVelocity,
+                  radarOrientation: tank.turret.radar.orientation,
+                  radarOrientationVelocity:
+                    tank.turret.radar.orientationVelocity,
+                  speed: tank.speed,
+                  speedMax: tank.speedMax,
+                  x: tank.x,
+                  y: tank.y,
+                });
+              });
+            })
+          );
+        });
+      })
+    ).then(() => {
+      return;
     });
   }
 

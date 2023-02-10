@@ -57,15 +57,23 @@ const getDemoEnvironment = async (): Promise<Environment> => {
         })   
     `);
 
-  const env = await environmentService.get(arena);
-  if (!env.isRunning() && !_locked) {
+  if (environmentService.has(arena.getId())) {
+    const env = await environmentService.get(arena);
+    if (!env.isRunning() && !_locked) {
+      _locked = true;
+      await env.restart().then(() => {
+        env.resume();
+        _locked = false;
+      });
+    }
+    return env;
+  } else {
     _locked = true;
-    await env.restart().then(() => {
-      env.resume();
-      _locked = false;
-    });
+    const env = await environmentService.get(arena);
+    env.resume();
+    _locked = false;
+    return env;
   }
-  return env;
 };
 
 export default {

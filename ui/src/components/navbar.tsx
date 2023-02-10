@@ -74,6 +74,23 @@ export default function NavBar(props: NavBarProps) {
                 className="topNavBar"
             >
                 <Navbar.Brand className="nav-item">
+                    <div
+                        style={{
+                            position: 'absolute',
+                            opacity: '.5',
+                            padding: '0px 1px 0px 1px',
+                            margin: '0px',
+                            top: '10px',
+                            left: '105px',
+                            fontWeight: '700',
+                            fontSize: '.5em',
+                            color: 'black',
+                            backgroundColor: 'gold',
+                            textDecoration: 'none!important',
+                        }}
+                    >
+                        BETA
+                    </div>
                     <span
                         style={{
                             fontWeight: '700',
@@ -123,28 +140,32 @@ export default function NavBar(props: NavBarProps) {
                         <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
                             |
                         </Navbar.Text>
-                                           
+
                         {props.user && (
                             <>
                                 <NavDropdown
                                     title="Apps"
                                     id="basic-nav-dropdown"
                                 >
-                                    {props.apps?.sort((a,b)=>a.name.localeCompare(b.name)).map((app) => (
-                                        <NavDropdown.Item
-                                            key={app.id}
-                                            onClick={() =>
-                                                navigate(
-                                                    `/user/${props.user.id}/app/${app.id}`
-                                                )
-                                            }
-                                        >
-                                            <AppLink
-                                                arena={props.arena}
-                                                app={app}
-                                            />
-                                        </NavDropdown.Item>
-                                    ))}
+                                    {props.apps
+                                        ?.sort((a, b) =>
+                                            a.name.localeCompare(b.name)
+                                        )
+                                        .map((app) => (
+                                            <NavDropdown.Item
+                                                key={app.id}
+                                                onClick={() =>
+                                                    navigate(
+                                                        `/user/${props.user.id}/app/${app.id}`
+                                                    )
+                                                }
+                                            >
+                                                <AppLink
+                                                    arena={props.arena}
+                                                    app={app}
+                                                />
+                                            </NavDropdown.Item>
+                                        ))}
                                     {props.apps && props.apps.length > 0 && (
                                         <NavDropdown.Divider />
                                     )}
@@ -155,12 +176,14 @@ export default function NavBar(props: NavBarProps) {
                                         Create new application
                                     </NavDropdown.Item>
                                     <NavDropdown.Item
-                                        onClick={() => navigate("/examples")}
+                                        onClick={() => navigate('/examples')}
                                     >
                                         View example applications
                                     </NavDropdown.Item>
                                 </NavDropdown>
-                                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
+                                <Navbar.Text
+                                    style={{ margin: '0 10px 0 10px' }}
+                                >
                                     |
                                 </Navbar.Text>
                                 <NavDropdown
@@ -196,7 +219,9 @@ export default function NavBar(props: NavBarProps) {
                                         </NavDropdown.Item>
                                     )}
                                 </NavDropdown>
-                                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
+                                <Navbar.Text
+                                    style={{ margin: '0 10px 0 10px' }}
+                                >
                                     |
                                 </Navbar.Text>
                             </>
@@ -204,25 +229,24 @@ export default function NavBar(props: NavBarProps) {
                     </Nav>
                     <Nav>
                         <Form>
-                        <Form.Control
-                            size="sm"
-                            type="search"
-                            placeholder="How do I..."
-                            aria-label="Search"
-                            onKeyDown={event =>
-                                {
-                                    if(event.key==='Enter')
-                                    {
-                                        event.preventDefault();
+                            <Form.Control
+                                size="sm"
+                                type="search"
+                                placeholder="How do I..."
+                                aria-label="Search"
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault()
                                         axios
-                                        .get(`/api/ask?question=${event.currentTarget.value}`)
-                                        .then((res) => {
-                                            navigate(res.data.answer)
-                                        })
+                                            .get(
+                                                `/api/ask?question=${event.currentTarget.value}`
+                                            )
+                                            .then((res) => {
+                                                navigate(res.data.answer)
+                                            })
                                     }
-                                }
-                            }
-                        />
+                                }}
+                            />
                         </Form>
                     </Nav>
                 </Navbar.Collapse>
@@ -253,7 +277,6 @@ export default function NavBar(props: NavBarProps) {
                         {!props.user && <div id="GoogleLoginButton"></div>}
                     </Nav>
                 </Navbar.Collapse>
-       
             </Navbar>
         </>
     )

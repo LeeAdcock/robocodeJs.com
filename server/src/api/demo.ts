@@ -24,13 +24,6 @@ app.get("/api/demo/events", async (req, res) => {
   });
 });
 
-app.get("/api/demo/restart", async (req, res) => {
-  const env = await demoService.getDemoEnvironment();
-  env.restart();
-  env.resume();
-  res.sendStatus(200);
-});
-
 // Get an arena status
 app.get("/api/demo/arena/", async (req, res) => {
   const env = await demoService.getDemoEnvironment();

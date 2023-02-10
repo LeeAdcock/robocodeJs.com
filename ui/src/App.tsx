@@ -95,29 +95,27 @@ function App() {
     }, [])
 
     const doReloadArena = () => {
-        console.log("reloading arena")
+        console.log('reloading arena')
         return new Promise((resolve) => {
-            axios.get(
-                user ? 
-                    `/api/user/${user.id}/arena` :
-                    `/api/demo/arena`
-            ).then((res) => {
-                setTime(res.data.clock.time)
-                res.data.apps.forEach((app) =>
-                    app.tanks.forEach((tank) => {
-                        tank.path = Array<PointInTime>(20)
-                        tank.path[0] = {
-                            x: tank.x,
-                            y: tank.y,
-                            time,
-                        }
-                        tank.pathIndex = 1
-                    })
-                )
-                setArena(res.data)
-                setPaused(!res.data.running)
-                resolve(res.data)
-            })
+            axios
+                .get(user ? `/api/user/${user.id}/arena` : `/api/demo/arena`)
+                .then((res) => {
+                    setTime(res.data.clock.time)
+                    res.data.apps.forEach((app) =>
+                        app.tanks.forEach((tank) => {
+                            tank.path = Array<PointInTime>(20)
+                            tank.path[0] = {
+                                x: tank.x,
+                                y: tank.y,
+                                time,
+                            }
+                            tank.pathIndex = 1
+                        })
+                    )
+                    setArena(res.data)
+                    setPaused(!res.data.running)
+                    resolve(res.data)
+                })
         })
     }
 
@@ -174,10 +172,9 @@ function App() {
         }
         // todo externalize the server
         eventSource = new EventSource(
-            user ?
-            `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
-            :
-            `${window.location.protocol}//${window.location.host}/api/demo/events`
+            user
+                ? `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
+                : `${window.location.protocol}//${window.location.host}/api/demo/events`
         )
 
         eventSource.onmessage = (message) => {
@@ -222,8 +219,7 @@ function App() {
                             if (tank.id === data.id) {
                                 tank.speed = data.speed
                                 tank.speedTarget = data.speedTarget
-                                tank.speedAcceleration =
-                                    data.speedAcceleration
+                                tank.speedAcceleration = data.speedAcceleration
                                 tank.speedMax = data.speedMax
                                 tank.x = data.x
                                 tank.y = data.y
@@ -246,10 +242,7 @@ function App() {
                         app.tanks.forEach((tank) => {
                             if (tank.id === data.id) {
                                 tank.radarOn = true
-                                setTimeout(
-                                    () => (tank.radarOn = false),
-                                    200
-                                )
+                                setTimeout(() => (tank.radarOn = false), 200)
                             }
                         })
                     )
@@ -295,9 +288,7 @@ function App() {
                 } else if (data.type === 'arenaResumed') {
                     setPaused(false)
                 } else if (data.type === 'arenaRemoveApp') {
-                    const removedApp = apps.find(
-                        (app) => app.id === data.id
-                    )
+                    const removedApp = apps.find((app) => app.id === data.id)
                     if (removedApp) {
                         apps = apps.slice(apps.indexOf(removedApp), 1)
                     }
@@ -339,12 +330,10 @@ function App() {
                                     speedAcceleration: 0,
                                     speedMax: data.speedMax,
                                     bodyOrientation: data.bodyOrientation,
-                                    bodyOrientationTarget:
-                                        data.bodyOrientation,
+                                    bodyOrientationTarget: data.bodyOrientation,
                                     bodyOrientationVelocity:
                                         data.bodyOrientationVelocity,
-                                    turretOrientation:
-                                        data.turretOrientation,
+                                    turretOrientation: data.turretOrientation,
                                     turretOrientationTarget:
                                         data.turretOrientation,
                                     turretOrientationVelocity:
@@ -480,10 +469,22 @@ function App() {
                         }}
                     >
                         <Routes>
-                            <Route path="/" element={<MarkdownPage path="index"/> }/>
-                            <Route path="/privacy" element={<MarkdownPage path="privacy"/> }/>
-                            <Route path="/examples" element={<MarkdownPage path="examples"/> }/>
-                            <Route path="/dev" element={<MarkdownPage path="dev"/> }/>
+                            <Route
+                                path="/"
+                                element={<MarkdownPage path="index" />}
+                            />
+                            <Route
+                                path="/privacy"
+                                element={<MarkdownPage path="privacy" />}
+                            />
+                            <Route
+                                path="/examples"
+                                element={<MarkdownPage path="examples" />}
+                            />
+                            <Route
+                                path="/dev"
+                                element={<MarkdownPage path="dev" />}
+                            />
 
                             <Route path="user/:userId" element={<>user</>} />
                             <Route
@@ -511,7 +512,6 @@ function App() {
                                 path="user/:userId/arena/logs"
                                 element={<ArenaLogPage />}
                             />
-
                         </Routes>
                     </div>
                 </Router>
