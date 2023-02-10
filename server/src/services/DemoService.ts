@@ -4,6 +4,8 @@ import environmentService from "./EnvironmentService";
 import userService from "./UserService";
 import Environment from "../types/environment";
 
+let _locked = false
+
 const getDemoEnvironment = async ():Promise<Environment> => {
 
     const user = await userService.getDemoUser()
@@ -58,8 +60,11 @@ const getDemoEnvironment = async ():Promise<Environment> => {
 
     const env = await environmentService.get(arena)
     if(!env.isRunning()) {
-        await env.restart()
-        env.resume()
+        _locked = true
+        await env.restart().then(() => {
+            env.resume()
+            _locked = false
+        })
     }
     return env
 }
