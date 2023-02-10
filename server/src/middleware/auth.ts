@@ -45,13 +45,13 @@ export default (required: boolean) => async (req, res, next) => {
       }
     })
     .catch((e) => {
-      if(required) {
-        console.log(e)
+      if (required) {
+        console.log(e);
         res.clearCookie("auth");
         res.status(401);
         res.send("Access forbidden");
       } else {
-        next()
+        next();
       }
     });
 };

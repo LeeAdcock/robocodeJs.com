@@ -77,7 +77,7 @@ export default class Environment {
     listener: (...args: any[]) => void
   ) => {
     this.emitter.addListener(eventName, listener);
-    console.log("listening!")
+    console.log("listening!");
     if (eventName === "event") {
       this.processes.forEach((process) => {
         appService.get(process.getAppId()).then((app) => {
@@ -177,7 +177,7 @@ export default class Environment {
 
     // Stop game if winning conditions are met
     if (appHealth.filter((item) => item > 0).length === 0) {
-      console.log("game over", this.arena.getId())
+      console.log("game over", this.arena.getId());
       this.emitter.emit("event", {
         type: "arenaPaused",
       });
@@ -190,7 +190,7 @@ export default class Environment {
   };
 
   resume() {
-    console.log("resuming", this.arena.getId())
+    console.log("resuming", this.arena.getId());
 
     this.emitter.emit("event", {
       type: "arenaResumed",
@@ -208,7 +208,7 @@ export default class Environment {
     this.running = false;
     this.stoppedAt = new Date();
   }
-  
+
   async restart() {
     this.emitter.emit("event", {
       type: "arenaRestart",

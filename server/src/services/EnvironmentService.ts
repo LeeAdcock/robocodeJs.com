@@ -31,16 +31,19 @@ export class EnvironmentService {
     console.log("creating isolate", arena.getId());
 
     this.store[arena.getId()] = env;
-    return arenaMemberService.getForArena(arena.getId()).then((members) =>
-      Promise.all(
-        members.map((member) => {
-          env.processes.push(new Process(member.getAppId()));
-        })
-      ).then(() => env)
-    ).then(()=> {
-      env.restart()
-      return env
-    });
+    return arenaMemberService
+      .getForArena(arena.getId())
+      .then((members) =>
+        Promise.all(
+          members.map((member) => {
+            env.processes.push(new Process(member.getAppId()));
+          })
+        ).then(() => env)
+      )
+      .then(() => {
+        env.restart();
+        return env;
+      });
   };
 
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {

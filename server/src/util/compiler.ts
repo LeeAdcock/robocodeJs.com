@@ -18,9 +18,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     );
   isolate
     .compileScriptSync(
-      `
-    bot.radar.getOrientation = () => _bot_radar_getOrientation().copy()
-  `
+      `bot.radar.getOrientation = () => _bot_radar_getOrientation().copy()`
     )
     .runSync(tank.getContext(), {});
 
@@ -39,8 +37,10 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.radar.setOrientation = orientation => new Promise((resolve, reject) => _bot_radar_setOrientation(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.radar.setOrientation = orientation => new Promise((resolve, reject) => 
+        _bot_radar_setOrientation(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -53,9 +53,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     );
   isolate
     .compileScriptSync(
-      `
-    bot.radar.isTurning = () => _bot_radar_isTurning().copy()
-  `
+      `bot.radar.isTurning = () => _bot_radar_isTurning().copy()`
     )
     .runSync(tank.getContext(), {});
 
@@ -71,8 +69,22 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.radar.turn = orientation => new Promise((resolve, reject) => _bot_radar_turn(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.radar.turn = orientation => new Promise((resolve, reject) => 
+        _bot_radar_turn(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
+    )
+    .runSync(tank.getContext(), {});
+
+  // Convenience turnTowards
+  isolate
+    .compileScriptSync(
+      `
+      bot.radar.turnTowards = (x, y) => {
+        let bearing = Math.atan2(bot.getY() - y, bot.getX() - x) * (180 / Math.PI) - 90 + 180
+        return bot.radar.setOrientation(bearing - bot.getOrientation() - bot.turret.getOrientation())
+      }
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -88,8 +100,10 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.radar.scan = () => new Promise((resolve, reject) => _bot_radar_scan(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject())))
-  `
+      bot.radar.scan = () => new Promise((resolve, reject) => 
+        _bot_radar_scan(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject()))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -105,8 +119,10 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.radar.onReady = () => new Promise((resolve, reject) => _bot_radar_onReady(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject())))
-  `
+      bot.radar.onReady = () => new Promise((resolve, reject) => 
+        _bot_radar_onReady(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject()))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -118,11 +134,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
       () => new ivm.ExternalCopy(tank.turret.radar.isReady())
     );
   isolate
-    .compileScriptSync(
-      `
-    bot.radar.isReady = () => _bot_radar_isReady().copy()
-  `
-    )
+    .compileScriptSync(`bot.radar.isReady = () => _bot_radar_isReady().copy()`)
     .runSync(tank.getContext(), {});
 }
 
@@ -136,9 +148,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     );
   isolate
     .compileScriptSync(
-      `
-    bot.turret.getOrientation = () => _bot_turret_getOrientation().copy()
-  `
+      `bot.turret.getOrientation = () => _bot_turret_getOrientation().copy()`
     )
     .runSync(tank.getContext(), {});
 
@@ -154,8 +164,10 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.turret.setOrientation = orientation => new Promise((resolve, reject) => _bot_turret_setOrientation(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.turret.setOrientation = orientation => new Promise((resolve, reject) => 
+        _bot_turret_setOrientation(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -168,9 +180,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     );
   isolate
     .compileScriptSync(
-      `
-    bot.turret.isTurning = () => _bot_turret_isTurning().copy()
-  `
+      `bot.turret.isTurning = () => _bot_turret_isTurning().copy()`
     )
     .runSync(tank.getContext(), {});
 
@@ -186,8 +196,22 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.turret.turn = orientation => new Promise((resolve, reject) => _bot_turret_turn(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.turret.turn = orientation => new Promise((resolve, reject) => 
+        _bot_turret_turn(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
+    )
+    .runSync(tank.getContext(), {});
+
+  // Convenience turnTowards
+  isolate
+    .compileScriptSync(
+      `
+      bot.turret.turnTowards = (x, y) => {
+        let bearing = Math.atan2(bot.getY() - y, bot.getX() - x) * (180 / Math.PI) - 90 + 180
+        return bot.turret.setOrientation(bearing - bot.getOrientation())
+      }
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -204,8 +228,10 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.turret.fire = () => new Promise((resolve, reject) => _bot_turret_fire(new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.turret.fire = () => new Promise((resolve, reject) => 
+        _bot_turret_fire(new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -221,8 +247,10 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.turret.onReady = () => new Promise((resolve, reject) => _bot_turret_onReady(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject())))
-  `
+      bot.turret.onReady = () => new Promise((resolve, reject) => 
+        _bot_turret_onReady(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject()))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -235,9 +263,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     );
   isolate
     .compileScriptSync(
-      `
-    bot.turret.isReady = () => _bot_turret_isReady().copy()
-  `
+      `bot.turret.isReady = () => _bot_turret_isReady().copy()`
     )
     .runSync(tank.getContext(), {});
 }
@@ -266,12 +292,12 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.scope = {}
-    bot.on = (event, handler) => _bot_on(event, new _ivm.Reference((resolve, reject, jsonArgs) => { 
-      returnValue = handler.apply(bot.scope, JSON.parse(jsonArgs))
-      return (returnValue || Promise.resolve()).then(resolve, reject)
-    }))
-  `
+      bot.scope = {}
+      bot.on = (event, handler) => _bot_on(event, new _ivm.Reference((resolve, reject, jsonArgs) => { 
+        returnValue = handler.apply(bot.scope, JSON.parse(jsonArgs))
+        return (returnValue || Promise.resolve()).then(resolve, reject)
+      }))
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -280,11 +306,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .getContext()
     .global.setSync("_bot_getId", () => new ivm.ExternalCopy(tank.getId()));
   isolate
-    .compileScriptSync(
-      `
-    bot.getId = () => _bot_getId().copy()
-  `
-    )
+    .compileScriptSync(`bot.getId = () => _bot_getId().copy()`)
     .runSync(tank.getContext(), {});
 
   // Expose getSpeed
@@ -297,8 +319,8 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.getSpeed = () => _bot_getSpeed().copy()
-  `
+      bot.getSpeed = () => _bot_getSpeed().copy()
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -314,8 +336,10 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.setSpeed =  speed => new Promise((resolve, reject) => _bot_setSpeed(speed, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.setSpeed =  speed => new Promise((resolve, reject) => 
+        _bot_setSpeed(speed, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+     `
     )
     .runSync(tank.getContext(), {});
 
@@ -328,9 +352,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     );
   isolate
     .compileScriptSync(
-      `
-    bot.getOrientation = () => _bot_getOrientation().copy()
-  `
+      `bot.getOrientation = () => _bot_getOrientation().copy()`
     )
     .runSync(tank.getContext(), {});
 
@@ -346,8 +368,16 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.setOrientation = orientation => new Promise((resolve, reject) => _bot_setOrientation(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.setOrientation = orientation => new Promise((resolve, reject) => 
+        _bot_setOrientation(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
+    )
+    .runSync(tank.getContext(), {});
+
+  isolate
+    .compileScriptSync(
+      `bot.dropMarker = () => arena.createMarker(bot.getX(), bot.getY())`
     )
     .runSync(tank.getContext(), {});
 
@@ -358,8 +388,8 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.setName = name => _bot_setName(name)
-  `
+      bot.setName = name => _bot_setName(name)
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -373,8 +403,8 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.getHealth = () => _bot_getHealth().copy()
-  `
+      bot.getHealth = () => _bot_getHealth().copy()
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -388,8 +418,8 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.isTurning = () => _bot_isTurning().copy()
-  `
+      bot.isTurning = () => _bot_isTurning().copy()
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -405,8 +435,10 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.turn = orientation => new Promise((resolve, reject) => _bot_turn(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject)))
-  `
+      bot.turn = orientation => new Promise((resolve, reject) => 
+        _bot_turn(orientation, new _ivm.Callback(resolve), new _ivm.Callback(reject))
+      )
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -417,8 +449,8 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.getX = () => _bot_getX().copy()
-  `
+      bot.getX = () => _bot_getX().copy()
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -429,8 +461,8 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.getY = () => _bot_getY().copy()
-  `
+      bot.getY = () => _bot_getY().copy()
+      `
     )
     .runSync(tank.getContext(), {});
 
@@ -441,8 +473,20 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-    bot.send = message => _bot_send(message)
-  `
+      bot.send = message => _bot_send(message)
+      `
+    )
+    .runSync(tank.getContext(), {});
+
+  // Convenience turnTowards
+  isolate
+    .compileScriptSync(
+      `
+      bot.turnTowards = (x, y) => {
+        let bearing = Math.atan2(bot.getY() - y, bot.getX() - x) * (180 / Math.PI) - 90 + 180
+        return bot.setOrientation(bearing)
+      }
+      `
     )
     .runSync(tank.getContext(), {});
 }
@@ -495,9 +539,10 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getSandbox()
       .compileScriptSync(
         `
-      setInterval = (func, interval) => _setInterval(new _ivm.Callback(() => { func() }), interval)
-      clearInterval = (id) => _clearInterval(id)
-    `
+        setInterval = (func, interval) => 
+          _setInterval(new _ivm.Callback(() => { func() }), interval)
+        clearInterval = (id) => _clearInterval(id)
+        `
       )
       .runSync(tank.getContext(), {});
 
@@ -513,14 +558,14 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getSandbox()
       .compileScriptSync(
         `
-      setTimeout = (func, interval) => _setTimeout(new _ivm.Callback(() => { func() }), interval)
-      clearTimeout = (id) => _clearTimeout(id)
-    `
+        setTimeout = (func, interval) => 
+          _setTimeout(new _ivm.Callback(() => { func() }), interval)
+        clearTimeout = (id) => _clearTimeout(id)
+        `
       )
       .runSync(tank.getContext(), {});
 
     // Expose clock
-    // TODO .on(Event.TICK, ...)
     tank
       .getContext()
       .global.setSync(
@@ -531,15 +576,15 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getSandbox()
       .compileScriptSync(
         `
-      clock = {}
-      clock.getTime = () => _clock_getTime().copy()
-      clock.on = (event, handler) => _bot_on(event, new _ivm.Reference((resolve, reject, jsonArgs) => { 
-        if(event !== "TICK") throw new Error("Invalid event type")
-        returnValue = handler.apply(bot.scope, JSON.parse(jsonArgs))
-        return (returnValue || Promise.resolve()).then(resolve, reject)
-      }))
-      Date = undefined
-      `
+        clock = {}
+        clock.getTime = () => _clock_getTime().copy()
+        clock.on = (event, handler) => _bot_on(event, new _ivm.Reference((resolve, reject, jsonArgs) => { 
+          if(event !== "TICK") throw new Error("Invalid event type")
+          returnValue = handler.apply(bot.T, JSON.parse(jsonArgs))
+          return (returnValue || Promise.resolve()).then(resolve, reject)
+        }))
+        Date = undefined
+        `
       )
       .runSync(tank.getContext(), {});
 
@@ -560,10 +605,24 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getSandbox()
       .compileScriptSync(
         `
-      arena = {};
-      arena.getWidth = () => _arena_getWidth().copy();
-      arena.getHeight = () => _arena_getHeight().copy();
-    `
+        arena = {};
+        arena.getWidth = () => _arena_getWidth().copy();
+        arena.getHeight = () => _arena_getHeight().copy();
+
+        arena.createMarker = (x, y) => {
+          return {
+            getX: () => x,
+            getY: () => y,
+            getDistance: () => Math.sqrt(
+                Math.pow(bot.getX() - x, 2) +
+                  Math.pow(bot.getY() - y, 2)
+              ),
+            getBearing: () => 
+              Math.atan2(bot.getY() - y, bot.getX() - x) *
+                (180 / Math.PI) - 90 + 180
+          }
+        }
+      `
       )
       .runSync(tank.getContext(), {});
 
@@ -609,15 +668,15 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getSandbox()
       .compileScriptSync(
         `
-      logger = {};
-      logger.log = _log;
-      logger.info = _log;
-      logger.trace = _log;
-      logger.debug = _log;
-      logger.warn = _log;
-      logger.error = _log;
-      console = {log: _log};
-    `
+        logger = {};
+        logger.log = _log;
+        logger.info = _log;
+        logger.trace = _log;
+        logger.debug = _log;
+        logger.warn = _log;
+        logger.error = _log;
+        console = {log: _log};
+       `
       )
       .runSync(tank.getContext(), {});
 
@@ -626,23 +685,23 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getSandbox()
       .compileScriptSync(
         `
-      Event = {
-        RECEIVED: 'RECEIVED',
-        FIRED:'FIRED',
-        SCANNED:'SCANNED',
-        COLLIDED:'COLLIDED',
-        START:'START',
-        TICK:'TICK',
-        HIT: 'HIT',
-        DETECTED:'DETECTED',          
-      }
-  `
+        Event = {
+          RECEIVED: 'RECEIVED',
+          FIRED:'FIRED',
+          SCANNED:'SCANNED',
+          COLLIDED:'COLLIDED',
+          START:'START',
+          TICK:'TICK',
+          HIT: 'HIT',
+          DETECTED:'DETECTED',          
+        }
+        `
       )
       .runSync(tank.getContext(), {});
   } catch (e) {
+    console.log(e);
     tank.logger.error(`${ErrorCodes.E018}: ${e}`);
     tank.appCrashed = true;
-    console.log(e);
   }
 };
 

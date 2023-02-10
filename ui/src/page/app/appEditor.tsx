@@ -88,7 +88,7 @@ export default function CodeEditor(props: CodeEditorProps) {
                         prefix,
                         callback
                     ) {
-                        return callback(null, ["bot","Event", "on", "Event.DETECTED", "DETECTED", "Event.HIT", "HIT", "Event.START", "START", "Event.COLLIDED", "COLLIDED", "Event.RECEIVED","RECEIVED","Event.FIRED","FIRED","Event.SCANNED","SCANNED","clock","arena", "turn()", "fire()", "radar", "turret()", "isReady()", "getHealthy()", "getTime()", "getWidth()", "getHeight()", "getSpeed()", "setOrientation()", "scan()", "send()", "setName()", "setSpeed()",].filter(code => code.startsWith(prefix)).map(code => ({
+                        return callback(null, ["bot","Event", "on", "Event.DETECTED", "DETECTED", "Event.HIT", "HIT", "Event.START", "START", "Event.COLLIDED", "COLLIDED", "Event.RECEIVED","RECEIVED","Event.FIRED","FIRED","Event.SCANNED","SCANNED","clock","arena", "turnTowards", "dropMarker", "createMarker", "turn()", "fire()", "radar", "turret()", "isReady()", "getHealthy()", "getTime()", "getWidth()", "getHeight()", "getSpeed()", "setOrientation()", "scan()", "send()", "setName()", "setSpeed()",].filter(code => code.startsWith(prefix)).map(code => ({
                             name: code,
                             value: code,
                             score: 1,

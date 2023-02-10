@@ -17,6 +17,17 @@ The arena where bots live is a square. The orientation of objects within the are
 - `arena.getWidth() : number`
 - `arena.getHeight() : number`
 
+Virtual markers can be created in the arena that provide simplified calculations for angles and distance.  These markers are either dropped at the current bot location, or at a specified coordinate.
+
+- `arena.getMarker(x, y) : marker`
+
+The marker returned has several convenience methods:
+
+- `marker.getX() : number`
+- `marker.getY() : number`
+- `marker.getDistance() : number`
+- `marker.getBearing() : number`
+
 # Events Overview
 
 Most of your bot application code will be defined as functions you create that are executed when events take place in your bot's environment. These functions, which are registered on the bot as event handlers, enable you to define how your bot reacts and adapts. Each time you set an event handler with the `on` function, it will overwrite any previously defined handler for that event type.
@@ -72,6 +83,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 - `bot.setName(string)` Sets the bot's display name.
 - `bot.getId() : number` Returns a unique non-zero numeric identifier.
 - `bot.getHealth() : number` Returns a decimal value representing the bot's health, with 1 being healthy and 0 being unfortunately dead.
+- `bot.dropMarker() : marker` Returns a marker object for the bot's current location.
 
 ## Bot events
 
@@ -115,7 +127,8 @@ bot.setOrientation(90).then(() => {
 - `bot.setOrientation(number) : Promise` Sets the bot's target orientation in degrees. Returns a promise that resolves when the orientation is reached, or that is rejected if the target orientation is altered before being achieved.
 - `bot.getOrientation() : number` Returns the orientation in degrees, 0 to 360.
 - `bot.isTurning() : boolean` Returns if the bot is actively turning.
-- `bot.turn(number)` Turns the bot the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
+- `bot.turn(number) : Promise` Turns the bot the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
+- `bot.turnTowards(x, y) : Promise` Turns the bot towards the provided coordinates. Returns a promise that resolves when the turn is complete.
 
 ### Speed
 - `bot.setSpeed(number) : Promise` Sets the bot's target speed as an integer between -5 and 5. Returns a promise that resolves when the speed is reached, or that is rejected if the target speed is altered before being achieved.
@@ -136,6 +149,7 @@ As the bot turns, the turret will also turn. The position of the turret is relat
 - `bot.turret.getOrientation() : Promise`
 - `bot.turret.isTurning() : boolean`
 - `bot.turret.turn(number)`
+- `bot.turret.turnTowards(x, y) : Promise`
 
 ### Firing
 - `bot.turret.onReady(): Promise` Returns a promise that resolves when the turret is ready to fire. If the turret fires through another thread while this promise is pending, the promise will be rejected.
@@ -151,6 +165,7 @@ The radar provides the ability to detect other nearby bots. Only nearby bots in 
 - `bot.radar.getOrientation() : Promise`
 - `bot.radar.isTurning() : boolean`
 - `bot.radar.turn(number)`
+- `bot.radar.turnTowards(x, y) : Promise`
 
 ### Scanning
 - `bot.radar.onReady(): Promise` Returns a promise that resolves when the radar is ready to scan. If the radar scans through another thread while this promise is pending, the promise will be rejected.

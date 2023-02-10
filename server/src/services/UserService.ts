@@ -18,7 +18,7 @@ pool.query(`
 `);
 
 class UserService {
-  static demoUserId:UserId = "c8c62d4b-37bc-45af-a86a-0e9d654aef13"
+  static demoUserId: UserId = "c8c62d4b-37bc-45af-a86a-0e9d654aef13";
 
   create = (
     name: string | undefined,
@@ -26,9 +26,9 @@ class UserService {
     email: string | undefined,
     demo = false
   ): Promise<User> => {
-    const userId:UserId = demo ? UserService.demoUserId : uuidv4();
+    const userId: UserId = demo ? UserService.demoUserId : uuidv4();
     const user = new User(userId, name, picture, email);
-    console.log("creating user", userId)
+    console.log("creating user", userId);
     return pool
       .query({
         text: "INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)",
@@ -40,15 +40,13 @@ class UserService {
         ],
       })
       .then(() =>
-        arenaService
-          .create(user.getId())
-          .then((arena) =>
-            Promise.all(
-              [
-                appService.create(user.getId())
-                .then((app) => {
-                  app.setName("My First Bot")
-                  app.setSource(`
+        arenaService.create(user.getId()).then((arena) =>
+          Promise.all([
+            appService.create(user.getId()).then((app) => {
+              app.setName("My First Bot");
+              app
+                .setSource(
+                  `
 // Set the bot's name
 bot.setName('My First Bot')
 
@@ -68,31 +66,42 @@ function turnRight() {
   bot.turn(10)  
 }
 bot.on(Event.FIRED, turnRight)
-              `).then(() => arenaMemberService.create(arena.getId(), app.getId()))              
+              `
+                )
+                .then(() =>
+                  arenaMemberService.create(arena.getId(), app.getId())
+                );
             }),
-            appService.create(user.getId())
-            .then((app) => {
-              app.setName("Target Practice")
-              app.setSource(`
+            appService.create(user.getId()).then((app) => {
+              app.setName("Target Practice");
+              app
+                .setSource(
+                  `
 // Set the bot's name
 bot.setName('Target Practice')
-`).then(() => arenaMemberService.create(arena.getId(), app.getId()))
-            })
+`
+                )
+                .then(() =>
+                  arenaMemberService.create(arena.getId(), app.getId())
+                );
+            }),
           ])
-            .then(()=>environmentService.get(arena).then(env=>env.resume()))
+            .then(() =>
+              environmentService.get(arena).then((env) => env.resume())
+            )
             .then(() => user)
-          )
+        )
       );
   };
 
   getDemoUser = (): Promise<User> => {
-    return this.get(UserService.demoUserId).then(user => {
-      if(!user) {
-        return this.create("demo", undefined, undefined, true)
+    return this.get(UserService.demoUserId).then((user) => {
+      if (!user) {
+        return this.create("demo", undefined, undefined, true);
       }
-      return user
-    })
-  }
+      return user;
+    });
+  };
 
   get = (userId: UserId): Promise<User | undefined> => {
     return pool
