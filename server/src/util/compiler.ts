@@ -613,10 +613,10 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           return {
             getX: () => x,
             getY: () => y,
-            getDistance: () => Math.sqrt(
+            getDistance: () => Math.floor(Math.sqrt(
                 Math.pow(bot.getX() - x, 2) +
                   Math.pow(bot.getY() - y, 2)
-              ),
+              )),
             getBearing: () => 
               Math.atan2(bot.getY() - y, bot.getX() - x) *
                 (180 / Math.PI) - 90 + 180

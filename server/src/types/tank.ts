@@ -153,7 +153,9 @@ export default class Tank implements Point, Orientated {
                 result
                   .then(() => eventPromiseMap.delete(event))
                   .catch((e) => {
-                    this.logger.warn(`${ErrorCodes.W001}: ${e}`);
+                    this.logger.error(`${ErrorCodes.E019}: ${e}`);
+                    console.log(e)
+                    this.appCrashed=true
                     eventPromiseMap.delete(event);
                   });
               }
@@ -193,6 +195,7 @@ export default class Tank implements Point, Orientated {
   }
 
   execute(process: Process): Promise<unknown> {
+    this.logger.trace("Executing code")
     try {
       return compiler.execute(process, this);
     } catch (e) {
@@ -205,8 +208,10 @@ export default class Tank implements Point, Orientated {
 
   setOrientation(d: number) {
     const target = normalizeAngle(d);
+    if(target===this.orientationTarget)
+    {return Promise.resolve()}
+
     this.orientationTarget = target;
-    // todo only if this is an actual change
     this.env.emit("event", {
       type: "tankTurn",
       time: this.env.getTime(),
@@ -239,8 +244,9 @@ export default class Tank implements Point, Orientated {
 
   turn(d) {
     const target = normalizeAngle(this.orientation + d);
+    if(target===this.orientationTarget)
+      { return Promise.resolve() }
     this.orientationTarget = target;
-    // todo only if this is an actual change
     this.env.emit("event", {
       type: "tankTurn",
       time: this.env.getTime(),
@@ -264,8 +270,14 @@ export default class Tank implements Point, Orientated {
   }
 
   setSpeed(d: number) {
-    this.speedTarget = Math.min(d, this.speedMax);
-    // todo only if this is an actual change
+    const target = Math.min(d, this.speedMax)
+    if(target===this.speedTarget)
+      { return Promise.resolve() }
+    console.log(target, this.speedTarget)
+    this.logger.trace(
+      d === 0 ? "Stopping" : "Accelerating to " + target +" from "+this.speedTarget
+    );
+    this.speedTarget = target;
     this.env.emit("event", {
       type: "tankAccelerate",
       time: this.env.getTime(),
@@ -277,9 +289,6 @@ export default class Tank implements Point, Orientated {
       speedAcceleration: this.speedAcceleration,
       speedMax: this.speedMax,
     });
-    this.logger.trace(
-      d === 0 ? "Stopping" : "Accelerating to " + this.speedTarget
-    );
     return waitUntil(
       () => this.speed === Math.min(d, this.speedMax),
       () =>

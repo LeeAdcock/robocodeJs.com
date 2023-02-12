@@ -32,7 +32,22 @@ export default {
         });
     });
 
-    // First execute all timers
+    // Ensure the tank has started
+    env.getProcesses().forEach((process) => {
+      process.tanks.forEach((tank) => {
+        if (tank.health > 0) {
+          if (tank.needsStarting === true) {
+            if (tank.handlers[Event.START]) {
+              tank.handlers[Event.START]();
+            }
+            tank.needsStarting = false;
+          }
+        }
+      })
+    })
+
+          
+    // Then execute all timers
     timerTick(env);
 
     // Then execute the tank's tick handlers
@@ -53,12 +68,6 @@ export default {
     env.getProcesses().forEach((process) => {
       process.tanks.forEach((tank) => {
         if (tank.health > 0) {
-          if (tank.needsStarting === true) {
-            if (tank.handlers[Event.START]) {
-              tank.handlers[Event.START]();
-            }
-            tank.needsStarting = false;
-          }
 
           const newX =
             tank.x + tank.speed * Math.sin(-tank.orientation * (Math.PI / 180));
@@ -84,6 +93,8 @@ export default {
                   collided = true;
                   tank.stats.timesCollided += 1;
                   otherTank.stats.timesCollided += 1;
+                  tank.logger.trace("Collided with tank")
+                  otherTank.logger.trace("Collided with tank")
                   if (tank.handlers[Event.COLLIDED]) {
                     tank.handlers[Event.COLLIDED]({
                       angle,
@@ -165,6 +176,7 @@ export default {
           ) {
             collided = true;
             tank.stats.timesCollided += 1;
+            tank.logger.trace("Collided with arena boundary")
             if (tank.handlers[Event.COLLIDED]) {
               tank.handlers[Event.COLLIDED]({
                 angle: normalizeAngle(tank.orientation),
