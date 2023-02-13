@@ -8,6 +8,7 @@ import babel from 'prettier/parser-babel'
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
 import Col from 'react-bootstrap/Col'
+import Alert from 'react-bootstrap/Alert'
 import { colors } from '../../util/colors'
 import { useNavigate } from 'react-router-dom'
 
@@ -27,6 +28,7 @@ const titleCase = (str: string) =>
         .join(' ')
 
 export default function AppPage(props) {
+    const [error, setError] = useState('')
     const [code, setCode] = useState('')
     const [app, setApp] = useState(null as any)
     const { userId, appId } = useParams()
@@ -42,10 +44,23 @@ export default function AppPage(props) {
             return app
         })
     }
+
+    const appErrorListener = (event) => {
+        setError((prevError) => {
+            if (event.appId === appId && app) {
+                setTimeout(() => setError(() => ''), 15000)
+                return event.error
+            }
+            return prevError
+        })
+    }
+
     useEffect(() => {
         props.emitter.addListener('appRenamed', appRenamedListener)
+        props.emitter.addListener('appError', appErrorListener)
         return () => {
             props.emitter.removeListener('appRenamed', appRenamedListener)
+            props.emitter.removeListener('appError', appErrorListener)
         }
     })
 
@@ -150,6 +165,20 @@ export default function AppPage(props) {
                     </Col>
                 </Row>
             </Container>
+            {error && (
+                <Alert
+                    variant="danger"
+                    style={{
+                        position: 'absolute',
+                        width: '90%',
+                        left: '5%',
+                        bottom: '10px',
+                        zIndex: '100',
+                    }}
+                >
+                    {error}
+                </Alert>
+            )}
             <Editor
                 code={code}
                 onChange={setCode}

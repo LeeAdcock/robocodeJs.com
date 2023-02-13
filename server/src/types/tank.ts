@@ -154,9 +154,15 @@ export default class Tank implements Point, Orientated {
                   .then(() => eventPromiseMap.delete(event))
                   .catch((e) => {
                     this.logger.error(`${ErrorCodes.E019}: ${e}`);
-                    console.log(e)
-                    this.appCrashed=true
+                    console.log(e);
+                    this.appCrashed = true;
                     eventPromiseMap.delete(event);
+
+                    this.env.emit("event", {
+                      type: "appError",
+                      appId: this.process.appId,
+                      error: e.message,
+                    });
                   });
               }
 
@@ -195,21 +201,28 @@ export default class Tank implements Point, Orientated {
   }
 
   execute(process: Process): Promise<unknown> {
-    this.logger.trace("Executing code")
+    this.logger.trace("Executing code");
     try {
       return compiler.execute(process, this);
     } catch (e) {
       this.logger.error(`${ErrorCodes.E004}: ${e}`);
       this.appCrashed = true;
-      console.log(e);
+
+      this.env.emit("event", {
+        type: "appError",
+        appId: this.process.appId,
+        error: e.message,
+      });
+
       return Promise.resolve();
     }
   }
 
   setOrientation(d: number) {
     const target = normalizeAngle(d);
-    if(target===this.orientationTarget)
-    {return Promise.resolve()}
+    if (target === this.orientationTarget) {
+      return Promise.resolve();
+    }
 
     this.orientationTarget = target;
     this.env.emit("event", {
@@ -244,8 +257,9 @@ export default class Tank implements Point, Orientated {
 
   turn(d) {
     const target = normalizeAngle(this.orientation + d);
-    if(target===this.orientationTarget)
-      { return Promise.resolve() }
+    if (target === this.orientationTarget) {
+      return Promise.resolve();
+    }
     this.orientationTarget = target;
     this.env.emit("event", {
       type: "tankTurn",
@@ -270,12 +284,14 @@ export default class Tank implements Point, Orientated {
   }
 
   setSpeed(d: number) {
-    const target = Math.min(d, this.speedMax)
-    if(target===this.speedTarget)
-      { return Promise.resolve() }
-    console.log(target, this.speedTarget)
+    const target = Math.min(d, this.speedMax);
+    if (target === this.speedTarget) {
+      return Promise.resolve();
+    }
     this.logger.trace(
-      d === 0 ? "Stopping" : "Accelerating to " + target +" from "+this.speedTarget
+      d === 0
+        ? "Stopping"
+        : "Accelerating to " + target + " from " + this.speedTarget
     );
     this.speedTarget = target;
     this.env.emit("event", {

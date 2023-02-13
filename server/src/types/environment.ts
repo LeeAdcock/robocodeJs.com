@@ -242,7 +242,7 @@ export default class Environment {
           return Promise.all(
             [...Array(tankCount)].map(() => {
               const tank = new Tank(this, process);
-              tank.needsStarting=true
+              tank.needsStarting = true;
 
               process.tanks.push(tank);
               compiler.init(this, process, tank);
