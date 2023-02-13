@@ -1,6 +1,6 @@
 # RobocodeJs
 
-**Welcome to the arena! RobocodeJs is a browser-based programming game that teaches JavaScript. Brainstorm your own winning strategy, program your bot's artificial intelligence, and set it loose in the arena in teams to defeat your competition. Onwards to fame and glory!**
+**Welcome to the arena! RobocodeJs is a browser-based programming game that teaches [functional reactive programming](https://en.wikipedia.org/wiki/Functional_reactive_programming) JavaScript. Brainstorm your own winning strategy, program your bot's artificial intelligence, and set it loose in the arena in teams to defeat your competition. Onwards to fame and glory!**
 
 The battle arena is a square space filled with groups of bots working together as a team. Each app you program is the artificial intelligence for each member of a team. Your goal is to find and destroy your enemies before they eliminate you from the game. You'll have the use of your bot's radar and a turret mounted canon.
 
