@@ -35,10 +35,15 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
     width: arena.getWidth(),
     running: env.isRunning(),
     clock: { time: env.getTime() },
-    apps: env.getProcesses().map((process) => ({
+    apps: env.getProcesses()
+      .sort((a, b) => {
+        return (members.find((member) => member?.getAppId() === a.appId)?.getTimestamp()||0) -
+        (members.find((member) => member?.getAppId() === b.appId)?.getTimestamp()||0)
+      }).map((process) => ({
       id: process.getAppId(),
       name: apps.find((app) => app?.getId() === process.appId)?.getName(),
       userId: apps.find((app) => app?.getId() === process.appId)?.getUserId(),
+      addedTimestamp: members.find((member) => member?.getAppId() === process.appId)?.getTimestamp(),
       tanks: process.tanks.map((tank) => ({
         id: tank.id,
         x: tank.x,

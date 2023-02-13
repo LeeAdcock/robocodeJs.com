@@ -5,14 +5,17 @@ import pool from "../util/db";
 export default class ArenaMember {
   private appId: AppId;
   private arenaId: ArenaId;
+  private timestamp: number;
 
-  constructor(appId: AppId, arenaId: ArenaId) {
+  constructor(appId: AppId, arenaId: ArenaId, timestamp: number) {
     this.appId = appId;
     this.arenaId = arenaId;
+    this.timestamp = timestamp
   }
 
   getAppId = () => this.appId;
   getArenaId = () => this.arenaId;
+  getTimestamp = () => this.timestamp;
 
   delete = (): Promise<undefined> => {
     return pool

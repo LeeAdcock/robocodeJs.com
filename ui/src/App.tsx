@@ -279,10 +279,14 @@ function App() {
                             .then((res) => setUser(res.data))
                     }
                 } else if (data.type === 'arenaRestart') {
-                    if (isPaused) doReloadArena()
-                    else {
-                        messageArena.apps = []
-                    }
+                    setPaused(isPaused => {
+                        if (isPaused) doReloadArena()
+                        else {
+                            setArena([])
+                            messageArena.apps = []
+                        }
+                        return isPaused
+                    })
                 } else if (data.type === 'arenaPaused') {
                     setPaused(true)
                 } else if (data.type === 'arenaResumed') {

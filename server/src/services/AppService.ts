@@ -46,7 +46,7 @@ export class AppService {
   getForUser = (userId: UserId): Promise<TankApp[]> => {
     return pool
       .query({
-        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source" FROM app WHERE userId=$1 AND NOT deleted',
+        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source" FROM app WHERE userId=$1 AND NOT deleted ORDER BY app.id',
         values: [userId],
       })
       .then((res) =>

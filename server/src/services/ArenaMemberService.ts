@@ -14,7 +14,7 @@ pool.query(`
 
 export class ArenaMemberService {
   create = (arenaId: ArenaId, appId: AppId): Promise<ArenaMember> => {
-    const member = new ArenaMember(arenaId, appId);
+    const member = new ArenaMember(arenaId, appId, new Date().getTime());
     return pool
       .query({
         text: "INSERT INTO arena_member(arenaId, appId) VALUES($1, $2)",
@@ -26,22 +26,22 @@ export class ArenaMemberService {
   getForApp = (appId: AppId): Promise<ArenaMember[]> => {
     return pool
       .query({
-        text: 'SELECT arena_member.arenaId as "arenaId" FROM arena_member WHERE appId=$1',
+        text: 'SELECT arena_member.arenaId as "arenaId", arena_member.createdTimestamp as "createdTimestamp" FROM arena_member WHERE appId=$1 ORDER BY arena_member.createdTimestamp',
         values: [appId],
       })
       .then((res) =>
-        res.rows.map((row) => new ArenaMember(appId, row.arenaId))
+        res.rows.map((row) => new ArenaMember(appId, row.arenaId, new Date(row.createdTimestamp).getTime()))
       );
   };
 
   getForArena = (arenaId: ArenaId): Promise<ArenaMember[]> => {
     return pool
       .query({
-        text: 'SELECT arena_member.appId as "appId" FROM arena_member WHERE arenaId=$1',
+        text: 'SELECT arena_member.appId as "appId", arena_member.createdTimestamp as "createdTimestamp" FROM arena_member WHERE arenaId=$1 ORDER BY arena_member.createdTimestamp',
         values: [arenaId],
       })
       .then((res) =>
-        res.rows.map((row) => new ArenaMember(row.appId, arenaId))
+        res.rows.map((row) => new ArenaMember(row.appId, arenaId, new Date(row.createdTimestamp).getTime()))
       );
   };
 }
