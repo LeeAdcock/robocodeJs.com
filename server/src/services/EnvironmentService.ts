@@ -3,7 +3,9 @@ import Environment, { ArenaId, Process } from "../types/environment";
 import arenaMemberService from "./ArenaMemberService";
 
 export class EnvironmentService {
-  store: Map<ArenaId, Environment> = new Map();
+  // Keyed by arenaId. Accessed via bracket notation / Object.entries below, so
+  // this is a plain record, not a Map.
+  store: Record<ArenaId, Environment> = {};
 
   constructor() {
     // Garbage collection

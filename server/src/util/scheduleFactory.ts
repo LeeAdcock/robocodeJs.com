@@ -18,12 +18,14 @@ class Timer {
 }
 
 export class TimersContainer {
-  intervalMap: Map<number, Timer> = new Map<number, Timer>();
-  timerMap: Map<number, Timer> = new Map<number, Timer>();
+  // Keyed by timer id. Accessed via bracket notation / Object.entries, so these
+  // are plain records, not Maps.
+  intervalMap: Record<number, Timer> = {};
+  timerMap: Record<number, Timer> = {};
 
   reset = () => {
-    this.intervalMap = new Map<number, Timer>();
-    this.timerMap = new Map<number, Timer>();
+    this.intervalMap = {};
+    this.timerMap = {};
   };
 }
 
@@ -69,6 +71,7 @@ export const scheduleFactory = (tank: Tank) => {
         started: env.getTime(),
         interval,
         logger: tank.logger,
+        lastFired: null,
       };
       return timerId;
     },
@@ -91,6 +94,7 @@ export const scheduleFactory = (tank: Tank) => {
         interval,
         started: env.getTime(),
         logger: tank.logger,
+        lastFired: null,
       };
       return timerId;
     },
