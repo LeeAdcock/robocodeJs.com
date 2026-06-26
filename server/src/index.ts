@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 
 import auth from './middleware/auth';
+import { isLocalDev } from './util/devMode';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
@@ -42,4 +43,11 @@ const port = 8080;
 app.listen(port, () => {
   // tslint:disable-next-line:no-console
   console.log(`server started at http://localhost:${port}`);
+  if (isLocalDev) {
+    console.log(
+      '⚙  LOCAL DEV MODE — in-memory database + auth bypass (no Google sign-in).\n' +
+        '   A "Local Dev" user with starter bots is created automatically.\n' +
+        '   Set RDS_HOSTNAME (and NODE_ENV=production for deploys) to use a real database.'
+    );
+  }
 });

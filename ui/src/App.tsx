@@ -83,7 +83,10 @@ function App() {
                     } as Arena)
                     setPaused(true)*/
         })
-        .catch(() => google.accounts.id.prompt());
+        .catch(() => {
+          // Google Identity may be absent in local dev (no GSI script / offline).
+          if (typeof google !== 'undefined') google.accounts.id.prompt();
+        });
     }, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -114,29 +117,34 @@ function App() {
   };
 
   useEffect(() => {
-    google.accounts.id.initialize({
-      client_id:
-        '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
-      callback: (response: { credential: string }) => {
-        // The server verifies the credential and sets an HttpOnly
-        // session cookie (so it isn't readable by client-side JS).
-        axios
-          .post(`/api/session`, {
-            credential: response.credential,
-          })
-          .then(() => axios.get(`/api/user`))
-          .then((res) =>
-            axios
-              .get(`/api/user/${res.data.id}`)
-              .then((res) => setUser(res.data))
-              .then(() => google.accounts.id.cancel())
-          );
-      },
-    });
-    google.accounts.id.renderButton(
-      document.getElementById('GoogleLoginButton'),
-      { theme: 'outline', size: 'medium' } // customization attributes
-    );
+    // Google Identity Services may be unavailable in local dev (the GSI script is
+    // blocked/offline, or auth is bypassed server-side). Guard so the rest of the
+    // app — including the on-load auth check below — still runs.
+    if (typeof google !== 'undefined' && google.accounts?.id) {
+      google.accounts.id.initialize({
+        client_id:
+          '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
+        callback: (response: { credential: string }) => {
+          // The server verifies the credential and sets an HttpOnly
+          // session cookie (so it isn't readable by client-side JS).
+          axios
+            .post(`/api/session`, {
+              credential: response.credential,
+            })
+            .then(() => axios.get(`/api/user`))
+            .then((res) =>
+              axios
+                .get(`/api/user/${res.data.id}`)
+                .then((res) => setUser(res.data))
+                .then(() => google.accounts.id.cancel())
+            );
+        },
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('GoogleLoginButton'),
+        { theme: 'outline', size: 'medium' } // customization attributes
+      );
+    }
 
     // On window open, try to authenticate
     window.onload = function () {

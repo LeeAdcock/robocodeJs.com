@@ -7,7 +7,11 @@ Part of the [RobocodeJs monorepo](../README.md). Runs on port `8080` (reached th
 ## Requirements
 
 - **Node.js ≥ 22** — required by the native [`isolated-vm`](https://github.com/laverdet/isolated-vm) dependency. The isolated-vm major and Node major are coupled: isolated-vm 5.x needs Node ≥18, 6.x ≥22, 7.x ≥26. We pin `isolated-vm@^6` for Node 22. Building the native module needs `gcc`/`gcc-c++` (present in the dev container and in `.ebextensions/options.config` for Elastic Beanstalk).
-- **PostgreSQL** — see [Environment variables](#environment-variables).
+- **PostgreSQL** — only for a real/production setup; see [Environment variables](#environment-variables). For local dev it is optional (see below).
+
+### Local-dev mode
+
+When `RDS_HOSTNAME` is unset and `NODE_ENV` is neither `production` nor `test`, the server runs in **local-dev mode** (`src/util/devMode.ts`): the database is an in-memory Postgres ([`pg-mem`](https://github.com/oguimbal/pg-mem), a devDependency) and `auth()` skips Google verification, attaching a fixed **Local Dev** user (`ensureDevUser`). So `npm run dev` works with no database and no sign-in. That user is created with the standard starter bots and a running arena (`UserService.create`), so the arena is live immediately; all data resets on restart. The mode is force-disabled in production (re-checked at the auth bypass) and in tests.
 
 ## Scripts
 

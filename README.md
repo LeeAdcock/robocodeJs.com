@@ -93,10 +93,9 @@ In words: a **User** owns one or more **Arenas** and writes **Apps** (bot progra
 ### Prerequisites
 
 - **Node.js ≥ 22** (required by the native `isolated-vm` build; a `.devcontainer` with Node 22 is included).
-- **PostgreSQL**, configured via environment variables: `RDS_HOSTNAME`, `RDS_PORT`, `RDS_DB_NAME`, `RDS_USERNAME`, `RDS_PASSWORD`. Tables are created lazily on first use.
-- Sign-in uses **Google OAuth**.
+- That's it for local development — see below. **PostgreSQL** (`RDS_*` env vars) and **Google OAuth** are only needed for a production-like setup.
 
-### Run it locally
+### Run it locally (zero-config)
 
 There is no root-level install; work inside `server/` and `ui/` separately. Run all three processes (each in its own terminal):
 
@@ -107,6 +106,10 @@ node index.js                 # root proxy on :5000  (open this one)
 ```
 
 Then open <http://localhost:5000>.
+
+With no `RDS_HOSTNAME` configured, the server starts in **local-dev mode**: an in-memory Postgres ([pg-mem](https://github.com/oguimbal/pg-mem)) and an auth bypass that signs you in as a fixed "Local Dev" user — so **no database and no Google sign-in are required**. That user is created with the standard starter bots, so you land on a running arena immediately. Data resets on each restart. (Production safety: this mode can never activate when `NODE_ENV=production`, and a real deploy always sets both that and `RDS_HOSTNAME`.)
+
+To develop against a **real** database and Google sign-in instead, set the `RDS_*` variables (and `GOOGLE_CLIENT_ID`); see [`server/README.md`](server/README.md).
 
 ### Build
 

@@ -39,6 +39,8 @@ The server requires `node >=22` (see `server/package.json` engines), pinned by t
 
 The server needs Postgres via `RDS_*` env vars (`RDS_USERNAME`, `RDS_HOSTNAME`, `RDS_DB_NAME`, `RDS_PASSWORD`, `RDS_PORT`); see `server/src/util/db.ts`. Services create their own tables lazily with `CREATE TABLE IF NOT EXISTS` at import time.
 
+**Local-dev mode** (`util/devMode.ts`, `isLocalDev`): when `NODE_ENV` is neither `production` nor `test` **and** `RDS_HOSTNAME` is unset, the server runs with an in-memory Postgres (`pg-mem`, a devDependency `require`d lazily in `db.ts`) and an **auth bypass** that attaches a fixed "Local Dev" user (`ensureDevUser` in `middleware/auth.ts`) — no real database or Google sign-in needed. New users (including the dev user) are bootstrapped with starter bots and a running arena by `UserService.create`. The mode is force-disabled in production (re-checked at the auth-bypass site) and in the test suite. Don't rely on it serving requests with real persistence — data resets each restart.
+
 ## Architecture
 
 ### Bot sandboxing (the core of the system)

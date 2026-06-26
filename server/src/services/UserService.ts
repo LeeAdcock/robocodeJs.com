@@ -44,7 +44,7 @@ class UserService {
           Promise.all([
             appService.create(user.getId()).then((app) => {
               app.setName('My First Bot');
-              app
+              return app
                 .setSource(
                   `
 // Set the bot's name
@@ -74,7 +74,7 @@ bot.on(Event.FIRED, turnRight)
             }),
             appService.create(user.getId()).then((app) => {
               app.setName('Target Practice');
-              app
+              return app
                 .setSource(
                   `
 // Set the bot's name

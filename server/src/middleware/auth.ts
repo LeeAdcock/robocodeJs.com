@@ -3,8 +3,32 @@ import { Request, Response, NextFunction } from 'express';
 import userService from '../services/UserService';
 import authService from '../services/IdentityService';
 import User from '../types/user';
+import { isLocalDev } from '../util/devMode';
 
 export type AuthenticatedRequest = Request & { user: User };
+
+// Local-dev login bypass: resolve (or lazily create) a single fixed "Local Dev"
+// user so no Google sign-in is needed. Memoized so concurrent requests share one
+// creation rather than racing to insert the identity.
+let devUserPromise: Promise<User> | null = null;
+export const ensureDevUser = (): Promise<User> => {
+  if (!devUserPromise) {
+    devUserPromise = authService.get('local', 'dev').then((identity) => {
+      if (identity) {
+        return userService.get(identity.getUserId()).then((user) => {
+          if (user) return user;
+          throw new Error('Dev identity has no account.');
+        });
+      }
+      return userService
+        .create('Local Dev', undefined, 'dev@localhost')
+        .then((user) =>
+          authService.create(user.getId(), 'local', 'dev').then(() => user)
+        );
+    });
+  }
+  return devUserPromise;
+};
 
 // The Google OAuth client id that browser sign-in mints tokens for. Tokens are
 // verified against this as the audience, so a token issued for any other client
@@ -26,6 +50,21 @@ export const verifyGoogleCredential = (
 
 export default (required: boolean) =>
   async (req: Request, res: Response, next: NextFunction) => {
+    // Local dev: skip Google verification and act as the fixed dev user. The
+    // NODE_ENV re-check makes doubly sure this can never run in production.
+    if (isLocalDev && process.env.NODE_ENV !== 'production') {
+      try {
+        (req as AuthenticatedRequest).user = await ensureDevUser();
+        return next();
+      } catch {
+        if (required) {
+          res.status(401);
+          res.send('Access forbidden');
+          return;
+        }
+        return next();
+      }
+    }
     try {
       return verifyGoogleCredential(req.cookies.auth)
         .then((payload) => {
