@@ -16,10 +16,13 @@
 		"5000": {
 			"label": "proxy"
 		}
-	}
+	},
 
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "yarn install",
+	// Persist ~/.claude (Claude Code session history, memory, credentials) on
+	// the /workspaces volume, which is the only location guaranteed to survive
+	// a Codespaces container rebuild. The symlink is re-established on every
+	// rebuild, so session state and project memory carry over automatically.
+	"postCreateCommand": "mkdir -p /workspaces/.claude-persist && if [ ! -L /home/node/.claude ]; then if [ -e /home/node/.claude ]; then cp -an /home/node/.claude/. /workspaces/.claude-persist/ 2>/dev/null || true; rm -rf /home/node/.claude; fi; ln -s /workspaces/.claude-persist /home/node/.claude; fi"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
