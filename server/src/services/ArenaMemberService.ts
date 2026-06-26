@@ -41,6 +41,15 @@ export class ArenaMemberService {
       );
   };
 
+  deleteForArena = (arenaId: ArenaId): Promise<void> => {
+    return pool
+      .query({
+        text: 'DELETE FROM arena_member WHERE arenaId=$1',
+        values: [arenaId],
+      })
+      .then(() => undefined);
+  };
+
   getForArena = (arenaId: ArenaId): Promise<ArenaMember[]> => {
     return pool
       .query({

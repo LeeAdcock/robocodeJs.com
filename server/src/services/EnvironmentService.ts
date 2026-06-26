@@ -45,6 +45,18 @@ export class EnvironmentService {
       .then(() => env.restart().then(() => env));
   };
 
+  // Tears down an arena's in-memory environment immediately (rather than
+  // waiting for the 30-minute idle GC). Used when an arena is deleted.
+  dispose = (arenaId: ArenaId): Promise<void> => {
+    const env = this.store[arenaId];
+    if (env) {
+      console.log('disposing isolate', arenaId);
+      delete this.store[arenaId];
+      env.dispose();
+    }
+    return Promise.resolve();
+  };
+
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {
     return Promise.resolve(this.store[arenaId]);
   };

@@ -72,5 +72,5 @@ User bot code is untrusted JavaScript run in `isolated-vm` isolates — this is 
 
 ## Conventions
 
-- Several endpoints contain `// TODO assumes at least one arena ... first is default` — the app currently treats each user's first arena as their only/default arena. Preserve this assumption unless explicitly building multi-arena support.
-- Code style is enforced by prettier + eslint with `--fix`; run the package `lint` script rather than hand-formatting.
+- A user can own multiple arenas. Each arena action route is registered at **two paths sharing one handler** (`api/arena.ts`, via the `dual()` helper): `/api/user/:userId/arena/...` resolves the user's **default arena** (first by creation time, lazily created if none) and is what the UI uses, while `/api/user/:userId/arenas/:arenaId/...` addresses a **specific arena** and is intended for tooling. The `resolveArena` middleware (`middleware/resource.ts`) picks the right one and enforces that an `:arenaId` belongs to `:userId`. The collection lives at `/api/user/:userId/arenas` (GET list, POST create — capped at `MAX_ARENAS_PER_USER`), with `DELETE .../arenas/:arenaId` to tear one down. Keep the UI single-arena: add arena management to tooling against `/arenas`, not the UI.
+- Code style is enforced by prettier + eslint with `--fix`; one root `.prettierrc.json` governs the whole repo, eslint is per-package (each resolves its own plugins). Run the package `lint` script rather than hand-formatting.

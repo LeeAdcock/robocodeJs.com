@@ -46,8 +46,19 @@ export class ArenaService {
       .then((res) => res.rows.map((row) => new Arena(row.arenaId, userId)));
   };
 
+  // The user's default arena (first by creation time). Lazily creates one if
+  // the user has none, so callers never have to special-case the empty state —
+  // this is what lets the legacy `/arena` routes always resolve an arena.
   getDefaultForUser = (userId: UserId): Promise<Arena> => {
-    return this.getForUser(userId).then((arenas) => arenas[0]);
+    return this.getForUser(userId).then((arenas) =>
+      arenas.length > 0 ? arenas[0] : this.create(userId)
+    );
+  };
+
+  delete = (arenaId: ArenaId): Promise<void> => {
+    return pool
+      .query({ text: 'DELETE FROM arena WHERE id=$1', values: [arenaId] })
+      .then(() => undefined);
   };
 }
 

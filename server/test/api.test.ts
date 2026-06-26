@@ -12,13 +12,29 @@ vi.mock('../src/services/AppService', () => ({
   default: { get: vi.fn(), getForUser: vi.fn(), create: vi.fn() },
 }));
 vi.mock('../src/services/ArenaService', () => ({
-  default: { getForUser: vi.fn(), getDefaultForUser: vi.fn() },
+  default: {
+    getForUser: vi.fn(),
+    getDefaultForUser: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+  },
 }));
 vi.mock('../src/services/ArenaMemberService', () => ({
-  default: { getForApp: vi.fn(), getForArena: vi.fn(), create: vi.fn() },
+  default: {
+    getForApp: vi.fn(),
+    getForArena: vi.fn(),
+    create: vi.fn(),
+    deleteForArena: vi.fn(),
+  },
 }));
 vi.mock('../src/services/EnvironmentService', () => ({
-  default: { getByArenaId: vi.fn(), has: vi.fn(), get: vi.fn() },
+  default: {
+    getByArenaId: vi.fn(),
+    has: vi.fn(),
+    get: vi.fn(),
+    dispose: vi.fn(),
+  },
 }));
 
 import userService from '../src/services/UserService';
@@ -239,5 +255,99 @@ describe('arena endpoints', () => {
     );
     expect(res.status).toBe(201);
     expect(addApp).toHaveBeenCalled();
+  });
+});
+
+describe('multi-arena endpoints', () => {
+  beforeEach(() => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+  });
+
+  it('GET /api/user/:userId/arenas lists the user’s arenas', async () => {
+    vi.mocked(arenaService.getForUser).mockResolvedValue([
+      { getId: () => 'ar1' },
+      { getId: () => 'ar2' },
+    ] as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).get(
+      '/api/user/u1/arenas'
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([{ id: 'ar1' }, { id: 'ar2' }]);
+  });
+
+  it('POST /api/user/:userId/arenas creates an arena under the limit', async () => {
+    vi.mocked(arenaService.getForUser).mockResolvedValue([] as never);
+    vi.mocked(arenaService.create).mockResolvedValue({
+      getId: () => 'ar9',
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
+      '/api/user/u1/arenas'
+    );
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: 'ar9' });
+  });
+
+  it('POST /api/user/:userId/arenas rejects at the 10-arena limit', async () => {
+    vi.mocked(arenaService.getForUser).mockResolvedValue(
+      Array.from({ length: 10 }, (_, i) => ({ getId: () => `ar${i}` })) as never
+    );
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
+      '/api/user/u1/arenas'
+    );
+    expect(res.status).toBe(400);
+    expect(arenaService.create).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/user/:userId/arenas/:arenaId/restart targets that arena', async () => {
+    const restart = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(arenaService.get).mockResolvedValue({
+      getId: () => 'ar2',
+      getUserId: () => 'u1',
+    } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({ restart } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
+      '/api/user/u1/arenas/ar2/restart'
+    );
+    expect(res.status).toBe(200);
+    expect(arenaService.get).toHaveBeenCalledWith('ar2');
+    expect(arenaService.getDefaultForUser).not.toHaveBeenCalled();
+    expect(restart).toHaveBeenCalled();
+  });
+
+  it('rejects addressing an arena owned by another user with 404', async () => {
+    vi.mocked(arenaService.get).mockResolvedValue({
+      getId: () => 'ar2',
+      getUserId: () => 'someone-else',
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
+      '/api/user/u1/arenas/ar2/restart'
+    );
+    expect(res.status).toBe(404);
+    expect(environmentService.get).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /api/user/:userId/arenas/:arenaId tears down the arena', async () => {
+    vi.mocked(arenaService.get).mockResolvedValue({
+      getId: () => 'ar2',
+      getUserId: () => 'u1',
+    } as never);
+    vi.mocked(environmentService.dispose).mockResolvedValue(undefined as never);
+    vi.mocked(arenaMemberService.deleteForArena).mockResolvedValue(
+      undefined as never
+    );
+    vi.mocked(arenaService.delete).mockResolvedValue(undefined as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).delete(
+      '/api/user/u1/arenas/ar2'
+    );
+    expect(res.status).toBe(200);
+    expect(environmentService.dispose).toHaveBeenCalledWith('ar2');
+    expect(arenaMemberService.deleteForArena).toHaveBeenCalledWith('ar2');
+    expect(arenaService.delete).toHaveBeenCalledWith('ar2');
   });
 });

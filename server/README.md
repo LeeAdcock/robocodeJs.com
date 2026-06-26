@@ -58,9 +58,9 @@ Most routes are namespaced under `/api/user/:userId/...`. Mutating routes additi
 | `help.ts` | help responses, classified with `ml-classify-text` |
 | `user.ts` | `GET /api/user` (current user) and `/api/user/:userId` |
 | `app.ts` | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile` |
-| `arena.ts` | arena status, add/remove app, `restart`/`pause`/`resume`, and the live `GET .../arena/events` & `.../arena/logs` SSE streams |
+| `arena.ts` | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); arena status, add/remove app, `restart`/`pause`/`resume`, and the live `.../events` & `.../logs` SSE streams |
 
-> **Convention:** several endpoints assume each user's *first* arena is their only/default arena (look for `// TODO assumes ... first is default`). Preserve this unless you're deliberately building multi-arena support.
+> **Multi-arena:** a user can own several arenas. Each action route is registered at **two paths sharing one handler** (the `dual()` helper): `/api/user/:userId/arena/...` resolves the user's **default arena** (lazily created if none) — this is what the UI uses — while `/api/user/:userId/arenas/:arenaId/...` addresses a **specific arena** for external tooling. The `resolveArena` middleware enforces that an `:arenaId` belongs to `:userId`. Creation is capped at `MAX_ARENAS_PER_USER` (10). Keep arena management out of the UI; build it against `/arenas`.
 
 ## The sandbox (the core of the system)
 
