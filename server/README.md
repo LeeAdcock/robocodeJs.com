@@ -15,6 +15,8 @@ Part of the [RobocodeJs monorepo](../README.md). Runs on port `8080` (reached th
 npm run dev     # build + nodemon-watch src, restart on change (port 8080)
 npm run build   # tsc -> dist/
 npm start       # node ./dist/src/index.js
+npm test        # run the Vitest suite once (test/**/*.test.ts)
+npm run test:watch  # Vitest in watch mode
 npm run smoke   # exercise the isolated-vm API surface compiler.ts relies on
 npm run lint    # prettier --write + eslint --fix
 npm run package # version bump + shrinkwrap + zip the deploy artifact
@@ -97,6 +99,10 @@ Live arena state is pushed to the browser via **Server-Sent Events**:
 - `GET /api/user/:userId/arena/logs` — bot `console` output.
 
 The UI consumes these and interpolates motion between server ticks with its own partial physics mirror. **If you change movement or collision math here, update `ui/src/util/simulate.ts` to match.**
+
+## Tests
+
+[Vitest](https://vitest.dev) suites live in `test/` (kept out of `src` so they're excluded from the `tsc` build). They focus on the pure-ish core: the simulation physics (`test/simulation.test.ts` — movement, acceleration, rotation, tank/boundary collisions, bullet hits and lifetimes) and the tick-driven timers (`test/scheduleFactory.test.ts`). `Simulation.run` only invokes `tank.handlers[...]` and mutates plain fields, so the tests drive it with lightweight mock tanks — no real isolates required. Run with `npm test`.
 
 ## Build & deploy
 

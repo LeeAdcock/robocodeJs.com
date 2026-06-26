@@ -29,7 +29,7 @@ node index.js                 # root proxy on :5000
 (cd ui && npm run lint)
 ```
 
-There are **no tests** — the `test` scripts in both packages are placeholder stubs.
+Both packages use **Vitest** (`npm test` runs `vitest run`, `npm run test:watch` for watch mode). Tests live in each package's `test/` directory (outside `src`, so they're excluded from the `tsc` build). Current coverage focuses on the pure-ish logic: the server's simulation physics (`test/simulation.test.ts`) and tick-driven timers (`test/scheduleFactory.test.ts`), and the UI's client-side interpolation (`test/simulate.test.ts`). `Simulation.run` is tested with lightweight mock tanks — it only invokes `tank.handlers[...]` and mutates plain fields, so tests need no real isolates.
 
 `ui build` writes directly into `server/dist/public` (`build.outDir` in `ui/vite.config.ts`, with `emptyOutDir` clearing it first), so the server can serve the built UI as static files in production. Deployment is AWS CodeBuild (`buildspec.yaml`) → Elastic Beanstalk (`server/.ebextensions`).
 

@@ -10,7 +10,8 @@
     "lint": "npx prettier --write src && npx eslint src --fix",
     "start": "node ./dist/src/index.js",
     "smoke": "node ./scripts/ivm-smoke.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "package": "npm version patch && npm shrinkwrap && zip -r robocodejs-${npm_package_version}.zip ./ -x '*src*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
   "author": "",
@@ -35,7 +36,8 @@
     "nodemon": "^3.1.14",
     "npm-run-all": "^4.1.5",
     "prettier": "2.8.3",
-    "typescript": "^4.9.3"
+    "typescript": "^4.9.3",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "npm": ">=10.0.0",

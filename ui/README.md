@@ -19,8 +19,12 @@ Part of the [RobocodeJs monorepo](../README.md). Runs on port `3000` in developm
 npm run dev      # Vite dev server on :3000 (alias: npm start)
 npm run build    # tsc --noEmit type-check, then vite build
 npm run preview  # serve the production build locally
+npm test         # run the Vitest suite once (test/**/*.test.ts)
+npm run test:watch  # Vitest in watch mode
 npm run lint     # eslint --fix + prettier --write
 ```
+
+Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`). The current suite covers `src/util/simulate.ts` — the client-side movement/rotation/bullet interpolation — which is pure logic over plain objects, so it runs in a plain `node` environment with no DOM.
 
 `vite.config.ts` sets `build.outDir` to `../server/dist/public` (with `emptyOutDir`), so a production build lands directly where the server serves static files from — no copy step. The `build` script runs `tsc --noEmit` first, so type errors fail the build.
 
