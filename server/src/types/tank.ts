@@ -14,6 +14,9 @@ import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
 
+// Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
+const MAX_NAME_LENGTH = 50;
+
 // Convenience method to create a promise that resolves/rejects
 // when specific conditions are met.
 export const waitUntil = (
@@ -173,15 +176,23 @@ export default class Tank implements Point, Orientated {
   }
 
   setName(name: string) {
-    // todo sanitize name
+    // Bot-controlled and persisted to the DB + broadcast to every SSE client:
+    // coerce to a string, strip control characters, and bound the length before
+    // it goes anywhere. An empty result is ignored rather than applied.
+    const clean = String(name)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .trim()
+      .slice(0, MAX_NAME_LENGTH);
+    if (clean.length === 0) return;
     appService.get(this.process.getAppId()).then((app) => {
-      if (app && app.getName() !== name) {
+      if (app && app.getName() !== clean) {
         this.env.emit('event', {
           type: 'appRenamed',
           appId: app.getId(),
-          name: name,
+          name: clean,
         });
-        return app.setName(name);
+        return app.setName(clean);
       }
     });
   }

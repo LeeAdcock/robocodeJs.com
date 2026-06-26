@@ -8,6 +8,30 @@ import Environment, { Process } from '../types/environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from '../types/ErrorCodes';
 
+// Wall-clock ceiling, in ms, for any single synchronous entry into untrusted
+// bot code (top-level script load, event handlers, and timer callbacks).
+// Without it a bot can hang the host thread forever — e.g. an interval whose
+// body is `while (true) {}`. Tunable via env so it can be tightened in prod or
+// shortened in tests; defaults to 5s to match the original behavior.
+const sandboxTimeoutMs = () => Number(process.env.SANDBOX_TIMEOUT_MS) || 5000;
+
+// Bounds on bot-controlled log output, which is broadcast to every SSE client.
+const MAX_LOGS_PER_TICK = 50;
+const MAX_LOG_LENGTH = 2000;
+
+// Invoke a bot-supplied timer callback (an isolate Reference) under the sandbox
+// timeout, isolating the host thread from runaway loops. A timeout (or any
+// throw) crashes the bot rather than the server; Simulation kills crashed bots.
+function runTimer(func: ivm.Reference, tank: Tank) {
+  try {
+    func.applySync(undefined, [], { timeout: sandboxTimeoutMs() });
+  } catch (e) {
+    tank.logger.error(`${ErrorCodes.E020}: ${e}`);
+    tank.appCrashed = true;
+    console.log(e);
+  }
+}
+
 // --- helpers for exposing the bot API into the isolate ---
 // Each installs a native `_name` function on the isolate global and compiles the
 // matching `botPath` wrapper that bridges to it (via ExternalCopy for values and
@@ -229,7 +253,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
             handler.applySync(
               undefined,
               [resolve, reject, JSON.stringify(args)],
-              { timeout: 5000 }
+              { timeout: sandboxTimeoutMs() }
             );
           });
         } catch (e) {
@@ -312,7 +336,7 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
         process
           .getSandbox()
           .compileScriptSync(app.getSource())
-          .runSync(tank.getContext(), { timeout: 5000 });
+          .runSync(tank.getContext(), { timeout: sandboxTimeoutMs() });
       } catch (e) {
         tank.logger.error(`${ErrorCodes.E017}: ${e}`);
         tank.appCrashed = true;
@@ -336,13 +360,16 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     exposeTankRadar(tank, process.getSandbox());
     exposeTankTurret(tank, process.getSandbox());
 
-    // Expose scheduler / timers
+    // Expose scheduler / timers. The bot hands its callback across as an isolate
+    // Reference (not a Callback) so the host can invoke it under the sandbox
+    // timeout via runTimer — a Callback would run with no time limit, letting a
+    // looping timer body hang the whole server.
     const scheduler = scheduleFactory(tank);
     tank
       .getContext()
-      .global.setSync('_setInterval', (func: () => void, interval: number) => {
-        scheduler.setInterval(func, interval, env);
-      });
+      .global.setSync('_setInterval', (func: ivm.Reference, interval: number) =>
+        scheduler.setInterval(() => runTimer(func, tank), interval, env)
+      );
     tank.getContext().global.setSync('_clearInterval', (id: number) => {
       scheduler.clearInterval(id);
     });
@@ -351,7 +378,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .compileScriptSync(
         `
         setInterval = (func, interval) =>
-          _setInterval(new _ivm.Callback(() => { func() }), interval)
+          _setInterval(new _ivm.Reference(func), interval)
         clearInterval = (id) => _clearInterval(id)
         `
       )
@@ -359,9 +386,9 @@ const init = (env: Environment, process: Process, tank: Tank) => {
 
     tank
       .getContext()
-      .global.setSync('_setTimeout', (func: () => void, interval: number) => {
-        scheduler.setTimeout(func, interval, env);
-      });
+      .global.setSync('_setTimeout', (func: ivm.Reference, interval: number) =>
+        scheduler.setTimeout(() => runTimer(func, tank), interval, env)
+      );
     tank.getContext().global.setSync('_clearTimeout', (id: number) => {
       scheduler.clearTimeout(id);
     });
@@ -370,7 +397,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .compileScriptSync(
         `
         setTimeout = (func, interval) =>
-          _setTimeout(new _ivm.Callback(() => { func() }), interval)
+          _setTimeout(new _ivm.Reference(func), interval)
         clearTimeout = (id) => _clearTimeout(id)
         `
       )
@@ -471,8 +498,26 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       streams,
     });
 
+    // Bot-controlled log output is broadcast to every connected SSE client, so
+    // bound it: drop anything past a per-tick budget (stops a tight loop from
+    // flooding clients) and clamp long strings. The budget resets whenever the
+    // simulation clock advances; within one synchronous handler the clock is
+    // fixed, so a logging loop is capped at MAX_LOGS_PER_TICK.
+    let logCount = 0;
+    let logWindow = env.getTime();
+    const clampLog = (m: unknown) =>
+      typeof m === 'string' && m.length > MAX_LOG_LENGTH
+        ? m.slice(0, MAX_LOG_LENGTH) + '…'
+        : m;
     tank.getContext().global.setSync('_log', (msg: any, ...msgs: any[]) => {
-      tank.logger.info(msg, ...msgs);
+      const now = env.getTime();
+      if (now !== logWindow) {
+        logWindow = now;
+        logCount = 0;
+      }
+      if (logCount >= MAX_LOGS_PER_TICK) return;
+      logCount += 1;
+      tank.logger.info(clampLog(msg), ...msgs.map(clampLog));
     });
     // TODO better log-level support
     process

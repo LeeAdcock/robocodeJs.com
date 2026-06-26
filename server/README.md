@@ -35,6 +35,7 @@ PostgreSQL connection (see `src/util/db.ts`):
 | `RDS_PASSWORD` | database password |
 | `GOOGLE_CLIENT_ID` | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with. |
 | `NODE_ENV` | `production` enables the `Secure` flag on the session cookie |
+| `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`) |
 
 Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema is created lazily on first connection.
 
