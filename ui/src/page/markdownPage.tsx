@@ -41,6 +41,11 @@ export default function MarkdownPage(props: MarkdownPageProps) {
     }, [props.path])
 
     useEffect(() => {
+        // showdown has an unfixed moderate ReDoS advisory (GHSA-rmmh-p597-ppvv),
+        // accepted here because `md` is only ever our own static /docs/*.md content,
+        // never user input. Revisit (swap for a maintained renderer, preserving
+        // showdown's auto-generated header ids that scrollToSection relies on) if
+        // this ever renders untrusted markdown.
         setHtml(new showdown.Converter().makeHtml(md))
     }, [md])
 
