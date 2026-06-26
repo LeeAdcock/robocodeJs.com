@@ -32,6 +32,8 @@ describe('AppService', () => {
         expect(app?.getUserId()).toBe('u1')
         expect(app?.getName()).toBe('Cool Bot')
         expect(app?.getSource()).toBe('// code')
+        // hydration must not write back to the database (only the SELECT runs)
+        expect(query).toHaveBeenCalledTimes(1)
     })
 
     it('getForUser() maps each row to a TankApp', async () => {

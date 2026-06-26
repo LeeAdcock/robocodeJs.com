@@ -36,10 +36,10 @@ export class AppService {
       })
       .then((res) => {
         if (res.rowCount === 0) return undefined;
-        const app = new TankApp(appId, res.rows[0].userId);
-        app.setName(res.rows[0].name);
-        app.setSource(res.rows[0].source);
-        return app;
+        return new TankApp(appId, res.rows[0].userId).hydrate(
+          res.rows[0].name,
+          res.rows[0].source
+        );
       });
   };
 
@@ -50,12 +50,9 @@ export class AppService {
         values: [userId],
       })
       .then((res) =>
-        res.rows.map((row) => {
-          const app = new TankApp(row.appId, userId);
-          app.setName(row.name);
-          app.setSource(row.source);
-          return app;
-        })
+        res.rows.map((row) =>
+          new TankApp(row.appId, userId).hydrate(row.name, row.source)
+        )
       );
   };
 }

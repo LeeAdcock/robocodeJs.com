@@ -20,6 +20,14 @@ export default class App {
   getId = () => this.id;
   getUserId = () => this.userId;
 
+  // Populate fields from persistence without writing them back to the database
+  // (setName/setSource persist; this is for hydrating a loaded record).
+  hydrate = (name: string, source: string): App => {
+    this.name = name;
+    this.source = source;
+    return this;
+  };
+
   getSource = () => this.source || "";
   setSource = (source: string): Promise<undefined> => {
     this.source = source;
