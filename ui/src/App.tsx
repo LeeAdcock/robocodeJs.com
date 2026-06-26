@@ -3,18 +3,20 @@ import ArenaSvg from './components/arena/arena'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
 import TankApp from './types/tankApp'
 import Arena from './types/arena'
-import AppPage from './page/app/appPage'
+// Lazy-loaded so the heavy editor chunk (ace-builds + prettier) isn't part of
+// the initial arena/home bundle.
+const AppPage = lazy(() => import('./page/app/appPage'))
 import NavBar from './components/navbar'
 import MarkdownPage from './page/markdownPage'
 import User from './types/user'
 import ArenaToolbar from './components/arena/arenaToolbar'
 import 'bootstrap/dist/css/bootstrap.min.css'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import PointInTime from './types/pointInTime'
 import applyArenaEvent from './util/arenaReducer'
-import ArenaLogPage from './page/arena/arenaLogsPage'
+const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'))
 import { Emitter } from './util/emitter'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -246,6 +248,7 @@ function App() {
                             margin: '10px',
                         }}
                     >
+                        <Suspense fallback={null}>
                         <Routes>
                             <Route
                                 path="/"
@@ -291,6 +294,7 @@ function App() {
                                 element={<ArenaLogPage />}
                             />
                         </Routes>
+                        </Suspense>
                     </div>
                 </Router>
             </div>
