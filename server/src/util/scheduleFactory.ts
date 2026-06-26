@@ -63,8 +63,14 @@ export const timerTick = (env: Environment) => {
 // Create timer and interval wrapper functions for the provided tank
 export const scheduleFactory = (tank: Tank) => {
   return {
-    setInterval: (func: () => void, interval: number, env: Environment) => {
-      const timerId = Math.floor(Math.random() * 100000);
+    // timerId is generated isolate-side (a per-tank sequence) and passed in, so
+    // the host map and the bot's own timer table share one stable key.
+    setInterval: (
+      timerId: number,
+      func: () => void,
+      interval: number,
+      env: Environment
+    ) => {
       tank.logger.trace('Created interval', timerId);
       tank.timers.intervalMap[timerId] = {
         func,
@@ -81,8 +87,12 @@ export const scheduleFactory = (tank: Tank) => {
       delete tank.timers.intervalMap[timerId];
     },
 
-    setTimeout: (func: () => void, interval: number, env: Environment) => {
-      const timerId = Math.floor(Math.random() * 100000);
+    setTimeout: (
+      timerId: number,
+      func: () => void,
+      interval: number,
+      env: Environment
+    ) => {
       tank.logger.trace('Created timer', timerId);
       const wrappedFunc = () => {
         delete tank.timers.timerMap[timerId];

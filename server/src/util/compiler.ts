@@ -19,14 +19,20 @@ const sandboxTimeoutMs = () => Number(process.env.SANDBOX_TIMEOUT_MS) || 5000;
 const MAX_LOGS_PER_TICK = 50;
 const MAX_LOG_LENGTH = 2000;
 
-// Invoke a bot-supplied timer callback (an isolate Reference) under the sandbox
-// timeout, isolating the host thread from runaway loops. A timeout (or any
-// throw) crashes the bot rather than the server; Simulation kills crashed bots.
-function runTimer(func: ivm.Reference, tank: Tank) {
+// Invoke an isolate function (captured host-side as a Reference) under the
+// sandbox timeout, isolating the host thread from a runaway bot. A timeout (or
+// any throw) crashes the bot rather than the server; Simulation kills crashed
+// bots. Used to drive event handlers and timer callbacks back into the isolate.
+function runInIsolate(
+  ref: ivm.Reference,
+  args: unknown[],
+  tank: Tank,
+  code: ErrorCodes
+) {
   try {
-    func.applySync(undefined, [], { timeout: sandboxTimeoutMs() });
+    return ref.applySync(undefined, args, { timeout: sandboxTimeoutMs() });
   } catch (e) {
-    tank.logger.error(`${ErrorCodes.E020}: ${e}`);
+    tank.logger.error(`${code}: ${e}`);
     tank.appCrashed = true;
     console.log(e);
   }
@@ -34,8 +40,9 @@ function runTimer(func: ivm.Reference, tank: Tank) {
 
 // --- helpers for exposing the bot API into the isolate ---
 // Each installs a native `_name` function on the isolate global and compiles the
-// matching `botPath` wrapper that bridges to it (via ExternalCopy for values and
-// _ivm.Callback for async results).
+// matching `botPath` wrapper that bridges to it. ivm objects (Callbacks,
+// References) are always built host-side; the ivm module is never exposed to
+// untrusted bot code.
 
 // Synchronous getter: `botPath()` copies fn()'s result out of the host.
 function exposeGetter(
@@ -51,7 +58,17 @@ function exposeGetter(
     .runSync(tank.getContext(), {});
 }
 
-// Async action taking one argument; resolves/rejects when fn() settles.
+// Settles a pending bot-side promise by id (see __settle). Each tank's settler
+// is registered by init; the async callbacks below look it up by tank, so the
+// expose* helpers don't need to thread it through their signatures.
+type Settle = (id: number, ok: boolean, value: unknown) => void;
+const settlers = new WeakMap<Tank, Settle>();
+
+// Async action taking one argument; resolves/rejects when fn() settles. The
+// side effect (fn) runs synchronously inside this sync callback so commands
+// apply immediately; the promise the bot is awaiting is settled later via the
+// host-captured __settle reference. The bot wrapper calls the shared
+// __asyncCall bridge, so no ivm primitive is ever exposed to bot code.
 function exposeAsync1(
   tank: Tank,
   isolate: ivm.Isolate,
@@ -59,26 +76,20 @@ function exposeAsync1(
   name: string,
   fn: (arg: number) => Promise<unknown>
 ) {
-  tank
-    .getContext()
-    .global.setSync(
-      name,
-      (
-        arg: number,
-        resolve: (v?: unknown) => void,
-        reject: (v?: unknown) => void
-      ) => {
-        fn(arg).then(resolve, reject).catch(reject);
-      }
+  tank.getContext().global.setSync(name, (id: number, arg: number) => {
+    const settle = settlers.get(tank)!;
+    fn(arg).then(
+      (v) => settle(id, true, v),
+      (e) => settle(id, false, e)
     );
+  });
   isolate
-    .compileScriptSync(
-      `${botPath} = arg => new Promise((resolve, reject) => ${name}(arg, new _ivm.Callback(resolve), new _ivm.Callback(reject)))`
-    )
+    .compileScriptSync(`${botPath} = (arg) => __asyncCall(${name}, arg)`)
     .runSync(tank.getContext(), {});
 }
 
-// Async action with no arguments that resolves with fn()'s result.
+// Async action with no arguments that resolves with fn()'s result (e.g.
+// radar.scan's hit list). __settle copies object results across the boundary.
 function exposeAsyncResult(
   tank: Tank,
   isolate: ivm.Isolate,
@@ -86,18 +97,15 @@ function exposeAsyncResult(
   name: string,
   fn: () => Promise<unknown>
 ) {
-  tank
-    .getContext()
-    .global.setSync(
-      name,
-      (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
-        fn().then(resolve, reject).catch(reject);
-      }
+  tank.getContext().global.setSync(name, (id: number) => {
+    const settle = settlers.get(tank)!;
+    fn().then(
+      (v) => settle(id, true, v),
+      (e) => settle(id, false, e)
     );
+  });
   isolate
-    .compileScriptSync(
-      `${botPath} = () => new Promise((resolve, reject) => ${name}(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject())))`
-    )
+    .compileScriptSync(`${botPath} = () => __asyncCall(${name})`)
     .runSync(tank.getContext(), {});
 }
 
@@ -212,22 +220,15 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
 
   // Expose fire
   // todo resulting value
-  tank
-    .getContext()
-    .global.setSync(
-      '_bot_turret_fire',
-      (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
-        turret.fire().then(resolve, reject).catch(reject);
-      }
+  tank.getContext().global.setSync('_bot_turret_fire', (id: number) => {
+    const settle = settlers.get(tank)!;
+    turret.fire().then(
+      (v) => settle(id, true, v),
+      (e) => settle(id, false, e)
     );
+  });
   isolate
-    .compileScriptSync(
-      `
-      bot.turret.fire = () => new Promise((resolve, reject) =>
-        _bot_turret_fire(new _ivm.Callback(resolve), new _ivm.Callback(reject))
-      )
-      `
-    )
+    .compileScriptSync(`bot.turret.fire = () => __asyncCall(_bot_turret_fire)`)
     .runSync(tank.getContext(), {});
 
   exposeAsyncResult(
@@ -243,37 +244,58 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
 }
 
 function exposeTank(tank: Tank, isolate: ivm.Isolate) {
-  // Expose event handler
-  tank
-    .getContext()
-    .global.setSync('_bot_on', (event: Event, handler: ivm.Reference) => {
-      tank.on(event, (...args: unknown[]) => {
-        try {
-          return new Promise((resolve, reject) => {
-            handler.applySync(
-              undefined,
-              [resolve, reject, JSON.stringify(args)],
-              { timeout: sandboxTimeoutMs() }
-            );
-          });
-        } catch (e) {
-          tank.logger.error(`${ErrorCodes.E013}: ${e}`);
-          tank.appCrashed = true;
-          console.log(e);
-        }
-      });
-    });
+  // Event handlers, without exposing ivm. The bot stores its handler functions
+  // in an isolate-side table (`__handlers`); the host captures a Reference to a
+  // single `__dispatch` entry point and drives it when an event fires. The
+  // handler functions never cross the boundary — only the event name + JSON args
+  // do (host -> isolate) and resolve/reject callbacks (which auto-wrap).
   isolate
     .compileScriptSync(
       `
       bot.scope = {}
-      bot.on = (event, handler) => _bot_on(event, new _ivm.Reference((resolve, reject, jsonArgs) => {
-        returnValue = handler.apply(bot.scope, JSON.parse(jsonArgs))
+      const __handlers = {}
+      bot.on = (event, handler) => { __handlers[event] = handler; _bot_register(event) }
+      globalThis.__dispatch = (event, jsonArgs, resolve, reject) => {
+        const handler = __handlers[event]
+        if (!handler) { resolve(); return }
+        const returnValue = handler.apply(bot.scope, JSON.parse(jsonArgs))
         return (returnValue || Promise.resolve()).then(resolve, reject)
-      }))
+      }
       `
     )
     .runSync(tank.getContext(), {});
+
+  // Captured once, before any bot code runs, so a bot reassigning __dispatch
+  // later cannot hijack what the host invokes.
+  const dispatchRef = tank
+    .getContext()
+    .evalSync('__dispatch', { reference: true });
+
+  const dispatchEvent = (event: string, x: unknown) =>
+    new Promise((resolve, reject) => {
+      try {
+        dispatchRef.applySync(
+          undefined,
+          [event, JSON.stringify([x]), resolve, reject],
+          { timeout: sandboxTimeoutMs() }
+        );
+      } catch (e) {
+        tank.logger.error(`${ErrorCodes.E013}: ${e}`);
+        tank.appCrashed = true;
+        console.log(e);
+        reject(e);
+      }
+    });
+
+  tank.getContext().global.setSync(
+    '_bot_register',
+    new ivm.Callback(
+      (event: Event) => {
+        tank.on(event, (x: unknown) => dispatchEvent(event, x));
+      },
+      { sync: true }
+    )
+  );
 
   exposeGetter(tank, isolate, 'bot.getId', '_bot_getId', () => tank.getId());
   exposeGetter(tank, isolate, 'bot.getSpeed', '_bot_getSpeed', () =>
@@ -349,59 +371,129 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
 // Initialize a tank.getContext() within the isolated sandbox
 const init = (env: Environment, process: Process, tank: Tank) => {
   try {
-    tank.getContext().global.setSync('_ivm', ivm);
-
     // Expose tank
     process
       .getSandbox()
       .compileScriptSync(`const bot={radar: {}, turret: {}}`)
       .runSync(tank.getContext(), {});
+
+    // Async-call bridge (no ivm in the isolate). The bot's async API wrappers
+    // call __asyncCall, which parks the promise's resolve/reject in __pending
+    // keyed by id and makes a synchronous native call. The host later settles it
+    // via the captured __settle reference. __pending is closure-private so bot
+    // code cannot reach into other pending calls.
+    process
+      .getSandbox()
+      .compileScriptSync(
+        `
+        let __asyncSeq = 0
+        const __pending = {}
+        const __asyncCall = (nativeFn, ...args) => new Promise((resolve, reject) => {
+          const id = ++__asyncSeq
+          __pending[id] = { resolve, reject }
+          nativeFn(id, ...args)
+        })
+        globalThis.__settle = (id, ok, value) => {
+          const p = __pending[id]
+          if (!p) return
+          delete __pending[id]
+          if (ok) p.resolve(value)
+          else p.reject(value)
+        }
+        `
+      )
+      .runSync(tank.getContext(), {});
+
+    const settleRef = tank
+      .getContext()
+      .evalSync('__settle', { reference: true });
+    const settle: Settle = (id, ok, value) => {
+      // Objects (e.g. the scan hit list) must be copied to cross the boundary;
+      // primitives transfer as-is.
+      const transfer =
+        typeof value === 'object' && value !== null
+          ? new ivm.ExternalCopy(value).copyInto()
+          : value;
+      runInIsolate(settleRef, [id, ok, transfer], tank, ErrorCodes.E019);
+    };
+    settlers.set(tank, settle);
+
     exposeTank(tank, process.getSandbox());
     exposeTankRadar(tank, process.getSandbox());
     exposeTankTurret(tank, process.getSandbox());
 
-    // Expose scheduler / timers. The bot hands its callback across as an isolate
-    // Reference (not a Callback) so the host can invoke it under the sandbox
-    // timeout via runTimer — a Callback would run with no time limit, letting a
-    // looping timer body hang the whole server.
+    // Expose scheduler / timers, without exposing ivm. The bot keeps its timer
+    // callbacks in an isolate-side table keyed by id and the host captures a
+    // Reference to a single `__runTimer` entry point — the mirror of the event
+    // dispatch above. Running it under the sandbox timeout keeps a looping timer
+    // body from hanging the host thread.
     const scheduler = scheduleFactory(tank);
-    tank
-      .getContext()
-      .global.setSync('_setInterval', (func: ivm.Reference, interval: number) =>
-        scheduler.setInterval(() => runTimer(func, tank), interval, env)
-      );
-    tank.getContext().global.setSync('_clearInterval', (id: number) => {
-      scheduler.clearInterval(id);
-    });
     process
       .getSandbox()
       .compileScriptSync(
         `
-        setInterval = (func, interval) =>
-          _setInterval(new _ivm.Reference(func), interval)
-        clearInterval = (id) => _clearInterval(id)
+        let __timerSeq = 0
+        const __timers = {}
+        globalThis.__runTimer = (id, oneShot) => {
+          const func = __timers[id]
+          if (oneShot) delete __timers[id]
+          if (func) func()
+        }
+        setInterval = (func, interval) => {
+          const id = ++__timerSeq; __timers[id] = func; _setInterval(id, interval); return id
+        }
+        clearInterval = (id) => { delete __timers[id]; _clearInterval(id) }
+        setTimeout = (func, interval) => {
+          const id = ++__timerSeq; __timers[id] = func; _setTimeout(id, interval); return id
+        }
+        clearTimeout = (id) => { delete __timers[id]; _clearTimeout(id) }
         `
       )
       .runSync(tank.getContext(), {});
 
+    const runTimerRef = tank
+      .getContext()
+      .evalSync('__runTimer', { reference: true });
+    const fireTimer = (id: number, oneShot: boolean) =>
+      runInIsolate(runTimerRef, [id, oneShot], tank, ErrorCodes.E020);
+
     tank
       .getContext()
-      .global.setSync('_setTimeout', (func: ivm.Reference, interval: number) =>
-        scheduler.setTimeout(() => runTimer(func, tank), interval, env)
+      .global.setSync(
+        '_setInterval',
+        new ivm.Callback(
+          (id: number, interval: number) =>
+            scheduler.setInterval(
+              id,
+              () => fireTimer(id, false),
+              interval,
+              env
+            ),
+          { sync: true }
+        )
       );
-    tank.getContext().global.setSync('_clearTimeout', (id: number) => {
-      scheduler.clearTimeout(id);
-    });
-    process
-      .getSandbox()
-      .compileScriptSync(
-        `
-        setTimeout = (func, interval) =>
-          _setTimeout(new _ivm.Reference(func), interval)
-        clearTimeout = (id) => _clearTimeout(id)
-        `
-      )
-      .runSync(tank.getContext(), {});
+    tank.getContext().global.setSync(
+      '_clearInterval',
+      new ivm.Callback((id: number) => scheduler.clearInterval(id), {
+        sync: true,
+      })
+    );
+    tank
+      .getContext()
+      .global.setSync(
+        '_setTimeout',
+        new ivm.Callback(
+          (id: number, interval: number) =>
+            scheduler.setTimeout(id, () => fireTimer(id, true), interval, env),
+          { sync: true }
+        )
+      );
+    tank.getContext().global.setSync(
+      '_clearTimeout',
+      new ivm.Callback((id: number) => scheduler.clearTimeout(id), {
+        sync: true,
+      })
+    );
 
     // Expose clock
     tank
@@ -416,11 +508,11 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         `
         clock = {}
         clock.getTime = () => _clock_getTime().copy()
-        clock.on = (event, handler) => _bot_on(event, new _ivm.Reference((resolve, reject, jsonArgs) => {
-          if(event !== "TICK") throw new Error("Invalid event type")
-          returnValue = handler.apply(bot.T, JSON.parse(jsonArgs))
-          return (returnValue || Promise.resolve()).then(resolve, reject)
-        }))
+        clock.on = (event, handler) => {
+          if (event !== "TICK") throw new Error("Invalid event type")
+          __handlers[event] = handler
+          _bot_register(event)
+        }
         Date = undefined
         `
       )

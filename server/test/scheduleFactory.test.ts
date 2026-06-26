@@ -31,7 +31,7 @@ describe('scheduleFactory + timerTick', () => {
     const tank = makeTank();
     const env = makeEnv(tank);
     const fn = vi.fn();
-    scheduleFactory(tank).setInterval(fn, 5, env as never);
+    scheduleFactory(tank).setInterval(1, fn, 5, env as never);
 
     env.state.time = 4;
     timerTick(env as never);
@@ -54,7 +54,7 @@ describe('scheduleFactory + timerTick', () => {
     const tank = makeTank();
     const env = makeEnv(tank);
     const fn = vi.fn();
-    scheduleFactory(tank).setTimeout(fn, 3, env as never);
+    scheduleFactory(tank).setTimeout(1, fn, 3, env as never);
 
     env.state.time = 2;
     timerTick(env as never);
@@ -74,7 +74,7 @@ describe('scheduleFactory + timerTick', () => {
     const env = makeEnv(tank);
     const fn = vi.fn();
     const sched = scheduleFactory(tank);
-    const id = sched.setInterval(fn, 1, env as never);
+    const id = sched.setInterval(7, fn, 1, env as never);
     sched.clearInterval(id);
 
     env.state.time = 5;
@@ -87,7 +87,7 @@ describe('scheduleFactory + timerTick', () => {
     const env = makeEnv(tank);
     const fn = vi.fn();
     const sched = scheduleFactory(tank);
-    const id = sched.setTimeout(fn, 2, env as never);
+    const id = sched.setTimeout(8, fn, 2, env as never);
     sched.clearTimeout(id);
 
     env.state.time = 5;
@@ -99,7 +99,7 @@ describe('scheduleFactory + timerTick', () => {
     const tank = makeTank(0); // health 0
     const env = makeEnv(tank);
     const fn = vi.fn();
-    scheduleFactory(tank).setInterval(fn, 1, env as never);
+    scheduleFactory(tank).setInterval(1, fn, 1, env as never);
 
     env.state.time = 5;
     timerTick(env as never);
