@@ -11,15 +11,7 @@ import Col from 'react-bootstrap/Col'
 import Alert from 'react-bootstrap/Alert'
 import { colors } from '../../util/colors'
 import { useNavigate } from 'react-router-dom'
-
-const titleCase = (str: string) =>
-    str
-        .toLowerCase()
-        .split(' ')
-        .map(function (word) {
-            return word.charAt(0).toUpperCase() + word.slice(1)
-        })
-        .join(' ')
+import { titleCase } from '../../util/titleCase'
 
 export default function AppPage(props) {
     const [error, setError] = useState('')

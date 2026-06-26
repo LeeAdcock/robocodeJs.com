@@ -13,15 +13,7 @@ import User from '../types/user'
 import Arena from '../types/arena'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-
-const titleCase = (str: string) =>
-    str
-        .toLowerCase()
-        .split(' ')
-        .map(function (word) {
-            return word.charAt(0).toUpperCase() + word.slice(1)
-        })
-        .join(' ')
+import { titleCase } from '../util/titleCase'
 
 interface AppLinkProps {
     arena: Arena
