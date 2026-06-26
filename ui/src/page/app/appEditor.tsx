@@ -1,16 +1,12 @@
 import React from 'react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import AceEditor from 'react-ace'
-import 'brace/mode/javascript'
-import 'brace/theme/xcode'
-import 'brace/snippets/javascript'
-import 'brace/ext/language_tools'
-import brace from 'brace'
 
 import languageTools from 'ace-builds/src-noconflict/ext-language_tools'
 import 'ace-builds/src-noconflict/mode-javascript'
 import 'ace-builds/src-noconflict/theme-github'
 import 'ace-builds/src-noconflict/theme-kr_theme'
+import 'ace-builds/src-noconflict/snippets/javascript'
 
 import prettier from 'prettier/standalone'
 import babel from 'prettier/parser-babel'
