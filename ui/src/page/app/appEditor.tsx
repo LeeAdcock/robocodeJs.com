@@ -1,5 +1,5 @@
 import React from 'react'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import AceEditor from 'react-ace'
 
 import languageTools from 'ace-builds/src-noconflict/ext-language_tools'
@@ -11,12 +11,6 @@ import 'ace-builds/src-noconflict/snippets/javascript'
 import prettier from 'prettier/standalone'
 import babel from 'prettier/parser-babel'
 
-let debounceCompileTimer
-const debounce = (func, timeout) => {
-    clearTimeout(debounceCompileTimer)
-    debounceCompileTimer = setTimeout(func, timeout)
-}
-
 interface CodeEditorProps {
     code: string
     onChange: (source) => void
@@ -26,6 +20,9 @@ interface CodeEditorProps {
 
 export default function CodeEditor(props: CodeEditorProps) {
     const [editor, setEditor] = useState(null as any)
+    const compileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+        undefined
+    )
 
     const compile = (source) => {
         try {
@@ -70,7 +67,8 @@ export default function CodeEditor(props: CodeEditorProps) {
                 },
             ]}
             onChange={(source) => {
-                debounce(() => compile(source), 5000)
+                clearTimeout(compileTimer.current)
+                compileTimer.current = setTimeout(() => compile(source), 5000)
                 props.onChange(source)
             }}
             onLoad={(editor) => {

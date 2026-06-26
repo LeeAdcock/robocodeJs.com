@@ -1,7 +1,7 @@
 import Editor from './appEditor'
 import axios from 'axios'
 import { useParams } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Toolbar from './appEditorToolbar'
 import prettier from 'prettier/standalone'
 import babel from 'prettier/parser-babel'
@@ -11,12 +11,6 @@ import Col from 'react-bootstrap/Col'
 import Alert from 'react-bootstrap/Alert'
 import { colors } from '../../util/colors'
 import { useNavigate } from 'react-router-dom'
-
-let debounceSaveTimer
-const debounce = (func: () => void, timeout: number) => {
-    clearTimeout(debounceSaveTimer)
-    debounceSaveTimer = setTimeout(func, timeout)
-}
 
 const titleCase = (str: string) =>
     str
@@ -32,6 +26,9 @@ export default function AppPage(props) {
     const [code, setCode] = useState('')
     const [app, setApp] = useState(null as any)
     const { userId, appId } = useParams()
+    const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+        undefined
+    )
 
     const navigate = useNavigate()
 
@@ -73,18 +70,16 @@ export default function AppPage(props) {
             .then((res) => setApp(res.data))
     }, [userId, appId])
 
+    // Debounced auto-save of the current code (30s after the last edit).
     useEffect(() => {
-        debounce(
-            () =>
-                setCode((code) => {
-                    axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
-                        headers: { 'content-type': 'application/octet-stream' },
-                    })
-                    return code
-                }),
-            30000
-        )
-    }, [code])
+        clearTimeout(saveTimer.current)
+        saveTimer.current = setTimeout(() => {
+            axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
+                headers: { 'content-type': 'application/octet-stream' },
+            })
+        }, 30000)
+        return () => clearTimeout(saveTimer.current)
+    }, [code, userId, appId])
 
     const doExecute = () => {
         axios

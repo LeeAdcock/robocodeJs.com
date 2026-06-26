@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 
 import Logs from './logs'
-
-let eventSource: EventSource | undefined
 
 interface LogEntry {
     id: string
@@ -25,17 +23,19 @@ export default function ArenaLogsPage() {
         index: 0,
     } as LogEntries)
     const { userId } = useParams()
+    const eventSource = useRef<EventSource | undefined>(undefined)
 
     useEffect(() => {
-        if (eventSource) {
-            eventSource.close()
-            eventSource = undefined
+        if (eventSource.current) {
+            eventSource.current.close()
+            eventSource.current = undefined
         }
-        eventSource = new EventSource(
+        const source = new EventSource(
             `${window.location.protocol}//${window.location.host}/api/user/${userId}/arena/logs`
         )
+        eventSource.current = source
 
-        eventSource.onmessage = (message) => {
+        source.onmessage = (message) => {
             setLogEntries((oldLogs) => {
                 const logEntry = JSON.parse(message.data) as LogEntry
                 oldLogs.logs[oldLogs.index] = logEntry
@@ -47,9 +47,10 @@ export default function ArenaLogsPage() {
         }
 
         return () => {
-            eventSource?.close()
+            source.close()
+            eventSource.current = undefined
         }
-    }, [])
+    }, [userId])
 
     return (
         <>

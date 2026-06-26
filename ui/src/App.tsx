@@ -11,7 +11,7 @@ import MarkdownPage from './page/markdownPage'
 import User from './types/user'
 import ArenaToolbar from './components/arena/arenaToolbar'
 import 'bootstrap/dist/css/bootstrap.min.css'
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import PointInTime from './types/pointInTime'
@@ -66,7 +66,6 @@ const Nav = (props: NavProps) => {
     )
 }
 
-let eventSource: EventSource | undefined
 const emitter = new Emitter()
 
 function App() {
@@ -77,6 +76,7 @@ function App() {
     } as Arena)
     const [time, setTime] = useState(0)
     const [isPaused, setPaused] = useState(true)
+    const eventSource = useRef<EventSource | undefined>(undefined)
 
     // Reset the experience if the user session expires
     useEffect(() => {
@@ -168,18 +168,19 @@ function App() {
     }, [user])
 
     useEffect(() => {
-        if (eventSource) {
-            eventSource.close()
-            eventSource = undefined
+        if (eventSource.current) {
+            eventSource.current.close()
+            eventSource.current = undefined
         }
         // todo externalize the server
-        eventSource = new EventSource(
+        const source = new EventSource(
             user
                 ? `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
                 : `${window.location.protocol}//${window.location.host}/api/demo/events`
         )
+        eventSource.current = source
 
-        eventSource.onmessage = (message) => {
+        source.onmessage = (message) => {
             const data = JSON.parse(message.data)
             emitter.emit(data.type, data)
 
@@ -209,10 +210,8 @@ function App() {
         }
 
         return () => {
-            if (eventSource) {
-                eventSource.close()
-                eventSource = undefined
-            }
+            source.close()
+            eventSource.current = undefined
         }
     }, [user])
 
