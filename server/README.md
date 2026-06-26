@@ -110,6 +110,7 @@ The UI consumes these and interpolates motion between server ticks with its own 
 - `test/compiler.test.ts` — integration tests that spin up a **real** isolated-vm isolate, have `compiler.init` build the bot API into it, then compile/run bot code in the sandbox and read values back out (`{copy:true}`): synchronous getters, `Date`/Node-global removal, mutating commands, the `bot.on`/`clock.on` Reference bridge, `console.log` routing, and timer registration.
 - `test/api.test.ts` — Express endpoints via [supertest](https://github.com/ladjs/supertest), with the data-access singletons `vi.mock`ed so handlers run with no Postgres/isolates. Covers health, the user/app endpoints, and the shared 404-unknown / 401-not-owner authorization boilerplate.
 - `test/auth.test.ts` — the Google-OAuth auth middleware: recognized token attaches the user, first login auto-creates one, and an invalid token 401s when required / falls through when optional. Mocks `google-auth-library` (via `vi.hoisted`) and the user/identity services.
+- `test/services.test.ts` — the Postgres data-access services (`AppService`, `ArenaService`, `ArenaMemberService`): `vi.mock`s the pool with canned result sets and asserts the row→domain-object mapping and `undefined`-on-empty.
 - `test/nameFactory.test.ts` — display-name generation.
 
 When testing other isolate-/DB-coupled code, follow the same pattern: `vi.mock('../src/util/db', ...)` (or mock the relevant service modules) at the top of the file, then construct real domain objects / mount routers with mock collaborators.
