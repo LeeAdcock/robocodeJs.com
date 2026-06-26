@@ -1,12 +1,12 @@
-import TankApp from './tankApp'
+import TankApp from './tankApp';
 
 interface Clock {
-    time: number
+  time: number;
 }
 
 export default interface Arena {
-    apps: TankApp[]
-    clock: Clock
-    height: number
-    width: number
+  apps: TankApp[];
+  clock: Clock;
+  height: number;
+  width: number;
 }

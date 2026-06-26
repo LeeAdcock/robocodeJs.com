@@ -1,18 +1,21 @@
-// .eslintrc
+// .eslintrc — kept consistent with server/.eslintrc.json (shared base settings);
+// each package resolves its own plugins from its own node_modules, so the
+// config is duplicated rather than extended from a root file.
 {
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "ecmaVersion": 12,
+    "ecmaVersion": "latest",
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint", "react-hooks"],
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2021": true
+  },
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn"
-  },
-  "env": {
-    "browser": true,
-    "es2021": true
-  },
+  }
 }

@@ -3,7 +3,7 @@
 
 // Normalizes an angle (in degrees) into the [0, 360) range.
 export const normalizeAngle = (x: number): number => {
-    x = x % 360
-    while (x < 0) x += 360
-    return x
-}
+  x = x % 360;
+  while (x < 0) x += 360;
+  return x;
+};

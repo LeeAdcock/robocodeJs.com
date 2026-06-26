@@ -1,21 +1,21 @@
-import express from "express";
-import appService from "../services/AppService";
-import arenaService from "../services/ArenaService";
-import environmentService from "../services/EnvironmentService";
-import arenaMemberService from "../services/ArenaMemberService";
-import Arena from "../types/arena";
+import express from 'express';
+import appService from '../services/AppService';
+import arenaService from '../services/ArenaService';
+import environmentService from '../services/EnvironmentService';
+import arenaMemberService from '../services/ArenaMemberService';
+import Arena from '../types/arena';
 import {
   loadUser,
   requireOwner,
   loadApp,
   scopedUser,
   scopedApp,
-} from "../middleware/resource";
+} from '../middleware/resource';
 
 const app = express();
 
 // Get an arena status
-app.get("/api/user/:userId/arena/", loadUser, async (req, res) => {
+app.get('/api/user/:userId/arena/', loadUser, async (req, res) => {
   const user = scopedUser(req);
 
   // TODO assumes at least one arena, order is consistant, first is default
@@ -34,47 +34,57 @@ app.get("/api/user/:userId/arena/", loadUser, async (req, res) => {
     width: arena.getWidth(),
     running: env.isRunning(),
     clock: { time: env.getTime() },
-    apps: env.getProcesses()
+    apps: env
+      .getProcesses()
       .sort((a, b) => {
-        return (members.find((member) => member?.getAppId() === a.appId)?.getTimestamp()||0) -
-        (members.find((member) => member?.getAppId() === b.appId)?.getTimestamp()||0)
-      }).map((process) => ({
-      id: process.getAppId(),
-      name: apps.find((app) => app?.getId() === process.appId)?.getName(),
-      userId: apps.find((app) => app?.getId() === process.appId)?.getUserId(),
-      addedTimestamp: members.find((member) => member?.getAppId() === process.appId)?.getTimestamp(),
-      tanks: process.tanks.map((tank) => ({
-        id: tank.id,
-        x: tank.x,
-        y: tank.y,
-        speed: tank.speed,
-        speedTarget: tank.speedTarget,
-        speedAcceleration: tank.speedAcceleration,
-        speedMax: tank.speedMax,
-        bodyOrientation: tank.orientation,
-        bodyOrientationTarget: tank.orientationTarget,
-        bodyOrientationVelocity: tank.orientationVelocity,
-        turretOrientation: tank.turret.orientation,
-        turretOrientationTarget: tank.turret.orientationTarget,
-        turretOrientationVelocity: tank.turret.radar.orientationVelocity,
-        radarOrientation: tank.turret.radar.orientation,
-        radarOrientationTarget: tank.turret.radar.orientationTarget,
-        radarOrientationVelocity: tank.turret.radar.orientationVelocity,
-        health: tank.health,
-        bullets: tank.bullets.map((bullet) => ({
-          id: bullet.id,
-          x: bullet.x,
-          y: bullet.y,
-          exploded: bullet.exploded,
+        return (
+          (members
+            .find((member) => member?.getAppId() === a.appId)
+            ?.getTimestamp() || 0) -
+          (members
+            .find((member) => member?.getAppId() === b.appId)
+            ?.getTimestamp() || 0)
+        );
+      })
+      .map((process) => ({
+        id: process.getAppId(),
+        name: apps.find((app) => app?.getId() === process.appId)?.getName(),
+        userId: apps.find((app) => app?.getId() === process.appId)?.getUserId(),
+        addedTimestamp: members
+          .find((member) => member?.getAppId() === process.appId)
+          ?.getTimestamp(),
+        tanks: process.tanks.map((tank) => ({
+          id: tank.id,
+          x: tank.x,
+          y: tank.y,
+          speed: tank.speed,
+          speedTarget: tank.speedTarget,
+          speedAcceleration: tank.speedAcceleration,
+          speedMax: tank.speedMax,
+          bodyOrientation: tank.orientation,
+          bodyOrientationTarget: tank.orientationTarget,
+          bodyOrientationVelocity: tank.orientationVelocity,
+          turretOrientation: tank.turret.orientation,
+          turretOrientationTarget: tank.turret.orientationTarget,
+          turretOrientationVelocity: tank.turret.radar.orientationVelocity,
+          radarOrientation: tank.turret.radar.orientation,
+          radarOrientationTarget: tank.turret.radar.orientationTarget,
+          radarOrientationVelocity: tank.turret.radar.orientationVelocity,
+          health: tank.health,
+          bullets: tank.bullets.map((bullet) => ({
+            id: bullet.id,
+            x: bullet.x,
+            y: bullet.y,
+            exploded: bullet.exploded,
+          })),
         })),
       })),
-    })),
   });
 });
 
 // Remove an app from an arena
 app.delete(
-  "/api/user/:userId/arena/app/:appId",
+  '/api/user/:userId/arena/app/:appId',
   loadUser,
   requireOwner,
   async (req, res) => {
@@ -89,7 +99,7 @@ app.delete(
     );
     if (!member) {
       res.status(404);
-      res.send("Invalid app id");
+      res.send('Invalid app id');
       return;
     }
     (await environmentService.getByArenaId(arena.getId()))?.removeApp(
@@ -104,7 +114,7 @@ app.delete(
 
 // Add an app to an arena
 app.put(
-  "/api/user/:userId/arena/app/:appId",
+  '/api/user/:userId/arena/app/:appId',
   loadUser,
   requireOwner,
   loadApp,
@@ -118,7 +128,7 @@ app.put(
     const members = await arenaMemberService.getForArena(arena.getId());
     if (members.length > 4) {
       res.status(400);
-      res.send("Arena limit reached");
+      res.send('Arena limit reached');
       return;
     }
 
@@ -132,7 +142,7 @@ app.put(
 );
 
 app.post(
-  "/api/user/:userId/arena/restart",
+  '/api/user/:userId/arena/restart',
   loadUser,
   requireOwner,
   async (req, res) => {
@@ -150,7 +160,7 @@ app.post(
 );
 
 app.post(
-  "/api/user/:userId/arena/pause",
+  '/api/user/:userId/arena/pause',
   loadUser,
   requireOwner,
   async (req, res) => {
@@ -168,7 +178,7 @@ app.post(
 );
 
 app.post(
-  "/api/user/:userId/arena/resume",
+  '/api/user/:userId/arena/resume',
   loadUser,
   requireOwner,
   async (req, res) => {
@@ -186,49 +196,49 @@ app.post(
 );
 
 // Listen to an arena
-app.get("/api/user/:userId/arena/events", loadUser, async (req, res) => {
+app.get('/api/user/:userId/arena/events', loadUser, async (req, res) => {
   const user = scopedUser(req);
 
   res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
   });
 
   function listener(event: unknown) {
-    res.write("data: " + JSON.stringify(event) + "\n\n");
+    res.write('data: ' + JSON.stringify(event) + '\n\n');
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
   const arena: Arena = await arenaService.getDefaultForUser(user.getId());
   return environmentService.get(arena).then((env) => {
-    env.addListener("event", listener);
-    req.on("close", () => {
-      env.removeListener("event", listener);
+    env.addListener('event', listener);
+    req.on('close', () => {
+      env.removeListener('event', listener);
       res.end();
     });
   });
 });
 
 // Listen to an arena
-app.get("/api/user/:userId/arena/logs", loadUser, async (req, res) => {
+app.get('/api/user/:userId/arena/logs', loadUser, async (req, res) => {
   const user = scopedUser(req);
 
   res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
   });
 
   function listener(event: unknown) {
-    res.write("data: " + JSON.stringify(event) + "\n\n");
+    res.write('data: ' + JSON.stringify(event) + '\n\n');
   }
 
   // TODO assumes at least one arena, order is consistant, first is default
   const arena: Arena = await arenaService.getDefaultForUser(user.getId());
   return environmentService.get(arena).then((env) => {
-    env.addListener("log", listener);
+    env.addListener('log', listener);
 
-    req.on("close", () => {
-      env.removeListener("log", listener);
+    req.on('close', () => {
+      env.removeListener('log', listener);
       res.end();
     });
   });

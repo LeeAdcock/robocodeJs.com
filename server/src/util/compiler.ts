@@ -1,12 +1,12 @@
-import Tank from "../types/tank";
-import { Event } from "../types/event";
-import { scheduleFactory } from "./scheduleFactory";
-import ivm from "isolated-vm";
-import { createLogger } from "browser-bunyan";
-import { v4 as uuidv4 } from "uuid";
-import Environment, { Process } from "../types/environment";
-import appService from "../services/AppService";
-import { ErrorCodes } from "../types/ErrorCodes";
+import Tank from '../types/tank';
+import { Event } from '../types/event';
+import { scheduleFactory } from './scheduleFactory';
+import ivm from 'isolated-vm';
+import { createLogger } from 'browser-bunyan';
+import { v4 as uuidv4 } from 'uuid';
+import Environment, { Process } from '../types/environment';
+import appService from '../services/AppService';
+import { ErrorCodes } from '../types/ErrorCodes';
 
 // --- helpers for exposing the bot API into the isolate ---
 // Each installs a native `_name` function on the isolate global and compiles the
@@ -35,12 +35,18 @@ function exposeAsync1(
   name: string,
   fn: (arg: number) => Promise<unknown>
 ) {
-  tank.getContext().global.setSync(
-    name,
-    (arg: number, resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
-      fn(arg).then(resolve, reject).catch(reject);
-    }
-  );
+  tank
+    .getContext()
+    .global.setSync(
+      name,
+      (
+        arg: number,
+        resolve: (v?: unknown) => void,
+        reject: (v?: unknown) => void
+      ) => {
+        fn(arg).then(resolve, reject).catch(reject);
+      }
+    );
   isolate
     .compileScriptSync(
       `${botPath} = arg => new Promise((resolve, reject) => ${name}(arg, new _ivm.Callback(resolve), new _ivm.Callback(reject)))`
@@ -56,12 +62,14 @@ function exposeAsyncResult(
   name: string,
   fn: () => Promise<unknown>
 ) {
-  tank.getContext().global.setSync(
-    name,
-    (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
-      fn().then(resolve, reject).catch(reject);
-    }
-  );
+  tank
+    .getContext()
+    .global.setSync(
+      name,
+      (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
+        fn().then(resolve, reject).catch(reject);
+      }
+    );
   isolate
     .compileScriptSync(
       `${botPath} = () => new Promise((resolve, reject) => ${name}(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject())))`
@@ -87,10 +95,30 @@ function exposeVoid(
 
 function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
   const radar = tank.turret.radar;
-  exposeGetter(tank, isolate, "bot.radar.getOrientation", "_bot_radar_getOrientation", () => radar.getOrientation());
-  exposeAsync1(tank, isolate, "bot.radar.setOrientation", "_bot_radar_setOrientation", (arg) => radar.setOrientation(arg));
-  exposeGetter(tank, isolate, "bot.radar.isTurning", "_bot_radar_isTurning", () => radar.isTurning());
-  exposeAsync1(tank, isolate, "bot.radar.turn", "_bot_radar_turn", (arg) => radar.turn(arg));
+  exposeGetter(
+    tank,
+    isolate,
+    'bot.radar.getOrientation',
+    '_bot_radar_getOrientation',
+    () => radar.getOrientation()
+  );
+  exposeAsync1(
+    tank,
+    isolate,
+    'bot.radar.setOrientation',
+    '_bot_radar_setOrientation',
+    (arg) => radar.setOrientation(arg)
+  );
+  exposeGetter(
+    tank,
+    isolate,
+    'bot.radar.isTurning',
+    '_bot_radar_isTurning',
+    () => radar.isTurning()
+  );
+  exposeAsync1(tank, isolate, 'bot.radar.turn', '_bot_radar_turn', (arg) =>
+    radar.turn(arg)
+  );
 
   // Convenience turnTowards
   isolate
@@ -104,17 +132,47 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     )
     .runSync(tank.getContext(), {});
 
-  exposeAsyncResult(tank, isolate, "bot.radar.scan", "_bot_radar_scan", () => radar.scan());
-  exposeAsyncResult(tank, isolate, "bot.radar.onReady", "_bot_radar_onReady", () => radar.onReady());
-  exposeGetter(tank, isolate, "bot.radar.isReady", "_bot_radar_isReady", () => radar.isReady());
+  exposeAsyncResult(tank, isolate, 'bot.radar.scan', '_bot_radar_scan', () =>
+    radar.scan()
+  );
+  exposeAsyncResult(
+    tank,
+    isolate,
+    'bot.radar.onReady',
+    '_bot_radar_onReady',
+    () => radar.onReady()
+  );
+  exposeGetter(tank, isolate, 'bot.radar.isReady', '_bot_radar_isReady', () =>
+    radar.isReady()
+  );
 }
 
 function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   const turret = tank.turret;
-  exposeGetter(tank, isolate, "bot.turret.getOrientation", "_bot_turret_getOrientation", () => turret.getOrientation());
-  exposeAsync1(tank, isolate, "bot.turret.setOrientation", "_bot_turret_setOrientation", (arg) => turret.setOrientation(arg));
-  exposeGetter(tank, isolate, "bot.turret.isTurning", "_bot_turret_isTurning", () => turret.isTurning());
-  exposeAsync1(tank, isolate, "bot.turret.turn", "_bot_turret_turn", (arg) => turret.turn(arg));
+  exposeGetter(
+    tank,
+    isolate,
+    'bot.turret.getOrientation',
+    '_bot_turret_getOrientation',
+    () => turret.getOrientation()
+  );
+  exposeAsync1(
+    tank,
+    isolate,
+    'bot.turret.setOrientation',
+    '_bot_turret_setOrientation',
+    (arg) => turret.setOrientation(arg)
+  );
+  exposeGetter(
+    tank,
+    isolate,
+    'bot.turret.isTurning',
+    '_bot_turret_isTurning',
+    () => turret.isTurning()
+  );
+  exposeAsync1(tank, isolate, 'bot.turret.turn', '_bot_turret_turn', (arg) =>
+    turret.turn(arg)
+  );
 
   // Convenience turnTowards
   isolate
@@ -130,12 +188,14 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
 
   // Expose fire
   // todo resulting value
-  tank.getContext().global.setSync(
-    "_bot_turret_fire",
-    (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
-      turret.fire().then(resolve, reject).catch(reject);
-    }
-  );
+  tank
+    .getContext()
+    .global.setSync(
+      '_bot_turret_fire',
+      (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
+        turret.fire().then(resolve, reject).catch(reject);
+      }
+    );
   isolate
     .compileScriptSync(
       `
@@ -146,15 +206,23 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     )
     .runSync(tank.getContext(), {});
 
-  exposeAsyncResult(tank, isolate, "bot.turret.onReady", "_bot_turret_onReady", () => turret.onReady());
-  exposeGetter(tank, isolate, "bot.turret.isReady", "_bot_turret_isReady", () => turret.isReady());
+  exposeAsyncResult(
+    tank,
+    isolate,
+    'bot.turret.onReady',
+    '_bot_turret_onReady',
+    () => turret.onReady()
+  );
+  exposeGetter(tank, isolate, 'bot.turret.isReady', '_bot_turret_isReady', () =>
+    turret.isReady()
+  );
 }
 
 function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   // Expose event handler
   tank
     .getContext()
-    .global.setSync("_bot_on", (event: Event, handler: ivm.Reference) => {
+    .global.setSync('_bot_on', (event: Event, handler: ivm.Reference) => {
       tank.on(event, (...args: unknown[]) => {
         try {
           return new Promise((resolve, reject) => {
@@ -183,11 +251,23 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     )
     .runSync(tank.getContext(), {});
 
-  exposeGetter(tank, isolate, "bot.getId", "_bot_getId", () => tank.getId());
-  exposeGetter(tank, isolate, "bot.getSpeed", "_bot_getSpeed", () => tank.getSpeed());
-  exposeAsync1(tank, isolate, "bot.setSpeed", "_bot_setSpeed", (arg) => tank.setSpeed(arg));
-  exposeGetter(tank, isolate, "bot.getOrientation", "_bot_getOrientation", () => tank.getOrientation());
-  exposeAsync1(tank, isolate, "bot.setOrientation", "_bot_setOrientation", (arg) => tank.setOrientation(arg));
+  exposeGetter(tank, isolate, 'bot.getId', '_bot_getId', () => tank.getId());
+  exposeGetter(tank, isolate, 'bot.getSpeed', '_bot_getSpeed', () =>
+    tank.getSpeed()
+  );
+  exposeAsync1(tank, isolate, 'bot.setSpeed', '_bot_setSpeed', (arg) =>
+    tank.setSpeed(arg)
+  );
+  exposeGetter(tank, isolate, 'bot.getOrientation', '_bot_getOrientation', () =>
+    tank.getOrientation()
+  );
+  exposeAsync1(
+    tank,
+    isolate,
+    'bot.setOrientation',
+    '_bot_setOrientation',
+    (arg) => tank.setOrientation(arg)
+  );
 
   isolate
     .compileScriptSync(
@@ -195,13 +275,19 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     )
     .runSync(tank.getContext(), {});
 
-  exposeVoid(tank, isolate, "bot.setName", "_bot_setName", (arg) => tank.setName(arg));
-  exposeGetter(tank, isolate, "bot.getHealth", "_bot_getHealth", () => tank.getHealth());
-  exposeGetter(tank, isolate, "bot.isTurning", "_bot_isTurning", () => tank.isTurning());
-  exposeAsync1(tank, isolate, "bot.turn", "_bot_turn", (arg) => tank.turn(arg));
-  exposeGetter(tank, isolate, "bot.getX", "_bot_getX", () => tank.getX());
-  exposeGetter(tank, isolate, "bot.getY", "_bot_getY", () => tank.getY());
-  exposeVoid(tank, isolate, "bot.send", "_bot_send", (arg) => tank.send(arg));
+  exposeVoid(tank, isolate, 'bot.setName', '_bot_setName', (arg) =>
+    tank.setName(arg)
+  );
+  exposeGetter(tank, isolate, 'bot.getHealth', '_bot_getHealth', () =>
+    tank.getHealth()
+  );
+  exposeGetter(tank, isolate, 'bot.isTurning', '_bot_isTurning', () =>
+    tank.isTurning()
+  );
+  exposeAsync1(tank, isolate, 'bot.turn', '_bot_turn', (arg) => tank.turn(arg));
+  exposeGetter(tank, isolate, 'bot.getX', '_bot_getX', () => tank.getX());
+  exposeGetter(tank, isolate, 'bot.getY', '_bot_getY', () => tank.getY());
+  exposeVoid(tank, isolate, 'bot.send', '_bot_send', (arg) => tank.send(arg));
 
   // Convenience turnTowards
   isolate
@@ -239,7 +325,7 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
 // Initialize a tank.getContext() within the isolated sandbox
 const init = (env: Environment, process: Process, tank: Tank) => {
   try {
-    tank.getContext().global.setSync("_ivm", ivm);
+    tank.getContext().global.setSync('_ivm', ivm);
 
     // Expose tank
     process
@@ -254,10 +340,10 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     const scheduler = scheduleFactory(tank);
     tank
       .getContext()
-      .global.setSync("_setInterval", (func: () => void, interval: number) => {
+      .global.setSync('_setInterval', (func: () => void, interval: number) => {
         scheduler.setInterval(func, interval, env);
       });
-    tank.getContext().global.setSync("_clearInterval", (id: number) => {
+    tank.getContext().global.setSync('_clearInterval', (id: number) => {
       scheduler.clearInterval(id);
     });
     process
@@ -273,10 +359,10 @@ const init = (env: Environment, process: Process, tank: Tank) => {
 
     tank
       .getContext()
-      .global.setSync("_setTimeout", (func: () => void, interval: number) => {
+      .global.setSync('_setTimeout', (func: () => void, interval: number) => {
         scheduler.setTimeout(func, interval, env);
       });
-    tank.getContext().global.setSync("_clearTimeout", (id: number) => {
+    tank.getContext().global.setSync('_clearTimeout', (id: number) => {
       scheduler.clearTimeout(id);
     });
     process
@@ -294,7 +380,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     tank
       .getContext()
       .global.setSync(
-        "_clock_getTime",
+        '_clock_getTime',
         () => new ivm.ExternalCopy(env.getTime())
       );
     process
@@ -317,13 +403,13 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     tank
       .getContext()
       .global.setSync(
-        "_arena_getWidth",
+        '_arena_getWidth',
         () => new ivm.ExternalCopy(env.getArena().getWidth())
       );
     tank
       .getContext()
       .global.setSync(
-        "_arena_getHeight",
+        '_arena_getHeight',
         () => new ivm.ExternalCopy(env.getArena().getHeight())
       );
     process
@@ -354,10 +440,10 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     // Expose console / logger
     const streams = [
       {
-        level: "TRACE",
+        level: 'TRACE',
         stream: {
           write: (entry: any) => {
-            env.emit("log", {
+            env.emit('log', {
               ...entry,
               time: env.getTime(),
               id: uuidv4(),
@@ -381,11 +467,11 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         1);
 
     tank.logger = createLogger({
-      name: "<" + tankId + ">",
+      name: '<' + tankId + '>',
       streams,
     });
 
-    tank.getContext().global.setSync("_log", (msg: any, ...msgs: any[]) => {
+    tank.getContext().global.setSync('_log', (msg: any, ...msgs: any[]) => {
       tank.logger.info(msg, ...msgs);
     });
     // TODO better log-level support

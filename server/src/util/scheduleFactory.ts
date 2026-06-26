@@ -1,5 +1,5 @@
-import Environment from "../types/environment";
-import Tank from "../types/tank";
+import Environment from '../types/environment';
+import Tank from '../types/tank';
 
 /*
   This creates "monkey-patched" wrappers for the timer related
@@ -40,7 +40,7 @@ export const timerTick = (env: Environment) => {
           const timer: Timer = entry[1] as Timer;
           const timerId: number = parseInt(entry[0]);
           if (time - (timer.lastFired || timer.started) >= timer.interval) {
-            timer.logger.trace("Triggered interval", timerId);
+            timer.logger.trace('Triggered interval', timerId);
             timer.lastFired = time;
             if (timer.func) timer.func();
           }
@@ -50,9 +50,9 @@ export const timerTick = (env: Environment) => {
           const timer: Timer = entry[1] as Timer;
           const timerId: number = parseInt(entry[0]);
           if (time - timer.started >= timer.interval) {
-            timer.logger.trace("Triggered timer", timerId);
+            timer.logger.trace('Triggered timer', timerId);
             if (timer.func) timer.func();
-            timer.logger.trace("Canceled timer", timerId);
+            timer.logger.trace('Canceled timer', timerId);
             delete tank.timers.timerMap[timerId];
           }
         });
@@ -65,7 +65,7 @@ export const scheduleFactory = (tank: Tank) => {
   return {
     setInterval: (func: () => void, interval: number, env: Environment) => {
       const timerId = Math.floor(Math.random() * 100000);
-      tank.logger.trace("Created interval", timerId);
+      tank.logger.trace('Created interval', timerId);
       tank.timers.intervalMap[timerId] = {
         func,
         started: env.getTime(),
@@ -77,16 +77,16 @@ export const scheduleFactory = (tank: Tank) => {
     },
 
     clearInterval: (timerId: number) => {
-      tank.logger.trace("Canceled interval", timerId);
+      tank.logger.trace('Canceled interval', timerId);
       delete tank.timers.intervalMap[timerId];
     },
 
     setTimeout: (func: () => void, interval: number, env: Environment) => {
       const timerId = Math.floor(Math.random() * 100000);
-      tank.logger.trace("Created timer", timerId);
+      tank.logger.trace('Created timer', timerId);
       const wrappedFunc = () => {
         delete tank.timers.timerMap[timerId];
-        tank.logger.trace("Triggered timer", timerId);
+        tank.logger.trace('Triggered timer', timerId);
         func();
       };
       tank.timers.timerMap[timerId] = {
@@ -100,7 +100,7 @@ export const scheduleFactory = (tank: Tank) => {
     },
 
     clearTimeout: (timerId: number) => {
-      tank.logger.trace("Canceled timer", timerId);
+      tank.logger.trace('Canceled timer', timerId);
       delete tank.timers.timerMap[timerId];
     },
   };

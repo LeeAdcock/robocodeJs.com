@@ -27,7 +27,7 @@
     "preview": "vite preview --port 3000",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src --fix ; prettier --write src"
+    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src --fix ; prettier --write src test"
   },
   "browserslist": {
     "production": [

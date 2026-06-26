@@ -1,7 +1,7 @@
-import { UserId } from "../types/user";
-import TankApp, { AppId } from "../types/app";
-import pool from "../util/db";
-import { v4 as uuidv4 } from "uuid";
+import { UserId } from '../types/user';
+import TankApp, { AppId } from '../types/app';
+import pool from '../util/db';
+import { v4 as uuidv4 } from 'uuid';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS app (
@@ -22,7 +22,7 @@ export class AppService {
     const app = new TankApp(appId, userId);
     return pool
       .query({
-        text: "INSERT INTO app(id, userId, name) VALUES($1, $2, $3)",
+        text: 'INSERT INTO app(id, userId, name) VALUES($1, $2, $3)',
         values: [app.getId(), app.getUserId(), app.getName()],
       })
       .then(() => Promise.resolve(app));

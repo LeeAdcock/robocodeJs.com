@@ -1,7 +1,7 @@
-import { UserId } from "../types/user";
-import pool from "../util/db";
-import { v4 as uuidv4 } from "uuid";
-import Arena, { ArenaId } from "../types/arena";
+import { UserId } from '../types/user';
+import pool from '../util/db';
+import { v4 as uuidv4 } from 'uuid';
+import Arena, { ArenaId } from '../types/arena';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS arena (
@@ -18,7 +18,7 @@ export class ArenaService {
     const arena = new Arena(arenaId, userId);
     return pool
       .query({
-        text: "INSERT INTO arena(id, userId) VALUES($1, $2)",
+        text: 'INSERT INTO arena(id, userId) VALUES($1, $2)',
         values: [arena.getId(), arena.getUserId()],
       })
       .then(() => Promise.resolve(arena));

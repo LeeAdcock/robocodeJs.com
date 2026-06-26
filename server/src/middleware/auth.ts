@@ -1,8 +1,8 @@
-import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { Request, Response, NextFunction } from "express";
-import userService from "../services/UserService";
-import authService from "../services/IdentityService";
-import User from "../types/user";
+import { OAuth2Client, TokenPayload } from 'google-auth-library';
+import { Request, Response, NextFunction } from 'express';
+import userService from '../services/UserService';
+import authService from '../services/IdentityService';
+import User from '../types/user';
 
 export type AuthenticatedRequest = Request & { user: User };
 
@@ -11,7 +11,7 @@ export type AuthenticatedRequest = Request & { user: User };
 // is rejected. Overridable via env for different deployments.
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
-  "926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com";
+  '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com';
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -30,14 +30,14 @@ export default (required: boolean) =>
       return verifyGoogleCredential(req.cookies.auth)
         .then((payload) => {
           if (payload) {
-            return authService.get("google", payload.sub).then((userAuth) => {
+            return authService.get('google', payload.sub).then((userAuth) => {
               if (userAuth) {
                 // We recognize this user
                 return userService.get(userAuth.getUserId()).then((user) => {
                   if (!user) {
                     // Should not be possible to recognize their auth but not
                     // have a user record for them.
-                    throw new Error("Missing account.");
+                    throw new Error('Missing account.');
                   }
                   (req as AuthenticatedRequest).user = user;
                   return next();
@@ -49,7 +49,7 @@ export default (required: boolean) =>
                   .then((user) => {
                     (req as AuthenticatedRequest).user = user;
                     return authService
-                      .create(user.getId(), "google", payload.sub)
+                      .create(user.getId(), 'google', payload.sub)
                       .then(next);
                   });
               }
@@ -58,16 +58,16 @@ export default (required: boolean) =>
         })
         .catch(() => {
           if (required) {
-            res.clearCookie("auth");
+            res.clearCookie('auth');
             res.status(401);
-            res.send("Access forbidden");
+            res.send('Access forbidden');
           } else {
             next();
           }
         });
     } catch (e) {
-      res.clearCookie("auth");
+      res.clearCookie('auth');
       res.status(401);
-      res.send("Access forbidden");
+      res.send('Access forbidden');
     }
   };

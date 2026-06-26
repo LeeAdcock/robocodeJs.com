@@ -1,23 +1,23 @@
-import express from "express";
+import express from 'express';
 
-import appService from "../services/AppService";
-import arenaService from "../services/ArenaService";
-import environmentService from "../services/EnvironmentService";
-import arenaMemberService from "../services/ArenaMemberService";
+import appService from '../services/AppService';
+import arenaService from '../services/ArenaService';
+import environmentService from '../services/EnvironmentService';
+import arenaMemberService from '../services/ArenaMemberService';
 
-import Arena from "../types/arena";
+import Arena from '../types/arena';
 import {
   loadUser,
   requireOwner,
   loadApp,
   scopedUser,
   scopedApp,
-} from "../middleware/resource";
+} from '../middleware/resource';
 
 const app = express();
 
 // Get user apps
-app.get("/api/user/:userId/apps", loadUser, async (req, res) => {
+app.get('/api/user/:userId/apps', loadUser, async (req, res) => {
   const user = scopedUser(req);
   // TODO filter this response
   const apps = await appService.getForUser(user.getId());
@@ -25,7 +25,7 @@ app.get("/api/user/:userId/apps", loadUser, async (req, res) => {
 });
 
 // Create an app
-app.post("/api/user/:userId/app/", loadUser, requireOwner, async (req, res) => {
+app.post('/api/user/:userId/app/', loadUser, requireOwner, async (req, res) => {
   const user = scopedUser(req);
   const tankApp = await appService.create(user.getId());
   res.status(201);
@@ -33,7 +33,7 @@ app.post("/api/user/:userId/app/", loadUser, requireOwner, async (req, res) => {
 });
 
 // Get an app
-app.get("/api/user/:userId/app/:appId", loadUser, loadApp, (req, res) => {
+app.get('/api/user/:userId/app/:appId', loadUser, loadApp, (req, res) => {
   const app = scopedApp(req);
   res.json({
     id: app.getId(),
@@ -43,7 +43,7 @@ app.get("/api/user/:userId/app/:appId", loadUser, loadApp, (req, res) => {
 
 // Put app source code
 app.put(
-  "/api/user/:userId/app/:appId/source",
+  '/api/user/:userId/app/:appId/source',
   loadUser,
   requireOwner,
   loadApp,
@@ -51,7 +51,7 @@ app.put(
     const app = scopedApp(req);
     // TODO validate the source code first?
     return app
-      .setSource(req.body.toString("utf-8"))
+      .setSource(req.body.toString('utf-8'))
       .then(() => {
         res.status(200);
         res.send();
@@ -76,7 +76,7 @@ app.put(
 
 // Execute app source code
 app.post(
-  "/api/user/:userId/app/:appId/compile",
+  '/api/user/:userId/app/:appId/compile',
   loadUser,
   requireOwner,
   loadApp,
@@ -102,7 +102,7 @@ app.post(
 
 // Get app source code
 app.get(
-  "/api/user/:userId/app/:appId/source",
+  '/api/user/:userId/app/:appId/source',
   loadUser,
   requireOwner,
   loadApp,
@@ -115,7 +115,7 @@ app.get(
 
 // Delete an app
 app.delete(
-  "/api/user/:userId/app/:appId",
+  '/api/user/:userId/app/:appId',
   loadUser,
   requireOwner,
   loadApp,

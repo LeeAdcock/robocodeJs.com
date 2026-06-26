@@ -1,18 +1,18 @@
-import Bullet from "./bullet";
-import Point from "./point";
-import { TimersContainer } from "../util/scheduleFactory";
-import { v4 as uuidv4 } from "uuid";
-import { Event } from "./event";
-import { Orientated } from "./orientated";
-import { TankStats } from "./tankStats";
-import { TankTurret } from "./tankTurret";
-import ivm from "isolated-vm";
+import Bullet from './bullet';
+import Point from './point';
+import { TimersContainer } from '../util/scheduleFactory';
+import { v4 as uuidv4 } from 'uuid';
+import { Event } from './event';
+import { Orientated } from './orientated';
+import { TankStats } from './tankStats';
+import { TankTurret } from './tankTurret';
+import ivm from 'isolated-vm';
 
-import compiler from "../util/compiler";
-import Environment, { Process } from "./environment";
-import appService from "../services/AppService";
-import { ErrorCodes } from "./ErrorCodes";
-import { normalizeAngle } from "../util/geometry";
+import compiler from '../util/compiler';
+import Environment, { Process } from './environment';
+import appService from '../services/AppService';
+import { ErrorCodes } from './ErrorCodes';
+import { normalizeAngle } from '../util/geometry';
 
 // Convenience method to create a promise that resolves/rejects
 // when specific conditions are met.
@@ -118,7 +118,7 @@ export default class Tank implements Point, Orientated {
   // Enables the registration of event handlers
   on(event: Event, handler: (...args: any[]) => any) {
     if (!Object.keys(Event).includes(event))
-      throw new Error("Invalid event type.");
+      throw new Error('Invalid event type.');
 
     // Keep a record of event promises, ignore repeated calls to event if previous promise
     // has not yet resolved.
@@ -152,8 +152,8 @@ export default class Tank implements Point, Orientated {
                     this.appCrashed = true;
                     eventPromiseMap.delete(event);
 
-                    this.env.emit("event", {
-                      type: "appError",
+                    this.env.emit('event', {
+                      type: 'appError',
                       appId: this.process.appId,
                       error: e.message,
                     });
@@ -176,8 +176,8 @@ export default class Tank implements Point, Orientated {
     // todo sanitize name
     appService.get(this.process.getAppId()).then((app) => {
       if (app && app.getName() !== name) {
-        this.env.emit("event", {
-          type: "appRenamed",
+        this.env.emit('event', {
+          type: 'appRenamed',
           appId: app.getId(),
           name: name,
         });
@@ -195,15 +195,15 @@ export default class Tank implements Point, Orientated {
   }
 
   execute(process: Process): Promise<unknown> {
-    this.logger.trace("Executing code");
+    this.logger.trace('Executing code');
     try {
       return compiler.execute(process, this);
     } catch (e) {
       this.logger.error(`${ErrorCodes.E004}: ${e}`);
       this.appCrashed = true;
 
-      this.env.emit("event", {
-        type: "appError",
+      this.env.emit('event', {
+        type: 'appError',
         appId: this.process.appId,
         error: e instanceof Error ? e.message : String(e),
       });
@@ -219,8 +219,8 @@ export default class Tank implements Point, Orientated {
     }
 
     this.orientationTarget = target;
-    this.env.emit("event", {
-      type: "tankTurn",
+    this.env.emit('event', {
+      type: 'tankTurn',
       time: this.env.getTime(),
       id: this.id,
       x: this.x,
@@ -229,7 +229,7 @@ export default class Tank implements Point, Orientated {
       bodyOrientation: this.orientation,
       bodyOrientationVelocity: this.orientationVelocity,
     });
-    this.logger.trace("Turning to " + this.orientationTarget + "°");
+    this.logger.trace('Turning to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target,
@@ -237,7 +237,7 @@ export default class Tank implements Point, Orientated {
         !this.env.isRunning() ||
         this.orientationTarget !== target ||
         this.health <= 0,
-      "Orientation change cancelled"
+      'Orientation change cancelled'
     );
   }
 
@@ -256,8 +256,8 @@ export default class Tank implements Point, Orientated {
       return Promise.resolve();
     }
     this.orientationTarget = target;
-    this.env.emit("event", {
-      type: "tankTurn",
+    this.env.emit('event', {
+      type: 'tankTurn',
       time: this.env.getTime(),
       id: this.id,
       x: this.x,
@@ -266,7 +266,7 @@ export default class Tank implements Point, Orientated {
       bodyOrientation: this.orientation,
       bodyOrientationVelocity: this.orientationVelocity,
     });
-    this.logger.trace("Turning to " + this.orientationTarget + "°");
+    this.logger.trace('Turning to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target,
@@ -274,7 +274,7 @@ export default class Tank implements Point, Orientated {
         !this.env.isRunning() ||
         this.orientationTarget !== target ||
         this.health <= 0,
-      "Turn cancelled"
+      'Turn cancelled'
     );
   }
 
@@ -285,12 +285,12 @@ export default class Tank implements Point, Orientated {
     }
     this.logger.trace(
       d === 0
-        ? "Stopping"
-        : "Accelerating to " + target + " from " + this.speedTarget
+        ? 'Stopping'
+        : 'Accelerating to ' + target + ' from ' + this.speedTarget
     );
     this.speedTarget = target;
-    this.env.emit("event", {
-      type: "tankAccelerate",
+    this.env.emit('event', {
+      type: 'tankAccelerate',
       time: this.env.getTime(),
       id: this.id,
       x: this.x,
@@ -306,7 +306,7 @@ export default class Tank implements Point, Orientated {
         !this.env.isRunning() ||
         this.speedTarget !== Math.min(d, this.speedMax) ||
         this.health <= 0,
-      "Speed change cancelled"
+      'Speed change cancelled'
     );
   }
 
@@ -324,7 +324,7 @@ export default class Tank implements Point, Orientated {
 
   send(x: number) {
     if (!Number.isInteger(x)) {
-      throw new Error("Must be numeric");
+      throw new Error('Must be numeric');
     }
     this.logger.trace('Sending message "' + x + '"');
     this.stats.messagesSent += 1;

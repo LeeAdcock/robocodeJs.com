@@ -1,4 +1,4 @@
-import { UserId } from "./user";
+import { UserId } from './user';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type ArenaId = string & {};

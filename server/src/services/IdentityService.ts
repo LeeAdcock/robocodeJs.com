@@ -1,6 +1,6 @@
-import { UserId } from "../types/user";
-import Identity from "../types/identity";
-import pool from "../util/db";
+import { UserId } from '../types/user';
+import Identity from '../types/identity';
+import pool from '../util/db';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS identity (
@@ -21,7 +21,7 @@ class IdentityService {
     const userAuth = new Identity(userId, source, sourceId);
     return pool
       .query({
-        text: "INSERT INTO identity(userId, source, sourceId) VALUES($1, $2, $3)",
+        text: 'INSERT INTO identity(userId, source, sourceId) VALUES($1, $2, $3)',
         values: [userId, source, sourceId],
       })
       .then(() => userAuth);
@@ -36,7 +36,7 @@ class IdentityService {
       .then((res) =>
         res.rowCount === 0
           ? undefined
-          : new Identity(res.rows[0]["userId"], source, sourceId)
+          : new Identity(res.rows[0]['userId'], source, sourceId)
       );
   };
 }

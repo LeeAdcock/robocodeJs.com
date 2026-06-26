@@ -2,7 +2,7 @@
 export type UserId = string & {};
 
 export default class User {
-  private id: UserId = "";
+  private id: UserId = '';
   private name: string | undefined;
   private picture: string | undefined;
   private email: string | undefined;

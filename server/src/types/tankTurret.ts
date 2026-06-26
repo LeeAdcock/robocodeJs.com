@@ -1,10 +1,10 @@
-import Bullet from "./bullet";
-import { v4 as uuidv4 } from "uuid";
-import { Event } from "./event";
-import { Orientated } from "./orientated";
-import Tank, { waitUntil } from "./tank";
-import { normalizeAngle } from "../util/geometry";
-import { TankRadar } from "./tankRadar";
+import Bullet from './bullet';
+import { v4 as uuidv4 } from 'uuid';
+import { Event } from './event';
+import { Orientated } from './orientated';
+import Tank, { waitUntil } from './tank';
+import { normalizeAngle } from '../util/geometry';
+import { TankRadar } from './tankRadar';
 
 export class TankTurret implements Orientated {
   public orientation: number;
@@ -27,15 +27,15 @@ export class TankTurret implements Orientated {
     const target = normalizeAngle(d);
     this.orientationTarget = normalizeAngle(d);
     // todo only if this is an actual change
-    this.tank.env.emit("event", {
-      type: "turretTurn",
+    this.tank.env.emit('event', {
+      type: 'turretTurn',
       time: this.tank.env.getTime(),
       id: this.tank.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
       turretOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace("Turning turret to " + this.orientationTarget + "°");
+    this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target % 360,
@@ -43,7 +43,7 @@ export class TankTurret implements Orientated {
         !this.tank.env.isRunning() ||
         this.orientationTarget !== target % 360 ||
         this.tank.health <= 0,
-      "Turret orientation change cancelled"
+      'Turret orientation change cancelled'
     );
   }
 
@@ -59,15 +59,15 @@ export class TankTurret implements Orientated {
     const target = normalizeAngle(this.orientation + d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.env.emit("event", {
-      type: "turretTurn",
+    this.tank.env.emit('event', {
+      type: 'turretTurn',
       time: this.tank.env.getTime(),
       id: this.tank.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
       turretOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace("Turning turret to " + this.orientationTarget + "°");
+    this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target,
@@ -75,7 +75,7 @@ export class TankTurret implements Orientated {
         !this.tank.env.isRunning() ||
         this.orientationTarget !== target ||
         this.tank.health <= 0,
-      "Turret turn cancelled"
+      'Turret turn cancelled'
     );
   }
 
@@ -92,7 +92,7 @@ export class TankTurret implements Orientated {
           this.loaded < peakValue
         );
       },
-      "Turret already fired"
+      'Turret already fired'
     );
   }
 
@@ -101,8 +101,8 @@ export class TankTurret implements Orientated {
   }
 
   fire() {
-    if (this.loaded < 100) return Promise.reject("Turret not ready");
-    this.tank.logger.trace("Turret firing");
+    if (this.loaded < 100) return Promise.reject('Turret not ready');
+    this.tank.logger.trace('Turret firing');
 
     this.tank.stats.shotsFired += 1;
 
@@ -125,8 +125,8 @@ export class TankTurret implements Orientated {
     this.tank.bullets.push(bullet);
     this.loaded = 0;
 
-    this.tank.env.emit("event", {
-      type: "bulletFired",
+    this.tank.env.emit('event', {
+      type: 'bulletFired',
       time: this.tank.env.getTime(),
       id: bullet.id,
       tankId: this.tank.id,

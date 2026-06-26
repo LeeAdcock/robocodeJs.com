@@ -1,4 +1,4 @@
-import Point from "./point";
+import Point from './point';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type BulletId = string & {};

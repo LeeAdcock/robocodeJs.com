@@ -1,10 +1,10 @@
-import Point from './point'
+import Point from './point';
 
 export default interface Bullet extends Point {
-    id: string
-    origin: Point
-    speed: number
-    orientation: number
+  id: string;
+  origin: Point;
+  speed: number;
+  orientation: number;
 
-    explodedAt: number | undefined
+  explodedAt: number | undefined;
 }

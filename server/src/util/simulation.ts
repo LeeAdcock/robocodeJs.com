@@ -1,7 +1,7 @@
-import { Event } from "../types/event";
-import { timerTick } from "./scheduleFactory";
-import Environment from "../types/environment";
-import { normalizeAngle } from "./geometry";
+import { Event } from '../types/event';
+import { timerTick } from './scheduleFactory';
+import Environment from '../types/environment';
+import { normalizeAngle } from './geometry';
 
 /*
   These functions calculate the changes and interaction between active
@@ -17,8 +17,8 @@ export default {
         .filter((tank) => tank.health > 0 && tank.appCrashed)
         .forEach((tank) => {
           tank.health = 0;
-          env.emit("event", {
-            type: "tankDamaged",
+          env.emit('event', {
+            type: 'tankDamaged',
             id: tank.id,
             time: env.getTime(),
             health: tank.health,
@@ -85,8 +85,8 @@ export default {
                   collided = true;
                   tank.stats.timesCollided += 1;
                   otherTank.stats.timesCollided += 1;
-                  tank.logger.trace("Collided with tank");
-                  otherTank.logger.trace("Collided with tank");
+                  tank.logger.trace('Collided with tank');
+                  otherTank.logger.trace('Collided with tank');
                   if (tank.handlers[Event.COLLIDED]) {
                     tank.handlers[Event.COLLIDED]({
                       angle,
@@ -139,14 +139,14 @@ export default {
                       bullet.exploded = true;
                       if (bullet.callback) bullet.callback({ id: tank.id });
 
-                      env.emit("event", {
-                        type: "tankDamaged",
+                      env.emit('event', {
+                        type: 'tankDamaged',
                         id: tank.id,
                         time: env.getTime(),
                         health: tank.health,
                       });
-                      env.emit("event", {
-                        type: "bulletExploded",
+                      env.emit('event', {
+                        type: 'bulletExploded',
                         time: env.getTime(),
                         id: bullet.id,
                         tankId: tank.id,
@@ -168,7 +168,7 @@ export default {
           ) {
             collided = true;
             tank.stats.timesCollided += 1;
-            tank.logger.trace("Collided with arena boundary");
+            tank.logger.trace('Collided with arena boundary');
             if (tank.handlers[Event.COLLIDED]) {
               tank.handlers[Event.COLLIDED]({
                 angle: normalizeAngle(tank.orientation),
@@ -202,15 +202,15 @@ export default {
             tank.speed = 0;
             tank.health -= 1;
             // Handle a collision
-            env.emit("event", {
-              type: "tankStop",
+            env.emit('event', {
+              type: 'tankStop',
               time: env.getTime(),
               id: tank.id,
               x: tank.x,
               y: tank.y,
             });
-            env.emit("event", {
-              type: "tankDamaged",
+            env.emit('event', {
+              type: 'tankDamaged',
               time: env.getTime(),
               id: tank.id,
               health: tank.health,
@@ -219,7 +219,11 @@ export default {
 
           // Convenience method for manging rotating towards a target orientation
           // with a maximum rotational velocity.
-          const rotate = (current: number, target: number, velocity: number) => {
+          const rotate = (
+            current: number,
+            target: number,
+            velocity: number
+          ) => {
             if (normalizeAngle(Math.abs(current - target)) < velocity)
               return target;
             const delta = normalizeAngle(current - target);
@@ -267,8 +271,8 @@ export default {
               bullet.y = newY;
             } else {
               // Went outside the arena, get rid of it
-              env.emit("event", {
-                type: "bulletRemoved",
+              env.emit('event', {
+                type: 'bulletRemoved',
                 time: env.getTime(),
                 id: bullet.id,
                 tankId: tank.id,

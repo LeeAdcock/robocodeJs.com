@@ -1,7 +1,7 @@
-import pool from "../util/db";
-import { ArenaId } from "../types/arena";
-import { AppId } from "../types/app";
-import ArenaMember from "../types/arenaMember";
+import pool from '../util/db';
+import { ArenaId } from '../types/arena';
+import { AppId } from '../types/app';
+import ArenaMember from '../types/arenaMember';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS arena_member (
@@ -17,7 +17,7 @@ export class ArenaMemberService {
     const member = new ArenaMember(appId, arenaId, new Date().getTime());
     return pool
       .query({
-        text: "INSERT INTO arena_member(arenaId, appId) VALUES($1, $2)",
+        text: 'INSERT INTO arena_member(arenaId, appId) VALUES($1, $2)',
         values: [arenaId, appId],
       })
       .then(() => Promise.resolve(member));
@@ -30,7 +30,14 @@ export class ArenaMemberService {
         values: [appId],
       })
       .then((res) =>
-        res.rows.map((row) => new ArenaMember(appId, row.arenaId, new Date(row.createdTimestamp).getTime()))
+        res.rows.map(
+          (row) =>
+            new ArenaMember(
+              appId,
+              row.arenaId,
+              new Date(row.createdTimestamp).getTime()
+            )
+        )
       );
   };
 
@@ -41,7 +48,14 @@ export class ArenaMemberService {
         values: [arenaId],
       })
       .then((res) =>
-        res.rows.map((row) => new ArenaMember(row.appId, arenaId, new Date(row.createdTimestamp).getTime()))
+        res.rows.map(
+          (row) =>
+            new ArenaMember(
+              row.appId,
+              arenaId,
+              new Date(row.createdTimestamp).getTime()
+            )
+        )
       );
   };
 }

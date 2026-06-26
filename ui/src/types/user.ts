@@ -1,10 +1,10 @@
-import TankApp from './tankApp'
+import TankApp from './tankApp';
 
 export default interface User {
-    id: string
-    name: string
-    picture: string
-    email: string
+  id: string;
+  name: string;
+  picture: string;
+  email: string;
 
-    apps: TankApp[]
+  apps: TankApp[];
 }

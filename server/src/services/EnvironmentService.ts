@@ -1,6 +1,6 @@
-import Arena from "../types/arena";
-import Environment, { ArenaId, Process } from "../types/environment";
-import arenaMemberService from "./ArenaMemberService";
+import Arena from '../types/arena';
+import Environment, { ArenaId, Process } from '../types/environment';
+import arenaMemberService from './ArenaMemberService';
 
 export class EnvironmentService {
   // Keyed by arenaId. Accessed via bracket notation / Object.entries below, so
@@ -14,7 +14,7 @@ export class EnvironmentService {
       (Object.entries(this.store) as [ArenaId, Environment][]).forEach(
         ([arenaId, env]) => {
           if (env.stoppedAt && threshold > env.stoppedAt.getTime()) {
-            console.log("disposing isolate", arenaId);
+            console.log('disposing isolate', arenaId);
             delete this.store[arenaId];
             env.dispose();
           }
@@ -30,7 +30,7 @@ export class EnvironmentService {
     }
 
     env = new Environment(arena);
-    console.log("creating isolate", arena.getId());
+    console.log('creating isolate', arena.getId());
 
     this.store[arena.getId()] = env;
     return arenaMemberService

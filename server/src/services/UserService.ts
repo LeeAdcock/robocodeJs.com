@@ -1,10 +1,10 @@
-import User, { UserId } from "../types/user";
-import { v4 as uuidv4 } from "uuid";
-import arenaService from "./ArenaService";
-import pool from "../util/db";
-import appService from "./AppService";
-import arenaMemberService from "./ArenaMemberService";
-import environmentService from "./EnvironmentService";
+import User, { UserId } from '../types/user';
+import { v4 as uuidv4 } from 'uuid';
+import arenaService from './ArenaService';
+import pool from '../util/db';
+import appService from './AppService';
+import arenaMemberService from './ArenaMemberService';
+import environmentService from './EnvironmentService';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS account (
@@ -18,7 +18,7 @@ pool.query(`
 `);
 
 class UserService {
-  static demoUserId: UserId = "c8c62d4b-37bc-45af-a86a-0e9d654aef13";
+  static demoUserId: UserId = 'c8c62d4b-37bc-45af-a86a-0e9d654aef13';
 
   create = (
     name: string | undefined,
@@ -28,10 +28,10 @@ class UserService {
   ): Promise<User> => {
     const userId: UserId = demo ? UserService.demoUserId : uuidv4();
     const user = new User(userId, name, picture, email);
-    console.log("creating user", userId);
+    console.log('creating user', userId);
     return pool
       .query({
-        text: "INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)",
+        text: 'INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)',
         values: [
           user.getId(),
           user.getName(),
@@ -43,7 +43,7 @@ class UserService {
         arenaService.create(user.getId()).then((arena) =>
           Promise.all([
             appService.create(user.getId()).then((app) => {
-              app.setName("My First Bot");
+              app.setName('My First Bot');
               app
                 .setSource(
                   `
@@ -73,7 +73,7 @@ bot.on(Event.FIRED, turnRight)
                 );
             }),
             appService.create(user.getId()).then((app) => {
-              app.setName("Target Practice");
+              app.setName('Target Practice');
               app
                 .setSource(
                   `
@@ -97,7 +97,7 @@ bot.setName('Target Practice')
   getDemoUser = (): Promise<User> => {
     return this.get(UserService.demoUserId).then((user) => {
       if (!user) {
-        return this.create("demo", undefined, undefined, true);
+        return this.create('demo', undefined, undefined, true);
       }
       return user;
     });
@@ -106,7 +106,7 @@ bot.setName('Target Practice')
   get = (userId: UserId): Promise<User | undefined> => {
     return pool
       .query({
-        text: "SELECT account.name, account.picture, account.email FROM account WHERE id=$1",
+        text: 'SELECT account.name, account.picture, account.email FROM account WHERE id=$1',
         values: [userId],
       })
       .then((res) => {
