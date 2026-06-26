@@ -105,11 +105,30 @@ node index.js                 # root proxy on :5000  (open this one)
 (cd ui     && npm install && npm run dev)   # Vite dev server on :3000
 ```
 
-Then open <http://localhost:5000>.
+Then open <http://localhost:5000>. With no configuration, you land on a running arena with starter bots — **no database, no Google account, nothing to set up.**
 
-With no `RDS_HOSTNAME` configured, the server starts in **local-dev mode**: an in-memory Postgres ([pg-mem](https://github.com/oguimbal/pg-mem)) and an auth bypass that signs you in as a fixed "Local Dev" user — so **no database and no Google sign-in are required**. That user is created with the standard starter bots, so you land on a running arena immediately. Data resets on each restart. (Production safety: this mode can never activate when `NODE_ENV=production`, and a real deploy always sets both that and `RDS_HOSTNAME`.)
+This works because the server picks one of two modes at startup based on a single signal — whether `RDS_HOSTNAME` is set:
 
-To develop against a **real** database and Google sign-in instead, set the `RDS_*` variables (and `GOOGLE_CLIENT_ID`); see [`server/README.md`](server/README.md).
+| | **Local-dev mode** (default) | **Production-like mode** |
+| --- | --- | --- |
+| **Trigger** | `RDS_HOSTNAME` unset *and* `NODE_ENV` ≠ `production`/`test` | `RDS_HOSTNAME` set (or `NODE_ENV=production`) |
+| **Database** | In-memory [pg-mem](https://github.com/oguimbal/pg-mem) — created on boot, **resets on every restart** | Real PostgreSQL via the `RDS_*` variables |
+| **Auth** | **Bypassed** — every request is a fixed "Local Dev" user; no sign-in, the Google button never appears | Real **Google OAuth** (`GOOGLE_CLIENT_ID`); sign in with the in-app button |
+| **First load** | "Local Dev" user is auto-created with starter bots and a live arena | A user/arena is created on first sign-in |
+
+The toggle is computed in `server/src/util/devMode.ts` (`isLocalDev`). **Local-dev mode is for your machine only:** it can never activate when `NODE_ENV=production` (re-checked at the auth-bypass site), and it's disabled under `NODE_ENV=test` so the test suite exercises the real code paths. A real deployment always sets both `NODE_ENV=production` and `RDS_HOSTNAME`, so it gets production-like mode.
+
+#### Developing against a real database + Google sign-in
+
+To run the production-like stack locally (e.g. to test persistence or the OAuth flow), set the database variables before `npm run dev` — their presence alone flips the server out of local-dev mode:
+
+```bash
+export RDS_HOSTNAME=localhost RDS_PORT=5432 \
+       RDS_DB_NAME=robocode RDS_USERNAME=postgres RDS_PASSWORD=postgres
+export GOOGLE_CLIENT_ID=<your-oauth-client-id>   # must match the id the UI signs in with
+```
+
+Tables are created lazily on first use, so an empty database is fine. See [`server/README.md`](server/README.md#environment-variables) for the full variable list and the auth details (the UI posts the Google credential to `POST /api/session`, which sets an HttpOnly cookie the server verifies).
 
 ### Build
 
