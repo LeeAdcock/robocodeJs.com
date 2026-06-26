@@ -126,13 +126,19 @@ function App() {
             client_id:
                 '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
             callback: (response: { credential: string }) => {
-                document.cookie = 'auth=' + response.credential + '; path=/'
-                axios.get(`/api/user`).then((res) =>
-                    axios
-                        .get(`/api/user/${res.data.id}`)
-                        .then((res) => setUser(res.data))
-                        .then(() => google.accounts.id.cancel())
-                )
+                // The server verifies the credential and sets an HttpOnly
+                // session cookie (so it isn't readable by client-side JS).
+                axios
+                    .post(`/api/session`, {
+                        credential: response.credential,
+                    })
+                    .then(() => axios.get(`/api/user`))
+                    .then((res) =>
+                        axios
+                            .get(`/api/user/${res.data.id}`)
+                            .then((res) => setUser(res.data))
+                            .then(() => google.accounts.id.cancel())
+                    )
             },
         })
         google.accounts.id.renderButton(

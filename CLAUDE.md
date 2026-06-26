@@ -64,7 +64,7 @@ User bot code is untrusted JavaScript run in `isolated-vm` isolates — this is 
 
 ### Auth
 
-`server/src/middleware/auth.ts` verifies a Google OAuth id token stored in the `auth` cookie (set client-side in `App.tsx`). It auto-creates a user record on first login. Only `/api/user` is hard-gated (`auth(true)`); mutating endpoints additionally check `req.user.id === :userId`.
+`server/src/middleware/auth.ts` verifies a Google OAuth id token (checking its **audience** against `GOOGLE_CLIENT_ID`, which must match the client id the UI signs in with) stored in the `auth` cookie. The cookie is set **server-side and HttpOnly** by `POST /api/session` (the UI posts the Google credential there; `DELETE /api/session` logs out) — see `server/src/api/session.ts`. A user record is auto-created on first login. Only `/api/user` is hard-gated (`auth(true)`); mutating endpoints additionally enforce ownership via the `requireOwner` middleware.
 
 ### Services & types
 
