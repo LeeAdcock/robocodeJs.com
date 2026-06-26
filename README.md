@@ -48,6 +48,46 @@ A few things worth knowing about how it fits together:
 - **Tick-based simulation.** The engine (`server/src/util/simulation.ts`) advances the world on a fixed interval: it runs bot event handlers, fires tick-driven timers, moves tanks, resolves collisions and bullet hits, and applies damage.
 - **Live streaming + client interpolation.** Arena state streams to the browser over Server-Sent Events; the UI applies those events and runs its own lightweight physics between ticks (`ui/src/util/simulate.ts`) for smooth motion.
 
+### How the pieces relate
+
+The same words name both a database row and a live object. The persisted entities (left) map onto the in-memory runtime (right) when an arena starts running:
+
+```mermaid
+graph TD
+  subgraph persist["Persisted (PostgreSQL)"]
+    User["User"]
+    App["App — bot source"]
+    Arena["Arena"]
+    Member["ArenaMember — join table"]
+  end
+
+  subgraph runtime["In-memory (while an arena runs)"]
+    Env["Environment — one per running arena"]
+    Proc["Process — one per app in the arena"]
+    Iso[["ivm.Isolate — 8 MB sandbox"]]
+    Tank["Tank ×5 — share the isolate"]
+    Turret["Turret"]
+    Radar["Radar"]
+    Bullet["Bullet"]
+  end
+
+  User -->|owns| Arena
+  User -->|writes| App
+  Arena -->|has| Member
+  Member -->|references| App
+
+  Arena -.->|"resume() via EnvironmentService"| Env
+  App -.->|"compiled by compiler.ts"| Proc
+  Env -->|hosts| Proc
+  Proc -->|owns| Iso
+  Proc -->|"controls 5"| Tank
+  Tank --> Turret
+  Turret --> Radar
+  Tank -->|fires| Bullet
+```
+
+In words: a **User** owns one or more **Arenas** and writes **Apps** (bot programs); an **ArenaMember** row records that an app has joined an arena. When an arena is running, `EnvironmentService` holds one **Environment** for it in memory; each member app becomes a **Process** that owns an 8 MB `isolated-vm` **Isolate** and controls a team of **5 Tanks** (which share that isolate). Each Tank has a **Turret** with a **Radar**, and fires **Bullets**.
+
 ## Getting started
 
 ### Prerequisites
@@ -86,7 +126,12 @@ The UI build outputs directly into `server/dist/public`, which the server serves
 
 ## Deployment
 
-The app deploys via AWS CodeBuild (`buildspec.yaml`) to Elastic Beanstalk (config in `server/.ebextensions`). The build produces the UI bundle inside `server/dist/public` and ships the server as the artifact.
+The app deploys via AWS CodeBuild (`buildspec.yaml`) to Elastic Beanstalk (config in `server/.ebextensions`):
+
+1. `ui` is built into `server/dist/public` and `server` is compiled to `server/dist`.
+2. The server runs as the single artifact, serving both the API and the static UI from one process on port `8080`.
+
+The production runtime needs the same configuration as local dev — the `RDS_*` Postgres variables and `GOOGLE_CLIENT_ID` — plus `NODE_ENV=production`, which sets the `Secure` flag on the session cookie. The native `isolated-vm` module is compiled on deploy, so the instance needs `gcc`/`gcc-c++` (installed via `server/.ebextensions/options.config`). To build a versioned deploy zip locally, run `cd server && npm run package`.
 
 ## License
 

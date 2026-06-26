@@ -73,6 +73,28 @@ User bot code is untrusted, so it never runs in the Node process directly — it
 
 `src/util/compiler.ts` builds the bot-facing API. For each method it sets a native `_bot_*` function on the isolate global, then compiles a thin JS wrapper (`bot.turn`, `bot.radar.scan`, `bot.turret.fire`, `arena`, `clock`, `console`, `setInterval`/`setTimeout`, `Event`, …) that bridges to it. The **`ivm` module is never exposed to bot code** — all `Callback`/`Reference`/`ExternalCopy` objects are built host-side. Asynchronous actions are Promises parked isolate-side and settled by the host via a captured `__settle` reference; events and timers use the same host-pinned dispatch references (`__dispatch`/`__runTimer`). Bot code runs via isolated-vm's async `run`/`apply` (on the thread pool, off the main event loop), each bounded by `SANDBOX_TIMEOUT_MS`. `Date` is set to `undefined` so bots stay deterministic — they use `clock.getTime()` instead.
 
+Two directions cross the host ↔ isolate boundary — an **outbound** command the bot makes, and an **inbound** event the simulation delivers:
+
+```mermaid
+sequenceDiagram
+  participant Bot as Bot code (isolate)
+  participant Host as Host bridge (compiler.ts)
+  participant Game as Tank / Simulation
+
+  Note over Bot,Game: Outbound — bot calls a command, e.g. await bot.setSpeed(10)
+  Bot->>Host: __asyncCall parks the promise, makes a sync native call (id, 10)
+  Host->>Game: tank.setSpeed(10) — side effect applies immediately
+  Game-->>Host: returns a promise that settles over ticks
+  Host-->>Bot: __settle(id, ok, value) via captured reference — resolves the awaited promise
+
+  Note over Bot,Game: Inbound — simulation fires an event (START / TICK / HIT / …)
+  Game->>Host: tank.handlers[event](data)
+  Host->>Bot: __dispatch(event, args) via captured reference — async apply, under SANDBOX_TIMEOUT_MS
+  Bot-->>Host: handler runs off the main thread; resolve/reject report completion
+```
+
+The host pins the `__settle`, `__dispatch`, and `__runTimer` references at init (before any bot code runs), so a bot cannot reassign those globals to intercept what the host invokes.
+
 `npm run smoke` (`scripts/ivm-smoke.js`) is a quick check that the native module loads and the exact API patterns compiler.ts depends on (ExternalCopy round-trips incl. `copyInto`, the host-settled async-call bridge, event dispatch via a captured Reference, and async `apply` honoring a timeout) still work — run it after any Node or isolated-vm version change.
 
 ## The simulation loop
@@ -92,7 +114,7 @@ Domain types and DTOs live in `src/types/` (`Tank`, `Arena`, `Environment`/`Proc
 
 ## Auth
 
-`src/middleware/auth.ts` verifies a Google OAuth id token stored in the `auth` cookie (set client-side by the UI) and attaches `req.user`. A user record is auto-created on first login. Only `/api/user` is hard-gated; individual mutating endpoints additionally check that the authenticated user owns the resource.
+The UI posts the Google credential to **`POST /api/session`**, which verifies it and sets an **HttpOnly, `SameSite=Lax`** `auth` cookie server-side (`Secure` when `NODE_ENV=production`); `DELETE /api/session` logs out (`src/api/session.ts`). `src/middleware/auth.ts` then verifies that cookie's id token on each request — checking its **audience** against `GOOGLE_CLIENT_ID` — and attaches `req.user`. A user record is auto-created on first login. Only `/api/user` is hard-gated (`auth(true)`); mutating endpoints additionally enforce ownership via the `requireOwner` middleware.
 
 ## Server ↔ UI communication
 
@@ -110,7 +132,7 @@ The UI consumes these and interpolates motion between server ticks with its own 
 - `test/simulation.test.ts` — the simulation physics (movement, acceleration, rotation, tank/boundary collisions, bullet hits and lifetimes). `Simulation.run` only invokes `tank.handlers[...]` and mutates plain fields, so the tests drive it with lightweight mock tanks — no real isolates required.
 - `test/scheduleFactory.test.ts` — the tick-driven timers.
 - `test/tankTypes.test.ts` — the `Tank`/`TankTurret`/`TankRadar` classes (turn/accelerate targeting, `send` messaging, turret `fire`, radar `scan` detection geometry). These classes transitively import `util/db`, so the suite `vi.mock`s the db pool to avoid touching Postgres and builds a **real** `Tank` against a mock environment whose `isRunning()` returns false (so `waitUntil`-based methods settle immediately instead of leaving polling timers running).
-- `test/compiler.test.ts` — integration tests that spin up a **real** isolated-vm isolate, have `compiler.init` build the bot API into it, then compile/run bot code in the sandbox and read values back out (`{copy:true}`): synchronous getters, `Date`/Node-global removal, mutating commands, the `bot.on`/`clock.on` Reference bridge, `console.log` routing, and timer registration.
+- `test/compiler.test.ts` — integration tests that spin up a **real** isolated-vm isolate, have `compiler.init` build the bot API into it, then compile/run bot code in the sandbox and read values back out (`{copy:true}`): synchronous getters, `Date`/Node-global removal, mutating commands, the `bot.on`/`clock.on` dispatch bridge, `console.log` routing and per-tick log capping, timer registration, and the security invariants — `ivm`/`Reference`/`ExternalCopy` are **not** reachable from bot code, async results/rejections cross the boundary correctly, the per-call timeout terminates a runaway timer, and `setName` is sanitized and length-bounded.
 - `test/api.test.ts` — Express endpoints via [supertest](https://github.com/ladjs/supertest), with the data-access singletons `vi.mock`ed so handlers run with no Postgres/isolates. Covers health, the user/app endpoints, and the shared 404-unknown / 401-not-owner authorization boilerplate.
 - `test/auth.test.ts` — the Google-OAuth auth middleware: recognized token attaches the user, first login auto-creates one, and an invalid token 401s when required / falls through when optional. Mocks `google-auth-library` (via `vi.hoisted`) and the user/identity services.
 - `test/services.test.ts` — the Postgres data-access services (`AppService`, `ArenaService`, `ArenaMemberService`): `vi.mock`s the pool with canned result sets and asserts the row→domain-object mapping and `undefined`-on-empty.

@@ -24,7 +24,7 @@ npm run test:watch  # Vitest in watch mode
 npm run lint     # eslint --fix + prettier --write
 ```
 
-Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`). The current suite covers `src/util/simulate.ts` — the client-side movement/rotation/bullet interpolation — which is pure logic over plain objects, so it runs in a plain `node` environment with no DOM.
+Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`): the SSE event reducer (`arenaReducer.test.ts`), the shared angle geometry (`geometry.test.ts`), and the client-side movement/rotation/bullet interpolation (`simulate.test.ts`). These are pure logic over plain objects, so they run in a plain `node` environment with no DOM.
 
 `vite.config.ts` sets `build.outDir` to `../server/dist/public` (with `emptyOutDir`), so a production build lands directly where the server serves static files from — no copy step. The `build` script runs `tsc --noEmit` first, so type errors fail the build.
 
@@ -34,7 +34,7 @@ Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`). The 
 
 `src/App.tsx` is the heart of the client:
 
-- **Auth** — initializes Google Sign-In; on login it stores the id token in the `auth` cookie and loads the current user.
+- **Auth** — initializes Google Sign-In; on login it POSTs the Google credential to `/api/session` (which sets an HttpOnly `auth` cookie server-side), then loads the current user. `DELETE /api/session` logs out.
 - **Bootstrapping** — fetches the arena snapshot over REST (`/api/user/:id/arena`, or the public `/api/demo/arena` when signed out).
 - **Live updates** — opens an `EventSource` to the server's SSE stream and applies a large per-event-type reducer to the arena state (ticks, tank movement/turn/stop, turret/radar turns, fire/hit, place & remove app/tank, pause/resume, restart).
 - **Smooth motion** — between server ticks it runs its own lightweight physics in `src/util/simulate.ts`, a partial mirror of the server's `simulation.ts`. **If the server's movement/collision math changes, update this file to match**, or client and server will drift.
