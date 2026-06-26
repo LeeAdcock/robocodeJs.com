@@ -1,11 +1,9 @@
 import TankApp from '../types/tankApp'
+import { normalizeAngle } from './geometry'
 
-const normalizeAngle = (x: number): number => {
-    x = x % 360
-    while (x < 0) x += 360
-    return x
-}
-
+// A partial mirror of the server's movement engine (server/src/util/
+// simulation.ts), used to interpolate motion smoothly between server ticks.
+// Keep the movement/rotation math here consistent with the server's.
 export default (
     time: number,
     apps: TankApp[],
@@ -53,15 +51,21 @@ export default (
 
                 // Convenience method for manging rotating towards a target orientation
                 // with a maximum rotational velocity.
-                const rotate = (current, target, velocity) => {
+                const rotate = (
+                    current: number,
+                    target: number,
+                    velocity: number
+                ) => {
                     const delta = normalizeAngle(current - target)
-                    return (
+                    // Normalize the result so the interpolated angle stays in
+                    // [0, 360) instead of drifting negative/over 360 over time.
+                    return normalizeAngle(
                         current +
-                        (delta <= 180 ? -1 : 1) *
-                            Math.min(
-                                normalizeAngle(Math.abs(current - target)),
-                                velocity
-                            )
+                            (delta <= 180 ? -1 : 1) *
+                                Math.min(
+                                    normalizeAngle(Math.abs(current - target)),
+                                    velocity
+                                )
                     )
                 }
 

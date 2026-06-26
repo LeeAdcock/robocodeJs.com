@@ -85,6 +85,17 @@ describe('simulate — rotation', () => {
         sim([tank])
         expect(tank.bodyOrientation).toBeCloseTo(5)
     })
+
+    it('keeps the rotated angle in [0, 360) when turning backward past 0', () => {
+        const tank = makeTank({
+            bodyOrientation: 0,
+            bodyOrientationTarget: 270,
+            bodyOrientationVelocity: 10,
+        })
+        sim([tank])
+        // shortest path is counter-clockwise (-10), normalized to 350
+        expect(tank.bodyOrientation).toBeCloseTo(350)
+    })
 })
 
 describe('simulate — bullets', () => {
