@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import express from 'express'
 import bodyParser from 'body-parser'
 import cookieParser from 'cookie-parser'
@@ -73,7 +73,7 @@ describe('GET /health', () => {
 
 describe('user endpoints', () => {
     it('GET /api/user returns the authenticated user with their apps', async () => {
-        ;(appService.getForUser as Mock).mockResolvedValue([mockApp('a1')])
+        vi.mocked(appService.getForUser).mockResolvedValue([mockApp('a1')] as never)
         const res = await request(makeApp(userRouter, mockUser('u1'))).get(
             '/api/user'
         )
@@ -90,14 +90,14 @@ describe('user endpoints', () => {
     })
 
     it('GET /api/user/:userId returns 404 for an unknown user', async () => {
-        ;(userService.get as Mock).mockResolvedValue(undefined)
+        vi.mocked(userService.get).mockResolvedValue(undefined)
         const res = await request(makeApp(userRouter)).get('/api/user/nope')
         expect(res.status).toBe(404)
     })
 
     it('GET /api/user/:userId returns the user when found', async () => {
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        ;(appService.getForUser as Mock).mockResolvedValue([])
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.getForUser).mockResolvedValue([])
         const res = await request(makeApp(userRouter)).get('/api/user/u1')
         expect(res.status).toBe(200)
         expect(res.body).toMatchObject({ id: 'u1', apps: [] })
@@ -106,11 +106,11 @@ describe('user endpoints', () => {
 
 describe('app endpoints', () => {
     it('GET /api/user/:userId/apps lists the user apps', async () => {
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        ;(appService.getForUser as Mock).mockResolvedValue([
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.getForUser).mockResolvedValue([
             mockApp('a1'),
             mockApp('a2'),
-        ])
+        ] as never)
         const res = await request(makeApp(appRouter)).get('/api/user/u1/apps')
         expect(res.status).toBe(200)
         expect(res.body).toEqual([
@@ -120,14 +120,14 @@ describe('app endpoints', () => {
     })
 
     it('GET /api/user/:userId/apps returns 404 for an unknown user', async () => {
-        ;(userService.get as Mock).mockResolvedValue(undefined)
+        vi.mocked(userService.get).mockResolvedValue(undefined)
         const res = await request(makeApp(appRouter)).get('/api/user/u1/apps')
         expect(res.status).toBe(404)
     })
 
     it('POST /api/user/:userId/app creates an app for the owner', async () => {
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        ;(appService.create as Mock).mockResolvedValue(mockApp('a9'))
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.create).mockResolvedValue(mockApp('a9') as never)
         const res = await request(makeApp(appRouter, mockUser('u1'))).post(
             '/api/user/u1/app/'
         )
@@ -137,15 +137,16 @@ describe('app endpoints', () => {
     })
 
     it('POST /api/user/:userId/app is forbidden for a different user', async () => {
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        const res = await request(makeApp(appRouter, mockUser('someone-else')))
-            .post('/api/user/u1/app/')
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        const res = await request(
+            makeApp(appRouter, mockUser('someone-else'))
+        ).post('/api/user/u1/app/')
         expect(res.status).toBe(401)
         expect(appService.create).not.toHaveBeenCalled()
     })
 
     it('POST /api/user/:userId/app returns 404 for an unknown user', async () => {
-        ;(userService.get as Mock).mockResolvedValue(undefined)
+        vi.mocked(userService.get).mockResolvedValue(undefined)
         const res = await request(makeApp(appRouter, mockUser('u1'))).post(
             '/api/user/u1/app/'
         )
@@ -153,8 +154,8 @@ describe('app endpoints', () => {
     })
 
     it('GET /api/user/:userId/app/:appId/source returns the source to the owner', async () => {
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        ;(appService.get as Mock).mockResolvedValue(mockApp('a1'))
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never)
         const res = await request(makeApp(appRouter, mockUser('u1'))).get(
             '/api/user/u1/app/a1/source'
         )
@@ -163,8 +164,8 @@ describe('app endpoints', () => {
     })
 
     it('GET /api/user/:userId/app/:appId/source returns 404 for an unknown app', async () => {
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        ;(appService.get as Mock).mockResolvedValue(undefined)
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.get).mockResolvedValue(undefined)
         const res = await request(makeApp(appRouter, mockUser('u1'))).get(
             '/api/user/u1/app/missing/source'
         )
@@ -173,9 +174,9 @@ describe('app endpoints', () => {
 
     it('DELETE /api/user/:userId/app/:appId removes the app for the owner', async () => {
         const app = mockApp('a1')
-        ;(userService.get as Mock).mockResolvedValue(mockUser('u1'))
-        ;(appService.get as Mock).mockResolvedValue(app)
-        ;(arenaMemberService.getForApp as Mock).mockResolvedValue([])
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.get).mockResolvedValue(app as never)
+        vi.mocked(arenaMemberService.getForApp).mockResolvedValue([])
         const res = await request(makeApp(appRouter, mockUser('u1'))).delete(
             '/api/user/u1/app/a1'
         )
