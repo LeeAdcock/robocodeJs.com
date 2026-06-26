@@ -2,8 +2,14 @@
 //
 // Run after changing the Node or isolated-vm version (e.g. `npm run smoke`) to
 // confirm the native module builds/loads and the API patterns compiler.ts
-// relies on still work: ExternalCopy round-trips, Callback-based async bridges,
-// and Reference + applySync with a timeout.
+// relies on still work. The ivm module is never exposed to the isolate; all
+// Callback/Reference/ExternalCopy objects are built host-side. Patterns checked:
+//   1. ExternalCopy round-trip (synchronous getters)
+//   2. async-call bridge: a parked promise settled via a captured __settle
+//      reference, object result copied back with copyInto()
+//   3. event dispatch via a captured __dispatch reference + async apply, with
+//      host resolve/reject passed as arguments (they auto-wrap)
+//   4. async apply honoring a timeout to interrupt a runaway loop (off-thread)
 const ivm = require('isolated-vm');
 const { version } = require('isolated-vm/package.json');
 
@@ -15,14 +21,12 @@ async function main() {
       catastrophic = true;
     },
   });
-
   const context = isolate.createContextSync();
-  context.global.setSync('_ivm', ivm);
   isolate
     .compileScriptSync('var bot = { radar: {}, turret: {} }')
     .runSync(context, {});
 
-  // ExternalCopy round-trip (e.g. bot.getX = () => _bot_getX().copy())
+  // 1) ExternalCopy round-trip (e.g. bot.getX = () => _bot_getX().copy())
   context.global.setSync('_bot_getX', () => new ivm.ExternalCopy(42));
   isolate
     .compileScriptSync('bot.getX = () => _bot_getX().copy()')
@@ -32,41 +36,82 @@ async function main() {
     .runSync(context, { copy: true });
   if (x !== 42) throw new Error(`ExternalCopy round-trip failed: got ${x}`);
 
-  // Callback-based async (e.g. bot.setSpeed via _ivm.Callback resolve/reject)
-  context.global.setSync('_bot_setSpeed', (arg, resolve) => {
-    Promise.resolve(arg * 2).then(resolve);
-  });
+  // 2) async-call bridge (e.g. bot.radar.scan): native parks the promise, host
+  //    settles it via the captured __settle reference; object result copied back.
   isolate
     .compileScriptSync(
-      `bot.setSpeed = speed => new Promise((resolve, reject) =>
-                _bot_setSpeed(speed, new _ivm.Callback(resolve), new _ivm.Callback(reject)))`
+      `
+      let __seq = 0
+      const __pending = {}
+      const __asyncCall = (fn, ...a) => new Promise((res, rej) => {
+        const id = ++__seq; __pending[id] = { res, rej }; fn(id, ...a)
+      })
+      globalThis.__settle = (id, ok, v) => {
+        const p = __pending[id]; if (!p) return; delete __pending[id]
+        ok ? p.res(v) : p.rej(v)
+      }
+      bot.scan = () => __asyncCall(_bot_scan)
+      `
     )
     .runSync(context, {});
-  const doubled = await isolate
-    .compileScriptSync('bot.setSpeed(21)')
+  const settleRef = context.evalSync('__settle', { reference: true });
+  context.global.setSync('_bot_scan', (id) => {
+    Promise.resolve([{ id: 'a' }]).then((v) =>
+      settleRef.apply(
+        undefined,
+        [id, true, new ivm.ExternalCopy(v).copyInto()],
+        { timeout: 5000 }
+      )
+    );
+  });
+  const hits = await isolate
+    .compileScriptSync('bot.scan()')
     .runSync(context, { copy: true, promise: true });
-  if (doubled !== 42) throw new Error(`Callback async failed: got ${doubled}`);
+  if (!Array.isArray(hits) || hits[0].id !== 'a')
+    throw new Error(`async result copy failed: ${JSON.stringify(hits)}`);
 
-  // Reference + applySync with timeout (e.g. the bot.on event-handler bridge).
-  // The native side invokes the handler Reference; it must not return a Promise
-  // across the boundary (compiler.ts consumes the promise natively).
-  let handlerResult = null;
-  context.global.setSync('_bot_on', (event, handler) => {
-    handler.applySync(undefined, [JSON.stringify([event])], { timeout: 5000 });
-  });
-  context.global.setSync('_capture', (v) => {
-    handlerResult = v;
-  });
+  // 3) event dispatch via a captured reference + async apply (the bot.on bridge)
+  let captured = null;
   isolate
     .compileScriptSync(
-      `bot.on = (event, fn) => _bot_on(event, new _ivm.Reference((jsonArgs) => {
-                fn.apply(undefined, JSON.parse(jsonArgs))
-            }))
-            bot.on('START', (e) => { _capture(e) })`
+      `
+      const __handlers = {}
+      bot.on = (e, fn) => { __handlers[e] = fn; _register(e) }
+      globalThis.__dispatch = (e, jsonArgs, resolve, reject) => {
+        const fn = __handlers[e]; if (!fn) { resolve(); return }
+        return (fn.apply(undefined, JSON.parse(jsonArgs)) || Promise.resolve()).then(resolve, reject)
+      }
+      `
     )
     .runSync(context, {});
-  if (handlerResult !== 'START')
-    throw new Error(`Reference/applySync failed: got ${handlerResult}`);
+  const dispatchRef = context.evalSync('__dispatch', { reference: true });
+  context.global.setSync('_register', () => {});
+  context.global.setSync('_capture', (v) => {
+    captured = v;
+  });
+  isolate
+    .compileScriptSync(`bot.on('START', (x) => { _capture(x) })`)
+    .runSync(context, {});
+  await dispatchRef.apply(
+    undefined,
+    ['START', JSON.stringify(['hello']), () => {}, () => {}],
+    { timeout: 5000 }
+  );
+  if (captured !== 'hello')
+    throw new Error(`event dispatch failed: got ${captured}`);
+
+  // 4) async apply honors a timeout, interrupting a runaway loop off-thread
+  isolate
+    .compileScriptSync('globalThis.__loop = () => { while (true) {} }')
+    .runSync(context, {});
+  const loopRef = context.evalSync('__loop', { reference: true });
+  let timedOut = false;
+  try {
+    await loopRef.apply(undefined, [], { timeout: 200 });
+  } catch {
+    timedOut = true;
+  }
+  if (!timedOut) throw new Error('apply timeout did not fire');
 
   context.release();
   isolate.dispose();

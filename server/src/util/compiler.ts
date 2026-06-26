@@ -20,22 +20,24 @@ const MAX_LOGS_PER_TICK = 50;
 const MAX_LOG_LENGTH = 2000;
 
 // Invoke an isolate function (captured host-side as a Reference) under the
-// sandbox timeout, isolating the host thread from a runaway bot. A timeout (or
-// any throw) crashes the bot rather than the server; Simulation kills crashed
-// bots. Used to drive event handlers and timer callbacks back into the isolate.
+// sandbox timeout. `apply` (async) runs the bot's work on isolated-vm's thread
+// pool rather than the main event loop, so a runaway bot can't stall the
+// simulation or other arenas; host callbacks it makes still run on the main
+// thread. A timeout (or any throw) crashes the bot rather than the server;
+// Simulation kills crashed bots. Drives timer callbacks and promise settling.
 function runInIsolate(
   ref: ivm.Reference,
   args: unknown[],
   tank: Tank,
   code: ErrorCodes
 ) {
-  try {
-    return ref.applySync(undefined, args, { timeout: sandboxTimeoutMs() });
-  } catch (e) {
-    tank.logger.error(`${code}: ${e}`);
-    tank.appCrashed = true;
-    console.log(e);
-  }
+  return ref
+    .apply(undefined, args, { timeout: sandboxTimeoutMs() })
+    .catch((e: unknown) => {
+      tank.logger.error(`${code}: ${e}`);
+      tank.appCrashed = true;
+      console.log(e);
+    });
 }
 
 // --- helpers for exposing the bot API into the isolate ---
@@ -273,18 +275,20 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
 
   const dispatchEvent = (event: string, x: unknown) =>
     new Promise((resolve, reject) => {
-      try {
-        dispatchRef.applySync(
-          undefined,
-          [event, JSON.stringify([x]), resolve, reject],
-          { timeout: sandboxTimeoutMs() }
-        );
-      } catch (e) {
-        tank.logger.error(`${ErrorCodes.E013}: ${e}`);
-        tank.appCrashed = true;
-        console.log(e);
-        reject(e);
-      }
+      // apply (async) runs the handler off the main thread under the timeout;
+      // the handler settles this promise via the resolve/reject host callbacks.
+      // The apply promise itself only surfaces synchronous failures (e.g. a
+      // handler that loops past the timeout).
+      dispatchRef
+        .apply(undefined, [event, JSON.stringify([x]), resolve, reject], {
+          timeout: sandboxTimeoutMs(),
+        })
+        .catch((e: unknown) => {
+          tank.logger.error(`${ErrorCodes.E013}: ${e}`);
+          tank.appCrashed = true;
+          console.log(e);
+          reject(e);
+        });
     });
 
   tank.getContext().global.setSync(
@@ -353,18 +357,24 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
   tank.handlers = {};
   tank.timers.reset();
   return appService.get(process.getAppId()).then((app) => {
-    if (app) {
-      try {
-        process
-          .getSandbox()
-          .compileScriptSync(app.getSource())
-          .runSync(tank.getContext(), { timeout: sandboxTimeoutMs() });
-      } catch (e) {
-        tank.logger.error(`${ErrorCodes.E017}: ${e}`);
-        tank.appCrashed = true;
-        console.log(e);
-      }
+    if (!app) return;
+    const onError = (e: unknown) => {
+      tank.logger.error(`${ErrorCodes.E017}: ${e}`);
+      tank.appCrashed = true;
+      console.log(e);
+    };
+    let script: ivm.Script;
+    try {
+      // Compile is synchronous (and can throw on a syntax error); the top-level
+      // run goes async so the bot's startup code runs off the main thread.
+      script = process.getSandbox().compileScriptSync(app.getSource());
+    } catch (e) {
+      onError(e);
+      return;
     }
+    return script
+      .run(tank.getContext(), { timeout: sandboxTimeoutMs() })
+      .catch(onError);
   });
 };
 
