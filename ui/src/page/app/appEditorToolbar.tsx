@@ -5,7 +5,7 @@ import ButtonToolbar from 'react-bootstrap/ButtonToolbar'
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger'
 import Tooltip from 'react-bootstrap/Tooltip'
 
-import { FaCode, FaDownload, FaTrash, FaSave, FaHammer } from 'react-icons/fa'
+import { FaCode, FaDownload, FaTrash, FaSave } from 'react-icons/fa'
 
 interface EditorToolbarProps {
     code: string

@@ -240,7 +240,7 @@ export default class Logs extends React.Component<
                                             : 0
                                     )
                                     .map(
-                                        (record, index) =>
+                                        (record) =>
                                             record && (
                                                 <span key={record.id}>
                                                     <span

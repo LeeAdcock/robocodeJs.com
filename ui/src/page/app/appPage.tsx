@@ -12,8 +12,16 @@ import Alert from 'react-bootstrap/Alert'
 import { colors } from '../../util/colors'
 import { useNavigate } from 'react-router-dom'
 import { titleCase } from '../../util/titleCase'
+import Arena from '../../types/arena'
+import { Emitter } from '../../util/emitter'
 
-export default function AppPage(props) {
+interface AppPageProps {
+    arena: Arena
+    doDelete: () => void
+    emitter: Emitter
+}
+
+export default function AppPage(props: AppPageProps) {
     const [error, setError] = useState('')
     const [code, setCode] = useState('')
     const [app, setApp] = useState(null as any)
@@ -24,8 +32,8 @@ export default function AppPage(props) {
 
     const navigate = useNavigate()
 
-    const appRenamedListener = (event) => {
-        setApp((app) => {
+    const appRenamedListener = (event: any) => {
+        setApp((app: any) => {
             if (event.appId === appId && app) {
                 app.name = event.name
                 return { ...app, name: event.name }
@@ -34,7 +42,7 @@ export default function AppPage(props) {
         })
     }
 
-    const appErrorListener = (event) => {
+    const appErrorListener = (event: any) => {
         setError((prevError) => {
             if (event.appId === appId && app) {
                 setTimeout(() => setError(() => ''), 15000)

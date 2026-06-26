@@ -27,7 +27,7 @@
     "preview": "vite preview --port 3000",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts src --fix ; prettier --write src"
+    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src --fix ; prettier --write src"
   },
   "browserslist": {
     "production": [
@@ -52,6 +52,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^8.30.0",
     "eslint-plugin-react": "^7.31.11",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "prettier": "^2.8.1",
     "vite": "^6.4.3",
     "vitest": "^4.1.9"

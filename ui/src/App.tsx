@@ -103,8 +103,8 @@ function App() {
                 .get(user ? `/api/user/${user.id}/arena` : `/api/demo/arena`)
                 .then((res) => {
                     setTime(res.data.clock.time)
-                    res.data.apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
+                    res.data.apps.forEach((app: any) =>
+                        app.tanks.forEach((tank: any) => {
                             tank.path = Array<PointInTime>(20)
                             tank.path[0] = {
                                 x: tank.x,
@@ -125,7 +125,7 @@ function App() {
         google.accounts.id.initialize({
             client_id:
                 '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
-            callback: (response) => {
+            callback: (response: { credential: string }) => {
                 document.cookie = 'auth=' + response.credential + '; path=/'
                 axios.get(`/api/user`).then((res) =>
                     axios

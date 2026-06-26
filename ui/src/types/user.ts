@@ -1,7 +1,7 @@
 import TankApp from './tankApp'
 
 export default interface User {
-    id
+    id: string
     name: string
     picture: string
     email: string

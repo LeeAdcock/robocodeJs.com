@@ -13,7 +13,7 @@ import babel from 'prettier/parser-babel'
 
 interface CodeEditorProps {
     code: string
-    onChange: (source) => void
+    onChange: (source: string) => void
     doClean: () => void
     doExecute: () => void
 }
@@ -24,7 +24,7 @@ export default function CodeEditor(props: CodeEditorProps) {
         undefined
     )
 
-    const compile = (source) => {
+    const compile = (source: string) => {
         try {
             new Function('x', source)
             if (editor) {
@@ -76,11 +76,11 @@ export default function CodeEditor(props: CodeEditorProps) {
 
                 const bots = {
                     getCompletions: function (
-                        editor,
-                        session,
-                        pos,
-                        prefix,
-                        callback
+                        editor: any,
+                        session: any,
+                        pos: any,
+                        prefix: string,
+                        callback: any
                     ) {
                         return callback(
                             null,

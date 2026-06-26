@@ -11,7 +11,21 @@ const seed = Math.floor(Math.random() * 10)
   screen.
 */
 
-const roadBuilderVert = (terrain, x, y, oldX, oldY, direction, isSand) => {
+// terrain is a [layer][x][y] grid of SVG elements (or null); typed loosely since
+// this generative code indexes it freely.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Terrain = any
+type IsSand = (x: number, y: number) => boolean
+
+const roadBuilderVert = (
+    terrain: Terrain,
+    x: number,
+    y: number,
+    oldX: number,
+    oldY: number,
+    direction: number,
+    isSand: IsSand
+): void => {
     if (x < 0 || y < 0 || x >= terrain[0].length || y >= terrain[0][0].length)
         return
     const isStraight = Math.random() > 0.2
@@ -149,7 +163,14 @@ const roadBuilderVert = (terrain, x, y, oldX, oldY, direction, isSand) => {
     roadBuilderVert(terrain, newX, newY, x, y, direction, isSand)
 }
 
-const roadBuilderHoriz = (terrain, x, y, oldX, oldY, isSand) => {
+const roadBuilderHoriz = (
+    terrain: Terrain,
+    x: number,
+    y: number,
+    oldX: number,
+    oldY: number,
+    isSand: IsSand
+): void => {
     if (x < 0 || y < 0 || x >= terrain[0].length || y >= terrain[0][0].length)
         return
     const isStayStraight = Math.random() > 0.2
@@ -294,7 +315,7 @@ const roadBuilderHoriz = (terrain, x, y, oldX, oldY, isSand) => {
     roadBuilderHoriz(terrain, newX, newY, x, y, isSand)
 }
 
-const treePlanter = (x, y, isDead) => {
+const treePlanter = (x: number, y: number, isDead: boolean) => {
     const treeTypes = [
         'Oak',
         'Poplar',
@@ -332,7 +353,12 @@ const treePlanter = (x, y, isDead) => {
     )
 }
 
-const forestPlanter = (terrain, forestX, forestY, isSand) => {
+const forestPlanter = (
+    terrain: Terrain,
+    forestX: number,
+    forestY: number,
+    isSand: IsSand
+) => {
     for (let i = 0; i < 15; i++) {
         const treeX = forestX + Math.floor(Math.random() * 8) - 4
         const treeY = forestY + Math.floor(Math.random() * 8) - 4
@@ -374,7 +400,12 @@ const forestPlanter = (terrain, forestX, forestY, isSand) => {
     }
 }
 
-const sander = (terrain, isSandHorizontal, sandX, sandY) => {
+const sander = (
+    terrain: Terrain,
+    isSandHorizontal: boolean,
+    sandX: number,
+    sandY: number
+) => {
     if (isSandHorizontal) {
         for (let i = 0; i <= 2; i++) {
             sandY = Math.floor(Math.random() * 20)
@@ -424,7 +455,8 @@ const generateTerrain = () => {
     const sandX = Math.floor(Math.random() * 20)
     const sandY = Math.floor(Math.random() * 20)
     sander(terrain, isSandHorizontal, sandX, sandY)
-    const isSand = (x, y) => (isSandHorizontal ? x > sandX : y > sandY)
+    const isSand = (x: number, y: number) =>
+        isSandHorizontal ? x > sandX : y > sandY
 
     // Create roads
     try {
@@ -449,11 +481,11 @@ const generateTerrain = () => {
 
     // Flatten the data structure to a list of sprites
     terrain[0] = terrain[0]
-        .reduce((prev, cur) => [...prev, ...cur], [])
-        .filter((e) => e)
+        .reduce((prev: any[], cur: any[]) => [...prev, ...cur], [])
+        .filter((e: any) => e)
     terrain[1] = terrain[1]
-        .reduce((prev, cur) => [...prev, ...cur], [])
-        .filter((e) => e)
+        .reduce((prev: any[], cur: any[]) => [...prev, ...cur], [])
+        .filter((e: any) => e)
 
     // Add some shaded contours
     terrain[0].unshift(
