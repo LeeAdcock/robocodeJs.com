@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import PointInTime from './types/pointInTime'
 import Simulate from './util/simulate'
 import ArenaLogPage from './page/arena/arenaLogsPage'
-import EventEmitter from 'events'
+import { Emitter } from './util/emitter'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any
@@ -65,7 +65,7 @@ const Nav = (props: NavProps) => {
 }
 
 let eventSource: EventSource | undefined
-const emitter = new EventEmitter()
+const emitter = new Emitter()
 
 function App() {
     const [user, setUser] = useState(null as unknown as User)
@@ -282,7 +282,7 @@ function App() {
                     setPaused(isPaused => {
                         if (isPaused) doReloadArena()
                         else {
-                            setArena([])
+                            setArena({ ...messageArena, apps: [] })
                             messageArena.apps = []
                         }
                         return isPaused
