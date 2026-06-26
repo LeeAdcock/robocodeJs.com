@@ -18,7 +18,7 @@ const TerrainLayer = React.memo((props: TerrainLayerProps) => (
 ))
 
 const TerrainSvg = (props: TerrainProps) => {
-    const [terrain, setTerrain] = useState(generateTerrain())
+    const [terrain, setTerrain] = useState(() => generateTerrain())
 
     return (
         <>

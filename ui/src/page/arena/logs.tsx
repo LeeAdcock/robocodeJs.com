@@ -85,15 +85,11 @@ export default class Logs extends React.Component<
                                                     name
                                                 )
                                             ) {
-                                                this.state.hideNames.splice(
-                                                    this.state.hideNames.indexOf(
-                                                        name
-                                                    ),
-                                                    1
-                                                )
                                                 this.setState({
                                                     hideNames:
-                                                        this.state.hideNames,
+                                                        this.state.hideNames.filter(
+                                                            (n) => n !== name
+                                                        ),
                                                 })
                                             } else
                                                 this.setState({
@@ -157,15 +153,11 @@ export default class Logs extends React.Component<
                                                     level
                                                 )
                                             ) {
-                                                this.state.hideLevels.splice(
-                                                    this.state.hideLevels.indexOf(
-                                                        level
-                                                    ),
-                                                    1
-                                                )
                                                 this.setState({
                                                     hideLevels:
-                                                        this.state.hideLevels,
+                                                        this.state.hideLevels.filter(
+                                                            (l) => l !== level
+                                                        ),
                                                 })
                                             } else
                                                 this.setState({
@@ -213,7 +205,7 @@ export default class Logs extends React.Component<
                         <div
                             className="logs"
                             style={{
-                                maxHeight: 'calc(100%-70px)',
+                                maxHeight: 'calc(100% - 70px)',
                                 marginRight: '15px',
                                 overflowY: 'scroll',
                                 fontFamily:
@@ -238,10 +230,7 @@ export default class Logs extends React.Component<
                                             ) &&
                                             (this.state.search?.length === 0
                                                 ? true
-                                                : JSON.stringify(record).match(
-                                                      this.state.search
-                                                  ) ||
-                                                  JSON.stringify(
+                                                : JSON.stringify(
                                                       record
                                                   ).includes(this.state.search))
                                     )

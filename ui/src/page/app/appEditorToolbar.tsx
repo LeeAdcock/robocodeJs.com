@@ -22,7 +22,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                 <ButtonGroup style={{ marginRight: '5px' }}>
                     <OverlayTrigger
                         placement={'bottom'}
-                        overlay={<Tooltip id={`reformat`}>Save</Tooltip>}
+                        overlay={<Tooltip id={`save`}>Save (Ctrl-S)</Tooltip>}
                     >
                         <Button
                             variant="secondary"
@@ -55,7 +55,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                         placement={'bottom'}
                         overlay={
                             <Tooltip id={`delete-app`}>
-                                Detroy this application and its bots. Be
+                                Destroy this application and its bots. Be
                                 careful!
                             </Tooltip>
                         }

@@ -292,16 +292,16 @@ function App() {
                 } else if (data.type === 'arenaResumed') {
                     setPaused(false)
                 } else if (data.type === 'arenaRemoveApp') {
-                    const removedApp = apps.find((app) => app.id === data.id)
-                    if (removedApp) {
-                        apps = apps.slice(apps.indexOf(removedApp), 1)
+                    const index = apps.findIndex((app) => app.id === data.id)
+                    if (index >= 0) {
+                        apps.splice(index, 1)
                     }
                 } else if (data.type === 'arenaPlaceApp') {
-                    const removedApp = apps.find(
+                    const index = apps.findIndex(
                         (app) => app && app.id === data.id
                     )
-                    if (removedApp) {
-                        apps = apps.slice(apps.indexOf(removedApp), 1)
+                    if (index >= 0) {
+                        apps.splice(index, 1)
                     }
                     const newApp = {
                         id: data.id,
@@ -312,14 +312,11 @@ function App() {
                 } else if (data.type === 'arenaRemoveTank') {
                     apps.filter((app) => app.id === data.appId).forEach(
                         (app) => {
-                            const removedTank = app.tanks.find(
+                            const tankIndex = app.tanks.findIndex(
                                 (tank) => tank.id === data.id
                             )
-                            if (removedTank) {
-                                app.tanks = app.tanks.slice(
-                                    app.tanks.indexOf(removedTank),
-                                    1
-                                )
+                            if (tankIndex >= 0) {
+                                app.tanks.splice(tankIndex, 1)
                             }
                         }
                     )

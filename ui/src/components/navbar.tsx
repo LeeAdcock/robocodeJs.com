@@ -108,16 +108,11 @@ export default function NavBar(props: NavBarProps) {
                     <Nav>
                         <Navbar.Text>
                             <Link
-                                to={{
-                                    pathname: '/',
-                                }}
+                                to="/"
+                                className="nav-link"
+                                style={{ padding: '0px' }}
                             >
-                                <a
-                                    className="nav-link"
-                                    style={{ padding: '0px' }}
-                                >
-                                    Home
-                                </a>
+                                Home
                             </Link>
                         </Navbar.Text>
                         <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
@@ -125,16 +120,11 @@ export default function NavBar(props: NavBarProps) {
                         </Navbar.Text>
                         <Navbar.Text>
                             <Link
-                                to={{
-                                    pathname: '/dev',
-                                }}
+                                to="/dev"
+                                className="nav-link"
+                                style={{ padding: '0px' }}
                             >
-                                <a
-                                    className="nav-link"
-                                    style={{ padding: '0px' }}
-                                >
-                                    Docs
-                                </a>
+                                Docs
                             </Link>
                         </Navbar.Text>
                         <Navbar.Text style={{ margin: '0 10px 0 10px' }}>
@@ -147,8 +137,8 @@ export default function NavBar(props: NavBarProps) {
                                     title="Apps"
                                     id="basic-nav-dropdown"
                                 >
-                                    {props.apps
-                                        ?.sort((a, b) =>
+                                    {[...(props.apps || [])]
+                                        .sort((a, b) =>
                                             a.name.localeCompare(b.name)
                                         )
                                         .map((app) => (
@@ -239,7 +229,9 @@ export default function NavBar(props: NavBarProps) {
                                         event.preventDefault()
                                         axios
                                             .get(
-                                                `/api/ask?question=${event.currentTarget.value}`
+                                                `/api/ask?question=${encodeURIComponent(
+                                                    event.currentTarget.value
+                                                )}`
                                             )
                                             .then((res) => {
                                                 navigate(res.data.answer)
