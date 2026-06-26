@@ -29,10 +29,7 @@
     "emitDecoratorMetadata": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
-    // Incremental strict adoption: strict:true is on, but these two stay off
-    // pending a dedicated pass (untyped callbacks; catch(e).message usage).
-    "noImplicitAny": false,
-    "useUnknownInCatchVariables": false,
+    "useUnknownInCatchVariables": true,
     "esModuleInterop": true,
     "removeComments": true,
     "noUnusedLocals": true

@@ -219,7 +219,7 @@ export default {
 
           // Convenience method for manging rotating towards a target orientation
           // with a maximum rotational velocity.
-          const rotate = (current, target, velocity) => {
+          const rotate = (current: number, target: number, velocity: number) => {
             if (normalizeAngle(Math.abs(current - target)) < velocity)
               return target;
             const delta = normalizeAngle(current - target);

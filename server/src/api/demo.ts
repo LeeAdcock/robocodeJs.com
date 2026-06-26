@@ -11,7 +11,7 @@ app.get("/api/demo/events", async (req, res) => {
     "Cache-Control": "no-cache",
   });
 
-  function listener(event) {
+  function listener(event: unknown) {
     res.write("data: " + JSON.stringify(event) + "\n\n");
   }
 

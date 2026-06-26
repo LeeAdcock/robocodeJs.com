@@ -35,9 +35,12 @@ function exposeAsync1(
   name: string,
   fn: (arg: number) => Promise<unknown>
 ) {
-  tank.getContext().global.setSync(name, (arg: number, resolve, reject) => {
-    fn(arg).then(resolve, reject).catch(reject);
-  });
+  tank.getContext().global.setSync(
+    name,
+    (arg: number, resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
+      fn(arg).then(resolve, reject).catch(reject);
+    }
+  );
   isolate
     .compileScriptSync(
       `${botPath} = arg => new Promise((resolve, reject) => ${name}(arg, new _ivm.Callback(resolve), new _ivm.Callback(reject)))`
@@ -53,9 +56,12 @@ function exposeAsyncResult(
   name: string,
   fn: () => Promise<unknown>
 ) {
-  tank.getContext().global.setSync(name, (resolve, reject) => {
-    fn().then(resolve, reject).catch(reject);
-  });
+  tank.getContext().global.setSync(
+    name,
+    (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
+      fn().then(resolve, reject).catch(reject);
+    }
+  );
   isolate
     .compileScriptSync(
       `${botPath} = () => new Promise((resolve, reject) => ${name}(new _ivm.Callback((result) => resolve(result)), new _ivm.Callback(() => reject())))`
@@ -69,9 +75,9 @@ function exposeVoid(
   isolate: ivm.Isolate,
   botPath: string,
   name: string,
-  fn: (arg) => void
+  fn: (arg: any) => void
 ) {
-  tank.getContext().global.setSync(name, (arg) => {
+  tank.getContext().global.setSync(name, (arg: any) => {
     fn(arg);
   });
   isolate
@@ -124,9 +130,12 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
 
   // Expose fire
   // todo resulting value
-  tank.getContext().global.setSync("_bot_turret_fire", (resolve, reject) => {
-    turret.fire().then(resolve, reject).catch(reject);
-  });
+  tank.getContext().global.setSync(
+    "_bot_turret_fire",
+    (resolve: (v?: unknown) => void, reject: (v?: unknown) => void) => {
+      turret.fire().then(resolve, reject).catch(reject);
+    }
+  );
   isolate
     .compileScriptSync(
       `
@@ -146,7 +155,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   tank
     .getContext()
     .global.setSync("_bot_on", (event: Event, handler: ivm.Reference) => {
-      tank.on(event, (...args) => {
+      tank.on(event, (...args: unknown[]) => {
         try {
           return new Promise((resolve, reject) => {
             handler.applySync(
@@ -347,7 +356,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       {
         level: "TRACE",
         stream: {
-          write: (entry) => {
+          write: (entry: any) => {
             env.emit("log", {
               ...entry,
               time: env.getTime(),

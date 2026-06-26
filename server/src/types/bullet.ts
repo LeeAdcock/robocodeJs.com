@@ -6,10 +6,10 @@ export type BulletId = string & {};
 export default interface Bullet extends Point {
   id: BulletId;
   origin: Point;
-  x;
-  y;
-  speed;
-  orientation;
+  x: number;
+  y: number;
+  speed: number;
+  orientation: number;
 
   exploded: boolean;
 

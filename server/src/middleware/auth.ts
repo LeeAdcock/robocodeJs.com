@@ -1,11 +1,13 @@
 import { OAuth2Client } from "google-auth-library";
+import { Request, Response, NextFunction } from "express";
 import userService from "../services/UserService";
 import authService from "../services/IdentityService";
 import User from "../types/user";
 
 export type AuthenticatedRequest = Request & { user: User };
 
-export default (required: boolean) => async (req, res, next) => {
+export default (required: boolean) =>
+  async (req: Request, res: Response, next: NextFunction) => {
   const googleClientId =
     "344303216827-jtutvdqjp24q0or2fpqf5mihja138sem.apps.googleusercontent.com";
   const client = new OAuth2Client(googleClientId);

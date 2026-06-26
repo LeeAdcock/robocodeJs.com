@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import Classifier from "ml-classify-text";
 import auth, { AuthenticatedRequest } from "../middleware/auth";
 import cookieParser from "cookie-parser";
@@ -111,7 +111,7 @@ const app = express();
 app.get("/api/ask", [
   cookieParser(),
   auth(false),
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     if (req.query.question) {
       const predictions = classifier.predict(req.query.question);
       if (predictions.length) {

@@ -145,7 +145,7 @@ export default class Environment {
   }
 
   // Run the game
-  private simulate = (cancelable) => {
+  private simulate = (cancelable: { interval: ReturnType<typeof setInterval> }) => {
     const suddenDeathTime = 10000;
 
     // Forward the simulation one clock tick

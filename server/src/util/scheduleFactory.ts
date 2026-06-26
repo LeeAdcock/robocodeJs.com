@@ -99,7 +99,7 @@ export const scheduleFactory = (tank: Tank) => {
       return timerId;
     },
 
-    clearTimeout: (timerId) => {
+    clearTimeout: (timerId: number) => {
       tank.logger.trace("Canceled timer", timerId);
       delete tank.timers.timerMap[timerId];
     },

@@ -116,7 +116,7 @@ export default class Tank implements Point, Orientated {
   };
 
   // Enables the registration of event handlers
-  on(event: Event, handler) {
+  on(event: Event, handler: (...args: any[]) => any) {
     if (!Object.keys(Event).includes(event))
       throw new Error("Invalid event type.");
 
@@ -127,7 +127,7 @@ export default class Tank implements Point, Orientated {
       Promise<any>
     >();
 
-    this.handlers[event] = (x) =>
+    this.handlers[event] = (x: any) =>
       eventPromiseMap.get(event)
         ? undefined
         : setTimeout(() => {
@@ -146,7 +146,7 @@ export default class Tank implements Point, Orientated {
                 eventPromiseMap.set(event, result);
                 result
                   .then(() => eventPromiseMap.delete(event))
-                  .catch((e) => {
+                  .catch((e: any) => {
                     this.logger.error(`${ErrorCodes.E019}: ${e}`);
                     console.log(e);
                     this.appCrashed = true;
@@ -172,7 +172,7 @@ export default class Tank implements Point, Orientated {
           }, 0);
   }
 
-  setName(name) {
+  setName(name: string) {
     // todo sanitize name
     appService.get(this.process.getAppId()).then((app) => {
       if (app && app.getName() !== name) {
@@ -205,7 +205,7 @@ export default class Tank implements Point, Orientated {
       this.env.emit("event", {
         type: "appError",
         appId: this.process.appId,
-        error: e.message,
+        error: e instanceof Error ? e.message : String(e),
       });
 
       return Promise.resolve();
@@ -250,7 +250,7 @@ export default class Tank implements Point, Orientated {
     return this.orientation !== this.orientationTarget;
   }
 
-  turn(d) {
+  turn(d: number) {
     const target = normalizeAngle(this.orientation + d);
     if (target === this.orientationTarget) {
       return Promise.resolve();

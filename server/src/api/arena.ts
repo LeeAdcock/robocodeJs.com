@@ -194,7 +194,7 @@ app.get("/api/user/:userId/arena/events", loadUser, async (req, res) => {
     "Cache-Control": "no-cache",
   });
 
-  function listener(event) {
+  function listener(event: unknown) {
     res.write("data: " + JSON.stringify(event) + "\n\n");
   }
 
@@ -218,7 +218,7 @@ app.get("/api/user/:userId/arena/logs", loadUser, async (req, res) => {
     "Cache-Control": "no-cache",
   });
 
-  function listener(event) {
+  function listener(event: unknown) {
     res.write("data: " + JSON.stringify(event) + "\n\n");
   }
 
