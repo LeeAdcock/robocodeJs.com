@@ -1,6 +1,6 @@
-# Examples Bots
+# Example Bots
 
-Here are some simple bot applications that demonstrate concepts you may wish to integrate what you build.
+Here are some simple bot applications that demonstrate concepts you may wish to integrate into what you build.
 
 - [Lighthouse](https://robocodejs.com/samples/lighthouse.js) A stationary bot that turns as it scans for others, then adjusting its turret for maximum accuracy before firing.
 
