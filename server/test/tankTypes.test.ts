@@ -7,7 +7,8 @@ vi.mock('../src/util/db', () => ({
     default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
 }))
 
-import Tank, { normalizeAngle, waitUntil } from '../src/types/tank'
+import Tank, { waitUntil } from '../src/types/tank'
+import { normalizeAngle } from '../src/util/geometry'
 import { Event } from '../src/types/event'
 
 // Build a real Tank backed by a mock environment. isRunning() returns false so
@@ -48,14 +49,13 @@ function makeRealTank() {
     return { tank, env: env as any, proc, emit }
 }
 
-describe('normalizeAngle (tank.ts)', () => {
-    it('wraps into [0, 360) and floors', () => {
+describe('normalizeAngle (util/geometry)', () => {
+    it('wraps into [0, 360) without rounding', () => {
         expect(normalizeAngle(0)).toBe(0)
         expect(normalizeAngle(360)).toBe(0)
         expect(normalizeAngle(370)).toBe(10)
         expect(normalizeAngle(-10)).toBe(350)
-        // NOTE: this copy floors (Math.floor), unlike simulation.ts / simulate.ts
-        expect(normalizeAngle(90.9)).toBe(90)
+        expect(normalizeAngle(90.9)).toBeCloseTo(90.9)
     })
 })
 
@@ -118,6 +118,12 @@ describe('Tank', () => {
         const { tank, emit } = makeRealTank()
         await expect(tank.setSpeed(0)).resolves.toBeUndefined()
         expect(emit).not.toHaveBeenCalled()
+    })
+
+    it('getOrientation() returns integer degrees (floored)', () => {
+        const { tank } = makeRealTank()
+        tank.orientation = 90.9
+        expect(tank.getOrientation()).toBe(90)
     })
 
     it('isTurning() reflects whether orientation has reached its target', () => {

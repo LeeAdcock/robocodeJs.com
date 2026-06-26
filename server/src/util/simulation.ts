@@ -1,18 +1,12 @@
 import { Event } from "../types/event";
 import { timerTick } from "./scheduleFactory";
 import Environment from "../types/environment";
+import { normalizeAngle } from "./geometry";
 
 /*
   These functions calculate the changes and interaction between active
   elements in the arena, specifically tanks and their bullets.
 */
-
-// Convenience function that ensures an angle is between 0 and 360
-const normalizeAngle = (x: number): number => {
-  x = x % 360;
-  while (x < 0) x += 360;
-  return x;
-};
 
 export default {
   // Handles all object movement

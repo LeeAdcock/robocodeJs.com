@@ -12,13 +12,7 @@ import compiler from "../util/compiler";
 import Environment, { Process } from "./environment";
 import appService from "../services/AppService";
 import { ErrorCodes } from "./ErrorCodes";
-
-// Convenience function that ensures an angle is between 0 and 360
-export const normalizeAngle = (x: number): number => {
-  x = x % 360;
-  while (x < 0) x += 360;
-  return Math.floor(x);
-};
+import { normalizeAngle } from "../util/geometry";
 
 // Convenience method to create a promise that resolves/rejects
 // when specific conditions are met.
@@ -248,7 +242,8 @@ export default class Tank implements Point, Orientated {
   }
 
   getOrientation() {
-    return normalizeAngle(this.orientation);
+    // Bots see integer degrees.
+    return Math.floor(normalizeAngle(this.orientation));
   }
 
   isTurning() {

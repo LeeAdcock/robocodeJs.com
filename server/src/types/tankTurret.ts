@@ -2,7 +2,8 @@ import Bullet from "./bullet";
 import { v4 as uuidv4 } from "uuid";
 import { Event } from "./event";
 import { Orientated } from "./orientated";
-import Tank, { normalizeAngle, waitUntil } from "./tank";
+import Tank, { waitUntil } from "./tank";
+import { normalizeAngle } from "../util/geometry";
 import { TankRadar } from "./tankRadar";
 
 export class TankTurret implements Orientated {
@@ -47,7 +48,7 @@ export class TankTurret implements Orientated {
   }
 
   getOrientation() {
-    return normalizeAngle(this.orientation);
+    return Math.floor(normalizeAngle(this.orientation));
   }
 
   isTurning() {

@@ -1,6 +1,7 @@
 import { Event } from "./event";
 import { Orientated } from "./orientated";
-import Tank, { normalizeAngle, waitUntil } from "./tank";
+import Tank, { waitUntil } from "./tank";
+import { normalizeAngle } from "../util/geometry";
 
 export class TankRadar implements Orientated {
   public orientation: number;
@@ -41,7 +42,7 @@ export class TankRadar implements Orientated {
   }
 
   getOrientation() {
-    return normalizeAngle(this.orientation);
+    return Math.floor(normalizeAngle(this.orientation));
   }
 
   isTurning() {
