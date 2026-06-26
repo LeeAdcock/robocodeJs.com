@@ -1,7 +1,7 @@
 import express from "express";
-import userService from "../services/UserService";
 import appService from "../services/AppService";
 import { AuthenticatedRequest } from "../middleware/auth";
+import { loadUser, scopedUser } from "../middleware/resource";
 
 const app = express();
 
@@ -23,13 +23,8 @@ app.get("/api/user", async (req, res) => {
 });
 
 // Get a user
-app.get("/api/user/:userId", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
+app.get("/api/user/:userId", loadUser, async (req, res) => {
+  const user = scopedUser(req);
 
   const apps = await appService.getForUser(user.getId());
 

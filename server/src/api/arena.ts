@@ -1,23 +1,22 @@
 import express from "express";
-import userService from "../services/UserService";
 import appService from "../services/AppService";
 import arenaService from "../services/ArenaService";
 import environmentService from "../services/EnvironmentService";
 import arenaMemberService from "../services/ArenaMemberService";
-import TankApp from "../types/app";
 import Arena from "../types/arena";
-import { AuthenticatedRequest } from "../middleware/auth";
+import {
+  loadUser,
+  requireOwner,
+  loadApp,
+  scopedUser,
+  scopedApp,
+} from "../middleware/resource";
 
 const app = express();
 
 // Get an arena status
-app.get("/api/user/:userId/arena/", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
+app.get("/api/user/:userId/arena/", loadUser, async (req, res) => {
+  const user = scopedUser(req);
 
   // TODO assumes at least one arena, order is consistant, first is default
   const arena = await arenaService.getDefaultForUser(user.getId());
@@ -74,161 +73,121 @@ app.get("/api/user/:userId/arena/", async (req, res) => {
 });
 
 // Remove an app from an arena
-app.delete("/api/user/:userId/arena/app/:appId", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
-  if (user.getId() !== (req as unknown as AuthenticatedRequest).user.getId()) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
-  }
+app.delete(
+  "/api/user/:userId/arena/app/:appId",
+  loadUser,
+  requireOwner,
+  async (req, res) => {
+    const user = scopedUser(req);
 
-  // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
-  const members = await arenaMemberService.getForArena(arena.getId());
+    // TODO assumes at least one arena, order is consistant, first is default
+    const arena: Arena = await arenaService.getDefaultForUser(user.getId());
+    const members = await arenaMemberService.getForArena(arena.getId());
 
-  const member = members.find(
-    (member) => member.getAppId() === req.params.appId
-  );
-  if (!member) {
-    res.status(404);
-    res.send("Invalid app id");
-    return;
+    const member = members.find(
+      (member) => member.getAppId() === req.params.appId
+    );
+    if (!member) {
+      res.status(404);
+      res.send("Invalid app id");
+      return;
+    }
+    (await environmentService.getByArenaId(arena.getId()))?.removeApp(
+      req.params.appId
+    );
+    return member.delete().then(() => {
+      res.status(200);
+      res.send();
+    });
   }
-  (await environmentService.getByArenaId(arena.getId()))?.removeApp(
-    req.params.appId
-  );
-  return member.delete().then(() => {
-    res.status(200);
-    res.send();
-  });
-});
+);
 
 // Add an app to an arena
-app.put("/api/user/:userId/arena/app/:appId", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
-  if (user.getId() !== (req as unknown as AuthenticatedRequest).user.getId()) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
-  }
+app.put(
+  "/api/user/:userId/arena/app/:appId",
+  loadUser,
+  requireOwner,
+  loadApp,
+  async (req, res) => {
+    const user = scopedUser(req);
+    const app = scopedApp(req);
 
-  const app: TankApp | undefined = await appService.get(req.params.appId);
+    // TODO assumes at least one arena, order is consistant, first is default
+    const arena: Arena = await arenaService.getDefaultForUser(user.getId());
 
-  if (!app) {
-    res.status(404);
-    res.send("Invalid app id");
-    return;
-  }
+    const members = await arenaMemberService.getForArena(arena.getId());
+    if (members.length > 4) {
+      res.status(400);
+      res.send("Arena limit reached");
+      return;
+    }
 
-  // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
-
-  const members = await arenaMemberService.getForArena(arena.getId());
-  if (members.length > 4) {
-    res.status(400);
-    res.send("Arena limit reached");
-    return;
-  }
-
-  const env = await environmentService.get(arena);
-  env.addApp(app);
-  return arenaMemberService.create(arena.getId(), app.getId()).then(() => {
-    res.status(201);
-    res.send();
-  });
-});
-
-app.post("/api/user/:userId/arena/restart", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
-  if (user.getId() !== (req as unknown as AuthenticatedRequest).user.getId()) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
-  }
-
-  // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
-  return environmentService
-    .get(arena)
-    .then((env) => env.restart())
-    .then(() => {
-      res.status(200);
+    const env = await environmentService.get(arena);
+    env.addApp(app);
+    return arenaMemberService.create(arena.getId(), app.getId()).then(() => {
+      res.status(201);
       res.send();
     });
-});
-
-app.post("/api/user/:userId/arena/pause", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
   }
-  if (user.getId() !== (req as unknown as AuthenticatedRequest).user.getId()) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
+);
+
+app.post(
+  "/api/user/:userId/arena/restart",
+  loadUser,
+  requireOwner,
+  async (req, res) => {
+    const user = scopedUser(req);
+    // TODO assumes at least one arena, order is consistant, first is default
+    const arena: Arena = await arenaService.getDefaultForUser(user.getId());
+    return environmentService
+      .get(arena)
+      .then((env) => env.restart())
+      .then(() => {
+        res.status(200);
+        res.send();
+      });
   }
+);
 
-  // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
-
-  return environmentService
-    .get(arena)
-    .then((env) => env.pause())
-    .then(() => {
-      res.status(200);
-      res.send();
-    });
-});
-
-app.post("/api/user/:userId/arena/resume", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
+app.post(
+  "/api/user/:userId/arena/pause",
+  loadUser,
+  requireOwner,
+  async (req, res) => {
+    const user = scopedUser(req);
+    // TODO assumes at least one arena, order is consistant, first is default
+    const arena: Arena = await arenaService.getDefaultForUser(user.getId());
+    return environmentService
+      .get(arena)
+      .then((env) => env.pause())
+      .then(() => {
+        res.status(200);
+        res.send();
+      });
   }
-  if (user.getId() !== (req as unknown as AuthenticatedRequest).user.getId()) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
-  }
+);
 
-  // TODO assumes at least one arena, order is consistant, first is default
-  const arena: Arena = await arenaService.getDefaultForUser(user.getId());
-  return environmentService
-    .get(arena)
-    .then((env) => env.resume())
-    .then(() => {
-      res.status(200);
-      res.send();
-    });
-});
+app.post(
+  "/api/user/:userId/arena/resume",
+  loadUser,
+  requireOwner,
+  async (req, res) => {
+    const user = scopedUser(req);
+    // TODO assumes at least one arena, order is consistant, first is default
+    const arena: Arena = await arenaService.getDefaultForUser(user.getId());
+    return environmentService
+      .get(arena)
+      .then((env) => env.resume())
+      .then(() => {
+        res.status(200);
+        res.send();
+      });
+  }
+);
 
 // Listen to an arena
-app.get("/api/user/:userId/arena/events", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
+app.get("/api/user/:userId/arena/events", loadUser, async (req, res) => {
+  const user = scopedUser(req);
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -251,13 +210,8 @@ app.get("/api/user/:userId/arena/events", async (req, res) => {
 });
 
 // Listen to an arena
-app.get("/api/user/:userId/arena/logs", async (req, res) => {
-  const user = await userService.get(req.params.userId);
-  if (!user) {
-    res.status(404);
-    res.send("Invalid user id");
-    return;
-  }
+app.get("/api/user/:userId/arena/logs", loadUser, async (req, res) => {
+  const user = scopedUser(req);
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
