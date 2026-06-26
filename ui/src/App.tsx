@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import PointInTime from './types/pointInTime'
-import Simulate from './util/simulate'
+import applyArenaEvent from './util/arenaReducer'
 import ArenaLogPage from './page/arena/arenaLogsPage'
 import { Emitter } from './util/emitter'
 
@@ -178,255 +178,32 @@ function App() {
         )
 
         eventSource.onmessage = (message) => {
-            // workaround to access arena inside of callback
-            setArena((messageArena) => {
-                const data = JSON.parse(message.data)
-                let apps = messageArena.apps
-                console.log('message', data)
-                emitter.emit(data.type, data)
-                if (
-                    data.type === 'tick' &&
-                    messageArena.clock.time !== data.time
-                ) {
-                    Simulate(
-                        messageArena.clock.time,
-                        messageArena.apps,
-                        750, //todo get this from the server
-                        750
-                    )
-                    messageArena.clock.time = data.time
-                    setTime(data.time)
-                } else if (data.type === 'tankTurn') {
-                    apps.forEach((app) =>
-                        app.tanks
-                            .filter((tank) => tank.id === data.id)
-                            .forEach((tank) => {
-                                if (tank.id === data.id) {
-                                    //const delta = normalizeAngle(normalizeAngle(tank.bodyOrientation) - data.bodyOrientation)
-                                    //tank.bodyOrientation = data.bodyOrientation + (delta <= 180 ? -1 : 1) * (360-delta)
-                                    tank.bodyOrientationTarget =
-                                        data.bodyOrientationTarget
-                                    tank.bodyOrientationVelocity =
-                                        data.bodyOrientationVelocity
-                                    tank.x = data.x
-                                    tank.y = data.y
-                                }
-                            })
-                    )
-                } else if (data.type === 'tankAccelerate') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (tank.id === data.id) {
-                                tank.speed = data.speed
-                                tank.speedTarget = data.speedTarget
-                                tank.speedAcceleration = data.speedAcceleration
-                                tank.speedMax = data.speedMax
-                                tank.x = data.x
-                                tank.y = data.y
-                            }
-                        })
-                    )
-                } else if (data.type === 'tankStop') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (tank.id === data.id) {
-                                tank.speed = 0
-                                tank.speedTarget = 0
-                                tank.x = data.x
-                                tank.y = data.y
-                            }
-                        })
-                    )
-                } else if (data.type === 'radarScan') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (tank.id === data.id) {
-                                tank.radarOn = true
-                                setTimeout(() => (tank.radarOn = false), 200)
-                            }
-                        })
-                    )
-                } else if (data.type === 'radarTurn') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (tank.id === data.id) {
-                                //tank.radarOrientation = data.radarOrientation
-                                tank.radarOrientationTarget =
-                                    data.radarOrientationTarget
-                                tank.radarOrientationVelocity =
-                                    data.radarOrientationVelocity
-                            }
-                        })
-                    )
-                } else if (data.type === 'tankDamaged') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (tank.id === data.id) {
-                                tank.health = data.health
-                                if (tank.health <= 0) {
-                                    tank.speed = 0
-                                    tank.speedTarget = 0
-                                }
-                            }
-                        })
-                    )
-                } else if (data.type === 'appRenamed') {
-                    const app = apps.find((app) => app.id === data.appId)
-                    if (app && app.name !== data.name) {
-                        app.name = data.name
-                        axios
-                            .get(`/api/user/${user.id}`)
-                            .then((res) => setUser(res.data))
-                    }
-                } else if (data.type === 'arenaRestart') {
-                    setPaused(isPaused => {
-                        if (isPaused) doReloadArena()
-                        else {
-                            setArena({ ...messageArena, apps: [] })
-                            messageArena.apps = []
-                        }
-                        return isPaused
-                    })
-                } else if (data.type === 'arenaPaused') {
-                    setPaused(true)
-                } else if (data.type === 'arenaResumed') {
-                    setPaused(false)
-                } else if (data.type === 'arenaRemoveApp') {
-                    const index = apps.findIndex((app) => app.id === data.id)
-                    if (index >= 0) {
-                        apps.splice(index, 1)
-                    }
-                } else if (data.type === 'arenaPlaceApp') {
-                    const index = apps.findIndex(
-                        (app) => app && app.id === data.id
-                    )
-                    if (index >= 0) {
-                        apps.splice(index, 1)
-                    }
-                    const newApp = {
-                        id: data.id,
-                        name: data.name,
-                        tanks: [],
-                    }
-                    apps.push(newApp)
-                } else if (data.type === 'arenaRemoveTank') {
-                    apps.filter((app) => app.id === data.appId).forEach(
-                        (app) => {
-                            const tankIndex = app.tanks.findIndex(
-                                (tank) => tank.id === data.id
-                            )
-                            if (tankIndex >= 0) {
-                                app.tanks.splice(tankIndex, 1)
-                            }
-                        }
-                    )
-                } else if (data.type === 'arenaPlaceTank') {
-                    apps.filter((app) => app.id === data.appId).forEach(
-                        (app) => {
-                            if (!app.tanks.find((t) => t.id === data.id)) {
-                                const tank = {
-                                    id: data.id,
-                                    speed: data.speed,
-                                    speedTarget: 0,
-                                    speedAcceleration: 0,
-                                    speedMax: data.speedMax,
-                                    bodyOrientation: data.bodyOrientation,
-                                    bodyOrientationTarget: data.bodyOrientation,
-                                    bodyOrientationVelocity:
-                                        data.bodyOrientationVelocity,
-                                    turretOrientation: data.turretOrientation,
-                                    turretOrientationTarget:
-                                        data.turretOrientation,
-                                    turretOrientationVelocity:
-                                        data.turretOrientationVelocity,
-                                    radarOrientation: data.radarOrientation,
-                                    radarOrientationTarget:
-                                        data.radarOrientation,
-                                    radarOrientationVelocity:
-                                        data.radarOrientationVelocity,
-                                    radarOn: false,
-                                    bullets: [],
-                                    health: 100,
-                                    path: Array<PointInTime>(20),
-                                    pathIndex: 0,
-                                    x: data.x,
-                                    y: data.y,
-                                }
-                                tank.path[0] = {
-                                    x: data.x,
-                                    y: data.y,
-                                    time,
-                                }
-                                tank.pathIndex = 1
-                                app.tanks.push(tank)
-                            }
-                        }
-                    )
-                } else if (data.type === 'turretTurn') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (tank.id === data.id) {
-                                //tank.turretOrientation =
-                                //    data.turretOrientation
-                                tank.turretOrientationTarget =
-                                    data.turretOrientationTarget
-                                tank.turretOrientationVelocity =
-                                    data.turretOrientationVelocity
-                            }
-                        })
-                    )
-                } else if (data.type === 'bulletFired') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) => {
-                            if (
-                                !tank.bullets.find(
-                                    (bullet) => bullet.id === data.id
-                                )
-                            ) {
-                                if (tank.id === data.tankId) {
-                                    tank.bullets.push({
-                                        id: data.id,
-                                        x: data.x,
-                                        y: data.y,
-                                        orientation: data.orientation,
-                                        origin: {
-                                            x: data.x,
-                                            y: data.y,
-                                        },
-                                        explodedAt: undefined,
-                                        speed: data.speed,
-                                    })
-                                }
-                            }
-                        })
-                    )
-                } else if (data.type === 'bulletRemoved') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) =>
-                            tank.bullets.forEach(
-                                (bullet, bulletIndex, bullets) => {
-                                    if (bullet.id === data.id) {
-                                        bullets.splice(bulletIndex, 1)
-                                    }
-                                }
-                            )
-                        )
-                    )
-                } else if (data.type === 'bulletExploded') {
-                    apps.forEach((app) =>
-                        app.tanks.forEach((tank) =>
-                            tank.bullets.forEach((bullet) => {
-                                //if(tank.id === data.tankId) {
-                                if (bullet.id === data.id) {
-                                    bullet.explodedAt = data.time
-                                }
-                                //}
-                            })
-                        )
-                    )
+            const data = JSON.parse(message.data)
+            emitter.emit(data.type, data)
+
+            // React-state side effects (not part of the arena object)
+            if (data.type === 'tick') {
+                setTime(data.time)
+            } else if (data.type === 'arenaPaused') {
+                setPaused(true)
+            } else if (data.type === 'arenaResumed') {
+                setPaused(false)
+            } else if (data.type === 'appRenamed') {
+                if (user) {
+                    axios
+                        .get(`/api/user/${user.id}`)
+                        .then((res) => setUser(res.data))
                 }
-                return messageArena
-            })
+            } else if (data.type === 'arenaRestart') {
+                setPaused((isPaused) => {
+                    if (isPaused) doReloadArena()
+                    else setArena((arena) => ({ ...arena, apps: [] }))
+                    return isPaused
+                })
+                return
+            }
+
+            setArena((arena) => applyArenaEvent(arena, data, time))
         }
 
         return () => {
