@@ -72,4 +72,4 @@ src/
 
 - `src/types/*` mirror the server's wire DTOs; keep them in sync when the API payloads change.
 - `showdown` carries an unfixed moderate ReDoS advisory; it's accepted because it only ever renders our own static `/docs/*.md`, never user input (see the note in `markdownPage.tsx`).
-- The production JS bundle is large and not yet code-split — a known future optimization.
+- The heavy editor dependencies (`ace-builds` + `prettier`) are **code-split**: `App.tsx` lazy-loads the editor and log pages behind `React.lazy`/`Suspense`, so they ship in a separate `appPage` chunk fetched only when you open a bot — not in the initial bundle (~440 kB / ~147 kB gzip). That editor chunk is itself large (~1.3 MB / ~380 kB gzip); trimming it further (a lighter editor or slimmer formatter) is a possible future optimization.
