@@ -102,7 +102,14 @@ The UI consumes these and interpolates motion between server ticks with its own 
 
 ## Tests
 
-[Vitest](https://vitest.dev) suites live in `test/` (kept out of `src` so they're excluded from the `tsc` build). They focus on the pure-ish core: the simulation physics (`test/simulation.test.ts` — movement, acceleration, rotation, tank/boundary collisions, bullet hits and lifetimes) and the tick-driven timers (`test/scheduleFactory.test.ts`). `Simulation.run` only invokes `tank.handlers[...]` and mutates plain fields, so the tests drive it with lightweight mock tanks — no real isolates required. Run with `npm test`.
+[Vitest](https://vitest.dev) suites live in `test/` (kept out of `src` so they're excluded from the `tsc` build). Run with `npm test`. Coverage so far:
+
+- `test/simulation.test.ts` — the simulation physics (movement, acceleration, rotation, tank/boundary collisions, bullet hits and lifetimes). `Simulation.run` only invokes `tank.handlers[...]` and mutates plain fields, so the tests drive it with lightweight mock tanks — no real isolates required.
+- `test/scheduleFactory.test.ts` — the tick-driven timers.
+- `test/tankTypes.test.ts` — the `Tank`/`TankTurret`/`TankRadar` classes (turn/accelerate targeting, `send` messaging, turret `fire`, radar `scan` detection geometry). These classes transitively import `util/db`, so the suite `vi.mock`s the db pool to avoid touching Postgres and builds a **real** `Tank` against a mock environment whose `isRunning()` returns false (so `waitUntil`-based methods settle immediately instead of leaving polling timers running).
+- `test/nameFactory.test.ts` — display-name generation.
+
+When testing other isolate-/DB-coupled code, follow the same pattern: `vi.mock('../src/util/db', ...)` at the top of the file, then construct real domain objects with mock collaborators.
 
 ## Build & deploy
 
