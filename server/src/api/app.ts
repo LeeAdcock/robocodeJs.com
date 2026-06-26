@@ -45,7 +45,7 @@ app.post("/api/user/:userId/app/", async (req, res) => {
 
 // Get an app
 app.get("/api/user/:userId/app/:appId", async (req, res) => {
-  const user = userService.get(req.params.userId);
+  const user = await userService.get(req.params.userId);
   if (!user) {
     res.status(404);
     res.send("Invalid user id");
@@ -93,7 +93,7 @@ app.put("/api/user/:userId/app/:appId/source", async (req, res) => {
     .then(() => {
       arenaMemberService.getForApp(app.getId()).then((members) => {
         members.forEach((member) => {
-          environmentService.getByArenaId(member.getAppId()).then((env) => {
+          environmentService.getByArenaId(member.getArenaId()).then((env) => {
             if (env) {
               env.processes
                 .filter((process) => process.getAppId() == member.getAppId())

@@ -197,7 +197,7 @@ export default class Tank implements Point, Orientated {
   }
 
   getHealth() {
-    this.health / 100;
+    return this.health / 100;
   }
 
   execute(process: Process): Promise<unknown> {

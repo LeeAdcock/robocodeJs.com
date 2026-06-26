@@ -107,16 +107,12 @@ describe('ArenaMemberService', () => {
         expect(member.getArenaId()).toBe('ar1')
     })
 
-    it('create() inserts the correct row but returns swapped ids (refactor backlog)', async () => {
+    it('create() inserts the row and returns a member with the correct ids', async () => {
         const member = await arenaMemberService.create('arena1', 'app1')
-        // The INSERT uses the correct column order...
         expect(query).toHaveBeenCalledWith(
             expect.objectContaining({ values: ['arena1', 'app1'] })
         )
-        // ...but the returned object's ids are swapped: create() calls
-        // `new ArenaMember(arenaId, appId, ...)` while the constructor is
-        // (appId, arenaId, ...). BUG — captured here for the refactor backlog.
-        expect(member.getAppId()).toBe('arena1')
-        expect(member.getArenaId()).toBe('app1')
+        expect(member.getAppId()).toBe('app1')
+        expect(member.getArenaId()).toBe('arena1')
     })
 })

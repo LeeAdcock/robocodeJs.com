@@ -135,11 +135,9 @@ app.put("/api/user/:userId/arena/app/:appId", async (req, res) => {
 
   const members = await arenaMemberService.getForArena(arena.getId());
   if (members.length > 4) {
-    if (!app) {
-      res.status(400);
-      res.send("Arena limit reached");
-      return;
-    }
+    res.status(400);
+    res.send("Arena limit reached");
+    return;
   }
 
   const env = await environmentService.get(arena);

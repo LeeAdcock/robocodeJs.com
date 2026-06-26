@@ -15,7 +15,7 @@ vi.mock('../src/services/ArenaService', () => ({
     default: { getForUser: vi.fn(), getDefaultForUser: vi.fn() },
 }))
 vi.mock('../src/services/ArenaMemberService', () => ({
-    default: { getForApp: vi.fn(), getForArena: vi.fn() },
+    default: { getForApp: vi.fn(), getForArena: vi.fn(), create: vi.fn() },
 }))
 vi.mock('../src/services/EnvironmentService', () => ({
     default: { getByArenaId: vi.fn(), has: vi.fn(), get: vi.fn() },
@@ -23,10 +23,13 @@ vi.mock('../src/services/EnvironmentService', () => ({
 
 import userService from '../src/services/UserService'
 import appService from '../src/services/AppService'
+import arenaService from '../src/services/ArenaService'
 import arenaMemberService from '../src/services/ArenaMemberService'
+import environmentService from '../src/services/EnvironmentService'
 import healthRouter from '../src/api/health'
 import userRouter from '../src/api/user'
 import appRouter from '../src/api/app'
+import arenaRouter from '../src/api/arena'
 
 // Build an Express app around a router, injecting an authenticated user the way
 // the real auth middleware would (the routers read req.user for ownership checks).
@@ -153,6 +156,20 @@ describe('app endpoints', () => {
         expect(res.status).toBe(404)
     })
 
+    it('GET /api/user/:userId/app/:appId returns 404 for an unknown user', async () => {
+        vi.mocked(userService.get).mockResolvedValue(undefined)
+        const res = await request(makeApp(appRouter)).get('/api/user/u1/app/a1')
+        expect(res.status).toBe(404)
+    })
+
+    it('GET /api/user/:userId/app/:appId returns the app when found', async () => {
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never)
+        const res = await request(makeApp(appRouter)).get('/api/user/u1/app/a1')
+        expect(res.status).toBe(200)
+        expect(res.body).toMatchObject({ id: 'a1', name: 'App a1' })
+    })
+
     it('GET /api/user/:userId/app/:appId/source returns the source to the owner', async () => {
         vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
         vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never)
@@ -182,5 +199,43 @@ describe('app endpoints', () => {
         )
         expect(res.status).toBe(200)
         expect(app.delete).toHaveBeenCalled()
+    })
+})
+
+describe('arena endpoints', () => {
+    it('PUT /api/user/:userId/arena/app/:appId rejects once the arena is full', async () => {
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never)
+        vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+            getId: () => 'ar1',
+        } as never)
+        // already at the 5-app limit
+        vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+            1, 2, 3, 4, 5,
+        ] as never)
+
+        const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
+            '/api/user/u1/arena/app/a1'
+        )
+        expect(res.status).toBe(400)
+        expect(environmentService.get).not.toHaveBeenCalled()
+    })
+
+    it('PUT /api/user/:userId/arena/app/:appId adds an app when under the limit', async () => {
+        const addApp = vi.fn()
+        vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never)
+        vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never)
+        vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+            getId: () => 'ar1',
+        } as never)
+        vi.mocked(arenaMemberService.getForArena).mockResolvedValue([])
+        vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never)
+        vi.mocked(arenaMemberService.create).mockResolvedValue(undefined as never)
+
+        const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
+            '/api/user/u1/arena/app/a1'
+        )
+        expect(res.status).toBe(201)
+        expect(addApp).toHaveBeenCalled()
     })
 })

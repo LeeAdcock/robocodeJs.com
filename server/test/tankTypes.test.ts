@@ -148,10 +148,11 @@ describe('Tank', () => {
         expect(() => tank.send(1.5)).toThrow()
     })
 
-    it('getHealth() currently returns undefined (missing return — refactor backlog)', () => {
+    it('getHealth() returns health as a 0–1 fraction', () => {
         const { tank } = makeRealTank()
-        // BUG: tank.ts getHealth() computes this.health / 100 but never returns it.
-        expect(tank.getHealth()).toBeUndefined()
+        expect(tank.getHealth()).toBe(1) // default health 100 -> 1.0
+        tank.health = 50
+        expect(tank.getHealth()).toBe(0.5)
     })
 })
 

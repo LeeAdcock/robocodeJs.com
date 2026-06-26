@@ -140,8 +140,8 @@ describe('compiler — bot API in a real isolate', () => {
         expect(ctx.read('Event.TICK')).toBe('TICK')
     })
 
-    it('surfaces the getHealth() missing-return bug across the boundary (refactor backlog)', () => {
-        // tank.getHealth() never returns, so bot.getHealth() copies out undefined.
-        expect(ctx.read('bot.getHealth()')).toBeUndefined()
+    it('copies bot.getHealth() across the boundary as a 0–1 fraction', () => {
+        // tank health 100 -> 1.0
+        expect(ctx.read('bot.getHealth()')).toBe(1)
     })
 })

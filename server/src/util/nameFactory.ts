@@ -134,8 +134,8 @@ export default function nameFactory() {
 
   return (
     "Bot " +
-    adjs[Math.floor(Math.random() * (adjs.length - 1))] +
+    adjs[Math.floor(Math.random() * adjs.length)] +
     " " +
-    nouns[Math.floor(Math.random() * (nouns.length - 1))]
+    nouns[Math.floor(Math.random() * nouns.length)]
   );
 }

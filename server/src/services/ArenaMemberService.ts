@@ -14,7 +14,7 @@ pool.query(`
 
 export class ArenaMemberService {
   create = (arenaId: ArenaId, appId: AppId): Promise<ArenaMember> => {
-    const member = new ArenaMember(arenaId, appId, new Date().getTime());
+    const member = new ArenaMember(appId, arenaId, new Date().getTime());
     return pool
       .query({
         text: "INSERT INTO arena_member(arenaId, appId) VALUES($1, $2)",
