@@ -35,7 +35,7 @@ There are **no tests** — the `test` scripts in both packages are placeholder s
 
 ## Runtime requirements
 
-The server pins `node >=16.18.0 <17` and `npm >=8.19.0 <9` (see `server/package.json` engines) because of the native `isolated-vm` dependency. The dev container ships Node 18; if `isolated-vm` misbehaves, the Node version mismatch is the first thing to check.
+The server requires `node >=22` (see `server/package.json` engines), pinned by the native `isolated-vm` dependency: isolated-vm 6.x requires Node ≥22, 5.x ≥18, and 7.x ≥26 — so the isolated-vm major and the Node major must move together. The dev container (`.devcontainer/devcontainer.json`) runs Node 22. If `isolated-vm` fails to build or load, a Node/isolated-vm version mismatch is the first thing to check; the native build needs `gcc`/`gcc-c++` (provided in the container and in `server/.ebextensions/options.config` for Elastic Beanstalk).
 
 The server needs Postgres via `RDS_*` env vars (`RDS_USERNAME`, `RDS_HOSTNAME`, `RDS_DB_NAME`, `RDS_PASSWORD`, `RDS_PORT`); see `server/src/util/db.ts`. Services create their own tables lazily with `CREATE TABLE IF NOT EXISTS` at import time.
 

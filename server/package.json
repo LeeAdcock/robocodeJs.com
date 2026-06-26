@@ -9,6 +9,7 @@
     "dev:start": "npm-run-all build start",
     "lint": "npx prettier --write src && npx eslint src --fix",
     "start": "node ./dist/src/index.js",
+    "smoke": "node ./scripts/ivm-smoke.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "package": "npm version patch && npm shrinkwrap && zip -r robocodejs-${npm_package_version}.zip ./ -x '*src*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
@@ -20,7 +21,7 @@
     "eventsource": "^2.0.2",
     "express": "^4.18.2",
     "google-auth-library": "^8.7.0",
-    "isolated-vm": "^4.4.2",
+    "isolated-vm": "^6.1.2",
     "ml-classify-text": "^2.0.0",
     "node-postgres": "^0.6.2",
     "pg": "^8.8.0",
@@ -29,7 +30,7 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.14",
-    "@types/node": "^18.11.10",
+    "@types/node": "^22.0.0",
     "@types/pg": "^8.6.6",
     "@typescript-eslint/eslint-plugin": "^5.48.1",
     "@typescript-eslint/parser": "^5.48.1",
@@ -40,7 +41,7 @@
     "typescript": "^4.9.3"
   },
   "engines": {
-    "npm": ">=8.19.0 <9.0.0",
-    "node": ">=16.18.0 <17.0.0"
+    "npm": ">=10.0.0",
+    "node": ">=22.0.0"
   }
 }
