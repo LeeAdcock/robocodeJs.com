@@ -23,7 +23,7 @@ clock.on(Event.TICK, () => {
   }
 
   if (this.state === 'SCAN_RIGHT') {
-    if (bot.turret.getOrientation() < 360 - 45 && bot.turret.getOrientation() > 260 - 90)
+    if (bot.turret.getOrientation() < 360 - 45 && bot.turret.getOrientation() > 360 - 90)
       this.state = 'SCAN_LEFT'
     return Promise.all([bot.turret.turn(-2), bot.setSpeed(5)])
   }

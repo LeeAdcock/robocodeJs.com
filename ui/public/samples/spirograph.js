@@ -10,8 +10,12 @@ clock.on(Event.TICK, () =>
   bot.radar
     .onReady()
     .then(bot.radar.scan)
-    .then(bot.turret.onReady)
-    .then(bot.turret.fire)
+    .then(targets => {
+      // Only fire if the scan straight ahead found an enemy.
+      if (targets.length > 0 && !targets[0].friendly) {
+        return bot.turret.onReady().then(bot.turret.fire)
+      }
+    })
     .catch(() => {}),
 )
 
