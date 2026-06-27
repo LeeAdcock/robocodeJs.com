@@ -9,9 +9,9 @@ import { FaSyncAlt, FaPauseCircle, FaPlayCircle } from 'react-icons/fa';
 
 interface EditorToolbarProps {
   isPaused: boolean;
-  doPause: React.MouseEventHandler<any>;
-  doResume: React.MouseEventHandler<any>;
-  doRestart: React.MouseEventHandler<any>;
+  doPause: React.MouseEventHandler<HTMLElement>;
+  doResume: React.MouseEventHandler<HTMLElement>;
+  doRestart: React.MouseEventHandler<HTMLElement>;
 }
 
 export default function EditorToolbar(props: EditorToolbarProps) {

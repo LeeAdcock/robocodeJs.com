@@ -9,7 +9,7 @@ import { logger, LogEvent } from './logger';
 function createPool(): Pool {
   if (isLocalDev) {
     logger.info('LOCAL DEV: using in-memory database (pg-mem)');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { newDb } = require('pg-mem');
     const { Pool: MemPool } = newDb().adapters.createPg();
     return new MemPool() as Pool;

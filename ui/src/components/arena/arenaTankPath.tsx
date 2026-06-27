@@ -1,5 +1,4 @@
 import React from 'react';
-import Tank from '../../types/tank';
 import PointInTime from '../../types/pointInTime';
 
 interface TankPathProps {

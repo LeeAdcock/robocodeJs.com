@@ -3,11 +3,11 @@ import { useState } from 'react';
 import React from 'react';
 
 interface TerrainProps {
-  children: any;
+  children: React.ReactNode;
 }
 
 interface TerrainLayerProps {
-  tiles: any[];
+  tiles: React.ReactNode[];
 }
 const TerrainLayer = React.memo((props: TerrainLayerProps) => (
   <g>
@@ -18,7 +18,7 @@ const TerrainLayer = React.memo((props: TerrainLayerProps) => (
 ));
 
 const TerrainSvg = (props: TerrainProps) => {
-  const [terrain, setTerrain] = useState(() => generateTerrain());
+  const [terrain] = useState(() => generateTerrain());
 
   return (
     <>

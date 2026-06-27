@@ -449,7 +449,7 @@ const generateTerrain = () => {
   // Create roads
   try {
     roadBuilderHoriz(terrain, 0, Math.floor(Math.random() * 20), -1, 0, isSand);
-  } catch (e) {
+  } catch {
     // Sometimes gets throws a maximum stack size exceeded exception
   }
 
@@ -462,11 +462,17 @@ const generateTerrain = () => {
 
   // Flatten the data structure to a list of sprites
   terrain[0] = terrain[0]
-    .reduce((prev: any[], cur: any[]) => [...prev, ...cur], [])
-    .filter((e: any) => e);
+    .reduce(
+      (prev: React.ReactNode[], cur: React.ReactNode[]) => [...prev, ...cur],
+      []
+    )
+    .filter((e: React.ReactNode) => e);
   terrain[1] = terrain[1]
-    .reduce((prev: any[], cur: any[]) => [...prev, ...cur], [])
-    .filter((e: any) => e);
+    .reduce(
+      (prev: React.ReactNode[], cur: React.ReactNode[]) => [...prev, ...cur],
+      []
+    )
+    .filter((e: React.ReactNode) => e);
 
   // Add some shaded contours
   terrain[0].unshift(

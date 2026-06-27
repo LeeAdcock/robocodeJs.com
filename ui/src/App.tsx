@@ -141,8 +141,8 @@ function App() {
         .then((res) => {
           setTime(res.data.clock.time);
           setPlaybackTime(res.data.clock.time);
-          res.data.apps.forEach((app: any) =>
-            app.tanks.forEach((tank: any) => {
+          res.data.apps.forEach((app: TankApp) =>
+            app.tanks.forEach((tank) => {
               tank.path = Array<PointInTime>(20);
               tank.path[0] = {
                 x: tank.x,

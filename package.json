@@ -32,9 +32,6 @@
     "concurrently": "^10.0.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^2.8.3"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx,css,md,json,yaml,yml,html}": "prettier --write"
+    "prettier": "^3.9.0"
   }
 }
