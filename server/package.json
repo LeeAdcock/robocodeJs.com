@@ -21,7 +21,7 @@
     "browser-bunyan": "^1.8.0",
     "cookie-parser": "^1.4.6",
     "express": "^5.2.1",
-    "google-auth-library": "^8.7.0",
+    "google-auth-library": "^10.9.0",
     "isolated-vm": "^6.1.2",
     "ml-classify-text": "^2.0.0",
     "pg": "^8.8.0",
