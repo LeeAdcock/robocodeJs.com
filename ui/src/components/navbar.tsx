@@ -39,9 +39,9 @@ const AppLink = function (props: AppLinkProps) {
           src={'/sprites/tank_' + colors[appIndex] + '.png'}
           style={{ height: '1em', marginRight: '5px' }}
         />
-        <span style={{ color: 'black' }}>
-          {titleCase(props.app.name || 'Unknown')}
-        </span>
+        {/* No hardcoded color — inherit the dropdown's theme-aware text color
+            so the name stays readable in both light and dark mode. */}
+        {titleCase(props.app.name || 'Unknown')}
       </>
     );
   }
