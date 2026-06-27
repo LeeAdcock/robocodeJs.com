@@ -14,6 +14,17 @@ import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
 
+// Minimal structural type for the per-tank bot logger (a browser-bunyan
+// instance wired up in compiler.ts). It is only ever called, so the five level
+// methods are all we need — and all that scheduleFactory's Timer shares.
+export interface Logger {
+  trace(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+}
+
 // Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
 const MAX_NAME_LENGTH = 50;
 
@@ -55,12 +66,16 @@ export default class Tank implements Point, Orientated {
   public speedTarget = 0;
   public speedAcceleration = 2;
   public speedMax = 5;
+  // Dynamic event-dispatch table: populated across the isolated-vm boundary
+  // (compiler.ts) and invoked positionally by Simulation, so the value type is
+  // intentionally untyped.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public handlers: any = {};
   public bullets: Bullet[] = [];
   public health = 100;
   public stats: TankStats = new TankStats();
   public timers: TimersContainer = new TimersContainer();
-  public logger: any;
+  public logger!: Logger;
   public process: Process;
   public env: Environment;
 
@@ -119,18 +134,18 @@ export default class Tank implements Point, Orientated {
   };
 
   // Enables the registration of event handlers
-  on(event: Event, handler: (...args: any[]) => any) {
+  on(event: Event, handler: (...args: unknown[]) => unknown) {
     if (!Object.keys(Event).includes(event))
       throw new Error('Invalid event type.');
 
     // Keep a record of event promises, ignore repeated calls to event if previous promise
     // has not yet resolved.
-    const eventPromiseMap: Map<Event, Promise<any>> = new Map<
+    const eventPromiseMap: Map<Event, Promise<unknown>> = new Map<
       Event,
-      Promise<any>
+      Promise<unknown>
     >();
 
-    this.handlers[event] = (x: any) =>
+    this.handlers[event] = (x?: unknown) =>
       eventPromiseMap.get(event)
         ? undefined
         : setTimeout(() => {
@@ -144,12 +159,12 @@ export default class Tank implements Point, Orientated {
                 else this.logger.trace("Called event handler '" + event + "'");
               }
               const startTime = new Date();
-              const result = handler(x);
+              const result = handler(x) as Promise<unknown> | undefined;
               if (result) {
                 eventPromiseMap.set(event, result);
                 result
                   .then(() => eventPromiseMap.delete(event))
-                  .catch((e: any) => {
+                  .catch((e: unknown) => {
                     // An uncaught rejection from a handler's promise is NOT
                     // fatal. It is almost always a command the bot didn't
                     // .catch() being superseded by a later one — a documented,

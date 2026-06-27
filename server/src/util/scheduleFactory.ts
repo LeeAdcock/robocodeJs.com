@@ -1,5 +1,5 @@
 import Environment from '../types/environment';
-import Tank from '../types/tank';
+import Tank, { Logger } from '../types/tank';
 
 /*
   This creates "monkey-patched" wrappers for the timer related
@@ -10,7 +10,7 @@ import Tank from '../types/tank';
 
 class Timer {
   func: (() => void) | null = null;
-  logger: any;
+  logger!: Logger;
   interval = 0;
 
   started = 0;

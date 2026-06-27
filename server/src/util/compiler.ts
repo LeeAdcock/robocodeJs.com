@@ -78,6 +78,18 @@ function exposeGetter(
 type Settle = (id: number, ok: boolean, value: unknown) => void;
 const settlers = new WeakMap<Tank, Settle>();
 
+// A settler is registered for every tank during init, before any bot code, timer,
+// or command can run, so one is always present by the time a settlement fires.
+// Resolve it through this helper so that invariant is an explicit throw rather
+// than a non-null assertion.
+function getSettler(tank: Tank): Settle {
+  const settle = settlers.get(tank);
+  if (!settle) {
+    throw new Error('No settler registered for tank');
+  }
+  return settle;
+}
+
 // Async action taking one argument; resolves/rejects when fn() settles. The
 // side effect (fn) runs synchronously inside this sync callback so commands
 // apply immediately; the promise the bot is awaiting is settled later via the
@@ -91,7 +103,7 @@ function exposeAsync1(
   fn: (arg: number) => Promise<unknown>
 ) {
   tank.getContext().global.setSync(name, (id: number, arg: number) => {
-    const settle = settlers.get(tank)!;
+    const settle = getSettler(tank);
     fn(arg).then(
       (v) => settle(id, true, v),
       (e) => settle(id, false, e)
@@ -112,7 +124,7 @@ function exposeAsyncResult(
   fn: () => Promise<unknown>
 ) {
   tank.getContext().global.setSync(name, (id: number) => {
-    const settle = settlers.get(tank)!;
+    const settle = getSettler(tank);
     fn().then(
       (v) => settle(id, true, v),
       (e) => settle(id, false, e)
@@ -129,9 +141,9 @@ function exposeVoid(
   isolate: ivm.Isolate,
   botPath: string,
   name: string,
-  fn: (arg: any) => void
+  fn: (arg: unknown) => void
 ) {
-  tank.getContext().global.setSync(name, (arg: any) => {
+  tank.getContext().global.setSync(name, (arg: unknown) => {
     fn(arg);
   });
   isolate
@@ -235,7 +247,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   // Expose fire
   // todo resulting value
   tank.getContext().global.setSync('_bot_turret_fire', (id: number) => {
-    const settle = settlers.get(tank)!;
+    const settle = getSettler(tank);
     turret.fire().then(
       (v) => settle(id, true, v),
       (e) => settle(id, false, e)
@@ -338,7 +350,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .runSync(tank.getContext(), {});
 
   exposeVoid(tank, isolate, 'bot.setName', '_bot_setName', (arg) =>
-    tank.setName(arg)
+    tank.setName(arg as string)
   );
   exposeGetter(tank, isolate, 'bot.getHealth', '_bot_getHealth', () =>
     tank.getHealth()
@@ -349,7 +361,9 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   exposeAsync1(tank, isolate, 'bot.turn', '_bot_turn', (arg) => tank.turn(arg));
   exposeGetter(tank, isolate, 'bot.getX', '_bot_getX', () => tank.getX());
   exposeGetter(tank, isolate, 'bot.getY', '_bot_getY', () => tank.getY());
-  exposeVoid(tank, isolate, 'bot.send', '_bot_send', (arg) => tank.send(arg));
+  exposeVoid(tank, isolate, 'bot.send', '_bot_send', (arg) =>
+    tank.send(arg as number)
+  );
 
   // Convenience turnTowards
   isolate
@@ -595,7 +609,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       {
         level: 'TRACE',
         stream: {
-          write: (entry: any) => {
+          write: (entry: Record<string, unknown>) => {
             env.emit('log', {
               ...entry,
               time: env.getTime(),
@@ -636,7 +650,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     // The bot-side wrappers (below) format every argument into a single string
     // before it crosses the isolate boundary, so the host only ever receives a
     // string here. Coerce defensively in case `_log` is called directly.
-    tank.getContext().global.setSync('_log', (msg: any) => {
+    tank.getContext().global.setSync('_log', (msg: unknown) => {
       const now = env.getTime();
       if (now !== logWindow) {
         logWindow = now;

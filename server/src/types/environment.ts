@@ -81,7 +81,7 @@ export default class Environment {
 
   addListener = (
     eventName: string | symbol,
-    listener: (...args: any[]) => void
+    listener: (...args: unknown[]) => void
   ) => {
     this.emitter.addListener(eventName, listener);
 
@@ -131,13 +131,13 @@ export default class Environment {
 
   removeListener = (
     eventName: string | symbol,
-    listener: (...args: any[]) => void
+    listener: (...args: unknown[]) => void
   ) => {
     this.emitter.removeListener(eventName, listener);
     return this;
   };
 
-  emit(eventName: string | symbol, ...args: any[]): boolean {
+  emit(eventName: string | symbol, ...args: unknown[]): boolean {
     return this.emitter.emit(eventName, ...args);
   }
 
@@ -169,7 +169,7 @@ export default class Environment {
 
   // Run the game
   private simulate = (cancelable: {
-    interval: ReturnType<typeof setInterval>;
+    interval: ReturnType<typeof setInterval> | null;
   }) => {
     const suddenDeathTime = 10000;
 
@@ -189,7 +189,7 @@ export default class Environment {
     }
 
     // Calculate application health
-    const appHealth: any[] = this.processes.map(
+    const appHealth: number[] = this.processes.map(
       (process) =>
         process.tanks.reduce((sum, tank) => sum + tank.health, 0) /
         (process.tanks.length * 100)
@@ -209,7 +209,7 @@ export default class Environment {
       this.running = false;
     }
 
-    if (!this.running) {
+    if (!this.running && cancelable.interval) {
       clearInterval(cancelable.interval);
     }
   };
@@ -222,7 +222,9 @@ export default class Environment {
     });
     this.running = true;
 
-    const cancelable = { interval: null as any };
+    const cancelable = {
+      interval: null as ReturnType<typeof setInterval> | null,
+    };
     cancelable.interval = setInterval(() => this.simulate(cancelable), 100);
   }
 

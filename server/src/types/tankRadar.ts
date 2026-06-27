@@ -110,7 +110,14 @@ export class TankRadar implements Orientated {
 
     this.tank.stats.scansCompleted += 1;
 
-    const found: any[] = [];
+    const found: Array<{
+      id: string;
+      speed: number;
+      orientation: number;
+      distance: number;
+      angle: number;
+      friendly: boolean;
+    }> = [];
     this.tank.env.getProcesses().forEach((otherProcess) => {
       otherProcess.tanks.forEach((otherTank) => {
         if (otherTank.health > 0 && otherTank.id !== this.tank.id) {
