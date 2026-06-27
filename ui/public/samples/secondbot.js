@@ -25,9 +25,10 @@ clock.on(Event.TICK, async () => {
   if (this.state === 'SEARCH') {
     let targets = await bot.radar.onReady().then(bot.radar.scan);
     if (targets.length > 0 && !targets[0].friendly) {
-      // Slow down and adjust the turret for a better aim.
+      // Slow down and adjust the turret for a better aim. The scan bearing is
+      // relative to the body, and so is the turret, so it drops straight in.
       await bot.setSpeed(-1);
-      await bot.turret.setOrientation(targets[0].angle - bot.getOrientation());
+      await bot.turret.setOrientation(targets[0].angle);
       if (bot.turret.isReady()) {
         let result = await bot.turret.fire();
 
@@ -57,7 +58,8 @@ bot.on(Event.HIT, async (info) => {
   this.state = 'RETALIATE';
   try {
     await bot.setSpeed(-2);
-    await bot.setOrientation(info.angle);
+    // info.angle is relative to our body — turn BY it to face the attacker.
+    await bot.turn(info.angle);
     await bot.turret.onReady();
     await bot.turret.fire();
   } catch (e) {

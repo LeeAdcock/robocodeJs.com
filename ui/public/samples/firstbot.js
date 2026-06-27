@@ -20,7 +20,7 @@ bot.on(Event.START, () => {
   // and prepairing for battle. They each return a JavaScript
   // Promise that could allow us to detect when the action
   // is completed.
-  bot.setSpeed(10);
+  bot.setSpeed(5);
   bot.radar.setOrientation(0);
   bot.turret.setOrientation(0);
 });
@@ -42,7 +42,7 @@ clock.on(Event.TICK, async () => {
         // If the turret isn't ready or firing fails for any reason,
         // we'll just turn the bot and continue.
         bot.turn(10);
-        bot.setSpeed(10);
+        bot.setSpeed(5);
       });
   }
 });
@@ -51,5 +51,5 @@ clock.on(Event.TICK, async () => {
 // with another bot or the arena edges. In that situation, we set
 // some logic to avoid the obstacle and accelerate.
 bot.on(Event.COLLIDED, () => {
-  bot.turn(40).then(() => bot.setSpeed(10));
+  bot.turn(40).then(() => bot.setSpeed(5));
 });

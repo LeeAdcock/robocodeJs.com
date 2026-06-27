@@ -20,10 +20,10 @@ bot.on(Event.START, () => {
 clock.on(Event.TICK, () => {
   // Calculate details on next waypoint
   let waypoint = this.waypoints[this.waypointIndex % this.waypoints.length];
+  // North-zero compass heading toward the waypoint (0 = north/up, clockwise).
   let angle =
-    Math.atan2(waypoint.y - bot.getY(), waypoint.x - bot.getX()) *
-      (180 / Math.PI) -
-    90;
+    Math.atan2(waypoint.x - bot.getX(), bot.getY() - waypoint.y) *
+    (180 / Math.PI);
   let distance = Math.sqrt(
     Math.pow(waypoint.y - bot.getY(), 2) + Math.pow(waypoint.x - bot.getX(), 2)
   );

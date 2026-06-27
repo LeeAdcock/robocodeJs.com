@@ -1,7 +1,11 @@
 import { Event } from './event';
 import { Orientated } from './orientated';
 import Tank, { waitUntil } from './tank';
-import { normalizeAngle } from '../util/geometry';
+import {
+  normalizeAngle,
+  toApiHeading,
+  toRelativeBearing,
+} from '../util/geometry';
 
 export class TankRadar implements Orientated {
   public orientation: number;
@@ -147,9 +151,11 @@ export class TankRadar implements Orientated {
             found.push({
               id: otherTank.id,
               speed: otherTank.speed,
-              orientation: otherTank.getOrientation(),
+              // The enemy's own heading is absolute (north-zero); the bearing to
+              // it is relative to our body (so turret.setOrientation(angle) aims).
+              orientation: toApiHeading(otherTank.getOrientation()),
               distance,
-              angle,
+              angle: toRelativeBearing(angle, this.tank.getOrientation()),
               friendly:
                 otherProcess.getAppId() === this.tank.process.getAppId(),
             });

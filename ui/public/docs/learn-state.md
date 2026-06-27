@@ -52,7 +52,7 @@ bot.on(Event.SCANNED, (targets) => {
 
 // A named helper we can reuse anywhere.
 function aimAndFire(target) {
-  bot.turret.setOrientation(target.angle - bot.getOrientation());
+  bot.turret.setOrientation(target.angle);
   if (bot.turret.isReady()) bot.turret.fire();
 }
 ```

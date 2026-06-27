@@ -30,7 +30,7 @@ bot.on(Event.START, () => {
 
 # Arena
 
-The arena where bots live is a square. The orientation of objects within the arena is specified in degrees, with 0 degrees being south, 180 degrees being north, and 90 degrees being west. Terrain and other arena elements do not affect gameplay.
+The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
 
 - `arena.getWidth() : number`
 - `arena.getHeight() : number`
@@ -68,12 +68,12 @@ clock.on(Event.TICK, () => {
     .then(() => bot.setSpeed(0))
     .then(() => bot.turret.onReady())
     .then(() => bot.turret.fire())
-    .catch(() => bot.setSpeed(10))
+    .catch(() => bot.setSpeed(5))
 })
 ```
 
 ```
-bot.on(Event.COLLIDED, () => bot.turn(110).then(() => bot.setSpeed(10)))
+bot.on(Event.COLLIDED, () => bot.turn(110).then(() => bot.setSpeed(5)))
 ```
 
 Use `async...await` to stop code execution until an asynchronous activity has finished:
@@ -102,18 +102,18 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 - `bot.setName(string)` Sets the bot's display name.
 - `bot.getId() : string` Returns a unique identifier (a UUID string).
-- `bot.getHealth() : number` Returns a decimal value representing the bot's health, with 1 being healthy and 0 being unfortunately dead.
+- `bot.getHealth() : number` Returns the bot's health from 100 (full) down to 0 (unfortunately dead).
 - `bot.dropMarker() : marker` Returns a marker object for the bot's current location.
 
 ## Bot events
 
 - `bot.on(Event.FIRED, () => {}))` Registers a callback that is executed when the turret is fired.
-- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each tank detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean }`.
-- `bot.on(Event.COLLIDED, () => {object})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to the arena (0 degrees is south). Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
+- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each tank detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean }`. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading.
+- `bot.on(Event.COLLIDED, () => {object})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to your heading (a wall ahead is 0). Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
 
 ## Environment events
 
-- `bot.on(Event.HIT, (object) => {})` Registers a callback that is executed when the bot is hit. An object is provided to the handler that is of the format `{angle:number}`, where the angle is relative to the arena.
+- `bot.on(Event.HIT, (object) => {})` Registers a callback that is executed when the bot is hit. An object is provided to the handler that is of the format `{angle:number}`, where the angle is the bearing the shot came from, relative to your heading.
 - `bot.on(Event.DETECTED, () => {})` Registers a callback that is executed when the bot is detected by another bot's radar.
 - `bot.on(Event.START, () => {})` Registers a callback that is executed when the bot is being started at the beginning of a match.
 

@@ -53,7 +53,7 @@ clock.on(Event.TICK, fireIfReady)
 
 ## Movement
 
-Right now our bot just sits in place. Let's get it moving and have it turn each time it fires. Driving is controlled with `bot.setSpeed(...)`, while `bot.turn(...)` rotates the bot by a relative number of degrees. Angles in the arena are measured in degrees, with 0° pointing straight down and angles increasing clockwise.
+Right now our bot just sits in place. Let's get it moving and have it turn each time it fires. Driving is controlled with `bot.setSpeed(...)`, while `bot.turn(...)` rotates the bot by a relative number of degrees. Angles in the arena are measured in degrees on a compass, with 0° pointing straight up (north) and angles increasing clockwise.
 
 Let's start the bot driving when the match begins by handling the `Event.START` event — a good place to set up your bot's initial behavior, since it runs whenever your code is loaded:
 

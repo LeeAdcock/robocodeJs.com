@@ -12,18 +12,18 @@
 A robot faces some direction, measured in **degrees** from `0` to `359` — like a
 compass or a clock face. A full circle is `360` degrees.
 
-In this arena the compass is:
+It works like a real compass:
 
-- `0` = **south** (down) ⬇️
-- `90` = **west** (left) ⬅️
-- `180` = **north** (up) ⬆️
-- `270` = **east** (right) ➡️
+- `0` = **north** (up) ⬆️
+- `90` = **east** (right) ➡️
+- `180` = **south** (down) ⬇️
+- `270` = **west** (left) ⬅️
 
 There are two ways to steer:
 
 - `bot.turn(20)` — turn **20 degrees from where you're facing now**. Positive turns one
   way (clockwise), negative the other way.
-- `bot.setOrientation(90)` — face an **exact** compass direction (here, west).
+- `bot.setOrientation(90)` — face an **exact** compass direction (here, east).
 
 ## Try it
 
@@ -58,14 +58,14 @@ The new pieces:
 - Try a negative turn like `bot.turn(-20)` — Rusty loops the other way.
 - Add this to your TICK handler to see the direction:
   `console.log('facing', bot.getOrientation());`
-- Replace the loop with a fixed heading: put `bot.setOrientation(180);` in START to drive
+- Replace the loop with a fixed heading: put `bot.setOrientation(0);` in START to drive
   straight north.
 
 ## Common questions
 
-**Why is `0` south and not north?**
-It's just this game's compass. The important part is the pattern: bigger numbers rotate
-you around the circle. You'll get a feel for it quickly.
+**Which way is `0`?**
+North (up), just like a real compass, and the numbers increase clockwise (`90` east,
+`180` south, `270` west). If you've played classic Robocode, this is the same.
 
 **What's the difference between `turn` and `setOrientation`?**
 `turn` is **relative** ("turn 20 more from here"). `setOrientation` is **absolute**
@@ -77,7 +77,7 @@ time to finish.
 
 ## You learned
 
-- Directions are degrees `0`–`359`: `0` south, `90` west, `180` north, `270` east.
+- Directions are degrees `0`–`359`: `0` north, `90` east, `180` south, `270` west.
 - `bot.turn(n)` turns relative to now; `bot.setOrientation(n)` faces an exact direction.
 - `bot.getOrientation()` tells you which way you face; `bot.isTurning()` answers yes/no.
 - `!` means "not."

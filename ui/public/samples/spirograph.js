@@ -1,7 +1,7 @@
 bot.setName('Spirograph');
 
 bot.on(Event.START, () => {
-  bot.setSpeed(10);
+  bot.setSpeed(5);
   bot.radar.setOrientation(0);
   bot.turret.setOrientation(0);
 });
@@ -20,5 +20,5 @@ clock.on(Event.TICK, () =>
 );
 
 bot.on(Event.COLLIDED, () => {
-  bot.turn(40).finally(() => bot.setSpeed(10));
+  bot.turn(40).finally(() => bot.setSpeed(5));
 });
