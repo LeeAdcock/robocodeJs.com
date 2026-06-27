@@ -5,6 +5,7 @@ import parse, {
   domToReact,
   attributesToProps,
   Element,
+  HTMLReactParserOptions,
 } from 'html-react-parser';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
@@ -14,21 +15,19 @@ import { useLocation } from 'react-router-dom';
 const opensInNewTab = (href: string) =>
   /^https?:\/\//.test(href) || href.startsWith('/samples/');
 
-const parseOptions = {
-  replace: (node: unknown) => {
-    if (
-      node instanceof Element &&
-      node.name === 'a' &&
-      node.attribs.href &&
-      opensInNewTab(node.attribs.href)
-    ) {
+const parseOptions: HTMLReactParserOptions = {
+  replace: (node) => {
+    // Duck-type the element (instanceof Element is unreliable across domhandler
+    // versions). Text nodes have no `attribs`, so the guard skips them.
+    const el = node as Element;
+    if (el.name === 'a' && el.attribs?.href && opensInNewTab(el.attribs.href)) {
       return (
         <a
-          {...attributesToProps(node.attribs)}
+          {...attributesToProps(el.attribs)}
           target="_blank"
           rel="noopener noreferrer"
         >
-          {domToReact(node.children)}
+          {domToReact(el.children)}
         </a>
       );
     }
