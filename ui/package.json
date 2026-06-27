@@ -50,13 +50,13 @@
     "@types/showdown": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^8.62.0",
     "@typescript-eslint/parser": "^8.62.0",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^8.57.1",
     "eslint-plugin-react": "^7.31.11",
     "eslint-plugin-react-hooks": "^4.6.2",
     "jsdom": "^29.1.1",
     "prettier": "^3.9.0",
-    "vite": "^6.4.3",
+    "vite": "^8.1.0",
     "vitest": "^4.1.9"
   }
 }
