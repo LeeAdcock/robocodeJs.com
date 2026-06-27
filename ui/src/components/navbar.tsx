@@ -73,23 +73,6 @@ export default function NavBar(props: NavBarProps) {
         className="topNavBar"
       >
         <Navbar.Brand className="nav-item">
-          <div
-            style={{
-              position: 'absolute',
-              opacity: '.5',
-              padding: '0px 1px 0px 1px',
-              margin: '0px',
-              top: '10px',
-              left: '105px',
-              fontWeight: '700',
-              fontSize: '.5em',
-              color: 'black',
-              backgroundColor: 'gold',
-              textDecoration: 'none!important',
-            }}
-          >
-            BETA
-          </div>
           <span
             style={{
               fontWeight: '700',

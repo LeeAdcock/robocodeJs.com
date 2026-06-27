@@ -345,6 +345,11 @@ function App() {
                   element={<MarkdownPage path="examples" />}
                 />
                 <Route path="/dev" element={<MarkdownPage path="dev" />} />
+                <Route path="/rules" element={<MarkdownPage path="rules" />} />
+                <Route
+                  path="/classic"
+                  element={<MarkdownPage path="classic-robocode" />}
+                />
                 <Route path="/learn" element={<MarkdownPage path="learn" />} />
                 <Route path="/learn/:slug" element={<LessonPage />} />
 
