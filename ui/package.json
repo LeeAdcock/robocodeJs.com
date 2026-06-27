@@ -45,7 +45,6 @@
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
-    "@types/react-bootstrap": "^0.32.32",
     "@types/react-dom": "^19.2.3",
     "@types/showdown": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.46.1",

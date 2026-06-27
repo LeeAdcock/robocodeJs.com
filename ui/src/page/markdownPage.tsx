@@ -1,5 +1,5 @@
 import showdown from 'showdown';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import parse, {
   domToReact,
@@ -8,7 +8,6 @@ import parse, {
   DOMNode,
   HTMLReactParserOptions,
 } from 'html-react-parser';
-import React from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Open sample-source and external links in a new tab so following one doesn't
@@ -45,7 +44,7 @@ export default function MarkdownPage(props: MarkdownPageProps) {
   const [html, setHtml] = useState('');
   const [md, setMd] = useState('');
 
-  const divRef = React.createRef<HTMLDivElement>();
+  const divRef = useRef<HTMLDivElement>(null);
 
   const location = useLocation();
 
