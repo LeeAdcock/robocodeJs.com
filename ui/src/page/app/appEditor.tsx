@@ -13,11 +13,21 @@ import babel from 'prettier/parser-babel';
 
 import { completionsFor } from '../../util/botApi';
 
+// Editor font-size bounds and default, shared with the toolbar zoom controls so
+// the two can't disagree.
+export const EDITOR_FONT_MIN = 8;
+export const EDITOR_FONT_MAX = 30;
+export const EDITOR_FONT_DEFAULT = 12;
+
 interface CodeEditorProps {
   code: string;
   onChange: (source: string) => void;
   doClean: () => void;
   doExecute: () => void;
+  fontSize: number;
+  doZoomIn: () => void;
+  doZoomOut: () => void;
+  doZoomReset: () => void;
 }
 
 // Context-aware completer for the bot API (bot/arena/clock/Event …). It reads
@@ -87,6 +97,22 @@ export default function CodeEditor(props: CodeEditorProps) {
           bindKey: { win: 'Ctrl-R', mac: 'Cmd-R' },
           exec: () => props.doClean(),
         },
+        {
+          name: 'zoomIn',
+          // Both '=' and '+' so it works with and without Shift.
+          bindKey: { win: 'Ctrl-=|Ctrl-+', mac: 'Cmd-=|Cmd-+' },
+          exec: () => props.doZoomIn(),
+        },
+        {
+          name: 'zoomOut',
+          bindKey: { win: 'Ctrl--', mac: 'Cmd--' },
+          exec: () => props.doZoomOut(),
+        },
+        {
+          name: 'zoomReset',
+          bindKey: { win: 'Ctrl-0', mac: 'Cmd-0' },
+          exec: () => props.doZoomReset(),
+        },
       ]}
       onChange={(source) => {
         clearTimeout(compileTimer.current);
@@ -100,7 +126,7 @@ export default function CodeEditor(props: CodeEditorProps) {
           completerRegistered = true;
         }
       }}
-      fontSize={12}
+      fontSize={props.fontSize}
       showGutter={true}
       highlightActiveLine={true}
       value={props.code}

@@ -10,6 +10,9 @@ import Col from 'react-bootstrap/Col';
 export default class Logs extends React.Component<
   {
     selectedTankApp: string;
+    // The tick the arena has played up to. Log lines stamped later than this are
+    // held back so they surface in step with the (buffered) on-screen motion.
+    playbackTime?: number;
     logEntries: {
       logs: ({
         id: string;
@@ -182,6 +185,8 @@ export default class Logs extends React.Component<
                   .filter(
                     (record) =>
                       record &&
+                      record.time <=
+                        (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
                       !this.state.hideNames.includes(record.name) &&
                       !this.state.hideLevels.includes(
                         record.levelName.toUpperCase()

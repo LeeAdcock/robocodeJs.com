@@ -24,9 +24,11 @@ export class TankTurret implements Orientated {
   }
 
   setOrientation(d: number) {
-    const target = normalizeAngle(d);
-    this.orientationTarget = normalizeAngle(d);
-    // todo only if this is an actual change
+    const target = normalizeAngle(Math.round(d));
+    if (target === this.orientationTarget) {
+      return Promise.resolve();
+    }
+    this.orientationTarget = target;
     this.tank.env.emit('event', {
       type: 'turretTurn',
       time: this.tank.env.getTime(),
@@ -56,9 +58,11 @@ export class TankTurret implements Orientated {
   }
 
   turn(d: number) {
-    const target = normalizeAngle(this.orientation + d);
+    const target = normalizeAngle(Math.round(this.orientation + d));
+    if (target === this.orientationTarget) {
+      return Promise.resolve();
+    }
     this.orientationTarget = target;
-    // todo only if this is an actual change
     this.tank.env.emit('event', {
       type: 'turretTurn',
       time: this.tank.env.getTime(),

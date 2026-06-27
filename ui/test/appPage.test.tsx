@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 vi.mock('axios', () => ({
@@ -12,6 +12,11 @@ vi.mock('../src/page/app/appEditor', () => ({
   default: (props: { code: string }) => (
     <textarea data-testid="editor" defaultValue={props.code} />
   ),
+  // The toolbar and page import these bounds from appEditor; the real module
+  // pulls in Ace, so the mock supplies them directly.
+  EDITOR_FONT_MIN: 8,
+  EDITOR_FONT_MAX: 30,
+  EDITOR_FONT_DEFAULT: 12,
 }));
 import axios from 'axios';
 import AppPage from '../src/page/app/appPage';
@@ -23,6 +28,7 @@ const arena = { clock: { time: 0 }, apps: [] } as any;
 
 describe('AppPage (bot editor)', () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.mocked(axios.get).mockImplementation((url: string) =>
       url.endsWith('/source')
         ? (Promise.resolve({ data: 'bot.setName("x")' }) as never)
@@ -31,7 +37,7 @@ describe('AppPage (bot editor)', () => {
   });
   afterEach(cleanup);
 
-  it('mounts, loads the bot source, and renders the editor', async () => {
+  const renderPage = () =>
     render(
       <MemoryRouter initialEntries={['/user/u1/app/a1']}>
         <Routes>
@@ -49,8 +55,40 @@ describe('AppPage (bot editor)', () => {
       </MemoryRouter>
     );
 
+  it('mounts, loads the bot source, and renders the editor', async () => {
+    renderPage();
+
     const editor = (await screen.findByTestId('editor')) as HTMLTextAreaElement;
     expect(editor).toBeTruthy();
     expect(axios.get).toHaveBeenCalledWith('/api/user/u1/app/a1/source');
+  });
+
+  it('zooms the editor font in and out and persists the size', async () => {
+    renderPage();
+    await screen.findByTestId('editor');
+
+    // The reset button doubles as the current-size indicator (default 12).
+    const reset = screen.getByLabelText('Reset text size');
+    expect(reset.textContent).toBe('12');
+
+    fireEvent.click(screen.getByLabelText('Larger text'));
+    expect(reset.textContent).toBe('13');
+    expect(localStorage.getItem('editorFontSize')).toBe('13');
+
+    fireEvent.click(screen.getByLabelText('Smaller text'));
+    fireEvent.click(screen.getByLabelText('Smaller text'));
+    expect(reset.textContent).toBe('11');
+
+    // Reset returns to the default and persists it.
+    fireEvent.click(reset);
+    expect(reset.textContent).toBe('12');
+    expect(localStorage.getItem('editorFontSize')).toBe('12');
+  });
+
+  it('restores the persisted font size on mount', async () => {
+    localStorage.setItem('editorFontSize', '18');
+    renderPage();
+    await screen.findByTestId('editor');
+    expect(screen.getByLabelText('Reset text size').textContent).toBe('18');
   });
 });

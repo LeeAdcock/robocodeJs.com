@@ -38,6 +38,7 @@ clock.on(Event.TICK, async () => {
             .then(() => bot.turn(bot.turret.getOrientation()))
             .then(() => bot.turret.setOrientation(0))
             .then(() => bot.turn(20))
+            .catch(() => {})
         }
       }
     } else {
@@ -46,6 +47,7 @@ clock.on(Event.TICK, async () => {
         .turn(10)
         .then(() => bot.setSpeed(3))
         .then(() => bot.turret.setOrientation(0))
+        .catch(() => {})
     }
   }
 })
@@ -58,6 +60,8 @@ bot.on(Event.HIT, async info => {
     await bot.setOrientation(info.angle)
     await bot.turret.onReady()
     await bot.turret.fire()
+  } catch (e) {
+    // A command can be cancelled if another handler retargets first; ignore it.
   } finally {
     this.state = 'SEARCH'
   }
@@ -66,5 +70,8 @@ bot.on(Event.HIT, async info => {
 // If we hit an obstical, change modes until we have avoided it
 bot.on(Event.COLLIDED, () => {
   this.state = 'AVOID'
-  bot.turn(90).finally(() => (this.state = 'SEARCH'))
+  bot
+    .turn(90)
+    .catch(() => {})
+    .finally(() => (this.state = 'SEARCH'))
 })
