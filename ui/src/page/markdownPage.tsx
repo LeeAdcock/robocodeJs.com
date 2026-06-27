@@ -5,6 +5,7 @@ import parse, {
   domToReact,
   attributesToProps,
   Element,
+  DOMNode,
   HTMLReactParserOptions,
 } from 'html-react-parser';
 import React from 'react';
@@ -29,7 +30,7 @@ const parseOptions: HTMLReactParserOptions = {
           target="_blank"
           rel="noopener noreferrer"
         >
-          {domToReact(el.children)}
+          {domToReact(el.children as DOMNode[])}
         </a>
       );
     }
