@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/cookie-parser": "^1.4.7",
     "@types/express": "^5.0.6",
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.13.2",
     "@types/pg": "^8.6.6",
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^5.48.1",
@@ -48,6 +48,6 @@
   },
   "engines": {
     "npm": ">=10.0.0",
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   }
 }
