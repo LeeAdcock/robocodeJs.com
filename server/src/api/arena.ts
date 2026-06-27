@@ -12,6 +12,7 @@ import {
   scopedApp,
   scopedArena,
 } from '../middleware/resource';
+import { openSseStream } from '../util/sse';
 
 const app = express();
 
@@ -234,10 +235,7 @@ app.post(dual('/resume'), loadUser, requireOwner, resolveArena, resume);
 
 // Listen to an arena's game events
 const events = async (req: Request, res: Response) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-  });
+  openSseStream(res);
 
   function listener(event: unknown) {
     res.write('data: ' + JSON.stringify(event) + '\n\n');
@@ -256,10 +254,7 @@ app.get(dual('/events'), loadUser, resolveArena, events);
 
 // Listen to an arena's bot console logs
 const logs = async (req: Request, res: Response) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-  });
+  openSseStream(res);
 
   function listener(event: unknown) {
     res.write('data: ' + JSON.stringify(event) + '\n\n');

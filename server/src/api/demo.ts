@@ -2,14 +2,12 @@ import express from 'express';
 import appService from '../services/AppService';
 import arenaMemberService from '../services/ArenaMemberService';
 import demoService from '../services/DemoService';
+import { openSseStream } from '../util/sse';
 const app = express();
 
 // Listen to an arena
 app.get('/api/demo/events', async (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-  });
+  openSseStream(res);
 
   function listener(event: unknown) {
     res.write('data: ' + JSON.stringify(event) + '\n\n');
