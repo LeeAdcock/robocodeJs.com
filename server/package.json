@@ -8,6 +8,7 @@
     "dev": "fuser -k 8080/tcp & nodemon --watch src -e ts,ejs --exec npm run dev:start",
     "dev:start": "npm-run-all build start",
     "lint": "npx prettier --write src test && npx eslint src --fix",
+    "lint:eslint": "eslint src --fix",
     "start": "node ./dist/src/index.js",
     "smoke": "node ./scripts/ivm-smoke.js",
     "test": "vitest run",
