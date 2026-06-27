@@ -137,6 +137,28 @@ describe('sandbox + simulation integration', () => {
     expect(tank.health).toBe(0);
   });
 
+  it('does not crash when an uncaught command rejection escapes a handler', async () => {
+    // Awaiting a command that another command supersedes rejects it (documented
+    // behavior). If the bot doesn't .catch() it, that rejection escapes the
+    // async handler — which must NOT kill the bot. The bot keeps running and
+    // honors the latest target.
+    const tank = world.addBot(
+      `bot.on(Event.START, async () => {
+         const superseded = bot.setOrientation(90)
+         bot.setOrientation(270) // supersede -> 'superseded' rejects
+         await superseded        // uncaught rejection leaves the handler
+       })`,
+      'resilient'
+    );
+    expect(tank.health).toBe(100);
+
+    await world.tick(20);
+
+    expect(tank.appCrashed).toBe(false);
+    expect(tank.health).toBe(100); // still alive
+    expect(tank.getOrientation()).toBe(270); // kept running, reached new target
+  });
+
   it('fires a tick-driven setTimeout after its interval elapses', async () => {
     const tank = world.addBot(
       `setTimeout(() => { bot.setSpeed(3) }, 3)`,

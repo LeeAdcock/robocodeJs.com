@@ -1,7 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useParams } from 'react-router-dom';
 
 import Logs from './logs';
+import {
+  subscribePlaybackTime,
+  getPlaybackTime,
+} from '../../util/playbackClock';
 
 interface LogEntry {
   id: string;
@@ -24,6 +28,12 @@ export default function ArenaLogsPage() {
   } as LogEntries);
   const { userId } = useParams();
   const eventSource = useRef<EventSource | undefined>(undefined);
+  // The tick the arena has actually played up to; hold log lines until display
+  // catches up so they appear alongside the motion they describe.
+  const playbackTime = useSyncExternalStore(
+    subscribePlaybackTime,
+    getPlaybackTime
+  );
 
   useEffect(() => {
     if (eventSource.current) {
@@ -54,7 +64,11 @@ export default function ArenaLogsPage() {
 
   return (
     <>
-      <Logs logEntries={logEntries} selectedTankApp={''} />
+      <Logs
+        logEntries={logEntries}
+        selectedTankApp={''}
+        playbackTime={playbackTime}
+      />
     </>
   );
 }

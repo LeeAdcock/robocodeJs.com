@@ -13,7 +13,6 @@ import Environment, { Process } from './environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
-import { logBotFault } from '../util/logger';
 
 // Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
 const MAX_NAME_LENGTH = 50;
@@ -151,24 +150,18 @@ export default class Tank implements Point, Orientated {
                 result
                   .then(() => eventPromiseMap.delete(event))
                   .catch((e: any) => {
-                    this.logger.error(`${ErrorCodes.E019}: ${e}`);
-                    logBotFault(
-                      {
-                        appId: this.process.appId,
-                        tankId: this.id,
-                        arenaId: this.env.getArena().getId?.(),
-                      },
-                      'handler',
-                      e
-                    );
-                    this.appCrashed = true;
+                    // An uncaught rejection from a handler's promise is NOT
+                    // fatal. It is almost always a command the bot didn't
+                    // .catch() being superseded by a later one — a documented,
+                    // expected rejection (e.g. "Turn cancelled" when a HIT
+                    // handler retargets the body mid-turn). Surface it so the
+                    // author can debug, free the slot so the handler can run
+                    // again, and let the bot keep playing. This mirrors the
+                    // synchronous handler path (E003) and the fire-and-forget
+                    // settle path in compiler.ts, both of which log-and-continue
+                    // rather than killing the bot.
+                    this.logger.warn(`${ErrorCodes.E019}: ${e}`);
                     eventPromiseMap.delete(event);
-
-                    this.env.emit('event', {
-                      type: 'appError',
-                      appId: this.process.appId,
-                      error: e.message,
-                    });
                   });
               }
 
@@ -233,7 +226,7 @@ export default class Tank implements Point, Orientated {
   }
 
   setOrientation(d: number) {
-    const target = normalizeAngle(d);
+    const target = normalizeAngle(Math.round(d));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -271,7 +264,7 @@ export default class Tank implements Point, Orientated {
   }
 
   turn(d: number) {
-    const target = normalizeAngle(this.orientation + d);
+    const target = normalizeAngle(Math.round(this.orientation + d));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }

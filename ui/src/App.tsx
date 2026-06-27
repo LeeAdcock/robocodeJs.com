@@ -13,7 +13,27 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import PointInTime from './types/pointInTime';
 import applyArenaEvent from './util/arenaReducer';
+import PlaybackBuffer from './util/playbackBuffer';
+import { setPlaybackTime } from './util/playbackClock';
 import { Emitter } from './util/emitter';
+
+// High-frequency simulation events are played back through the jitter buffer on
+// a steady local clock. Everything else (structural/control events: app & tank
+// placement/removal, pause/resume/restart, renames, crashes) is applied the
+// instant it arrives, so bootstrap and the toolbar controls stay responsive.
+const CADENCE_EVENTS = new Set([
+  'tick',
+  'tankTurn',
+  'tankAccelerate',
+  'tankStop',
+  'turretTurn',
+  'radarTurn',
+  'radarScan',
+  'tankDamaged',
+  'bulletFired',
+  'bulletRemoved',
+  'bulletExploded',
+]);
 
 // Lazy-loaded so the heavy editor chunk (ace-builds + prettier) isn't part of
 // the initial arena/home bundle. Declared after the imports so the `lazy`
@@ -72,6 +92,14 @@ function App() {
   const [isPaused, setPaused] = useState(true);
   const eventSource = useRef<EventSource | undefined>(undefined);
 
+  // The jitter buffer plus refs the rAF playback loop reads, so the loop sees
+  // the latest arena/time without being re-created on every render.
+  const buffer = useRef(new PlaybackBuffer());
+  const arenaRef = useRef(arena);
+  arenaRef.current = arena;
+  const timeRef = useRef(time);
+  timeRef.current = time;
+
   // Reset the experience if the user session expires
   useEffect(() => {
     const interval = setInterval(() => {
@@ -95,11 +123,14 @@ function App() {
 
   const doReloadArena = () => {
     console.log('reloading arena');
+    // Any buffered motion belongs to the pre-reload arena; discard it.
+    buffer.current.flush();
     return new Promise((resolve) => {
       axios
         .get(user ? `/api/user/${user.id}/arena` : `/api/demo/arena`)
         .then((res) => {
           setTime(res.data.clock.time);
+          setPlaybackTime(res.data.clock.time);
           res.data.apps.forEach((app: any) =>
             app.tanks.forEach((tank: any) => {
               tank.path = Array<PointInTime>(20);
@@ -175,11 +206,43 @@ function App() {
     doReloadArena();
   }, [user]);
 
+  // Playback loop: drain the jitter buffer on a steady local clock so buffered
+  // simulation events are applied at an even cadence regardless of how bursty
+  // their network arrival was. Mounted once; reads live state through refs.
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const frame = (now: number) => {
+      // First frame establishes the baseline; clamp big gaps (e.g. a
+      // backgrounded tab) so we catch up over frames instead of one spike.
+      const dt = last === 0 ? 0 : Math.min(now - last, 250);
+      last = now;
+
+      let latestTick: number | null = null;
+      buffer.current.drain(dt, (event) => {
+        applyArenaEvent(arenaRef.current, event, timeRef.current);
+        if (event.type === 'tick') latestTick = event.time;
+      });
+      // A tick advanced the clock — trigger the React re-render ArenaSvg needs,
+      // and publish the displayed time so the log panel reveals lines in step.
+      if (latestTick !== null) {
+        setTime(latestTick);
+        setPlaybackTime(latestTick);
+      }
+
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   useEffect(() => {
     if (eventSource.current) {
       eventSource.current.close();
       eventSource.current = undefined;
     }
+    // A fresh stream replays current state; drop anything left from the old one.
+    buffer.current.flush();
     // todo externalize the server
     const source = new EventSource(
       user
@@ -192,10 +255,15 @@ function App() {
       const data = JSON.parse(message.data);
       emitter.emit(data.type, data);
 
-      // React-state side effects (not part of the arena object)
-      if (data.type === 'tick') {
-        setTime(data.time);
-      } else if (data.type === 'arenaPaused') {
+      // High-frequency simulation events: queue for steady playback. The rAF
+      // loop applies them (and advances `time`) on its own cadence.
+      if (CADENCE_EVENTS.has(data.type)) {
+        buffer.current.push(data);
+        return;
+      }
+
+      // Structural / control events: apply immediately.
+      if (data.type === 'arenaPaused') {
         setPaused(true);
       } else if (data.type === 'arenaResumed') {
         setPaused(false);
@@ -204,6 +272,8 @@ function App() {
           axios.get(`/api/user/${user.id}`).then((res) => setUser(res.data));
         }
       } else if (data.type === 'arenaRestart') {
+        // The arena is being rebuilt — drop buffered motion for the old one.
+        buffer.current.flush();
         setPaused((isPaused) => {
           if (isPaused) doReloadArena();
           else setArena((arena) => ({ ...arena, apps: [] }));
@@ -212,7 +282,7 @@ function App() {
         return;
       }
 
-      setArena((arena) => applyArenaEvent(arena, data, time));
+      setArena((arena) => applyArenaEvent(arena, data, timeRef.current));
     };
 
     return () => {

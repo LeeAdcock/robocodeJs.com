@@ -64,4 +64,45 @@ describe('App', () => {
     // Signed-out clients stream the public demo arena.
     expect(spy.mock.calls[0][0]).toContain('/api/demo/events');
   });
+
+  it('runs the playback loop and cancels it on unmount', () => {
+    let last: FakeEventSource | null = null;
+    vi.stubGlobal(
+      'EventSource',
+      class extends FakeEventSource {
+        constructor(url: string) {
+          super(url);
+          last = this;
+        }
+      }
+    );
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.fn((cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    const cancel = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('cancelAnimationFrame', cancel);
+
+    const { unmount } = render(<App />);
+    expect(raf).toHaveBeenCalled();
+
+    // Feed a burst of buffered simulation events, then drive frames manually:
+    // the loop should drain them without throwing.
+    for (let t = 1; t <= 6; t++) {
+      last!.onmessage?.({ data: JSON.stringify({ type: 'tick', time: t }) });
+    }
+    let now = 0;
+    expect(() => {
+      for (let i = 0; i < 10; i++) {
+        const next = frames.pop();
+        now += 100;
+        next?.(now);
+      }
+    }).not.toThrow();
+
+    unmount();
+    expect(cancel).toHaveBeenCalled();
+  });
 });

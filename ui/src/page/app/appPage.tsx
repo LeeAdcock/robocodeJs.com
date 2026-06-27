@@ -1,4 +1,8 @@
-import Editor from './appEditor';
+import Editor, {
+  EDITOR_FONT_MIN,
+  EDITOR_FONT_MAX,
+  EDITOR_FONT_DEFAULT,
+} from './appEditor';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
@@ -29,6 +33,22 @@ export default function AppPage(props: AppPageProps) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
+
+  // Editor font size, persisted so the preference survives reloads.
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = Number(localStorage.getItem('editorFontSize'));
+    return saved >= EDITOR_FONT_MIN && saved <= EDITOR_FONT_MAX
+      ? saved
+      : EDITOR_FONT_DEFAULT;
+  });
+  useEffect(() => {
+    localStorage.setItem('editorFontSize', String(fontSize));
+  }, [fontSize]);
+  const zoomIn = () =>
+    setFontSize((size) => Math.min(EDITOR_FONT_MAX, size + 1));
+  const zoomOut = () =>
+    setFontSize((size) => Math.max(EDITOR_FONT_MIN, size - 1));
+  const zoomReset = () => setFontSize(EDITOR_FONT_DEFAULT);
 
   const navigate = useNavigate();
 
@@ -150,6 +170,10 @@ export default function AppPage(props: AppPageProps) {
               doDelete={doDelete}
               doExecute={doExecute}
               doClean={doClean}
+              fontSize={fontSize}
+              doZoomIn={zoomIn}
+              doZoomOut={zoomOut}
+              doZoomReset={zoomReset}
             />
           </Col>
         </Row>
@@ -173,6 +197,10 @@ export default function AppPage(props: AppPageProps) {
         onChange={setCode}
         doExecute={doExecute}
         doClean={doClean}
+        fontSize={fontSize}
+        doZoomIn={zoomIn}
+        doZoomOut={zoomOut}
+        doZoomReset={zoomReset}
       />
     </>
   );
