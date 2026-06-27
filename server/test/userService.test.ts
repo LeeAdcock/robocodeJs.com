@@ -17,7 +17,7 @@ const query = vi.mocked(pool.query);
 const queryText = (arg: unknown): string =>
   typeof arg === 'string'
     ? arg
-    : (arg as { text?: string } | undefined)?.text ?? '';
+    : ((arg as { text?: string } | undefined)?.text ?? '');
 
 // Count of arena_member inserts that have actually *committed* (resolved), as
 // opposed to merely been issued.
