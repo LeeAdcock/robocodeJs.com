@@ -19,12 +19,15 @@ Part of the [RobocodeJs monorepo](../README.md). Runs on port `3000` in developm
 npm run dev      # Vite dev server on :3000 (alias: npm start)
 npm run build    # tsc --noEmit type-check, then vite build
 npm run preview  # serve the production build locally
-npm test         # run the Vitest suite once (test/**/*.test.ts)
+npm test         # run the Vitest suite once (test/**/*.test.{ts,tsx})
 npm run test:watch  # Vitest in watch mode
 npm run lint     # eslint --fix + prettier --write
 ```
 
-Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`): the SSE event reducer (`arenaReducer.test.ts`), the shared angle geometry (`geometry.test.ts`), and the client-side movement/rotation/bullet interpolation (`simulate.test.ts`). These are pure logic over plain objects, so they run in a plain `node` environment with no DOM.
+Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`). Two kinds:
+
+- **Pure-logic suites** (plain `node` env): the SSE event reducer (`arenaReducer.test.ts`), shared angle geometry (`geometry.test.ts`), and client-side movement/rotation/bullet interpolation (`simulate.test.ts`).
+- **Component/page suites** (jsdom + [Testing Library](https://testing-library.com), opted in per-file with a `// @vitest-environment jsdom` docblock): `App.test.tsx` (mounts the app and opens the SSE stream without crashing — guards against white-screen regressions), `arenaTank.test.tsx` (health bar sizing/color and the 0/360 rotation-seam fix), `appPage.test.tsx` (the bot editor page loads source and renders, with the Ace editor stubbed), and `markdownPage.test.tsx` (docs render; sample/external links open in a new tab).
 
 `vite.config.ts` sets `build.outDir` to `../server/dist/public` (with `emptyOutDir`), so a production build lands directly where the server serves static files from — no copy step. The `build` script runs `tsc --noEmit` first, so type errors fail the build.
 

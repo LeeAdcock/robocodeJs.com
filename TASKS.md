@@ -5,6 +5,9 @@ A living backlog for future sessions, written after the 2024 modernization effor
 rewrite, multi-arena API, zero-config local dev). Roughly priority-ordered within
 each tier. Effort tags: **S** ≈ <½ day, **M** ≈ 1–2 days, **L** ≈ multi-day.
 
+This file is the **engineering/health backlog**. For product feature ideas
+(game modes, leaderboards, onboarding, etc.) see [`ENHANCEMENTS.md`](ENHANCEMENTS.md).
+
 ## Now (high priority)
 
 - **Merge `modernize-foundation` → `main`.** (S) The branch is ~40 commits ahead
@@ -26,9 +29,6 @@ each tier. Effort tags: **S** ≈ <½ day, **M** ≈ 1–2 days, **L** ≈ multi
   pinned to v8 because v10's type declarations use TS 5.0 `const` type
   parameters — bump pino to v10 as part of this. Will also need
   `@typescript-eslint` v6/v7.
-- **Grow UI test coverage.** (M) Only 3 util suites today (`arenaReducer`,
-  `geometry`, `simulate`). Add component/page tests (the SSE-driven `App` state,
-  arena rendering, the editor) — `jsdom` + Testing Library.
 - **Graceful shutdown.** (S) On `SIGTERM`/`SIGINT`, dispose isolates and close the
   pg pool so deploys/restarts don't leak native resources.
 - **DB schema migrations.** (M) Schema is created ad-hoc via
