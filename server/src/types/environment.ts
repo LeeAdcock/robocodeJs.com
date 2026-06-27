@@ -11,7 +11,7 @@ import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
 
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ArenaId = string & {};
 
 export class Process {

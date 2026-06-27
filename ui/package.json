@@ -16,7 +16,7 @@
     "react-icons": "^4.7.1",
     "react-router-dom": "^6.4.4",
     "showdown": "^2.1.0",
-    "typescript": "^4.9.3"
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "dev": "fuser -k 3000/tcp & vite",
@@ -47,10 +47,10 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/showdown": "^2.0.0",
-    "@typescript-eslint/eslint-plugin": "^5.46.1",
-    "@typescript-eslint/parser": "^5.46.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
     "@vitejs/plugin-react": "^4.7.0",
-    "eslint": "^8.30.0",
+    "eslint": "^8.57.1",
     "eslint-plugin-react": "^7.31.11",
     "eslint-plugin-react-hooks": "^4.6.2",
     "jsdom": "^29.1.1",

@@ -1,5 +1,4 @@
 import React from 'react';
-import Bullet from '../../types/bullet';
 
 interface CraterProps {
   id: string;

@@ -1,6 +1,5 @@
 import React from 'react';
 import { colors } from '../../util/colors';
-import Bullet from '../../types/bullet';
 
 interface BulletProps {
   appIndex: number;

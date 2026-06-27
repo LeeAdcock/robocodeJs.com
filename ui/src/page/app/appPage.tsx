@@ -17,6 +17,7 @@ import { colors } from '../../util/colors';
 import { useNavigate } from 'react-router-dom';
 import { titleCase } from '../../util/titleCase';
 import Arena from '../../types/arena';
+import App from '../../types/tankApp';
 import { Emitter } from '../../util/emitter';
 
 interface AppPageProps {
@@ -28,7 +29,7 @@ interface AppPageProps {
 export default function AppPage(props: AppPageProps) {
   const [error, setError] = useState('');
   const [code, setCode] = useState('');
-  const [app, setApp] = useState(null as any);
+  const [app, setApp] = useState<App | null>(null);
   const { userId, appId } = useParams();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
@@ -52,21 +53,23 @@ export default function AppPage(props: AppPageProps) {
 
   const navigate = useNavigate();
 
-  const appRenamedListener = (event: any) => {
-    setApp((app: any) => {
-      if (event.appId === appId && app) {
-        app.name = event.name;
-        return { ...app, name: event.name };
+  const appRenamedListener = (event: unknown) => {
+    const e = event as { appId: string; name: string };
+    setApp((app) => {
+      if (e.appId === appId && app) {
+        app.name = e.name;
+        return { ...app, name: e.name };
       }
       return app;
     });
   };
 
-  const appErrorListener = (event: any) => {
+  const appErrorListener = (event: unknown) => {
+    const e = event as { appId: string; error: string };
     setError((prevError) => {
-      if (event.appId === appId && app) {
+      if (e.appId === appId && app) {
         setTimeout(() => setError(() => ''), 15000);
-        return event.error;
+        return e.error;
       }
       return prevError;
     });
@@ -135,7 +138,7 @@ export default function AppPage(props: AppPageProps) {
         plugins: [babel],
       });
       setCode(prettyCode);
-    } catch (error) {
+    } catch {
       // do nothing
     }
   };
@@ -176,7 +179,7 @@ export default function AppPage(props: AppPageProps) {
           </Col>
           <Col style={{ paddingRight: '0' }}>
             <Toolbar
-              appName={app?.name}
+              appName={app?.name ?? ''}
               code={code}
               doDelete={doDelete}
               doExecute={doExecute}

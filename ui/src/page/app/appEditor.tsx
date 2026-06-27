@@ -38,8 +38,8 @@ interface CodeEditorProps {
 // (with signatures + hover docs), driven by the shared model in botApi.ts.
 const botApiCompleter = {
   getCompletions(
-    _editor: any,
-    session: any,
+    _editor: Ace.Editor,
+    session: Ace.EditSession,
     pos: { row: number; column: number },
     _prefix: string,
     callback: (error: null, completions: unknown[]) => void
@@ -54,7 +54,7 @@ const botApiCompleter = {
 let completerRegistered = false;
 
 export default function CodeEditor(props: CodeEditorProps) {
-  const [editor, setEditor] = useState(null as any);
+  const [editor, setEditor] = useState<Ace.Editor | null>(null);
   const darkMode = useDarkMode();
   const compileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
@@ -66,19 +66,23 @@ export default function CodeEditor(props: CodeEditorProps) {
       if (editor) {
         editor.getSession().setAnnotations([]);
       }
-    } catch (error) {
+    } catch {
       try {
         prettier.format(source || ' ', {
           plugins: [babel],
         });
-      } catch (lintError: any) {
+      } catch (lintError) {
+        const err = lintError as {
+          loc: { start: { line: number; column: number } };
+          message: string;
+        };
         if (editor) {
           editor.getSession().setAnnotations([
             {
-              row: lintError.loc.start.line - 1,
-              column: lintError.loc.start.column,
-              type: 'error',
-              text: lintError.message,
+              row: err.loc.start.line - 1,
+              column: err.loc.start.column,
+              type: 'error' as const,
+              text: err.message,
             },
           ]);
         }

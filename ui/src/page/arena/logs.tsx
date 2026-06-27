@@ -7,31 +7,34 @@ import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 
-export default class Logs extends React.Component<
-  {
-    selectedTankApp: string;
-    // The tick the arena has played up to. Log lines stamped later than this are
-    // held back so they surface in step with the (buffered) on-screen motion.
-    playbackTime?: number;
-    logEntries: {
-      logs: ({
-        id: string;
-        name: string;
-        level: number;
-        levelName: string;
-        msg: string;
-        time: number;
-      } | null)[];
-      index: number;
-    };
-  },
-  {
-    search: string;
-    hideLevels: string[];
-    hideNames: string[];
-  }
-> {
-  constructor(props: any) {
+interface LogEntry {
+  id: string;
+  name: string;
+  level: number;
+  levelName: string;
+  msg: string;
+  time: number;
+}
+
+interface LogsProps {
+  selectedTankApp: string;
+  // The tick the arena has played up to. Log lines stamped later than this are
+  // held back so they surface in step with the (buffered) on-screen motion.
+  playbackTime?: number;
+  logEntries: {
+    logs: (LogEntry | null)[];
+    index: number;
+  };
+}
+
+interface LogsState {
+  search: string;
+  hideLevels: string[];
+  hideNames: string[];
+}
+
+export default class Logs extends React.Component<LogsProps, LogsState> {
+  constructor(props: LogsProps) {
     super(props);
     this.state = {
       search: '',
@@ -40,15 +43,18 @@ export default class Logs extends React.Component<
     };
   }
 
-  logRef: React.RefObject<any> = React.createRef();
+  logRef: React.RefObject<HTMLDivElement | null> =
+    React.createRef<HTMLDivElement>();
 
   componentDidUpdate() {
     // Pin to the bottom of the scroll area
-    const parentHeight = this.logRef.current.children[0].offsetHeight;
-    const height = this.logRef.current.offsetHeight;
-    const scrollTop = this.logRef.current.scrollTop;
+    const el = this.logRef.current;
+    if (!el) return;
+    const parentHeight = (el.children[0] as HTMLElement).offsetHeight;
+    const height = el.offsetHeight;
+    const scrollTop = el.scrollTop;
     if (Math.abs(scrollTop - (parentHeight - height)) < 200) {
-      this.logRef.current.scrollTo({ top: parentHeight });
+      el.scrollTo({ top: parentHeight });
     }
   }
 

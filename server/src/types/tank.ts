@@ -41,7 +41,7 @@ export const waitUntil = (
       if (failureCondition && failureCondition()) {
         try {
           return reject(msg);
-        } catch (e) {
+        } catch {
           // discard if we can't reject
         }
       }
