@@ -3,9 +3,6 @@ import ArenaSvg from './components/arena/arena';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import TankApp from './types/tankApp';
 import Arena from './types/arena';
-// Lazy-loaded so the heavy editor chunk (ace-builds + prettier) isn't part of
-// the initial arena/home bundle.
-const AppPage = lazy(() => import('./page/app/appPage'));
 import NavBar from './components/navbar';
 import MarkdownPage from './page/markdownPage';
 import User from './types/user';
@@ -16,8 +13,13 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import PointInTime from './types/pointInTime';
 import applyArenaEvent from './util/arenaReducer';
-const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
 import { Emitter } from './util/emitter';
+
+// Lazy-loaded so the heavy editor chunk (ace-builds + prettier) isn't part of
+// the initial arena/home bundle. Declared after the imports so the `lazy`
+// binding is initialized before use (avoids a dev-mode temporal-dead-zone error).
+const AppPage = lazy(() => import('./page/app/appPage'));
+const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
