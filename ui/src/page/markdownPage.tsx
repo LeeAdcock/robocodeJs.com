@@ -1,9 +1,39 @@
 import showdown from 'showdown';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import parse from 'html-react-parser';
+import parse, {
+  domToReact,
+  attributesToProps,
+  Element,
+} from 'html-react-parser';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+
+// Open sample-source and external links in a new tab so following one doesn't
+// navigate away from the app; in-app doc links (e.g. /dev) are left alone.
+const opensInNewTab = (href: string) =>
+  /^https?:\/\//.test(href) || href.startsWith('/samples/');
+
+const parseOptions = {
+  replace: (node: unknown) => {
+    if (
+      node instanceof Element &&
+      node.name === 'a' &&
+      node.attribs.href &&
+      opensInNewTab(node.attribs.href)
+    ) {
+      return (
+        <a
+          {...attributesToProps(node.attribs)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {domToReact(node.children)}
+        </a>
+      );
+    }
+  },
+};
 
 interface MarkdownPageProps {
   path: string;
@@ -56,7 +86,7 @@ export default function MarkdownPage(props: MarkdownPageProps) {
 
   return (
     <div ref={divRef} id="markdown" className="markdown">
-      {parse(html)}
+      {parse(html, parseOptions)}
     </div>
   );
 }
