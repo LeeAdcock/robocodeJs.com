@@ -31,8 +31,8 @@ clock.on(Event.TICK, async () => {
       if (bot.turret.isReady()) {
         let result = await bot.turret.fire()
 
-        // If it was a miss, accelerate and turn
-        if (!result) {
+        // If it was a miss (the shot resolved with no target id), move on
+        if (!result.id) {
           await bot
             .setSpeed(3)
             .then(() => bot.turn(bot.turret.getOrientation()))
@@ -51,23 +51,16 @@ clock.on(Event.TICK, async () => {
 })
 
 bot.on(Event.HIT, async info => {
-  // If we are hit, change modes.
+  // If we are hit, back off, turn to face the attacker, and fire back.
   this.state = 'RETALIATE'
-  // Prepare to fire back
-  return bot
-    .setSpeed(-2)
-    .then(() => bot.setOrientation(info.angle))
-    .then(bot.turret.onReady)
-    .then(async () => {
-      // Fire repeatedly as long as we still see an enemy
-      bot.turret.fire()
-      while (
-        (await bot.radar.onReady().then(await bot.radar.scan)).length() > 0 &&
-        !targets[0].friendly
-      )
-        bot.turret.fire()
-    })
-    .finally(() => (this.state = 'SEARCH'))
+  try {
+    await bot.setSpeed(-2)
+    await bot.setOrientation(info.angle)
+    await bot.turret.onReady()
+    await bot.turret.fire()
+  } finally {
+    this.state = 'SEARCH'
+  }
 })
 
 // If we hit an obstical, change modes until we have avoided it
