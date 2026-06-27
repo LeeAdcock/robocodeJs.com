@@ -214,6 +214,20 @@ describe('compiler — bot API in a real isolate', () => {
     ).toBeUndefined();
   });
 
+  it('re-arms START (needsStarting) when code is (re)loaded', async () => {
+    // A tank that already ran, then has new code loaded onto it (e.g. the bot's
+    // source is swapped/edited). START must fire again so a bot that initializes
+    // state in START isn't left half-set up.
+    ctx.tank.needsStarting = false;
+    vi.spyOn(appService, 'get').mockResolvedValue({
+      getSource: () => 'bot.on(Event.START, () => {})',
+    } as never);
+
+    await ctx.tank.execute(ctx.proc);
+
+    expect(ctx.tank.needsStarting).toBe(true);
+  });
+
   it('does not expose the ivm module (or Reference/Callback) to bot code', () => {
     expect(ctx.read('typeof _ivm')).toBe('undefined');
     expect(ctx.read('typeof globalThis._ivm')).toBe('undefined');

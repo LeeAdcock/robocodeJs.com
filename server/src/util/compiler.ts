@@ -368,6 +368,11 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
 const execute = (process: Process, tank: Tank): Promise<unknown> => {
   tank.handlers = {};
   tank.timers.reset();
+  // Re-arm the START event so loading (or reloading) code always re-runs the
+  // bot's initialization. Without this, swapping a bot's source onto a tank that
+  // already started would re-register handlers but never fire START — so any
+  // state a bot sets up in START (e.g. waypoints) would be missing when TICK runs.
+  tank.needsStarting = true;
   return appService.get(process.getAppId()).then((app) => {
     if (!app) return;
     const onError = (e: unknown) => {

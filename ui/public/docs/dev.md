@@ -182,23 +182,28 @@ Callback functions are limited to 5 seconds of runtime. Long duration activities
 
 Syntax-errors or runtime-errors in the application code will cause the bot to terminate. This can impact the bot as soon as the match begins, or at any point while it is running.
 
-## Persisted variables
+## State and the START event
 
-When a bot's logic code is changed, it is reexecuted to load new event handlers and behavior logic.  This can have the unintended side-effect of resetting any globally defined variables. It is recommended to store values as properties on `this` if you need to ensure they are available for the bot's full lifecycle. The `this` object will be stored durably across executions and available to all event handlers.
+When a bot's code is loaded — when it first starts, and again every time you save a change — it is re-executed to pick up your new handlers, and the `START` event fires so your setup code runs again. Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
 
 ```
-// This will be reset to the initial value each time the code
-// is recompiled and executed.
-let thisWillBeResetOnRecompile = 1
+// Reset to its initial value every time the code is (re)loaded.
+let resetOnReload = 1
 
 bot.on(Event.START, () => {
-  // This is only available within this run of the function
-  let thisWillOnlyBeAvailableInThisFunction = 2
+  // Local to this single call of the handler.
+  let localOnly = 2
 
-  // This can be accessed anywhere and is stored durably.
-  this.myImportantVariableAvailableEverywhere = 3
+  // Stored on `this`, which is shared across all of this bot's handlers.
+  this.sharedAcrossHandlers = 3
+})
+
+clock.on(Event.TICK, () => {
+  // `this.sharedAcrossHandlers` is available here.
 })
 ```
+
+Because `START` runs again whenever you save, anything you set up there is re-initialized on each code change. Set state up in `START` (not lazily in `TICK`) so it's always ready before your other handlers run.
 
 ## Console Logging
 
