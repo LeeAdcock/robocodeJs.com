@@ -1,6 +1,6 @@
 # Bot Development
 
-Each bot's logic is defined in JavaScript that is initialized at the beginning of a match to provide initial commands and register event handlers. The logic is reinitialized every time you save your code.
+Each bot's logic is defined in JavaScript that is initialized at the beginning of a match to provide initial commands and register event handlers. Saving your code reloads it live — your event handlers are replaced immediately — but it does **not** re-run the `START` handler, so a running bot keeps the state it set up. Use the editor's **reboot** button (or `Ctrl-Shift-S`) to reload your code and re-run `START` when you want a fresh initialization.
 
 The in-browser code editor offers **autocomplete** for the whole bot API: type `bot.`, `arena.`, `clock.`, or `Event.` to see the available members, each with its signature and a short description.
 
@@ -232,7 +232,7 @@ clock.on(Event.TICK, () => {
 })
 ```
 
-Because `START` runs again whenever you save, anything you set up there is re-initialized on each code change. Set state up in `START` (not lazily in `TICK`) so it's always ready before your other handlers run.
+`START` runs when the bot first starts, when the arena restarts, and when you **reboot** — it does **not** re-run on an ordinary save, so editing code won't reset the state you set up there. Set your initial state up in `START` (not lazily in `TICK`) so it's ready before your other handlers run, and reboot (the editor button or `Ctrl-Shift-S`) when you want to re-initialize after an edit.
 
 ## Console Logging
 

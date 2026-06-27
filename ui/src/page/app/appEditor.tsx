@@ -25,6 +25,7 @@ interface CodeEditorProps {
   onChange: (source: string) => void;
   doClean: () => void;
   doExecute: () => void;
+  doReboot: () => void;
   fontSize: number;
   doZoomIn: () => void;
   doZoomOut: () => void;
@@ -93,6 +94,12 @@ export default function CodeEditor(props: CodeEditorProps) {
           name: 'save',
           bindKey: { win: 'Ctrl-S', mac: 'Cmd-S' },
           exec: () => props.doExecute(),
+        },
+        {
+          // Shift-save: save and reboot (re-run START) in one keystroke.
+          name: 'saveAndReboot',
+          bindKey: { win: 'Ctrl-Shift-S', mac: 'Cmd-Shift-S' },
+          exec: () => props.doReboot(),
         },
         {
           name: 'clean',

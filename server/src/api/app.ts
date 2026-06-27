@@ -100,6 +100,34 @@ app.post(
   }
 );
 
+// Reboot the app: reload its code and re-fire START (the editor's reboot button).
+// Saving code no longer re-runs START on its own, so this is how an author asks
+// for a fresh initialization on demand.
+app.post(
+  '/api/user/:userId/app/:appId/reboot',
+  loadUser,
+  requireOwner,
+  loadApp,
+  async (req, res) => {
+    const user = scopedUser(req);
+    const app = scopedApp(req);
+
+    const arenas: Arena[] = await arenaService.getForUser(user.getId());
+    return Promise.all(
+      arenas
+        .filter((arena) => environmentService.has(arena.getId()))
+        .map((arena) =>
+          environmentService.get(arena).then((env) => env.reboot(app.getId()))
+        )
+    ).then(() => {
+      res.status(200);
+      res.send({
+        name: app.getName(),
+      });
+    });
+  }
+);
+
 // Get app source code
 app.get(
   '/api/user/:userId/app/:appId/source',

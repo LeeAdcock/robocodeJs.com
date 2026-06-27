@@ -151,6 +151,22 @@ export default class Environment {
     );
   }
 
+  // Reload the app's code and re-fire its START handlers — the manual "reboot"
+  // the editor offers. execute() no longer re-arms START on its own (so saves
+  // don't disrupt a running bot), so set needsStarting here once the freshly
+  // loaded handlers are registered.
+  reboot(appId: AppId): Promise<unknown> {
+    return this.execute(appId).then(() => {
+      this.processes
+        .filter((process) => process.getAppId() === appId)
+        .forEach((process) =>
+          process.tanks.forEach((tank) => {
+            tank.needsStarting = true;
+          })
+        );
+    });
+  }
+
   // Run the game
   private simulate = (cancelable: {
     interval: ReturnType<typeof setInterval>;

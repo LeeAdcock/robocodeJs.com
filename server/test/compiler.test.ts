@@ -226,6 +226,21 @@ describe('compiler — bot API in a real isolate', () => {
     expect(lastLogMsg()).toContain('boom');
   });
 
+  it('reloading code does not re-fire START (saves keep running state)', async () => {
+    // A tank that has already started, then has new source loaded onto it (a
+    // save/recompile). START must NOT re-arm — re-initialization is explicit
+    // (the reboot button / Environment.reboot), so an edit doesn't disrupt a
+    // running bot.
+    ctx.tank.needsStarting = false;
+    vi.spyOn(appService, 'get').mockResolvedValue({
+      getSource: () => 'bot.on(Event.START, () => {})',
+    } as never);
+
+    await ctx.tank.execute(ctx.proc);
+
+    expect(ctx.tank.needsStarting).toBe(false);
+  });
+
   it('exposes console.info / warn / error / debug and logger levels', () => {
     ctx.run(`
       console.info('i');
@@ -277,20 +292,6 @@ describe('compiler — bot API in a real isolate', () => {
     expect(
       ctx.emit.mock.calls.find((c) => c[1]?.type === 'appRenamed')
     ).toBeUndefined();
-  });
-
-  it('re-arms START (needsStarting) when code is (re)loaded', async () => {
-    // A tank that already ran, then has new code loaded onto it (e.g. the bot's
-    // source is swapped/edited). START must fire again so a bot that initializes
-    // state in START isn't left half-set up.
-    ctx.tank.needsStarting = false;
-    vi.spyOn(appService, 'get').mockResolvedValue({
-      getSource: () => 'bot.on(Event.START, () => {})',
-    } as never);
-
-    await ctx.tank.execute(ctx.proc);
-
-    expect(ctx.tank.needsStarting).toBe(true);
   });
 
   it('does not expose the ivm module (or Reference/Callback) to bot code', () => {
