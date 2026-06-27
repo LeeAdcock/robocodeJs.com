@@ -1,5 +1,5 @@
-import Environment from "../types/environment";
-import Tank from "../types/tank";
+import Environment from '../types/environment';
+import Tank from '../types/tank';
 
 /*
   This creates "monkey-patched" wrappers for the timer related
@@ -18,12 +18,14 @@ class Timer {
 }
 
 export class TimersContainer {
-  intervalMap: Map<number, Timer> = new Map<number, Timer>();
-  timerMap: Map<number, Timer> = new Map<number, Timer>();
+  // Keyed by timer id. Accessed via bracket notation / Object.entries, so these
+  // are plain records, not Maps.
+  intervalMap: Record<number, Timer> = {};
+  timerMap: Record<number, Timer> = {};
 
   reset = () => {
-    this.intervalMap = new Map<number, Timer>();
-    this.timerMap = new Map<number, Timer>();
+    this.intervalMap = {};
+    this.timerMap = {};
   };
 }
 
@@ -38,7 +40,7 @@ export const timerTick = (env: Environment) => {
           const timer: Timer = entry[1] as Timer;
           const timerId: number = parseInt(entry[0]);
           if (time - (timer.lastFired || timer.started) >= timer.interval) {
-            timer.logger.trace("Triggered interval", timerId);
+            timer.logger.trace('Triggered interval', timerId);
             timer.lastFired = time;
             if (timer.func) timer.func();
           }
@@ -48,9 +50,9 @@ export const timerTick = (env: Environment) => {
           const timer: Timer = entry[1] as Timer;
           const timerId: number = parseInt(entry[0]);
           if (time - timer.started >= timer.interval) {
-            timer.logger.trace("Triggered timer", timerId);
+            timer.logger.trace('Triggered timer', timerId);
             if (timer.func) timer.func();
-            timer.logger.trace("Canceled timer", timerId);
+            timer.logger.trace('Canceled timer', timerId);
             delete tank.timers.timerMap[timerId];
           }
         });
@@ -61,29 +63,40 @@ export const timerTick = (env: Environment) => {
 // Create timer and interval wrapper functions for the provided tank
 export const scheduleFactory = (tank: Tank) => {
   return {
-    setInterval: (func: () => void, interval: number, env: Environment) => {
-      const timerId = Math.floor(Math.random() * 100000);
-      tank.logger.trace("Created interval", timerId);
+    // timerId is generated isolate-side (a per-tank sequence) and passed in, so
+    // the host map and the bot's own timer table share one stable key.
+    setInterval: (
+      timerId: number,
+      func: () => void,
+      interval: number,
+      env: Environment
+    ) => {
+      tank.logger.trace('Created interval', timerId);
       tank.timers.intervalMap[timerId] = {
         func,
         started: env.getTime(),
         interval,
         logger: tank.logger,
+        lastFired: null,
       };
       return timerId;
     },
 
     clearInterval: (timerId: number) => {
-      tank.logger.trace("Canceled interval", timerId);
+      tank.logger.trace('Canceled interval', timerId);
       delete tank.timers.intervalMap[timerId];
     },
 
-    setTimeout: (func: () => void, interval: number, env: Environment) => {
-      const timerId = Math.floor(Math.random() * 100000);
-      tank.logger.trace("Created timer", timerId);
+    setTimeout: (
+      timerId: number,
+      func: () => void,
+      interval: number,
+      env: Environment
+    ) => {
+      tank.logger.trace('Created timer', timerId);
       const wrappedFunc = () => {
         delete tank.timers.timerMap[timerId];
-        tank.logger.trace("Triggered timer", timerId);
+        tank.logger.trace('Triggered timer', timerId);
         func();
       };
       tank.timers.timerMap[timerId] = {
@@ -91,12 +104,13 @@ export const scheduleFactory = (tank: Tank) => {
         interval,
         started: env.getTime(),
         logger: tank.logger,
+        lastFired: null,
       };
       return timerId;
     },
 
-    clearTimeout: (timerId) => {
-      tank.logger.trace("Canceled timer", timerId);
+    clearTimeout: (timerId: number) => {
+      tank.logger.trace('Canceled timer', timerId);
       delete tank.timers.timerMap[timerId];
     },
   };

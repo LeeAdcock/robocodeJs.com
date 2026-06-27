@@ -1,9 +1,12 @@
-import Arena from "../types/arena";
-import Environment, { ArenaId, Process } from "../types/environment";
-import arenaMemberService from "./ArenaMemberService";
+import Arena from '../types/arena';
+import Environment, { ArenaId, Process } from '../types/environment';
+import arenaMemberService from './ArenaMemberService';
+import { logger } from '../util/logger';
 
 export class EnvironmentService {
-  store: Map<ArenaId, Environment> = new Map();
+  // Keyed by arenaId. Accessed via bracket notation / Object.entries below, so
+  // this is a plain record, not a Map.
+  store: Record<ArenaId, Environment> = {};
 
   constructor() {
     // Garbage collection
@@ -12,7 +15,7 @@ export class EnvironmentService {
       (Object.entries(this.store) as [ArenaId, Environment][]).forEach(
         ([arenaId, env]) => {
           if (env.stoppedAt && threshold > env.stoppedAt.getTime()) {
-            console.log("disposing isolate", arenaId);
+            logger.debug({ arenaId }, 'disposing idle isolate (GC)');
             delete this.store[arenaId];
             env.dispose();
           }
@@ -28,7 +31,7 @@ export class EnvironmentService {
     }
 
     env = new Environment(arena);
-    console.log("creating isolate", arena.getId());
+    logger.debug({ arenaId: arena.getId() }, 'creating isolate');
 
     this.store[arena.getId()] = env;
     return arenaMemberService
@@ -41,6 +44,18 @@ export class EnvironmentService {
         ).then(() => env)
       )
       .then(() => env.restart().then(() => env));
+  };
+
+  // Tears down an arena's in-memory environment immediately (rather than
+  // waiting for the 30-minute idle GC). Used when an arena is deleted.
+  dispose = (arenaId: ArenaId): Promise<void> => {
+    const env = this.store[arenaId];
+    if (env) {
+      logger.debug({ arenaId }, 'disposing isolate');
+      delete this.store[arenaId];
+      env.dispose();
+    }
+    return Promise.resolve();
   };
 
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {

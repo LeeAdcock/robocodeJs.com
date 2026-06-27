@@ -2,44 +2,30 @@
   "name": "ui",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@testing-library/jest-dom": "^5.16.5",
-    "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.4",
-    "@types/react": "^18.0.26",
-    "@types/react-dom": "^18.0.9",
-    "ace": "^1.3.0",
+    "ace-builds": "^1.13.2",
     "axios": "^1.2.1",
     "bootstrap": "^5.2.3",
-    "brace": "^0.11.1",
     "html-react-parser": "^3.0.4",
     "react": "^18.2.0",
     "react-ace": "^10.1.0",
     "react-bootstrap": "^2.6.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.7.1",
-    "react-moment": "^1.1.2",
     "react-router-dom": "^6.4.4",
-    "react-scripts": "5.0.1",
     "showdown": "^2.1.0",
-    "source-map-explorer": "^2.5.3",
-    "typescript": "^4.9.3",
-    "web-vitals": "^2.1.4"
+    "typescript": "^4.9.3"
   },
   "scripts": {
-    "start": "fuser -k 3000/tcp & react-scripts start",
-    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build && rm -fr ../server/dist/public && mkdir ../server/dist/ -p && mv build ../server/dist/public",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts src --fix ; prettier --write src"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "dev": "fuser -k 3000/tcp & vite",
+    "start": "fuser -k 3000/tcp & vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 3000",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src --fix ; prettier --write src test"
   },
   "browserslist": {
     "production": [
@@ -54,13 +40,23 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.0.26",
     "@types/react-bootstrap": "^0.32.32",
+    "@types/react-dom": "^18.0.9",
     "@types/showdown": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.46.1",
     "@typescript-eslint/parser": "^5.46.1",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^8.30.0",
     "eslint-plugin-react": "^7.31.11",
-    "http-proxy-middleware": "^2.0.6",
-    "prettier": "^2.8.1"
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "jsdom": "^29.1.1",
+    "prettier": "^2.8.1",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.9"
   }
 }

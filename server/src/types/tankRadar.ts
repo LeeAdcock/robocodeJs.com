@@ -1,6 +1,7 @@
-import { Event } from "./event";
-import { Orientated } from "./orientated";
-import Tank, { normalizeAngle, waitUntil } from "./tank";
+import { Event } from './event';
+import { Orientated } from './orientated';
+import Tank, { waitUntil } from './tank';
+import { normalizeAngle } from '../util/geometry';
 
 export class TankRadar implements Orientated {
   public orientation: number;
@@ -22,26 +23,26 @@ export class TankRadar implements Orientated {
     const target = normalizeAngle(d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.env.emit("event", {
-      type: "radarTurn",
+    this.tank.env.emit('event', {
+      type: 'radarTurn',
       time: this.tank.env.getTime(),
       id: this.tank.id,
       radarOrientationTarget: this.orientationTarget,
       radarOrientation: this.orientation,
       radarOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace("Turning radar to " + this.orientationTarget + "°");
+    this.tank.logger.trace('Turning radar to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target % 360,
       () =>
         !this.tank.env.isRunning() || this.orientationTarget !== target % 360,
-      "Radar orientation change cancelled"
+      'Radar orientation change cancelled'
     );
   }
 
   getOrientation() {
-    return normalizeAngle(this.orientation);
+    return Math.floor(normalizeAngle(this.orientation));
   }
 
   isTurning() {
@@ -52,15 +53,15 @@ export class TankRadar implements Orientated {
     const target = normalizeAngle(this.orientation + d);
     this.orientationTarget = target;
     // todo only if this is an actual change
-    this.tank.env.emit("event", {
-      type: "radarTurn",
+    this.tank.env.emit('event', {
+      type: 'radarTurn',
       time: this.tank.env.getTime(),
       id: this.tank.id,
       radarOrientationTarget: this.orientationTarget,
       radarOrientation: this.orientation,
       radarOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace("Turning radar to " + this.orientationTarget + "°");
+    this.tank.logger.trace('Turning radar to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
       () => this.orientation === target,
@@ -68,7 +69,7 @@ export class TankRadar implements Orientated {
         !this.tank.env.isRunning() ||
         this.orientationTarget !== target ||
         this.tank.health <= 0,
-      "Radar turn chancelled"
+      'Radar turn chancelled'
     );
   }
 
@@ -85,7 +86,7 @@ export class TankRadar implements Orientated {
           this.charged < peakValue
         );
       },
-      "Radar already scanned"
+      'Radar already scanned'
     );
   }
 
@@ -94,11 +95,11 @@ export class TankRadar implements Orientated {
   }
 
   scan() {
-    if (this.charged < 100) return Promise.reject("Radar not ready");
-    this.tank.logger.trace("Scanning");
+    if (this.charged < 100) return Promise.reject('Radar not ready');
+    this.tank.logger.trace('Scanning');
     this.charged = 0;
-    this.tank.env.emit("event", {
-      type: "radarScan",
+    this.tank.env.emit('event', {
+      type: 'radarScan',
       time: this.tank.env.getTime(),
       id: this.tank.id,
     });

@@ -1,6 +1,6 @@
-import { AppId } from "./app";
-import { ArenaId } from "./arena";
-import pool from "../util/db";
+import { AppId } from './app';
+import { ArenaId } from './arena';
+import pool from '../util/db';
 
 export default class ArenaMember {
   private appId: AppId;
@@ -10,7 +10,7 @@ export default class ArenaMember {
   constructor(appId: AppId, arenaId: ArenaId, timestamp: number) {
     this.appId = appId;
     this.arenaId = arenaId;
-    this.timestamp = timestamp
+    this.timestamp = timestamp;
   }
 
   getAppId = () => this.appId;
@@ -20,7 +20,7 @@ export default class ArenaMember {
   delete = (): Promise<undefined> => {
     return pool
       .query({
-        text: "DELETE FROM arena_member WHERE arenaId=$1 AND appId=$2",
+        text: 'DELETE FROM arena_member WHERE arenaId=$1 AND appId=$2',
         values: [this.arenaId, this.appId],
       })
       .then(() => undefined);

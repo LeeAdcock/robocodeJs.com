@@ -1,0 +1,267 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// compiler.ts -> tank.ts -> appService -> util/db runs CREATE TABLE at import.
+// Mock the db pool so importing the real modules doesn't reach Postgres.
+vi.mock('../src/util/db', () => ({
+  default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
+}));
+
+import compiler from '../src/util/compiler';
+import Tank from '../src/types/tank';
+import { Process } from '../src/types/environment';
+import { Event } from '../src/types/event';
+import { timerTick } from '../src/util/scheduleFactory';
+import appService from '../src/services/AppService';
+
+// These are true integration tests: they spin up a real isolated-vm isolate,
+// have compiler.init build the bot API into it, then compile/run bot code in the
+// sandbox and read values back out. This locks the bot-facing contract before
+// any refactor of compiler.ts.
+
+function makeCompiledTank() {
+  const emit = vi.fn();
+  const proc = new Process('app1');
+  const env = {
+    getArena: () => ({ getWidth: () => 750, getHeight: () => 600 }),
+    getProcesses: () => [proc],
+    getTime: () => 42,
+    isRunning: () => false, // waitUntil-based bot calls settle immediately
+    emit,
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tank = new Tank(env as any, proc as any);
+  tank.x = 100;
+  tank.y = 200;
+  tank.orientation = 0;
+  tank.orientationTarget = 0;
+  tank.speed = 0;
+  tank.speedTarget = 0;
+  proc.tanks.push(tank);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  compiler.init(env as any, proc, tank);
+
+  // Run bot code in the sandbox.
+  const run = (code: string) =>
+    proc.getSandbox().compileScriptSync(code).runSync(tank.getContext());
+  // Evaluate an expression inside the isolate and copy the result out.
+  const read = (expr: string) =>
+    proc
+      .getSandbox()
+      .compileScriptSync(`(${expr})`)
+      .runSync(tank.getContext(), { copy: true });
+
+  return { tank, proc, env, emit, run, read };
+}
+
+describe('compiler — bot API in a real isolate', () => {
+  let ctx: ReturnType<typeof makeCompiledTank>;
+
+  beforeEach(() => {
+    ctx = makeCompiledTank();
+  });
+  afterEach(() => {
+    ctx.proc.dispose();
+  });
+
+  // Bot code now runs off-thread via async apply, so effects land after a
+  // boundary round-trip. Poll the isolate for a value rather than racing a fixed
+  // delay (timing varies under parallel-test CPU load).
+  const waitUntilRead = async (
+    expr: string,
+    done: (v: unknown) => boolean
+  ): Promise<unknown> => {
+    const deadline = Date.now() + 3000;
+    while (!done(ctx.read(expr)) && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return ctx.read(expr);
+  };
+
+  it('exposes synchronous getters that copy real values across the boundary', () => {
+    expect(ctx.read('bot.getX()')).toBe(100);
+    expect(ctx.read('bot.getY()')).toBe(200);
+    expect(ctx.read('bot.getId()')).toBe(ctx.tank.id);
+    expect(ctx.read('arena.getWidth()')).toBe(750);
+    expect(ctx.read('arena.getHeight()')).toBe(600);
+    expect(ctx.read('clock.getTime()')).toBe(42);
+  });
+
+  it('removes Date and does not leak Node globals into the sandbox', () => {
+    // Date is deliberately set to undefined so bots stay deterministic.
+    expect(ctx.read('typeof Date')).toBe('undefined');
+    expect(ctx.read('typeof process')).toBe('undefined');
+    expect(ctx.read('typeof require')).toBe('undefined');
+    expect(ctx.read('typeof globalThis.setInterval')).toBe('function');
+  });
+
+  it('applies mutating commands to the underlying tank', () => {
+    ctx.run('bot.setSpeed(3).catch(() => {})');
+    expect(ctx.tank.speedTarget).toBe(3);
+
+    ctx.run('bot.turn(90).catch(() => {})');
+    expect(ctx.tank.orientationTarget).toBe(90);
+
+    ctx.run('bot.turret.setOrientation(45).catch(() => {})');
+    expect(ctx.tank.turret.orientationTarget).toBe(45);
+
+    ctx.run('bot.radar.setOrientation(10).catch(() => {})');
+    expect(ctx.tank.turret.radar.orientationTarget).toBe(10);
+  });
+
+  it('clamps setSpeed to the tank speedMax', () => {
+    ctx.run('bot.setSpeed(1000).catch(() => {})');
+    expect(ctx.tank.speedTarget).toBe(ctx.tank.speedMax);
+  });
+
+  it('registers event handlers and runs them through the Reference bridge', async () => {
+    ctx.run(`
+            globalThis._started = false
+            bot.on(Event.START, () => { globalThis._started = true })
+        `);
+    expect(typeof ctx.tank.handlers[Event.START]).toBe('function');
+
+    // Invoking the handler schedules a setTimeout(0) that calls into the isolate.
+    ctx.tank.handlers[Event.START]();
+    expect(await waitUntilRead('globalThis._started', (v) => v === true)).toBe(
+      true
+    );
+  });
+
+  it('wires clock.on(TICK) through to a tank TICK handler', async () => {
+    ctx.run(`
+            globalThis._ticks = 0
+            clock.on(Event.TICK, () => { globalThis._ticks++ })
+        `);
+    expect(typeof ctx.tank.handlers[Event.TICK]).toBe('function');
+    ctx.tank.handlers[Event.TICK]();
+    expect(await waitUntilRead('globalThis._ticks', (v) => v === 1)).toBe(1);
+  });
+
+  it('routes console.log to the environment log stream', () => {
+    ctx.run(`console.log('hello world')`);
+    expect(ctx.emit).toHaveBeenCalledWith(
+      'log',
+      expect.objectContaining({ time: 42 })
+    );
+  });
+
+  it('registers tick-driven setInterval timers on the tank', () => {
+    ctx.run(`setInterval(() => {}, 5)`);
+    expect(Object.keys(ctx.tank.timers.intervalMap)).toHaveLength(1);
+  });
+
+  it('terminates a runaway timer body under the sandbox timeout (DoS guard)', async () => {
+    // Without a timeout on timer callbacks, this infinite loop would hang the
+    // host thread forever. The timer now runs off-thread via apply(), so the
+    // crash is recorded asynchronously once the (shortened) timeout fires.
+    process.env.SANDBOX_TIMEOUT_MS = '200';
+    try {
+      ctx.run(`setInterval(() => { while (true) {} }, 0)`);
+      // Fire the registered interval the way the simulation loop does.
+      timerTick(ctx.env as never);
+      // The crash is recorded asynchronously once the timeout fires; poll for it
+      // rather than racing a fixed delay (off-thread timing varies under load).
+      const deadline = Date.now() + 3000;
+      while (!ctx.tank.appCrashed && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(ctx.tank.appCrashed).toBe(true);
+    } finally {
+      delete process.env.SANDBOX_TIMEOUT_MS;
+    }
+  });
+
+  it('caps the per-tick log budget and clamps long messages', () => {
+    // env.getTime() is fixed at 42, so every call shares one budget window.
+    ctx.run(`for (let i = 0; i < 200; i++) console.log('x'.repeat(5000))`);
+    const logCalls = ctx.emit.mock.calls.filter((c) => c[0] === 'log');
+    expect(logCalls.length).toBeLessThanOrEqual(50);
+    // Long strings are truncated before they reach the SSE stream.
+    expect(logCalls[0][1].msg.length).toBeLessThanOrEqual(2001);
+  });
+
+  it('sanitizes and bounds a bot-supplied name before broadcasting it', async () => {
+    const app = {
+      getId: () => 'app1',
+      getName: () => 'old',
+      setName: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(appService, 'get').mockResolvedValue(app as never);
+    ctx.tank.setName('  \u0000Super\u0007Bot' + 'z'.repeat(100));
+    await new Promise((r) => setTimeout(r, 0));
+    const call = ctx.emit.mock.calls.find(
+      (c) => c[0] === 'event' && c[1]?.type === 'appRenamed'
+    );
+    expect(call).toBeTruthy();
+    // control chars stripped, trimmed, clamped to 50 chars
+    expect(call![1].name).toBe(('SuperBot' + 'z'.repeat(100)).slice(0, 50));
+    expect(call![1].name.length).toBe(50);
+  });
+
+  it('ignores a name that is empty after sanitizing', async () => {
+    const app = {
+      getId: () => 'app1',
+      getName: () => 'old',
+      setName: vi.fn(),
+    };
+    vi.spyOn(appService, 'get').mockResolvedValue(app as never);
+    ctx.emit.mockClear();
+    ctx.tank.setName(' ');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      ctx.emit.mock.calls.find((c) => c[1]?.type === 'appRenamed')
+    ).toBeUndefined();
+  });
+
+  it('re-arms START (needsStarting) when code is (re)loaded', async () => {
+    // A tank that already ran, then has new code loaded onto it (e.g. the bot's
+    // source is swapped/edited). START must fire again so a bot that initializes
+    // state in START isn't left half-set up.
+    ctx.tank.needsStarting = false;
+    vi.spyOn(appService, 'get').mockResolvedValue({
+      getSource: () => 'bot.on(Event.START, () => {})',
+    } as never);
+
+    await ctx.tank.execute(ctx.proc);
+
+    expect(ctx.tank.needsStarting).toBe(true);
+  });
+
+  it('does not expose the ivm module (or Reference/Callback) to bot code', () => {
+    expect(ctx.read('typeof _ivm')).toBe('undefined');
+    expect(ctx.read('typeof globalThis._ivm')).toBe('undefined');
+    expect(ctx.read('typeof ivm')).toBe('undefined');
+    // The escape-relevant primitives must be unreachable too.
+    expect(ctx.read('typeof Reference')).toBe('undefined');
+    expect(ctx.read('typeof ExternalCopy')).toBe('undefined');
+  });
+
+  it('delivers async rejections back to bot code across the boundary', async () => {
+    // radar starts uncharged, so scan() rejects — exercises the settle path.
+    ctx.run(
+      `globalThis.__r = 'pending'; bot.radar.scan().then(() => { __r = 'ok' }, (e) => { __r = 'err:' + e })`
+    );
+    expect(await waitUntilRead('__r', (v) => v !== 'pending')).toBe(
+      'err:Radar not ready'
+    );
+  });
+
+  it('copies an async object result (scan hit list) back across the boundary', async () => {
+    ctx.tank.turret.radar.charged = 100; // allow the scan to run
+    ctx.run(
+      `globalThis.__hits = 'pending'; bot.radar.scan().then((v) => { __hits = Array.isArray(v) ? v.length : 'notarray' })`
+    );
+    expect(await waitUntilRead('__hits', (v) => v !== 'pending')).toBe(0);
+  });
+
+  it('exposes the Event enum to bots', () => {
+    expect(ctx.read('Event.START')).toBe('START');
+    expect(ctx.read('Event.TICK')).toBe('TICK');
+  });
+
+  it('copies bot.getHealth() across the boundary as a 0–1 fraction', () => {
+    // tank health 100 -> 1.0
+    expect(ctx.read('bot.getHealth()')).toBe(1);
+  });
+});

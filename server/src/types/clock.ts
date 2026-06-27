@@ -1,3 +1,3 @@
 export default interface Clock {
-  time;
+  time: number;
 }

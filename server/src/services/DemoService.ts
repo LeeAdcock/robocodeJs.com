@@ -1,8 +1,8 @@
-import appService from "./AppService";
-import arenaService from "./ArenaService";
-import environmentService from "./EnvironmentService";
-import userService from "./UserService";
-import Environment from "../types/environment";
+import appService from './AppService';
+import arenaService from './ArenaService';
+import environmentService from './EnvironmentService';
+import userService from './UserService';
+import Environment from '../types/environment';
 
 let _locked = false;
 
@@ -10,12 +10,12 @@ const getDemoEnvironment = async (): Promise<Environment> => {
   const user = await userService.getDemoUser();
 
   const arena = await arenaService.getDefaultForUser(user.getId());
-  if (!arena) throw new Error("missing arena");
+  if (!arena) throw new Error('missing arena');
 
   const apps = await appService.getForUser(user.getId());
 
   const app1 = apps[0];
-  await app1.setName("Demo Bot 1");
+  await app1.setName('Demo Bot 1');
   await app1.setSource(`
         bot.turret.setOrientation(0)
         bot.radar.setOrientation(0)

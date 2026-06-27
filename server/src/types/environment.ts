@@ -1,14 +1,15 @@
-import Clock from "./clock";
-import { EventEmitter } from "events";
-import TankApp, { AppId } from "./app";
-import Tank from "./tank";
-import ivm from "isolated-vm";
-import Arena from "./arena";
-import compiler from "../util/compiler";
+import Clock from './clock';
+import { EventEmitter } from 'events';
+import TankApp, { AppId } from './app';
+import Tank from './tank';
+import ivm from 'isolated-vm';
+import Arena from './arena';
+import compiler from '../util/compiler';
 
-import Simulation from "../util/simulation";
-import appService from "../services/AppService";
-import { ErrorCodes } from "./ErrorCodes";
+import Simulation from '../util/simulation';
+import appService from '../services/AppService';
+import { ErrorCodes } from './ErrorCodes';
+import { logger, LogEvent } from '../util/logger';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type ArenaId = string & {};
@@ -30,10 +31,16 @@ export class Process {
       this.sandbox = new ivm.Isolate({
         memoryLimit: 8,
         onCatastrophicError: (msg) => {
+          // A fatal V8 error in the isolate — typically the 8 MB memory limit
+          // being hit (runaway allocation / possible abuse). Strong signal to
+          // alert on; logged once with the offending app id.
+          logger.error(
+            { event: LogEvent.SANDBOX_CATASTROPHIC, appId: this.appId, msg },
+            'isolate catastrophic error'
+          );
           this.tanks.forEach((tank) => {
             tank.appCrashed = true;
             tank.logger.error(new Error(`${ErrorCodes.E001}: ${msg}`));
-            console.log(msg);
           });
           this.sandbox?.dispose();
         },
@@ -78,12 +85,12 @@ export default class Environment {
   ) => {
     this.emitter.addListener(eventName, listener);
 
-    if (eventName === "event") {
+    if (eventName === 'event') {
       this.processes.forEach((process) => {
         appService.get(process.getAppId()).then((app) => {
           if (app) {
             listener({
-              type: "arenaPlaceApp",
+              type: 'arenaPlaceApp',
               id: process.getAppId(),
               name: app.getName(),
             });
@@ -92,7 +99,7 @@ export default class Environment {
         process.tanks.forEach((tank) => {
           // Emit new tank event
           listener({
-            type: "arenaPlaceTank",
+            type: 'arenaPlaceTank',
             id: tank.id,
             appId: process.getAppId(),
             bodyOrientation: tank.orientation,
@@ -111,11 +118,11 @@ export default class Environment {
 
       if (this.isRunning()) {
         listener({
-          type: "arenaResumed",
+          type: 'arenaResumed',
         });
       } else {
         listener({
-          type: "arenaPaused",
+          type: 'arenaPaused',
         });
       }
     }
@@ -145,7 +152,9 @@ export default class Environment {
   }
 
   // Run the game
-  private simulate = (cancelable) => {
+  private simulate = (cancelable: {
+    interval: ReturnType<typeof setInterval>;
+  }) => {
     const suddenDeathTime = 10000;
 
     // Forward the simulation one clock tick
@@ -170,16 +179,16 @@ export default class Environment {
         (process.tanks.length * 100)
     );
 
-    this.emitter.emit("event", {
-      type: "tick",
+    this.emitter.emit('event', {
+      type: 'tick',
       time: this.clock.time,
     });
 
     // Stop game if winning conditions are met
     if (appHealth.filter((item) => item > 0).length === 0) {
-      console.log("game over", this.arena.getId());
-      this.emitter.emit("event", {
-        type: "arenaPaused",
+      logger.info({ arenaId: this.arena.getId() }, 'game over');
+      this.emitter.emit('event', {
+        type: 'arenaPaused',
       });
       this.running = false;
     }
@@ -190,10 +199,10 @@ export default class Environment {
   };
 
   resume() {
-    console.log("resuming", this.arena.getId());
+    logger.info({ arenaId: this.arena.getId() }, 'resuming arena');
 
-    this.emitter.emit("event", {
-      type: "arenaResumed",
+    this.emitter.emit('event', {
+      type: 'arenaResumed',
     });
     this.running = true;
 
@@ -202,16 +211,16 @@ export default class Environment {
   }
 
   pause() {
-    this.emitter.emit("event", {
-      type: "arenaPaused",
+    this.emitter.emit('event', {
+      type: 'arenaPaused',
     });
     this.running = false;
     this.stoppedAt = new Date();
   }
 
   restart(): Promise<void> {
-    this.emitter.emit("event", {
-      type: "arenaRestart",
+    this.emitter.emit('event', {
+      type: 'arenaRestart',
     });
 
     // Restart each process
@@ -219,8 +228,8 @@ export default class Environment {
       this.processes.map((process) => {
         process.tanks.forEach((tank) => {
           // Emit removed tank event
-          this.emitter.emit("event", {
-            type: "arenaRemoveTank",
+          this.emitter.emit('event', {
+            type: 'arenaRemoveTank',
             id: tank.id,
             appId: process.getAppId(),
           });
@@ -232,8 +241,8 @@ export default class Environment {
         return appService.get(process.getAppId()).then((app) => {
           if (!app) return;
 
-          this.emitter.emit("event", {
-            type: "arenaPlaceApp",
+          this.emitter.emit('event', {
+            type: 'arenaPlaceApp',
             id: process.getAppId(),
             name: app.getName(),
           });
@@ -248,8 +257,8 @@ export default class Environment {
               compiler.init(this, process, tank);
               return tank.execute(process).then(() => {
                 // Emit new tank event
-                this.emitter.emit("event", {
-                  type: "arenaPlaceTank",
+                this.emitter.emit('event', {
+                  type: 'arenaPlaceTank',
                   id: tank.id,
                   appId: process.getAppId(),
                   bodyOrientation: tank.orientation,
@@ -286,8 +295,8 @@ export default class Environment {
       tank.execute(process);
 
       // Emit new tank event
-      this.emitter.emit("event", {
-        type: "arenaPlaceTank",
+      this.emitter.emit('event', {
+        type: 'arenaPlaceTank',
         id: tank.id,
         appId: process.getAppId(),
         bodyOrientation: tank.orientation,
@@ -306,8 +315,8 @@ export default class Environment {
 
   removeApp(appId: AppId) {
     // Emit removed app event
-    this.emitter.emit("event", {
-      type: "arenaRemoveApp",
+    this.emitter.emit('event', {
+      type: 'arenaRemoveApp',
       id: appId,
     });
 
@@ -323,8 +332,8 @@ export default class Environment {
 
       process.tanks.forEach((tank) => {
         // Emit removed tank event
-        this.emitter.emit("event", {
-          type: "arenaRemoveTank",
+        this.emitter.emit('event', {
+          type: 'arenaRemoveTank',
           id: tank.id,
           appId: appId,
         });

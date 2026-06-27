@@ -1,8 +1,8 @@
 # RobocodeJs
 
-**Welcome to the arena! RobocodeJs is a browser-based programming game that teaches [functional reactive programming](https://en.wikipedia.org/wiki/Functional_reactive_programming) with JavaScript. Brainstorm your own winning strategy, program your bot's artificial intelligence, and set it loose in the arena in teams to defeat your competition. Onwards to fame and glory!**
+**Welcome to the arena! RobocodeJs is a browser-based programming game that teaches [event-driven programming](https://en.wikipedia.org/wiki/Event-driven_programming) with JavaScript. Brainstorm your own winning strategy, program your bot's artificial intelligence, and set it loose in the arena in teams to defeat your competition. Onwards to fame and glory!**
 
-The battle arena is a square space filled with groups of bots working together as a team. Each app you program is the artificial intelligence for each member of a team. Your goal is to find and destroy your enemies before they eliminate you from the game. You'll have the use of your bot's radar and a turret mounted canon.
+The battle arena is a square space filled with groups of bots working together as a team. Each app you program is the artificial intelligence for each member of a team. Your goal is to find and destroy your enemies before they eliminate you from the game. You'll have the use of your bot's radar and a turret mounted cannon.
 
 As you work to develop your application code, the bots in the arena will immediately adapt to the changes you make. Quickly reset the match and start a new game, or add or remove bots as you try out different iterations on your strategy.
 
@@ -42,11 +42,21 @@ clock.on(Event.TICK, fireIfReady)
 
 ## Movement
 
-Now let's have our bot turn each time it fires.  This will be done by creating a new function for this behavior, and attaching it to the `Event.FIRED` event on our bot.  This follows a similar pattern to how we added our previous behavior. Angles in the arena are measured in degrees with 0° being directly down and increases in angle turn clockwise.
+Right now our bot just sits in place. Let's get it moving and have it turn each time it fires. Driving is controlled with `bot.setSpeed(...)`, while `bot.turn(...)` rotates the bot by a relative number of degrees. Angles in the arena are measured in degrees, with 0° pointing straight down and angles increasing clockwise.
+
+Let's start the bot driving when the match begins by handling the `Event.START` event — a good place to set up your bot's initial behavior, since it runs whenever your code is loaded:
+
+```
+bot.on(Event.START, () => {
+  bot.setSpeed(2)
+})
+```
+
+And let's turn a little each time the turret fires, by attaching a function to the `Event.FIRED` event on our bot:
 
 ```
 function turnRight() {
-  bot.turn(10)  
+  bot.turn(10)
 }
 
 bot.on(Event.FIRED, turnRight)

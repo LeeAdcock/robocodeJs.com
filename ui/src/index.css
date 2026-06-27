@@ -30,13 +30,13 @@ ul {
 
 .markdown h1 {
     font-size: 1.4em;
-    background: url('../public/sprites/tileGrass1.png');
+    background: url('/sprites/tileGrass1.png');
     padding-left: 5px;
 }
 
 .markdown h1::before {
     content: '';
-    background: url('../public/sprites/tank_red.png') left center no-repeat;
+    background: url('/sprites/tank_red.png') left center no-repeat;
     vertical-align: middle;
     background-size: 16px auto;
     padding-left: 20px;

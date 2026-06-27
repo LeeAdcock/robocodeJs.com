@@ -39,8 +39,8 @@ clock.on(Event.TICK, async () => {
       .onReady()
       .then(bot.turret.fire)
       .catch(() => {
-        // If the scan does not detect anything, or there is
-        // any other failure, we'll just turn the bot and continue.
+        // If the turret isn't ready or firing fails for any reason,
+        // we'll just turn the bot and continue.
         bot.turn(10)
         bot.setSpeed(10)
       })

@@ -13,7 +13,7 @@
       "esnext"
     ],
     "skipLibCheck": true,
-    "strict": false,
+    "strict": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "noEmit": false,
@@ -29,6 +29,7 @@
     "emitDecoratorMetadata": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
+    "useUnknownInCatchVariables": true,
     "esModuleInterop": true,
     "removeComments": true,
     "noUnusedLocals": true

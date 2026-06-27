@@ -1,7 +1,7 @@
-import Point from './point'
+import Point from './point';
 
 export default interface PointInTime extends Point {
-    x: number
-    y: number
-    time: number
+  x: number;
+  y: number;
+  time: number;
 }

@@ -19,7 +19,7 @@ The arena where bots live is a square. The orientation of objects within the are
 
 Virtual markers can be created in the arena that provide simplified calculations for angles and distance.  These markers are either dropped at the current bot location, or at a specified coordinate.
 
-- `arena.getMarker(x, y) : marker`
+- `arena.createMarker(x, y) : marker`
 
 The `marker` object returned has several convenience methods:
 
@@ -43,13 +43,13 @@ If an event handler returns nothing, it will be called each time the event occur
 Define a chain of behaviors when an event occurs:
 ```
 clock.on(Event.TICK, () => {
-  return
-    bot.radar.onReady()
+  return bot.radar
+    .onReady()
     .then(() => bot.radar.scan())
     .then(() => bot.setSpeed(0))
     .then(() => bot.turret.onReady())
-    .then(() => bot.turret.fire(10))
-    .catch(() =>  bot.setSpeed(10))
+    .then(() => bot.turret.fire())
+    .catch(() => bot.setSpeed(10))
 })
 ```
 
@@ -63,7 +63,7 @@ clock.on(Event.TICK, async () => {
   await bot.radar.onReady()
   await bot.radar.scan()
     .then(() => bot.turret.onReady())
-    .then(() => bot.turret.fire(10))
+    .then(() => bot.turret.fire())
 })
 ```
 
@@ -81,14 +81,14 @@ The `bot` object provides the programmatic ability to control the various capabi
 A few basic methods exist for setting and retrieving information about the bot.
 
 - `bot.setName(string)` Sets the bot's display name.
-- `bot.getId() : number` Returns a unique non-zero numeric identifier.
+- `bot.getId() : string` Returns a unique identifier (a UUID string).
 - `bot.getHealth() : number` Returns a decimal value representing the bot's health, with 1 being healthy and 0 being unfortunately dead.
 - `bot.dropMarker() : marker` Returns a marker object for the bot's current location.
 
 ## Bot events
 
 - `bot.on(Event.FIRED, () => {}))` Registers a callback that is executed when the turret is fired.
-- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each tank detection by the scan. The objects are of the format `{ id : number, speed: number, angle: number, distance: number, orientation: number }`.
+- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each tank detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean }`.
 - `bot.on(Event.COLLIDED, () => {object})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to the arena (0 degrees is south). Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
 
 ## Environment events
@@ -99,7 +99,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 ## Communications events
 
-- `bot.on(Event.RECEIVED, (number) = {})` Registers a callback that is executed when an incoming numeric message is received from another bot.
+- `bot.on(Event.RECEIVED, (number) => {})` Registers a callback that is executed when an incoming numeric message is received from another bot.
 
 ## Movement
 
@@ -125,7 +125,7 @@ bot.setOrientation(90).then(() => {
 
 ### Orientation
 - `bot.setOrientation(number) : Promise` Sets the bot's target orientation in degrees. Returns a promise that resolves when the orientation is reached, or that is rejected if the target orientation is altered before being achieved.
-- `bot.getOrientation() : number` Returns the orientation in degrees, 0 to 360.
+- `bot.getOrientation() : number` Returns the orientation in degrees, 0 to 359.
 - `bot.isTurning() : boolean` Returns if the bot is actively turning.
 - `bot.turn(number) : Promise` Turns the bot the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turnTowards(x, y) : Promise` Turns the bot towards the provided coordinates. Returns a promise that resolves when the turn is complete.
@@ -146,7 +146,7 @@ As the bot turns, the turret will also turn. The position of the turret is relat
 
 ### Orientation
 - `bot.turret.setOrientation(number) : Promise`
-- `bot.turret.getOrientation() : Promise`
+- `bot.turret.getOrientation() : number`
 - `bot.turret.isTurning() : boolean`
 - `bot.turret.turn(number)`
 - `bot.turret.turnTowards(x, y) : Promise`
@@ -162,7 +162,7 @@ The radar provides the ability to detect other nearby bots. Only nearby bots in 
 
 ### Orientation
 - `bot.radar.setOrientation(number) : Promise`
-- `bot.radar.getOrientation() : Promise`
+- `bot.radar.getOrientation() : number`
 - `bot.radar.isTurning() : boolean`
 - `bot.radar.turn(number)`
 - `bot.radar.turnTowards(x, y) : Promise`
@@ -170,7 +170,7 @@ The radar provides the ability to detect other nearby bots. Only nearby bots in 
 ### Scanning
 - `bot.radar.onReady(): Promise` Returns a promise that resolves when the radar is ready to scan. If the radar scans through another thread while this promise is pending, the promise will be rejected.
 - `bot.radar.isReady(): boolean` Returns a boolean indicating whether the radar is ready to scan.
-- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id : number, speed: number, orientation: number, friendly: boolean }`
+- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean }`
 
 # Coding Tips
 
@@ -182,23 +182,28 @@ Callback functions are limited to 5 seconds of runtime. Long duration activities
 
 Syntax-errors or runtime-errors in the application code will cause the bot to terminate. This can impact the bot as soon as the match begins, or at any point while it is running.
 
-## Persisted variables
+## State and the START event
 
-When a bot's logic code is changed, it is reexecuted to load new event handlers and behavior logic.  This can have the unintended side-effect of resetting any globally defined variables. It is recommended to store values as properties on `this` if you need to ensure they are available for the bot's full lifecycle. The `this` object will be stored durably across executions and available to all event handlers.
+When a bot's code is loaded — when it first starts, and again every time you save a change — it is re-executed to pick up your new handlers, and the `START` event fires so your setup code runs again. Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
 
 ```
-// This will be reset to the initial value each time the code
-// is recompiled and executed.
-let thisWillBeResetOnRecompile = 1
+// Reset to its initial value every time the code is (re)loaded.
+let resetOnReload = 1
 
 bot.on(Event.START, () => {
-  // This is only available within this run of the function
-  let thisWillOnlyBeAvailableInThisFunction = 2
+  // Local to this single call of the handler.
+  let localOnly = 2
 
-  // This can be accessed anywhere and is stored durably.
-  this.myImportantVariableAvailableEverywhere = 3
+  // Stored on `this`, which is shared across all of this bot's handlers.
+  this.sharedAcrossHandlers = 3
+})
+
+clock.on(Event.TICK, () => {
+  // `this.sharedAcrossHandlers` is available here.
 })
 ```
+
+Because `START` runs again whenever you save, anything you set up there is re-initialized on each code change. Set state up in `START` (not lazily in `TICK`) so it's always ready before your other handlers run.
 
 ## Console Logging
 

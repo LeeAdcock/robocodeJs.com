@@ -1,4 +1,4 @@
-import { UserId } from "./user";
+import { UserId } from './user';
 
 export default class UserAuth {
   private userId: UserId;

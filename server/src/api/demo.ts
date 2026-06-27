@@ -1,31 +1,29 @@
-import express from "express";
-import appService from "../services/AppService";
-import arenaMemberService from "../services/ArenaMemberService";
-import demoService from "../services/DemoService";
+import express from 'express';
+import appService from '../services/AppService';
+import arenaMemberService from '../services/ArenaMemberService';
+import demoService from '../services/DemoService';
+import { openSseStream } from '../util/sse';
 const app = express();
 
 // Listen to an arena
-app.get("/api/demo/events", async (req, res) => {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-  });
+app.get('/api/demo/events', async (req, res) => {
+  openSseStream(res);
 
-  function listener(event) {
-    res.write("data: " + JSON.stringify(event) + "\n\n");
+  function listener(event: unknown) {
+    res.write('data: ' + JSON.stringify(event) + '\n\n');
   }
 
   return demoService.getDemoEnvironment().then((env) => {
-    env.addListener("event", listener);
-    req.on("close", () => {
-      env.removeListener("event", listener);
+    env.addListener('event', listener);
+    req.on('close', () => {
+      env.removeListener('event', listener);
       res.end();
     });
   });
 });
 
 // Get an arena status
-app.get("/api/demo/arena/", async (req, res) => {
+app.get('/api/demo/arena/', async (req, res) => {
   const env = await demoService.getDemoEnvironment();
   const arena = await env.getArena();
 
