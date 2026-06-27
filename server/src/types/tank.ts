@@ -13,6 +13,7 @@ import Environment, { Process } from './environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
+import { logBotFault } from '../util/logger';
 
 // Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
 const MAX_NAME_LENGTH = 50;
@@ -151,7 +152,15 @@ export default class Tank implements Point, Orientated {
                   .then(() => eventPromiseMap.delete(event))
                   .catch((e: any) => {
                     this.logger.error(`${ErrorCodes.E019}: ${e}`);
-                    console.log(e);
+                    logBotFault(
+                      {
+                        appId: this.process.appId,
+                        tankId: this.id,
+                        arenaId: this.env.getArena().getId?.(),
+                      },
+                      'handler',
+                      e
+                    );
                     this.appCrashed = true;
                     eventPromiseMap.delete(event);
 

@@ -9,6 +9,7 @@ import compiler from '../util/compiler';
 import Simulation from '../util/simulation';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
+import { logger, LogEvent } from '../util/logger';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type ArenaId = string & {};
@@ -30,10 +31,16 @@ export class Process {
       this.sandbox = new ivm.Isolate({
         memoryLimit: 8,
         onCatastrophicError: (msg) => {
+          // A fatal V8 error in the isolate — typically the 8 MB memory limit
+          // being hit (runaway allocation / possible abuse). Strong signal to
+          // alert on; logged once with the offending app id.
+          logger.error(
+            { event: LogEvent.SANDBOX_CATASTROPHIC, appId: this.appId, msg },
+            'isolate catastrophic error'
+          );
           this.tanks.forEach((tank) => {
             tank.appCrashed = true;
             tank.logger.error(new Error(`${ErrorCodes.E001}: ${msg}`));
-            console.log(msg);
           });
           this.sandbox?.dispose();
         },
@@ -179,7 +186,7 @@ export default class Environment {
 
     // Stop game if winning conditions are met
     if (appHealth.filter((item) => item > 0).length === 0) {
-      console.log('game over', this.arena.getId());
+      logger.info({ arenaId: this.arena.getId() }, 'game over');
       this.emitter.emit('event', {
         type: 'arenaPaused',
       });
@@ -192,7 +199,7 @@ export default class Environment {
   };
 
   resume() {
-    console.log('resuming', this.arena.getId());
+    logger.info({ arenaId: this.arena.getId() }, 'resuming arena');
 
     this.emitter.emit('event', {
       type: 'arenaResumed',

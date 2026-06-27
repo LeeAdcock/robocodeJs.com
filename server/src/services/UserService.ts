@@ -5,6 +5,7 @@ import pool from '../util/db';
 import appService from './AppService';
 import arenaMemberService from './ArenaMemberService';
 import environmentService from './EnvironmentService';
+import { logger } from '../util/logger';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS account (
@@ -28,7 +29,7 @@ class UserService {
   ): Promise<User> => {
     const userId: UserId = demo ? UserService.demoUserId : uuidv4();
     const user = new User(userId, name, picture, email);
-    console.log('creating user', userId);
+    logger.info({ userId }, 'creating user');
     return pool
       .query({
         text: 'INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)',

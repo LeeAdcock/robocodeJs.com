@@ -4,6 +4,7 @@ import userService from '../services/UserService';
 import authService from '../services/IdentityService';
 import User from '../types/user';
 import { isLocalDev } from '../util/devMode';
+import { logger, LogEvent } from '../util/logger';
 
 export type AuthenticatedRequest = Request & { user: User };
 
@@ -97,6 +98,13 @@ export default (required: boolean) =>
         })
         .catch(() => {
           if (required) {
+            // A gated route rejected an invalid/expired credential. Worth
+            // monitoring: a spike suggests probing or token issues. No token
+            // contents are logged.
+            logger.warn(
+              { event: LogEvent.AUTH_FAILED, path: req.path },
+              'rejected request with invalid credential'
+            );
             res.clearCookie('auth');
             res.status(401);
             res.send('Access forbidden');
@@ -105,6 +113,10 @@ export default (required: boolean) =>
           }
         });
     } catch (e) {
+      logger.warn(
+        { event: LogEvent.AUTH_FAILED, path: req.path, err: e },
+        'auth middleware error'
+      );
       res.clearCookie('auth');
       res.status(401);
       res.send('Access forbidden');

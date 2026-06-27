@@ -1,6 +1,7 @@
 import Arena from '../types/arena';
 import Environment, { ArenaId, Process } from '../types/environment';
 import arenaMemberService from './ArenaMemberService';
+import { logger } from '../util/logger';
 
 export class EnvironmentService {
   // Keyed by arenaId. Accessed via bracket notation / Object.entries below, so
@@ -14,7 +15,7 @@ export class EnvironmentService {
       (Object.entries(this.store) as [ArenaId, Environment][]).forEach(
         ([arenaId, env]) => {
           if (env.stoppedAt && threshold > env.stoppedAt.getTime()) {
-            console.log('disposing isolate', arenaId);
+            logger.debug({ arenaId }, 'disposing idle isolate (GC)');
             delete this.store[arenaId];
             env.dispose();
           }
@@ -30,7 +31,7 @@ export class EnvironmentService {
     }
 
     env = new Environment(arena);
-    console.log('creating isolate', arena.getId());
+    logger.debug({ arenaId: arena.getId() }, 'creating isolate');
 
     this.store[arena.getId()] = env;
     return arenaMemberService
@@ -50,7 +51,7 @@ export class EnvironmentService {
   dispose = (arenaId: ArenaId): Promise<void> => {
     const env = this.store[arenaId];
     if (env) {
-      console.log('disposing isolate', arenaId);
+      logger.debug({ arenaId }, 'disposing isolate');
       delete this.store[arenaId];
       env.dispose();
     }

@@ -40,6 +40,7 @@ PostgreSQL connection (see `src/util/db.ts`):
 | `GOOGLE_CLIENT_ID` | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with. |
 | `NODE_ENV` | `production` enables the `Secure` flag on the session cookie |
 | `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`) |
+| `LOG_LEVEL` | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test |
 
 Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema is created lazily on first connection.
 
@@ -129,6 +130,24 @@ Live arena state is pushed to the browser via **Server-Sent Events**:
 
 The UI consumes these and interpolates motion between server ticks with its own partial physics mirror. **If you change movement or collision math here, update `ui/src/util/simulate.ts` to match.**
 
+## Logging & monitoring
+
+The server uses a structured [pino](https://getpino.io) logger (`src/util/logger.ts`) — **distinct from the per-tank bot `console` output**, which is streamed to the UI via browser-bunyan. It emits pretty, human-readable lines in local dev and JSON in production (for ingestion by a log pipeline), is silenced under test, and honors `LOG_LEVEL`. One line is logged per HTTP request (method, path, status, duration) via `pino-http`, skipping the long-lived SSE streams and `/health`.
+
+Beyond ordinary info/debug logs, a set of **named fault/security events** is logged with a stable `event` field so a pipeline can alert on them. Each carries relevant context (`appId`, `arenaId`, `tankId`, etc.):
+
+| `event` | Level | Meaning / why monitor |
+| --- | --- | --- |
+| `bot.fault` | warn | A bot crashed (`kind`: `load`/`init`/`handler`/`timer`/`callback`, or `log-flood`). **`timedOut: true`** means it tripped `SANDBOX_TIMEOUT_MS` — a runaway loop or possible sandbox-escape attempt; alert on these specifically. A rising overall rate signals broken bots. |
+| `sandbox.catastrophic` | error | A fatal V8 error in an isolate — typically the 8 MB memory limit (runaway allocation / abuse). |
+| `auth.failed` | warn | A gated route rejected an invalid/expired credential. A spike suggests probing or a token problem. |
+| `auth.forbidden` | warn | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse. |
+| `db.error` | error | Database/pool error (lost connection, auth failure). |
+| `http.error` | error | An unhandled error reached the Express error handler (a 5xx). |
+| `process.fatal` | error/fatal | An `unhandledRejection` or `uncaughtException` escaped to the process. |
+
+Note: a bot choosing **not** to await a command whose promise later rejects (e.g. a cancelled `bot.setSpeed`) is normal and is **not** logged as a fault or treated as a crash.
+
 ## Tests
 
 [Vitest](https://vitest.dev) suites live in `test/` (kept out of `src` so they're excluded from the `tsc` build). Run with `npm test`. Coverage so far:
@@ -142,6 +161,7 @@ The UI consumes these and interpolates motion between server ticks with its own 
 - `test/auth.test.ts` — the Google-OAuth auth middleware: recognized token attaches the user, first login auto-creates one, and an invalid token 401s when required / falls through when optional. Mocks `google-auth-library` (via `vi.hoisted`) and the user/identity services.
 - `test/services.test.ts` — the Postgres data-access services (`AppService`, `ArenaService`, `ArenaMemberService`): `vi.mock`s the pool with canned result sets and asserts the row→domain-object mapping and `undefined`-on-empty.
 - `test/nameFactory.test.ts` — display-name generation.
+- `test/logger.test.ts` — the `logBotFault` monitoring contract: the structured `bot.fault` payload (ids, `kind`) and the `timedOut` flag that lets runaway/abuse be alerted on separately.
 
 When testing other isolate-/DB-coupled code, follow the same pattern: `vi.mock('../src/util/db', ...)` (or mock the relevant service modules) at the top of the file, then construct real domain objects / mount routers with mock collaborators.
 

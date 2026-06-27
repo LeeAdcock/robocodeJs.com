@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import userService from '../services/UserService';
 import appService from '../services/AppService';
+import { logger, LogEvent } from '../util/logger';
 import arenaService from '../services/ArenaService';
 import User from '../types/user';
 import TankApp from '../types/app';
@@ -48,6 +49,17 @@ export const requireOwner = (
 ) => {
   const r = req as UserScopedRequest;
   if (!r.user || r.user.getId() !== r.targetUser.getId()) {
+    // An authenticated user tried to mutate another user's resource — a
+    // potential abuse signal worth alerting on if it recurs.
+    logger.warn(
+      {
+        event: LogEvent.AUTH_FORBIDDEN,
+        actor: r.user?.getId(),
+        target: r.targetUser.getId(),
+        path: req.path,
+      },
+      'ownership check failed'
+    );
     res.status(401);
     res.send('Unauthorized');
     return;

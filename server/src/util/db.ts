@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { isLocalDev } from './devMode';
+import { logger, LogEvent } from './logger';
 
 // In local-dev mode the database is an in-memory Postgres (pg-mem) so no real
 // server or connection details are needed. pg-mem is a devDependency, required
@@ -7,7 +8,7 @@ import { isLocalDev } from './devMode';
 // to the configured RDS/Postgres instance.
 function createPool(): Pool {
   if (isLocalDev) {
-    console.log('⚙  LOCAL DEV: using in-memory database (pg-mem)');
+    logger.info('LOCAL DEV: using in-memory database (pg-mem)');
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { newDb } = require('pg-mem');
     const { Pool: MemPool } = newDb().adapters.createPg();
@@ -23,5 +24,11 @@ function createPool(): Pool {
 }
 
 const pool = createPool();
+
+// Surface connection/idle-client failures (lost RDS connection, auth errors)
+// instead of letting them crash the process or vanish.
+pool.on('error', (err) => {
+  logger.error({ event: LogEvent.DB_ERROR, err }, 'database pool error');
+});
 
 export default pool;

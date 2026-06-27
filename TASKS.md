@@ -22,11 +22,10 @@ each tier. Effort tags: **S** ≈ <½ day, **M** ≈ 1–2 days, **L** ≈ multi
 ## Soon (medium priority)
 
 - **Upgrade TypeScript 4.9 → 5.x** (both packages). (S–M) Notably behind;
-  unlocks newer language/type features and keeps tooling current.
-- **Investigate un-awaited bot-command rejections.** (S) A bot that calls e.g.
-  `bot.setSpeed(2)` without awaiting produces "Speed change cancelled" rejections
-  (seen in the dev battle logs). Confirm these can't become process-level
-  `unhandledRejection`s and quiet the log noise.
+  unlocks newer language/type features. Now has a concrete trigger: `pino` is
+  pinned to v8 because v10's type declarations use TS 5.0 `const` type
+  parameters — bump pino to v10 as part of this. Will also need
+  `@typescript-eslint` v6/v7.
 - **Grow UI test coverage.** (M) Only 3 util suites today (`arenaReducer`,
   `geometry`, `simulate`). Add component/page tests (the SSE-driven `App` state,
   arena rendering, the editor) — `jsdom` + Testing Library.
@@ -55,8 +54,10 @@ each tier. Effort tags: **S** ≈ <½ day, **M** ≈ 1–2 days, **L** ≈ multi
 - **Burn down remaining `~18` TODOs** in `server/src` / `ui/src` (e.g. debounce
   `app.setSource` persistence, "only if actual change" guards, validate uploaded
   source). Mostly small.
-- **Structured logging / metrics.** (M) Replace scattered `console.log` with a
-  structured logger and basic operational metrics.
+- **Operational metrics.** (M) Structured logging is done (pino + request logs +
+  named fault/security events — see the server README "Logging & monitoring").
+  Still missing: metrics/gauges (e.g. live isolate count, tick duration) and
+  alert wiring on the `event=*` log fields.
 
 ## Known & accepted (not action items)
 

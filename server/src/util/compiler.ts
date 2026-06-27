@@ -7,6 +7,14 @@ import { v4 as uuidv4 } from 'uuid';
 import Environment, { Process } from '../types/environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from '../types/ErrorCodes';
+import { logBotFault, logger, LogEvent } from './logger';
+
+// Identifying context for a faulting bot, for the structured server log.
+const botCtx = (tank: Tank) => ({
+  appId: tank.process.appId,
+  tankId: tank.id,
+  arenaId: tank.env.getArena().getId?.(),
+});
 
 // Wall-clock ceiling, in ms, for any single synchronous entry into untrusted
 // bot code (top-level script load, event handlers, and timer callbacks).
@@ -36,7 +44,11 @@ function runInIsolate(
     .catch((e: unknown) => {
       tank.logger.error(`${code}: ${e}`);
       tank.appCrashed = true;
-      console.log(e);
+      logBotFault(
+        botCtx(tank),
+        code === ErrorCodes.E020 ? 'timer' : 'callback',
+        e
+      );
     });
 }
 
@@ -286,7 +298,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
         .catch((e: unknown) => {
           tank.logger.error(`${ErrorCodes.E013}: ${e}`);
           tank.appCrashed = true;
-          console.log(e);
+          logBotFault(botCtx(tank), 'handler', e);
           reject(e);
         });
     });
@@ -361,7 +373,7 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
     const onError = (e: unknown) => {
       tank.logger.error(`${ErrorCodes.E017}: ${e}`);
       tank.appCrashed = true;
-      console.log(e);
+      logBotFault(botCtx(tank), 'load', e);
     };
     let script: ivm.Script;
     try {
@@ -424,7 +436,13 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         typeof value === 'object' && value !== null
           ? new ivm.ExternalCopy(value).copyInto()
           : value;
-      runInIsolate(settleRef, [id, ok, transfer], tank, ErrorCodes.E019);
+      // Delivering a settlement is NOT bot execution, so it must not be treated
+      // as a crash. In particular, rejecting a command promise the bot chose not
+      // to await (e.g. a cancelled `bot.setSpeed`) surfaces here as a rejected
+      // apply — that's normal, so swallow it rather than killing the bot.
+      settleRef
+        .apply(undefined, [id, ok, transfer], { timeout: sandboxTimeoutMs() })
+        .catch(() => undefined);
     };
     settlers.set(tank, settle);
 
@@ -617,7 +635,18 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         logWindow = now;
         logCount = 0;
       }
-      if (logCount >= MAX_LOGS_PER_TICK) return;
+      if (logCount >= MAX_LOGS_PER_TICK) {
+        // Note the first drop in each window (a bot spamming logs is an abuse
+        // signal); subsequent drops in the same window are silent.
+        if (logCount === MAX_LOGS_PER_TICK) {
+          logCount += 1;
+          logger.warn(
+            { event: LogEvent.BOT_FAULT, kind: 'log-flood', ...botCtx(tank) },
+            'bot exceeded per-tick log budget; dropping further output'
+          );
+        }
+        return;
+      }
       logCount += 1;
       tank.logger.info(clampLog(msg), ...msgs.map(clampLog));
     });
@@ -657,9 +686,9 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       )
       .runSync(tank.getContext(), {});
   } catch (e) {
-    console.log(e);
     tank.logger.error(`${ErrorCodes.E018}: ${e}`);
     tank.appCrashed = true;
+    logBotFault(botCtx(tank), 'init', e);
   }
 };
 
