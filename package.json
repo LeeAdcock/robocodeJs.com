@@ -2,10 +2,14 @@
   "name": "robocodeJs.com",
   "version": "1.0.0",
   "description": "Welcome to Battlebots, [a browser-based programming game](https://robocodeJs.com) for creating Javascript artificial intellegence that enables your bots compete for fame and glory! Brainstorm your own winning strategy, program your bot, and set it lose in the arena in teams of one or more to defeat your competition.",
-  "script": "index.js",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "concurrently --names proxy,server,ui --prefix-colors blue,green,magenta \"node index.js\" \"npm --prefix server run dev\" \"npm --prefix ui run dev\"",
+    "dev": "npm start",
+    "install:all": "npm install && npm --prefix server install && npm --prefix ui install",
+    "build": "npm --prefix ui run build && npm --prefix server run build",
+    "test": "npm --prefix server test && npm --prefix ui test",
+    "lint": "npm --prefix server run lint && npm --prefix ui run lint"
   },
   "repository": {
     "type": "git",
@@ -17,9 +21,13 @@
     "url": "https://github.com/LeeAdcock/robocodeJs.com/issues"
   },
   "homepage": "https://github.com/LeeAdcock/robocodeJs.com#readme",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
-    "forever": "^4.0.3",
-    "http-proxy": "^1.18.1",
-    "node-http-proxy": "^0.2.4"
+    "http-proxy": "^1.18.1"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

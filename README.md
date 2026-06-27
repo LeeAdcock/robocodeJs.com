@@ -36,6 +36,7 @@ The full bot API is documented in [`ui/public/docs/`](ui/public/docs) (also serv
 
 ## Architecture
 
+
 RobocodeJs is a two-package monorepo plus a tiny root dev proxy:
 
 - **`index.js`** — a root reverse proxy (port `5000`) that routes `/api` and `/health` to the server and everything else to the UI. This is the single port you open in development.
@@ -97,15 +98,22 @@ In words: a **User** owns one or more **Arenas** and writes **Apps** (bot progra
 
 ### Run it locally (zero-config)
 
-There is no root-level install; work inside `server/` and `ui/` separately. Run all three processes (each in its own terminal):
+From the repo root, install all three packages once, then start everything with a single command:
 
 ```bash
-node index.js                 # root proxy on :5000  (open this one)
-(cd server && npm install && npm run dev)   # API + engine on :8080
-(cd ui     && npm install && npm run dev)   # Vite dev server on :3000
+npm run install:all   # installs root + server + ui dependencies
+npm start             # runs the proxy, server, and UI together (Ctrl-C stops all)
 ```
 
 Then open <http://localhost:5000>. With no configuration, you land on a running arena with starter bots — **no database, no Google account, nothing to set up.**
+
+`npm start` uses [concurrently](https://github.com/open-cli-tools/concurrently) to run the three processes with prefixed, color-coded output. Prefer separate terminals? Run them yourself:
+
+```bash
+node index.js              # root proxy on :5000  (open this one)
+(cd server && npm run dev) # API + engine on :8080
+(cd ui     && npm run dev) # Vite dev server on :3000
+```
 
 This works because the server picks one of two modes at startup based on a single signal — whether `RDS_HOSTNAME` is set:
 
@@ -133,11 +141,16 @@ Tables are created lazily on first use, so an empty database is fine. See [`serv
 ### Build
 
 ```bash
+npm run build   # from the root: builds the UI then the server
+
+# …or each package directly:
 (cd ui     && npm run build)  # type-checks, then builds into server/dist/public
 (cd server && npm run build)  # tsc -> server/dist
 ```
 
 The UI build outputs directly into `server/dist/public`, which the server serves as static files in production.
+
+Other root scripts: `npm test` and `npm run lint` run the respective task across both packages; `npm run install:all` installs all three.
 
 ## Documentation
 
