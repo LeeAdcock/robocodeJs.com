@@ -191,12 +191,18 @@ const TankSvg = React.memo((props: TankProps) => {
                 fillOpacity="0.9"
               />
               <rect
-                width={32 * (props.health / 100)}
                 height={4}
                 x={-16}
                 y={16}
-                fill="green"
                 fillOpacity="0.9"
+                // Color shifts green -> yellow -> red as health drains, and the
+                // width animates, so the slow collision bleed reads as visible
+                // motion instead of imperceptible per-tick steps.
+                fill={'hsl(' + Math.max(0, props.health) * 1.2 + ', 70%, 40%)'}
+                style={{
+                  width: 32 * (Math.max(0, props.health) / 100),
+                  transition: 'width 300ms linear, fill 300ms linear',
+                }}
               />
             </g>
           )}
