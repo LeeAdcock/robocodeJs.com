@@ -50,6 +50,8 @@ The arena is drawn with SVG. `arena.tsx` composes the scene from `arenaTank`, `a
 
 `appPage.tsx` hosts the Ace editor (`appEditor.tsx`) and toolbar. Saving a bot PUTs the source to `.../app/:appId/source`; the server recompiles it into the running isolates so the change takes effect immediately. Prettier formats the source in-editor. App-level notifications (rename, errors) are delivered from `App.tsx` through a small browser-safe pub/sub in `src/util/emitter.ts`.
 
+The editor's autocomplete is **context-aware**: a custom Ace completer (`appEditor.tsx`) offers the right members after `bot.`, `bot.radar.`, `arena.`, `clock.`, and `Event.`, each with its signature and a hover description. Both the completer and a downloadable `public/ts/robocode.d.ts` are generated from one model, `src/util/botApi.ts`, so they can't drift; `test/botApi.test.ts` regenerates the `.d.ts` (via `toMatchFileSnapshot`) and fails if the committed copy is stale (refresh it with `npm test -- -u`). The `.d.ts` is linked from the bot docs (`public/docs/dev.md`) for authoring bots in a local TypeScript-aware editor.
+
 ### Docs & logs
 
 - `src/page/markdownPage.tsx` fetches and renders the static bot documentation from `public/docs/*.md` (served in-app at routes like `/dev` and `/examples`).

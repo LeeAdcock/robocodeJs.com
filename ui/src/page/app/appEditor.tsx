@@ -11,12 +11,34 @@ import 'ace-builds/src-noconflict/snippets/javascript';
 import prettier from 'prettier/standalone';
 import babel from 'prettier/parser-babel';
 
+import { completionsFor } from '../../util/botApi';
+
 interface CodeEditorProps {
   code: string;
   onChange: (source: string) => void;
   doClean: () => void;
   doExecute: () => void;
 }
+
+// Context-aware completer for the bot API (bot/arena/clock/Event …). It reads
+// the line up to the cursor so it can offer the right members after `obj.`
+// (with signatures + hover docs), driven by the shared model in botApi.ts.
+const botApiCompleter = {
+  getCompletions(
+    _editor: any,
+    session: any,
+    pos: { row: number; column: number },
+    _prefix: string,
+    callback: (error: null, completions: unknown[]) => void
+  ) {
+    const line = session.getLine(pos.row).slice(0, pos.column);
+    callback(null, completionsFor(line));
+  },
+};
+
+// Register once for the whole app — addCompleter is global, and the editor can
+// mount more than once (so doing this in onLoad would stack duplicates).
+let completerRegistered = false;
 
 export default function CodeEditor(props: CodeEditorProps) {
   const [editor, setEditor] = useState(null as any);
@@ -73,67 +95,10 @@ export default function CodeEditor(props: CodeEditorProps) {
       }}
       onLoad={(editor) => {
         setEditor(editor);
-
-        const bots = {
-          getCompletions: function (
-            editor: any,
-            session: any,
-            pos: any,
-            prefix: string,
-            callback: any
-          ) {
-            return callback(
-              null,
-              [
-                'bot',
-                'Event',
-                'on',
-                'Event.DETECTED',
-                'DETECTED',
-                'Event.HIT',
-                'HIT',
-                'Event.START',
-                'START',
-                'Event.COLLIDED',
-                'COLLIDED',
-                'Event.RECEIVED',
-                'RECEIVED',
-                'Event.FIRED',
-                'FIRED',
-                'Event.SCANNED',
-                'SCANNED',
-                'clock',
-                'arena',
-                'turnTowards',
-                'dropMarker',
-                'createMarker',
-                'turn()',
-                'fire()',
-                'radar',
-                'turret',
-                'isReady()',
-                'getHealth()',
-                'getTime()',
-                'getWidth()',
-                'getHeight()',
-                'getSpeed()',
-                'setOrientation()',
-                'scan()',
-                'send()',
-                'setName()',
-                'setSpeed()',
-              ]
-                .filter((code) => code.startsWith(prefix))
-                .map((code) => ({
-                  name: code,
-                  value: code,
-                  score: 1,
-                  meta: '',
-                }))
-            );
-          },
-        };
-        languageTools.addCompleter(bots);
+        if (!completerRegistered) {
+          languageTools.addCompleter(botApiCompleter);
+          completerRegistered = true;
+        }
       }}
       fontSize={12}
       showGutter={true}

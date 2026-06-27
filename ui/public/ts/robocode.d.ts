@@ -1,0 +1,183 @@
+// robocode.d.ts — TypeScript definitions for the RobocodeJs bot API.
+//
+// Generated from ui/src/util/botApi.ts — do not edit by hand.
+// These power the in-browser editor autocomplete. Reference or copy this
+// file to author bots in your own TypeScript-aware IDE with full typing.
+
+/** One bot detected by a radar scan. */
+interface ScanResult {
+  /** Unique id of the detected bot. */
+  id: string;
+  /** Its speed (-5 to 5). */
+  speed: number;
+  /** Its body orientation in degrees (arena-relative). */
+  orientation: number;
+  /** Distance from you to it. */
+  distance: number;
+  /** Bearing from you to it, in degrees (arena-relative). */
+  angle: number;
+  /** True if it is on your team. */
+  friendly: boolean;
+}
+
+/** A virtual point in the arena with distance/bearing helpers, relative to the bot. */
+interface Marker {
+  /** The marker's x coordinate. */
+  getX(): number;
+  /** The marker's y coordinate. */
+  getY(): number;
+  /** Distance from the bot to this marker. */
+  getDistance(): number;
+  /** Bearing from the bot to this marker (arena-relative degrees). */
+  getBearing(): number;
+}
+
+/** Detects nearby bots in the direction it points. Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
+interface Radar {
+  /** Returns the radar's orientation in degrees (0–359). */
+  getOrientation(): number;
+  /** Sets the radar's target orientation in degrees. Resolves when reached; rejects if a later command overrides it. */
+  setOrientation(degrees: number): Promise<void>;
+  /** Turns the radar by the given number of degrees (positive = clockwise). */
+  turn(degrees: number): Promise<void>;
+  /** Turns the radar to face the arena coordinate (x, y). */
+  turnTowards(x: number, y: number): Promise<void>;
+  /** Returns whether the radar is currently turning. */
+  isTurning(): boolean;
+  /** Performs a scan, resolving with the bots detected (empty array if none). Rejects if the radar is not ready. */
+  scan(): Promise<ScanResult[]>;
+  /** Resolves when the radar is ready to scan again. Rejects if it scans (from elsewhere) while pending. */
+  onReady(): Promise<void>;
+  /** Returns whether the radar is ready to scan. */
+  isReady(): boolean;
+}
+
+/** Fires bullets. Mounted on the body, so its orientation is relative to the bot's. Reloads between shots. */
+interface Turret {
+  /** Returns the turret's orientation in degrees (0–359). */
+  getOrientation(): number;
+  /** Sets the turret's target orientation in degrees. Resolves when reached; rejects if a later command overrides it. */
+  setOrientation(degrees: number): Promise<void>;
+  /** Turns the turret by the given number of degrees (positive = clockwise). */
+  turn(degrees: number): Promise<void>;
+  /** Turns the turret to face the arena coordinate (x, y). */
+  turnTowards(x: number, y: number): Promise<void>;
+  /** Returns whether the turret is currently turning. */
+  isTurning(): boolean;
+  /** Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire. */
+  fire(): Promise<{ id?: string }>;
+  /** Resolves when the turret is ready to fire again. Rejects if it fires (from elsewhere) while pending. */
+  onReady(): Promise<void>;
+  /** Returns whether the turret is ready to fire. */
+  isReady(): boolean;
+}
+
+/** The battlefield. A square; orientation is in degrees (0 = south, 90 = west, 180 = north). */
+interface Arena {
+  /** Arena width. */
+  getWidth(): number;
+  /** Arena height. */
+  getHeight(): number;
+  /** Creates a marker at the arena coordinate (x, y) for distance/bearing math. */
+  createMarker(x: number, y: number): Marker;
+}
+
+/** Simulation time and the TICK event. */
+interface Clock {
+  /** Number of ticks elapsed in the current match. */
+  getTime(): number;
+  /** Registers a handler for Event.TICK, run every simulation tick. */
+  on(event: 'TICK', handler: () => void | Promise<unknown>): void;
+}
+
+/** Your tank: movement, radar, turret, communications, and event registration. */
+interface Bot {
+  /** The radar, for detecting other bots. */
+  radar: Radar;
+  /** The turret, for firing. */
+  turret: Turret;
+  /** Fires once when the bot starts — and again every time you save your code. Set up state here on `this`. */
+  on(event: 'START', handler: () => void | Promise<unknown>): void;
+  /** Fires after your radar scans. The handler receives the array of bots the scan detected. */
+  on(event: 'SCANNED', handler: (event: ScanResult[]) => void | Promise<unknown>): void;
+  /** Fires when another bot's radar sweeps over you — i.e. you have been spotted. */
+  on(event: 'DETECTED', handler: () => void | Promise<unknown>): void;
+  /** Fires when a bullet hits you. `angle` is the arena-relative direction the shot came from. */
+  on(event: 'HIT', handler: (event: { angle: number }) => void | Promise<unknown>): void;
+  /** Fires when you collide with a wall or another bot (you stop). `angle` is arena-relative; `friendly` is true for a teammate. */
+  on(event: 'COLLIDED', handler: (event: { angle: number; friendly: boolean }) => void | Promise<unknown>): void;
+  /** Fires when your turret fires a shot. */
+  on(event: 'FIRED', handler: () => void | Promise<unknown>): void;
+  /** Fires when a numeric message broadcast by a teammate (via bot.send) arrives. */
+  on(event: 'RECEIVED', handler: (event: number) => void | Promise<unknown>): void;
+  /** Returns this bot’s unique id. */
+  getId(): string;
+  /** Returns health from 1 (full) down to 0 (dead). */
+  getHealth(): number;
+  /** Current x position (0 is the left edge). */
+  getX(): number;
+  /** Current y position (0 is the top edge). */
+  getY(): number;
+  /** Body orientation in degrees (0–359). */
+  getOrientation(): number;
+  /** Sets the body target orientation. Resolves when reached; rejects if overridden by a later command. */
+  setOrientation(degrees: number): Promise<void>;
+  /** Turns the body by the given degrees (positive = clockwise). */
+  turn(degrees: number): Promise<void>;
+  /** Turns the body to face the arena coordinate (x, y). */
+  turnTowards(x: number, y: number): Promise<void>;
+  /** Returns whether the body is currently turning. */
+  isTurning(): boolean;
+  /** Returns the current speed. */
+  getSpeed(): number;
+  /** Sets the target speed, an integer from -5 to 5. Resolves when reached; rejects if overridden. */
+  setSpeed(speed: number): Promise<void>;
+  /** Sets the bot's display name. */
+  setName(name: string): void;
+  /** Broadcasts a numeric message to teammates (received via Event.RECEIVED). */
+  send(message: number): void;
+  /** Returns a marker at the bot's current location. */
+  dropMarker(): Marker;
+}
+
+declare const bot: Bot;
+declare const arena: Arena;
+declare const clock: Clock;
+
+/** Event-name constants for bot.on / clock.on. */
+declare const Event: {
+  START: 'START';
+  TICK: 'TICK';
+  SCANNED: 'SCANNED';
+  DETECTED: 'DETECTED';
+  HIT: 'HIT';
+  COLLIDED: 'COLLIDED';
+  FIRED: 'FIRED';
+  RECEIVED: 'RECEIVED';
+};
+
+/** Logs to the bot console shown in the UI. Accepts any mix of arguments
+ *  (strings, numbers, objects, arrays, Errors); each is formatted into the message. */
+declare const console: {
+  log(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
+};
+/** Leveled logging to the bot console; formats objects like console.log. */
+declare const logger: {
+  log(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
+  trace(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+};
+
+/** Runs the handler every N simulation ticks (not milliseconds). */
+declare function setInterval(handler: () => void, ticks: number): number;
+declare function clearInterval(id: number): void;
+/** Runs the handler once after N simulation ticks (not milliseconds). */
+declare function setTimeout(handler: () => void, ticks: number): number;
+declare function clearTimeout(id: number): void;
