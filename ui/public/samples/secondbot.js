@@ -9,27 +9,27 @@
 */
 
 // A simple first task is to set the name of our AI.
-bot.setName('My Second Bot')
+bot.setName('My Second Bot');
 
 bot.on(Event.START, () => {
-  bot.turret.setOrientation(0)
-  bot.radar.setOrientation(0)
+  bot.turret.setOrientation(0);
+  bot.radar.setOrientation(0);
 
   // Put persisted variables on 'this'. Set the intiial
   // state value.
-  this.state = 'SEARCH'
-})
+  this.state = 'SEARCH';
+});
 
 clock.on(Event.TICK, async () => {
   // If we are in SEARCH mode first scan for enemies
   if (this.state === 'SEARCH') {
-    let targets = await bot.radar.onReady().then(bot.radar.scan)
+    let targets = await bot.radar.onReady().then(bot.radar.scan);
     if (targets.length > 0 && !targets[0].friendly) {
       // Slow down and adjust the turret for a better aim.
-      await bot.setSpeed(-1)
-      await bot.turret.setOrientation(targets[0].angle - bot.getOrientation())
+      await bot.setSpeed(-1);
+      await bot.turret.setOrientation(targets[0].angle - bot.getOrientation());
       if (bot.turret.isReady()) {
-        let result = await bot.turret.fire()
+        let result = await bot.turret.fire();
 
         // If it was a miss (the shot resolved with no target id), move on
         if (!result.id) {
@@ -38,7 +38,7 @@ clock.on(Event.TICK, async () => {
             .then(() => bot.turn(bot.turret.getOrientation()))
             .then(() => bot.turret.setOrientation(0))
             .then(() => bot.turn(20))
-            .catch(() => {})
+            .catch(() => {});
         }
       }
     } else {
@@ -47,31 +47,31 @@ clock.on(Event.TICK, async () => {
         .turn(10)
         .then(() => bot.setSpeed(3))
         .then(() => bot.turret.setOrientation(0))
-        .catch(() => {})
+        .catch(() => {});
     }
   }
-})
+});
 
-bot.on(Event.HIT, async info => {
+bot.on(Event.HIT, async (info) => {
   // If we are hit, back off, turn to face the attacker, and fire back.
-  this.state = 'RETALIATE'
+  this.state = 'RETALIATE';
   try {
-    await bot.setSpeed(-2)
-    await bot.setOrientation(info.angle)
-    await bot.turret.onReady()
-    await bot.turret.fire()
+    await bot.setSpeed(-2);
+    await bot.setOrientation(info.angle);
+    await bot.turret.onReady();
+    await bot.turret.fire();
   } catch (e) {
     // A command can be cancelled if another handler retargets first; ignore it.
   } finally {
-    this.state = 'SEARCH'
+    this.state = 'SEARCH';
   }
-})
+});
 
 // If we hit an obstical, change modes until we have avoided it
 bot.on(Event.COLLIDED, () => {
-  this.state = 'AVOID'
+  this.state = 'AVOID';
   bot
     .turn(90)
     .catch(() => {})
-    .finally(() => (this.state = 'SEARCH'))
-})
+    .finally(() => (this.state = 'SEARCH'));
+});

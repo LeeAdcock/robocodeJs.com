@@ -30,17 +30,17 @@ npm run package # version bump + shrinkwrap + zip the deploy artifact
 
 PostgreSQL connection (see `src/util/db.ts`):
 
-| Variable | Purpose |
-| --- | --- |
-| `RDS_HOSTNAME` | database host |
-| `RDS_PORT` | database port (default `5432`) |
-| `RDS_DB_NAME` | database name |
-| `RDS_USERNAME` | database user |
-| `RDS_PASSWORD` | database password |
-| `GOOGLE_CLIENT_ID` | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with. |
-| `NODE_ENV` | `production` enables the `Secure` flag on the session cookie |
-| `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`) |
-| `LOG_LEVEL` | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test |
+| Variable             | Purpose                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RDS_HOSTNAME`       | database host                                                                                                                                           |
+| `RDS_PORT`           | database port (default `5432`)                                                                                                                          |
+| `RDS_DB_NAME`        | database name                                                                                                                                           |
+| `RDS_USERNAME`       | database user                                                                                                                                           |
+| `RDS_PASSWORD`       | database password                                                                                                                                       |
+| `GOOGLE_CLIENT_ID`   | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with.                        |
+| `NODE_ENV`           | `production` enables the `Secure` flag on the session cookie                                                                                            |
+| `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`)                     |
+| `LOG_LEVEL`          | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test |
 
 Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema is created lazily on first connection.
 
@@ -57,14 +57,14 @@ Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema i
 
 Most routes are namespaced under `/api/user/:userId/...`. Mutating routes additionally require `req.user.id === :userId`.
 
-| Router | Highlights |
-| --- | --- |
-| `health.ts` | `GET /health` liveness check |
-| `demo.ts` | public demo arena + its SSE streams (no auth) |
-| `help.ts` | help responses, classified with `ml-classify-text` |
-| `user.ts` | `GET /api/user` (current user) and `/api/user/:userId` |
-| `app.ts` | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile` |
-| `arena.ts` | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); arena status, add/remove app, `restart`/`pause`/`resume`, and the live `.../events` & `.../logs` SSE streams |
+| Router      | Highlights                                                                                                                                                                             |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `health.ts` | `GET /health` liveness check                                                                                                                                                           |
+| `demo.ts`   | public demo arena + its SSE streams (no auth)                                                                                                                                          |
+| `help.ts`   | help responses, classified with `ml-classify-text`                                                                                                                                     |
+| `user.ts`   | `GET /api/user` (current user) and `/api/user/:userId`                                                                                                                                 |
+| `app.ts`    | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile`                                                                                                                          |
+| `arena.ts`  | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); arena status, add/remove app, `restart`/`pause`/`resume`, and the live `.../events` & `.../logs` SSE streams |
 
 > **Multi-arena:** a user can own several arenas. Each action route is registered at **two paths sharing one handler** (the `dual()` helper): `/api/user/:userId/arena/...` resolves the user's **default arena** (lazily created if none) — this is what the UI uses — while `/api/user/:userId/arenas/:arenaId/...` addresses a **specific arena** for external tooling. The `resolveArena` middleware enforces that an `:arenaId` belongs to `:userId`. Creation is capped at `MAX_ARENAS_PER_USER` (10). Keep arena management out of the UI; build it against `/arenas`.
 
@@ -106,7 +106,7 @@ The host pins the `__settle`, `__dispatch`, and `__runTimer` references at init 
 
 - `Environment.resume()` starts a `setInterval(…, 100)` that calls `simulate()` each tick; the clock advances by 1 per tick.
 - `src/util/simulation.ts` (`Simulation.run`) is the physics/interaction engine: it kills crashed bots, runs `START` then `TICK` handlers, fires timers, recharges radar/turret, moves tanks, detects tank collisions and bullet hits, applies damage, and emits events. After a "sudden death" time it decays health to force a winner.
-- **Timers are tick-driven** (`src/util/scheduleFactory.ts`): bot `setInterval`/`setTimeout` are monkey-patched to advance with simulation ticks rather than wall-clock time, so the game can pause, resume, and reset them. Keep this in mind — a bot's `setTimeout(fn, 50)` means 50 *ticks*, not 50 ms.
+- **Timers are tick-driven** (`src/util/scheduleFactory.ts`): bot `setInterval`/`setTimeout` are monkey-patched to advance with simulation ticks rather than wall-clock time, so the game can pause, resume, and reset them. Keep this in mind — a bot's `setTimeout(fn, 50)` means 50 _ticks_, not 50 ms.
 
 ## Services & data model
 
@@ -136,15 +136,15 @@ The server uses a structured [pino](https://getpino.io) logger (`src/util/logger
 
 Beyond ordinary info/debug logs, a set of **named fault/security events** is logged with a stable `event` field so a pipeline can alert on them. Each carries relevant context (`appId`, `arenaId`, `tankId`, etc.):
 
-| `event` | Level | Meaning / why monitor |
-| --- | --- | --- |
-| `bot.fault` | warn | A bot crashed (`kind`: `load`/`init`/`handler`/`timer`/`callback`, or `log-flood`). **`timedOut: true`** means it tripped `SANDBOX_TIMEOUT_MS` — a runaway loop or possible sandbox-escape attempt; alert on these specifically. A rising overall rate signals broken bots. |
-| `sandbox.catastrophic` | error | A fatal V8 error in an isolate — typically the 8 MB memory limit (runaway allocation / abuse). |
-| `auth.failed` | warn | A gated route rejected an invalid/expired credential. A spike suggests probing or a token problem. |
-| `auth.forbidden` | warn | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse. |
-| `db.error` | error | Database/pool error (lost connection, auth failure). |
-| `http.error` | error | An unhandled error reached the Express error handler (a 5xx). |
-| `process.fatal` | error/fatal | An `unhandledRejection` or `uncaughtException` escaped to the process. |
+| `event`                | Level       | Meaning / why monitor                                                                                                                                                                                                                                                       |
+| ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bot.fault`            | warn        | A bot crashed (`kind`: `load`/`init`/`handler`/`timer`/`callback`, or `log-flood`). **`timedOut: true`** means it tripped `SANDBOX_TIMEOUT_MS` — a runaway loop or possible sandbox-escape attempt; alert on these specifically. A rising overall rate signals broken bots. |
+| `sandbox.catastrophic` | error       | A fatal V8 error in an isolate — typically the 8 MB memory limit (runaway allocation / abuse).                                                                                                                                                                              |
+| `auth.failed`          | warn        | A gated route rejected an invalid/expired credential. A spike suggests probing or a token problem.                                                                                                                                                                          |
+| `auth.forbidden`       | warn        | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse.                                                                                                                                                                     |
+| `db.error`             | error       | Database/pool error (lost connection, auth failure).                                                                                                                                                                                                                        |
+| `http.error`           | error       | An unhandled error reached the Express error handler (a 5xx).                                                                                                                                                                                                               |
+| `process.fatal`        | error/fatal | An `unhandledRejection` or `uncaughtException` escaped to the process.                                                                                                                                                                                                      |
 
 Note: a bot choosing **not** to await a command whose promise later rejects (e.g. a cancelled `bot.setSpeed`) is normal and is **not** logged as a fault or treated as a crash.
 

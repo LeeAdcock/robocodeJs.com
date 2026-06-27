@@ -12,13 +12,14 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
 ---
 
 ## 1. Approachability & onboarding
-*Lower the barrier so a first-time visitor writes a working bot in minutes.*
 
-- ✅ **In-editor API autocomplete + hover docs.** (M) *Shipped.* A context-aware
+_Lower the barrier so a first-time visitor writes a working bot in minutes._
+
+- ✅ **In-editor API autocomplete + hover docs.** (M) _Shipped._ A context-aware
   Ace completer (`ui/src/page/app/appEditor.tsx`) offers the right members after
   `bot.`, `bot.radar.`, `arena.`, `clock.`, and `Event.`, each with its signature
   and a hover description.
-- ✅ **Bundled TypeScript type definitions for the bot API.** (S–M) *Shipped.*
+- ✅ **Bundled TypeScript type definitions for the bot API.** (S–M) _Shipped._
   A `.d.ts` describing `bot`, `arena`, `clock`, events, markers, and scan results
   is published at `/ts/robocode.d.ts` and linked from the bot docs. Both it and
   the autocomplete are generated from one model (`ui/src/util/botApi.ts`), kept
@@ -36,7 +37,8 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
   defensive, scout) rather than a blank file.
 
 ## 2. Gameplay & fun
-*More to do, more ways to win, more reasons to iterate.*
+
+_More to do, more ways to win, more reasons to iterate._
 
 - **Game modes beyond deathmatch.** (M each) Last-team-standing (current),
   king-of-the-hill (hold a zone), capture-the-flag, target-practice/time-trial,
@@ -55,7 +57,8 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
   events and add a replay player (scrub, slow-mo). Hugely shareable.
 
 ## 3. Competition & community
-*The flywheel for popularity: ranking, sharing, and watching.*
+
+_The flywheel for popularity: ranking, sharing, and watching._
 
 - **Bot sharing / gallery.** (M) Publish a bot (read-only) for others to view and
   clone. Browsing real strategies is both fun and a learning tool.
@@ -71,7 +74,8 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
 - **Achievements / badges.** (S) First kill, flawless victory, 1000 shots, etc.
 
 ## 4. Developer experience (tech-enthusiast appeal)
-*The features that make hacker-news-type users want to play and share.*
+
+_The features that make hacker-news-type users want to play and share._
 
 - **Headless simulation / CLI.** (M) A command (or thin client over the existing
   `/arenas` API) to run a match between bots without the UI — enables scripting,
@@ -92,7 +96,8 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
   blogs/READMEs — free marketing every time someone shows off their bot.
 
 ## 5. Polish, performance & accessibility
-*Make it feel good on every screen and connection.*
+
+_Make it feel good on every screen and connection._
 
 - **Client-side interpolation loop.** (M) Drive smooth motion from a
   `requestAnimationFrame` loop (extrapolating from `simulate.ts`) so animation
@@ -113,14 +118,16 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
 ---
 
 ## Suggested "quick wins" (high impact / low effort, leverage existing code)
+
 1. **Fork-this-example** buttons + **starter templates** — turn the docs into action. (S)
-2. ✅ **Editor autocomplete + bot-API type defs** — the top onboarding lever. (M) *Shipped.*
+2. ✅ **Editor autocomplete + bot-API type defs** — the top onboarding lever. (M) _Shipped._
 3. **Dark-mode toggle** — the plumbing already exists. (S)
 4. **Surface bot crashes in the UI** — the `bot.fault` data is already there. (S–M)
 5. **Friend/private arenas** — the multi-arena API already supports it. (S–M)
 6. **Match score summary** — `TankStats` is already collected. (S–M)
 
 ## Bigger bets (highest popularity upside)
+
 - **Leaderboard / ranked ladder** + **bot sharing** (the competitive + social flywheel).
 - **Replays** (the most shareable artifact).
 - **Headless sim + deterministic seeds + ML hooks** (the tech-enthusiast magnet).

@@ -9,7 +9,7 @@
 */
 
 // A simple first task is to set the name of our AI.
-bot.setName('My First Bot')
+bot.setName('My First Bot');
 
 // Define what the bot should do when the match
 // first starts. This might includes starting some
@@ -20,10 +20,10 @@ bot.on(Event.START, () => {
   // and prepairing for battle. They each return a JavaScript
   // Promise that could allow us to detect when the action
   // is completed.
-  bot.setSpeed(10)
-  bot.radar.setOrientation(0)
-  bot.turret.setOrientation(0)
-})
+  bot.setSpeed(10);
+  bot.radar.setOrientation(0);
+  bot.turret.setOrientation(0);
+});
 
 // This TICK logic is executed at every tick of the game
 // clock. It defines behavior that occurs continuously.
@@ -32,7 +32,7 @@ clock.on(Event.TICK, async () => {
   // turret time to reload, some of the bot's functions
   // return Promises that allow us to wait until a condition
   // is met before our logic executes.
-  let targets = await bot.radar.onReady().then(bot.radar.scan)
+  let targets = await bot.radar.onReady().then(bot.radar.scan);
 
   if (targets.length > 0 && !targets[0].friendly) {
     return bot.turret
@@ -41,15 +41,15 @@ clock.on(Event.TICK, async () => {
       .catch(() => {
         // If the turret isn't ready or firing fails for any reason,
         // we'll just turn the bot and continue.
-        bot.turn(10)
-        bot.setSpeed(10)
-      })
+        bot.turn(10);
+        bot.setSpeed(10);
+      });
   }
-})
+});
 
 // The COLLIDED event is triggered if our bot comes into contact
 // with another bot or the arena edges. In that situation, we set
 // some logic to avoid the obstacle and accelerate.
 bot.on(Event.COLLIDED, () => {
-  bot.turn(40).then(() => bot.setSpeed(10))
-})
+  bot.turn(40).then(() => bot.setSpeed(10));
+});

@@ -11,31 +11,30 @@ The arena is a square space where teams of tanks fight. Each **app** you write i
 You program against a `bot` object (plus `arena` and `clock`) and react to events — `START`, `TICK`, `SCANNED`, `HIT`, `COLLIDED`, and more. Because movement, firing, and scanning all take time, the time-based actions return Promises so you can wait for them. Edit your code and save, and every tank on your team picks up the new logic instantly.
 
 ```js
-bot.setName('My First Bot')
+bot.setName('My First Bot');
 
 // Get moving when the match starts.
 bot.on(Event.START, () => {
-  bot.setSpeed(10)
-  bot.radar.setOrientation(0)
-  bot.turret.setOrientation(0)
-})
+  bot.setSpeed(10);
+  bot.radar.setOrientation(0);
+  bot.turret.setOrientation(0);
+});
 
 // Every clock tick: scan, and fire at any enemy we find.
 clock.on(Event.TICK, async () => {
-  const targets = await bot.radar.onReady().then(bot.radar.scan)
+  const targets = await bot.radar.onReady().then(bot.radar.scan);
   if (targets.length > 0 && !targets[0].friendly) {
-    return bot.turret.onReady().then(bot.turret.fire)
+    return bot.turret.onReady().then(bot.turret.fire);
   }
-})
+});
 
 // Bounced off a wall or another tank? Turn and keep going.
-bot.on(Event.COLLIDED, () => bot.turn(40).then(() => bot.setSpeed(10)))
+bot.on(Event.COLLIDED, () => bot.turn(40).then(() => bot.setSpeed(10)));
 ```
 
 The full bot API is documented in [`ui/public/docs/`](ui/public/docs) (also served in-app at `/dev`), and there are worked examples in [`ui/public/samples/`](ui/public/samples).
 
 ## Architecture
-
 
 RobocodeJs is a two-package monorepo plus a tiny root dev proxy:
 
@@ -117,12 +116,12 @@ node index.js              # root proxy on :5000  (open this one)
 
 This works because the server picks one of two modes at startup based on a single signal — whether `RDS_HOSTNAME` is set:
 
-| | **Local-dev mode** (default) | **Production-like mode** |
-| --- | --- | --- |
-| **Trigger** | `RDS_HOSTNAME` unset *and* `NODE_ENV` ≠ `production`/`test` | `RDS_HOSTNAME` set (or `NODE_ENV=production`) |
-| **Database** | In-memory [pg-mem](https://github.com/oguimbal/pg-mem) — created on boot, **resets on every restart** | Real PostgreSQL via the `RDS_*` variables |
-| **Auth** | **Bypassed** — every request is a fixed "Local Dev" user; no sign-in, the Google button never appears | Real **Google OAuth** (`GOOGLE_CLIENT_ID`); sign in with the in-app button |
-| **First load** | "Local Dev" user is auto-created with starter bots and a live arena | A user/arena is created on first sign-in |
+|                | **Local-dev mode** (default)                                                                          | **Production-like mode**                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Trigger**    | `RDS_HOSTNAME` unset _and_ `NODE_ENV` ≠ `production`/`test`                                           | `RDS_HOSTNAME` set (or `NODE_ENV=production`)                              |
+| **Database**   | In-memory [pg-mem](https://github.com/oguimbal/pg-mem) — created on boot, **resets on every restart** | Real PostgreSQL via the `RDS_*` variables                                  |
+| **Auth**       | **Bypassed** — every request is a fixed "Local Dev" user; no sign-in, the Google button never appears | Real **Google OAuth** (`GOOGLE_CLIENT_ID`); sign in with the in-app button |
+| **First load** | "Local Dev" user is auto-created with starter bots and a live arena                                   | A user/arena is created on first sign-in                                   |
 
 The toggle is computed in `server/src/util/devMode.ts` (`isLocalDev`). **Local-dev mode is for your machine only:** it can never activate when `NODE_ENV=production` (re-checked at the auth-bypass site), and it's disabled under `NODE_ENV=test` so the test suite exercises the real code paths. A real deployment always sets both `NODE_ENV=production` and `RDS_HOSTNAME`, so it gets production-like mode.
 
