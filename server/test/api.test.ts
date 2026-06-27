@@ -377,3 +377,33 @@ describe('multi-arena endpoints', () => {
     expect(arenaService.delete).toHaveBeenCalledWith('ar2');
   });
 });
+
+// The API route handlers are async and contain no try/catch: they rely on
+// Express 5 forwarding a rejected handler promise to the error-handling
+// middleware automatically. Express 4 did NOT do this (the request would hang),
+// so the catch-all 500 handler in src/index.ts only works because of the v5
+// upgrade. Lock that behavior in.
+describe('Express 5 async error forwarding', () => {
+  it('routes a rejected async handler to the error handler as 500', async () => {
+    const app = express();
+    app.get('/boom', async () => {
+      throw new Error('async failure');
+    });
+    // Mirrors the catch-all error handler in src/index.ts.
+    app.use(
+      (
+        err: Error,
+        req: express.Request,
+        res: express.Response,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _next: express.NextFunction
+      ) => {
+        if (!res.headersSent) res.status(500).send('Internal server error');
+      }
+    );
+
+    const res = await request(app).get('/boom');
+    expect(res.status).toBe(500);
+    expect(res.text).toBe('Internal server error');
+  });
+});

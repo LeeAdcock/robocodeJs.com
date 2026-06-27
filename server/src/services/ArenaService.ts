@@ -1,6 +1,6 @@
 import { UserId } from '../types/user';
 import pool from '../util/db';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import Arena, { ArenaId } from '../types/arena';
 
 pool.query(`
@@ -14,7 +14,7 @@ pool.query(`
 
 export class ArenaService {
   create = (userId: UserId): Promise<Arena> => {
-    const arenaId = uuidv4();
+    const arenaId = randomUUID();
     const arena = new Arena(arenaId, userId);
     return pool
       .query({

@@ -154,7 +154,7 @@ const removeApp = async (req: Request, res: Response) => {
     return;
   }
   (await environmentService.getByArenaId(arena.getId()))?.removeApp(
-    req.params.appId
+    req.params.appId as string
   );
   return member.delete().then(() => {
     res.status(200);

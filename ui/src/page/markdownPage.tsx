@@ -1,13 +1,13 @@
 import showdown from 'showdown';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import parse, {
   domToReact,
   attributesToProps,
   Element,
+  DOMNode,
   HTMLReactParserOptions,
 } from 'html-react-parser';
-import React from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Open sample-source and external links in a new tab so following one doesn't
@@ -29,7 +29,7 @@ const parseOptions: HTMLReactParserOptions = {
           target="_blank"
           rel="noopener noreferrer"
         >
-          {domToReact(el.children)}
+          {domToReact(el.children as DOMNode[])}
         </a>
       );
     }
@@ -44,7 +44,7 @@ export default function MarkdownPage(props: MarkdownPageProps) {
   const [html, setHtml] = useState('');
   const [md, setMd] = useState('');
 
-  const divRef = React.createRef<HTMLDivElement>();
+  const divRef = useRef<HTMLDivElement>(null);
 
   const location = useLocation();
 
@@ -72,11 +72,14 @@ export default function MarkdownPage(props: MarkdownPageProps) {
   }, [props.path]);
 
   useEffect(() => {
-    // showdown has an unfixed moderate ReDoS advisory (GHSA-rmmh-p597-ppvv),
-    // accepted here because `md` is only ever our own static /docs/*.md content,
-    // never user input. Revisit (swap for a maintained renderer, preserving
-    // showdown's auto-generated header ids that scrollToSection relies on) if
-    // this ever renders untrusted markdown.
+    // ACCEPTED SECURITY FINDING: showdown has an unfixed moderate ReDoS
+    // advisory (GHSA-rmmh-p597-ppvv) with no patched release, so `npm audit`
+    // will keep reporting it. It is not exploitable here: `md` is only ever our
+    // own static /docs/*.md content fetched above, never user input, so there
+    // is no untrusted-markdown path into the converter. Revisit only if this
+    // ever renders untrusted markdown — and if you swap renderers, preserve
+    // showdown's auto-generated header ids (lowercased, spaces -> hyphens) that
+    // scrollToSection and the in-page TOC anchors depend on.
     setHtml(new showdown.Converter().makeHtml(md));
   }, [md]);
 

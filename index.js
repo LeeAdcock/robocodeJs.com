@@ -1,5 +1,5 @@
 const httpProxy = require('http-proxy');
-const http = require('http');
+const http = require('node:http');
 const proxy = httpProxy.createServer();
 
 const port = 5000;

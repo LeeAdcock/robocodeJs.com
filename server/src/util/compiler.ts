@@ -3,7 +3,7 @@ import { Event } from '../types/event';
 import { scheduleFactory } from './scheduleFactory';
 import ivm from 'isolated-vm';
 import { createLogger } from 'browser-bunyan';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import Environment, { Process } from '../types/environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from '../types/ErrorCodes';
@@ -599,7 +599,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
             env.emit('log', {
               ...entry,
               time: env.getTime(),
-              id: uuidv4(),
+              id: randomUUID(),
             });
           },
         },

@@ -1,7 +1,7 @@
 import Bullet from './bullet';
 import Point from './point';
 import { TimersContainer } from '../util/scheduleFactory';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
 import { TankStats } from './tankStats';
@@ -50,7 +50,7 @@ export default class Tank implements Point, Orientated {
   public x: number;
   public y: number;
 
-  public id: string = uuidv4();
+  public id: string = randomUUID();
   public speed = 0;
   public speedTarget = 0;
   public speedAcceleration = 2;

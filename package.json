@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/LeeAdcock/robocodeJs.com#readme",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "dependencies": {
     "http-proxy": "^1.18.1"

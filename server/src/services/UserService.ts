@@ -1,5 +1,5 @@
 import User, { UserId } from '../types/user';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import arenaService from './ArenaService';
 import pool from '../util/db';
 import appService from './AppService';
@@ -27,7 +27,7 @@ class UserService {
     email: string | undefined,
     demo = false
   ): Promise<User> => {
-    const userId: UserId = demo ? UserService.demoUserId : uuidv4();
+    const userId: UserId = demo ? UserService.demoUserId : randomUUID();
     const user = new User(userId, name, picture, email);
     logger.info({ userId }, 'creating user');
     return pool

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useState, useRef } from 'react';
 import AceEditor from 'react-ace';
+import { Ace } from 'ace-builds';
 
 import languageTools from 'ace-builds/src-noconflict/ext-language_tools';
 import 'ace-builds/src-noconflict/mode-javascript';
@@ -131,7 +132,7 @@ export default function CodeEditor(props: CodeEditorProps) {
       onLoad={(editor) => {
         setEditor(editor);
         if (!completerRegistered) {
-          languageTools.addCompleter(botApiCompleter);
+          languageTools.addCompleter(botApiCompleter as Ace.Completer);
           completerRegistered = true;
         }
       }}

@@ -30,7 +30,7 @@ export const loadUser = async (
   res: Response,
   next: NextFunction
 ) => {
-  const user = await userService.get(req.params.userId);
+  const user = await userService.get(req.params.userId as string);
   if (!user) {
     res.status(404);
     res.send('Invalid user id');
@@ -73,7 +73,7 @@ export const loadApp = async (
   res: Response,
   next: NextFunction
 ) => {
-  const app = await appService.get(req.params.appId);
+  const app = await appService.get(req.params.appId as string);
   if (!app) {
     res.status(404);
     res.send('Invalid app id');
@@ -95,7 +95,7 @@ export const resolveArena = async (
 ) => {
   const targetUser = (req as UserScopedRequest).targetUser;
   if (req.params.arenaId) {
-    const arena = await arenaService.get(req.params.arenaId);
+    const arena = await arenaService.get(req.params.arenaId as string);
     if (!arena || arena.getUserId() !== targetUser.getId()) {
       res.status(404);
       res.send('Invalid arena id');
