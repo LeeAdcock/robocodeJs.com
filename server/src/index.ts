@@ -52,7 +52,10 @@ app.use(userEndpoints);
 app.use(appEndpoints);
 app.use(arenaEndpoints);
 
-app.all('*', function (req, res) {
+// SPA fallback: serve index.html for any request not handled above. Express 5
+// (path-to-regexp v8) no longer accepts a bare '*' route, so use a path-less
+// middleware, which matches every method and path including the root.
+app.use(function (req, res) {
   res.sendFile(path.resolve(__dirname + '/../public/index.html'));
 });
 
