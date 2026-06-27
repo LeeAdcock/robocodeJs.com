@@ -151,6 +151,10 @@ The UI build outputs directly into `server/dist/public`, which the server serves
 
 Other root scripts: `npm test` and `npm run lint` run the respective task across both packages; `npm run install:all` installs all three.
 
+### Code style & the pre-commit hook
+
+Formatting is governed by a single root [`.prettierrc.json`](.prettierrc.json) for the whole repo. A **Husky pre-commit hook** runs [`lint-staged`](https://github.com/lint-staged/lint-staged), which applies `prettier --write` to staged files (JS/TS/CSS/Markdown/JSON/YAML/HTML) so commits stay consistently formatted automatically. The hook is installed by the `prepare` script when you run `npm install` at the root (part of `npm run install:all`); no manual setup is needed. To format the whole repo on demand, run `npx prettier --write .` from the root.
+
 ## Documentation
 
 - [`server/README.md`](server/README.md) — API endpoints, the sandbox/compiler, the simulation engine, data model, environment variables.

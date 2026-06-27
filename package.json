@@ -9,7 +9,8 @@
     "install:all": "npm install && npm --prefix server install && npm --prefix ui install",
     "build": "npm --prefix ui run build && npm --prefix server run build",
     "test": "npm --prefix server test && npm --prefix ui test",
-    "lint": "npm --prefix server run lint && npm --prefix ui run lint"
+    "lint": "npm --prefix server run lint && npm --prefix ui run lint",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -28,6 +29,12 @@
     "http-proxy": "^1.18.1"
   },
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "concurrently": "^10.0.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^2.8.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,css,md,json,yaml,yml,html}": "prettier --write"
   }
 }
