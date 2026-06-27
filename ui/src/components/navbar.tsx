@@ -39,9 +39,9 @@ const AppLink = function (props: AppLinkProps) {
           src={'/sprites/tank_' + colors[appIndex] + '.png'}
           style={{ height: '1em', marginRight: '5px' }}
         />
-        <span style={{ color: 'black' }}>
-          {titleCase(props.app.name || 'Unknown')}
-        </span>
+        {/* No hardcoded color — inherit the dropdown's theme-aware text color
+            so the name stays readable in both light and dark mode. */}
+        {titleCase(props.app.name || 'Unknown')}
       </>
     );
   }
@@ -73,23 +73,6 @@ export default function NavBar(props: NavBarProps) {
         className="topNavBar"
       >
         <Navbar.Brand className="nav-item">
-          <div
-            style={{
-              position: 'absolute',
-              opacity: '.5',
-              padding: '0px 1px 0px 1px',
-              margin: '0px',
-              top: '10px',
-              left: '105px',
-              fontWeight: '700',
-              fontSize: '.5em',
-              color: 'black',
-              backgroundColor: 'gold',
-              textDecoration: 'none!important',
-            }}
-          >
-            BETA
-          </div>
           <span
             style={{
               fontWeight: '700',

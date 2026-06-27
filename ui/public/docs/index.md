@@ -8,9 +8,20 @@ As you work to develop your application code, the bots in the arena will immedia
 
 # Getting started
 
-To create your first bot, sign in to your Google account and use the menu to select "Apps"..."Create new application" and your new application will be created and your bots added to the arena. Time to get coding!
+Pick the path that fits you:
 
-You'll want to have the [documentation](/dev) on how to code your bots handy, and then walk through the tutorial below on creating your very first bot. Once you are ready to see some other more complex examples, check out the library of [example applications](/examples) that showcase a number of different techniques that you can put to use.
+- **New to coding?** Start the **[Learn to Code course](/learn)** — a guided, 14-lesson
+  path that takes you from "what is code?" to a fully featured battle bot, no experience
+  needed.
+- **Coming from classic Robocode?** Read **[Coming from classic Robocode](/classic)** for
+  a quick map of what's the same, what's different, and how to port your instincts.
+- **Want the details?** Keep the **[API reference](/dev)** and **[game rules &
+  physics](/rules)** handy, and browse the **[example bots](/examples)**.
+
+To create your first bot, sign in with your Google account and use the menu to select
+**Apps → Create new application**; your bots are added to the arena and you're ready to
+code. The quick walkthrough below builds a simple bot in a few minutes — or jump straight
+into the [course](/learn).
 
 ## Naming your Bot
 
