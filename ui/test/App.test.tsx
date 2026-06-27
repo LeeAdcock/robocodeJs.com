@@ -8,6 +8,7 @@ import { render, cleanup } from '@testing-library/react';
 vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 import axios from 'axios';
 import App from '../src/App';
+import { setDarkMode } from '../src/util/theme';
 
 class FakeEventSource {
   url: string;
@@ -40,12 +41,20 @@ describe('App', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    setDarkMode(false);
+    document.body.classList.remove('dark');
   });
 
   it('mounts and renders the arena without crashing (signed-out)', () => {
     const { container } = render(<App />);
     // The arena SVG renders regardless of auth state.
     expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('reflects the theme preference on the document body', () => {
+    setDarkMode(true);
+    render(<App />);
+    expect(document.body.classList.contains('dark')).toBe(true);
   });
 
   it('opens an SSE connection on mount', () => {

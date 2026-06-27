@@ -5,8 +5,16 @@ import NavDropdown from 'react-bootstrap/NavDropdown';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 import Form from 'react-bootstrap/Form';
-import { FaSyncAlt, FaPauseCircle, FaPlayCircle } from 'react-icons/fa';
+import Button from 'react-bootstrap/Button';
+import {
+  FaSyncAlt,
+  FaPauseCircle,
+  FaPlayCircle,
+  FaSun,
+  FaMoon,
+} from 'react-icons/fa';
 import { colors } from '../util/colors';
+import { useDarkMode, toggleDarkMode } from '../util/theme';
 import { Link } from 'react-router-dom';
 import TankApp from '../types/tankApp';
 import User from '../types/user';
@@ -53,6 +61,7 @@ interface NavBarProps {
 
 export default function NavBar(props: NavBarProps) {
   const navigate = useNavigate();
+  const darkMode = useDarkMode();
 
   return (
     <>
@@ -187,6 +196,27 @@ export default function NavBar(props: NavBarProps) {
                 }}
               />
             </Form>
+            <OverlayTrigger
+              placement={'bottom'}
+              overlay={
+                <Tooltip id={`theme`}>
+                  {darkMode ? 'Switch to light mode' : 'Switch to night mode'}
+                </Tooltip>
+              }
+            >
+              <Button
+                variant="outline-light"
+                size="sm"
+                aria-label={
+                  darkMode ? 'Switch to light mode' : 'Switch to night mode'
+                }
+                aria-pressed={darkMode}
+                style={{ marginLeft: '8px', border: 'none' }}
+                onClick={() => toggleDarkMode()}
+              >
+                {darkMode ? <FaSun /> : <FaMoon />}
+              </Button>
+            </OverlayTrigger>
           </Nav>
         </Navbar.Collapse>
 

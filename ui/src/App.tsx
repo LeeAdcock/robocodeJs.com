@@ -15,6 +15,7 @@ import PointInTime from './types/pointInTime';
 import applyArenaEvent from './util/arenaReducer';
 import PlaybackBuffer from './util/playbackBuffer';
 import { setPlaybackTime } from './util/playbackClock';
+import { useDarkMode } from './util/theme';
 import { Emitter } from './util/emitter';
 
 // High-frequency simulation events are played back through the jitter buffer on
@@ -99,6 +100,14 @@ function App() {
   arenaRef.current = arena;
   const timeRef = useRef(time);
   timeRef.current = time;
+
+  // Whole-app theme: reflect the preference onto <body> so CSS (variables under
+  // `body.dark`) re-themes the page, docs, and log console; the boolean is also
+  // passed to the arena filter and the editor's Ace theme.
+  const darkMode = useDarkMode();
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   // Reset the experience if the user session expires
   useEffect(() => {
@@ -388,7 +397,7 @@ function App() {
             />
           </div>
         )}
-        <ArenaSvg darkMode={false} arena={arena} time={time}></ArenaSvg>
+        <ArenaSvg darkMode={darkMode} arena={arena} time={time}></ArenaSvg>
       </div>
     </>
   );

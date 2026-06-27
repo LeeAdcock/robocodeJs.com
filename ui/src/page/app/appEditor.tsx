@@ -12,6 +12,7 @@ import prettier from 'prettier/standalone';
 import babel from 'prettier/parser-babel';
 
 import { completionsFor } from '../../util/botApi';
+import { useDarkMode } from '../../util/theme';
 
 // Editor font-size bounds and default, shared with the toolbar zoom controls so
 // the two can't disagree.
@@ -52,6 +53,7 @@ let completerRegistered = false;
 
 export default function CodeEditor(props: CodeEditorProps) {
   const [editor, setEditor] = useState(null as any);
+  const darkMode = useDarkMode();
   const compileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
@@ -85,7 +87,7 @@ export default function CodeEditor(props: CodeEditorProps) {
   return (
     <AceEditor
       mode="javascript"
-      theme={'github'}
+      theme={darkMode ? 'kr_theme' : 'github'}
       commands={[
         {
           name: 'save',
