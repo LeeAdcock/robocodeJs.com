@@ -1,7 +1,7 @@
 import { UserId } from '../types/user';
 import TankApp, { AppId } from '../types/app';
 import pool from '../util/db';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS app (
@@ -18,7 +18,7 @@ pool.query(`
 
 export class AppService {
   create = (userId: UserId): Promise<TankApp> => {
-    const appId = uuidv4();
+    const appId = randomUUID();
     const app = new TankApp(appId, userId);
     return pool
       .query({

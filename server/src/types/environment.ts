@@ -1,5 +1,5 @@
 import Clock from './clock';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import TankApp, { AppId } from './app';
 import Tank from './tank';
 import ivm from 'isolated-vm';

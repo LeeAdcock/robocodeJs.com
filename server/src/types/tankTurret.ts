@@ -1,5 +1,5 @@
 import Bullet from './bullet';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
 import Tank, { waitUntil } from './tank';
@@ -115,7 +115,7 @@ export class TankTurret implements Orientated {
     }
 
     const bullet: Bullet = {
-      id: uuidv4(),
+      id: randomUUID(),
       exploded: false,
       x: this.tank.x,
       y: this.tank.y,

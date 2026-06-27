@@ -2,7 +2,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
-import path from 'path';
+import path from 'node:path';
 
 import auth from './middleware/auth';
 import { isLocalDev } from './util/devMode';

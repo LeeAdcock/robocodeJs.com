@@ -17,8 +17,7 @@
         "ml-classify-text": "^2.0.0",
         "pg": "^8.8.0",
         "pino": "^8.21.0",
-        "pino-http": "^8.6.1",
-        "uuid": "^11.1.1"
+        "pino-http": "^8.6.1"
       },
       "devDependencies": {
         "@types/cookie-parser": "^1.4.7",
@@ -6187,19 +6186,6 @@
       "dev": true,
       "dependencies": {
         "punycode": "^2.1.0"
-      }
-    },
-    "node_modules/uuid": {
-      "version": "11.1.1",
-      "resolved": "https://registry.npmjs.org/uuid/-/uuid-11.1.1.tgz",
-      "integrity": "sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==",
-      "funding": [
-        "https://github.com/sponsors/broofa",
-        "https://github.com/sponsors/ctavan"
-      ],
-      "license": "MIT",
-      "bin": {
-        "uuid": "dist/esm/bin/uuid"
       }
     },
     "node_modules/validate-npm-package-license": {
