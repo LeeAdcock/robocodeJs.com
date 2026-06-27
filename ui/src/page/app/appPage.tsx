@@ -109,6 +109,17 @@ export default function AppPage(props: AppPageProps) {
       .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`));
   };
 
+  // Reboot: save the current code, then re-run the bot's START handler. Plain
+  // saving updates the logic without re-initializing, so this is the explicit
+  // way to re-run startup setup.
+  const doReboot = () => {
+    axios
+      .put(`/api/user/${userId}/app/${appId}/source`, code, {
+        headers: { 'content-type': 'application/octet-stream' },
+      })
+      .then(() => axios.post(`/api/user/${userId}/app/${appId}/reboot`));
+  };
+
   const doDelete = () => {
     axios
       .delete(`/api/user/${userId}/app/${appId}`)
@@ -169,6 +180,7 @@ export default function AppPage(props: AppPageProps) {
               code={code}
               doDelete={doDelete}
               doExecute={doExecute}
+              doReboot={doReboot}
               doClean={doClean}
               fontSize={fontSize}
               doZoomIn={zoomIn}
@@ -196,6 +208,7 @@ export default function AppPage(props: AppPageProps) {
         code={code}
         onChange={setCode}
         doExecute={doExecute}
+        doReboot={doReboot}
         doClean={doClean}
         fontSize={fontSize}
         doZoomIn={zoomIn}

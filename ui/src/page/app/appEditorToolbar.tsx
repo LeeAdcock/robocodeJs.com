@@ -12,6 +12,7 @@ import {
   FaSave,
   FaSearchMinus,
   FaSearchPlus,
+  FaPowerOff,
 } from 'react-icons/fa';
 
 import { EDITOR_FONT_MIN, EDITOR_FONT_MAX } from './appEditor';
@@ -22,6 +23,7 @@ interface EditorToolbarProps {
   doDelete: () => void;
   doClean: () => void;
   doExecute: () => void;
+  doReboot: () => void;
   fontSize: number;
   doZoomIn: () => void;
   doZoomOut: () => void;
@@ -102,6 +104,24 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               onClick={() => props.doClean()}
             >
               <FaCode />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement={'bottom'}
+            overlay={
+              <Tooltip id={`reboot`}>
+                Reboot — save, reload the code, and re-run the START handler
+                (Ctrl-Shift-S)
+              </Tooltip>
+            }
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Reboot bot"
+              onClick={() => props.doReboot()}
+            >
+              <FaPowerOff />
             </Button>
           </OverlayTrigger>
         </ButtonGroup>

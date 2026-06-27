@@ -218,6 +218,32 @@ describe('app endpoints', () => {
     expect(res.status).toBe(200);
     expect(app.delete).toHaveBeenCalled();
   });
+
+  it('POST /api/user/:userId/app/:appId/reboot reboots the app in running arenas', async () => {
+    const reboot = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(arenaService.getForUser).mockResolvedValue([
+      { getId: () => 'ar1' },
+    ] as never);
+    vi.mocked(environmentService.has).mockReturnValue(true as never);
+    vi.mocked(environmentService.get).mockResolvedValue({ reboot } as never);
+
+    const res = await request(makeApp(appRouter, mockUser('u1'))).post(
+      '/api/user/u1/app/a1/reboot'
+    );
+    expect(res.status).toBe(200);
+    expect(reboot).toHaveBeenCalledWith('a1');
+  });
+
+  it('POST /api/user/:userId/app/:appId/reboot is forbidden for a non-owner', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    const res = await request(
+      makeApp(appRouter, mockUser('someone-else'))
+    ).post('/api/user/u1/app/a1/reboot');
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('arena endpoints', () => {
