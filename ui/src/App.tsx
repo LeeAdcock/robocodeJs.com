@@ -5,6 +5,7 @@ import TankApp from './types/tankApp';
 import Arena from './types/arena';
 import NavBar from './components/navbar';
 import MarkdownPage from './page/markdownPage';
+import LessonPage from './page/lessonPage';
 import User from './types/user';
 import ArenaToolbar from './components/arena/arenaToolbar';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -344,6 +345,8 @@ function App() {
                   element={<MarkdownPage path="examples" />}
                 />
                 <Route path="/dev" element={<MarkdownPage path="dev" />} />
+                <Route path="/learn" element={<MarkdownPage path="learn" />} />
+                <Route path="/learn/:slug" element={<LessonPage />} />
 
                 <Route path="user/:userId" element={<>user</>} />
                 <Route path="user/:userId/arena" element={<>user arena</>} />
