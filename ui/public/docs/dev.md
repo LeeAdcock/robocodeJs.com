@@ -3,12 +3,29 @@
 
 Each bot's logic is defined in JavaScript that is initialized at the beginning of a match to provide initial commands and register event handlers. The logic is reinitialized every time you save your code.
 
+The in-browser code editor offers **autocomplete** for the whole bot API: type `bot.`, `arena.`, `clock.`, or `Event.` to see the available members, each with its signature and a short description.
+
+- [Type definitions](#type-definitions)
 - [Arena](#arena)
 - [Clock](#clock)
 - [Bot events](#bot-events)
 - [Bot movement](#movement)
 - [Bot turret](#turret)
 - [Bot radar](#radar)
+
+# Type definitions
+
+If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/ts/robocode.d.ts`](/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
+
+Reference them from a bot file with a triple-slash directive:
+
+```
+/// <reference path="./robocode.d.ts" />
+
+bot.on(Event.START, () => {
+  // `bot`, `arena`, `clock`, and `Event` are all typed here.
+})
+```
 
 # Arena
 
@@ -207,16 +224,38 @@ Because `START` runs again whenever you save, anything you set up there is re-in
 
 ## Console Logging
 
-The normal `console.log()` and related functions can be used for output messages. These will automatically be captured for display in the user interface, as well as being formatted and written to the browser console.
+The normal `console.log()` and related functions can be used for output messages. These are captured for display in the bot's log panel in the user interface, as well as being formatted and written to the browser console.
 
 ```
 console.log(`here a useful log message!`)
 ```
 
-A logger instance is also available for outputting messages with the various debug, trace, info, error, and warn levels.
+`console.log`, `console.info`, `console.warn`, `console.error`, and `console.debug` are all available.
+
+### Logging values, not just strings
+
+You don't have to format everything into a string yourself. Pass **any mix of arguments** — strings, numbers, booleans, objects, arrays, even an `Error` — and they're each rendered into the message, separated by spaces (just like `console.log` in a browser):
 
 ```
-logger.warn(`here a useful log message!`)
+console.log('target', target)                 // -> target {"x":120,"y":40,"id":"t3"}
+console.log('health', bot.getHealth())         // -> health 0.75
+console.log('scan results', results)           // -> scan results [{"angle":12,...}]
+```
+
+Objects and arrays are serialized to JSON, so you can dump whole state objects while debugging. A few details worth knowing:
+
+- **Put a label first.** The log panel shows the message text, so `console.log('state', obj)` reads better than `console.log(obj)` alone.
+- **Cycles and functions are safe.** Circular references render as `[Circular]` and functions as `[Function]` — logging something like `this` won't crash your bot.
+- **Errors show their stack**, so `try { ... } catch (e) { console.error(e) }` is useful.
+- Very long messages are truncated, and output is rate-limited per simulation tick, so a tight logging loop won't flood the panel.
+
+### Log levels
+
+A `logger` instance is also available for outputting messages with the various `debug`, `trace`, `info`, `warn`, and `error` levels. It accepts the same mix of arguments as `console.log`.
+
+```
+logger.warn('low health, retreating', bot.getHealth())
+logger.error('unexpected scan', results)
 ```
 
 ## JavaScript Timers

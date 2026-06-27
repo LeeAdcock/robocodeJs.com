@@ -14,13 +14,15 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
 ## 1. Approachability & onboarding
 *Lower the barrier so a first-time visitor writes a working bot in minutes.*
 
-- **In-editor API autocomplete + hover docs.** (M) The editor is Ace; wire up
-  completions and signature help for the `bot`/`arena`/`clock` API and the
-  `Event` enum. The single biggest quality-of-life win for new authors — no more
-  hunting the docs for method names.
-- **Bundled TypeScript type definitions for the bot API.** (S–M) Ship a `.d.ts`
-  describing `bot`, `arena`, `clock`, events, and scan results. Powers the
-  autocomplete above and lets advanced users author bots with full typing.
+- ✅ **In-editor API autocomplete + hover docs.** (M) *Shipped.* A context-aware
+  Ace completer (`ui/src/page/app/appEditor.tsx`) offers the right members after
+  `bot.`, `bot.radar.`, `arena.`, `clock.`, and `Event.`, each with its signature
+  and a hover description.
+- ✅ **Bundled TypeScript type definitions for the bot API.** (S–M) *Shipped.*
+  A `.d.ts` describing `bot`, `arena`, `clock`, events, markers, and scan results
+  is published at `/ts/robocode.d.ts` and linked from the bot docs. Both it and
+  the autocomplete are generated from one model (`ui/src/util/botApi.ts`), kept
+  in sync by a snapshot test.
 - **Interactive guided tutorial.** (M) A step-by-step overlay that walks a new
   player through naming, moving, scanning, and firing — building on the existing
   homepage tutorial but live in the editor with "try it" checkpoints.
@@ -112,7 +114,7 @@ streaming, the `dropMarker` API, the unused `darkMode` flag).
 
 ## Suggested "quick wins" (high impact / low effort, leverage existing code)
 1. **Fork-this-example** buttons + **starter templates** — turn the docs into action. (S)
-2. **Editor autocomplete + bot-API type defs** — the top onboarding lever. (M)
+2. ✅ **Editor autocomplete + bot-API type defs** — the top onboarding lever. (M) *Shipped.*
 3. **Dark-mode toggle** — the plumbing already exists. (S)
 4. **Surface bot crashes in the UI** — the `bot.fault` data is already there. (S–M)
 5. **Friend/private arenas** — the multi-arena API already supports it. (S–M)

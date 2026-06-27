@@ -10,6 +10,7 @@ import MarkdownPage from '../src/page/markdownPage';
 const md = [
   '[sample](/samples/lighthouse.js)',
   '[external](https://example.com/x)',
+  '[types](/ts/robocode.d.ts)',
   '[internal](/dev)',
 ].join('\n\n');
 
@@ -38,11 +39,13 @@ describe('MarkdownPage', () => {
 
     const sample = await screen.findByText('sample');
     const external = screen.getByText('external');
+    const types = screen.getByText('types');
     const internal = screen.getByText('internal');
 
     expect(sample.getAttribute('target')).toBe('_blank');
     expect(sample.getAttribute('rel')).toContain('noopener');
     expect(external.getAttribute('target')).toBe('_blank');
+    expect(types.getAttribute('target')).toBe('_blank');
     expect(internal.getAttribute('target')).toBeNull();
   });
 });

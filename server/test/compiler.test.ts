@@ -181,6 +181,71 @@ describe('compiler — bot API in a real isolate', () => {
     expect(logCalls[0][1].msg.length).toBeLessThanOrEqual(2001);
   });
 
+  // The message text of the most recent broadcast log line.
+  const lastLogMsg = () => {
+    const logs = ctx.emit.mock.calls.filter((c) => c[0] === 'log');
+    return logs[logs.length - 1]?.[1].msg as string;
+  };
+
+  it('formats object arguments into the log message (visible in the UI)', () => {
+    // The UI renders only the message text, so an object must be serialized into
+    // it — whether passed alone or after a label.
+    ctx.run(`console.log({ x: 1, y: 2 })`);
+    expect(lastLogMsg()).toBe('{"x":1,"y":2}');
+
+    ctx.run(`console.log('state', { hp: 0.5, pos: [1, 2] })`);
+    expect(lastLogMsg()).toBe('state {"hp":0.5,"pos":[1,2]}');
+  });
+
+  it('formats numbers, booleans, and arrays in console.log', () => {
+    ctx.run(`console.log('n', 42, true, [1, 2, 3])`);
+    expect(lastLogMsg()).toBe('n 42 true [1,2,3]');
+  });
+
+  it('does not crash the bot when logging a circular structure', () => {
+    ctx.run(`
+      const o = { a: 1 };
+      o.self = o;
+      console.log('obj', o);
+    `);
+    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(lastLogMsg()).toBe('obj {"a":1,"self":"[Circular]"}');
+  });
+
+  it('does not crash the bot when logging functions', () => {
+    // Functions can't be cloned across the isolate boundary; formatting them to
+    // a placeholder before crossing keeps a debugging log from killing the bot.
+    ctx.run(`console.log('fn', function greet() {}, { cb: () => {} })`);
+    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(lastLogMsg()).toBe('fn [Function: greet] {"cb":"[Function: cb]"}');
+  });
+
+  it('renders an Error with its stack', () => {
+    ctx.run(`console.error(new Error('boom'))`);
+    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(lastLogMsg()).toContain('boom');
+  });
+
+  it('exposes console.info / warn / error / debug and logger levels', () => {
+    ctx.run(`
+      console.info('i');
+      console.warn('w');
+      console.error('e');
+      console.debug('d');
+      logger.trace('t');
+    `);
+    const msgs = ctx.emit.mock.calls
+      .filter((c) => c[0] === 'log')
+      .map((c) => c[1].msg);
+    expect(msgs).toEqual(expect.arrayContaining(['i', 'w', 'e', 'd', 't']));
+  });
+
+  it('hides the raw _log channel from bot code', () => {
+    // Bots must go through the formatting wrappers; the raw native channel that
+    // can crash on un-cloneable arguments is removed after setup.
+    expect(ctx.read('typeof _log')).toBe('undefined');
+  });
+
   it('sanitizes and bounds a bot-supplied name before broadcasting it', async () => {
     const app = {
       getId: () => 'app1',

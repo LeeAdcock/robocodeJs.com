@@ -630,11 +630,12 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     // fixed, so a logging loop is capped at MAX_LOGS_PER_TICK.
     let logCount = 0;
     let logWindow = env.getTime();
-    const clampLog = (m: unknown) =>
-      typeof m === 'string' && m.length > MAX_LOG_LENGTH
-        ? m.slice(0, MAX_LOG_LENGTH) + '…'
-        : m;
-    tank.getContext().global.setSync('_log', (msg: any, ...msgs: any[]) => {
+    const clampLog = (m: string) =>
+      m.length > MAX_LOG_LENGTH ? m.slice(0, MAX_LOG_LENGTH) + '…' : m;
+    // The bot-side wrappers (below) format every argument into a single string
+    // before it crosses the isolate boundary, so the host only ever receives a
+    // string here. Coerce defensively in case `_log` is called directly.
+    tank.getContext().global.setSync('_log', (msg: any) => {
       const now = env.getTime();
       if (now !== logWindow) {
         logWindow = now;
@@ -653,21 +654,109 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         return;
       }
       logCount += 1;
-      tank.logger.info(clampLog(msg), ...msgs.map(clampLog));
+      tank.logger.info(clampLog(typeof msg === 'string' ? msg : String(msg)));
     });
     // TODO better log-level support
+    //
+    // console.log / logger.* accept any mix of arguments — strings, numbers,
+    // objects, arrays, Errors. We format them into one display string *inside*
+    // the isolate, because isolated-vm copies arguments across the boundary and
+    // that copy throws on values it can't clone (functions, circular refs),
+    // which — since logging is synchronous — would otherwise crash the bot. The
+    // formatter never throws: objects are safe-stringified (with circular-ref
+    // and function placeholders), Errors render their stack, and any failure
+    // falls back to String(). The result is one string, matching the UI, which
+    // only displays the message text. The helpers live in a closure so they
+    // can't be clobbered, and `_log` is captured before being hidden so bots
+    // can't reach the raw (crash-prone) channel directly.
     process
       .getSandbox()
       .compileScriptSync(
         `
-        logger = {};
-        logger.log = _log;
-        logger.info = _log;
-        logger.trace = _log;
-        logger.debug = _log;
-        logger.warn = _log;
-        logger.error = _log;
-        console = {log: _log};
+        (function () {
+          var emit = _log;
+          // Serialize one value into something JSON.stringify can render,
+          // tracking ancestors so genuine cycles become '[Circular]' without
+          // false-positiving on values merely shared between siblings.
+          function safe(v, anc) {
+            if (v === null) return null;
+            var t = typeof v;
+            if (t === 'string' || t === 'number' || t === 'boolean') return v;
+            if (t === 'undefined') return undefined;
+            if (t === 'bigint') return v.toString() + 'n';
+            if (t === 'symbol') return v.toString();
+            if (t === 'function')
+              return '[Function' + (v.name ? ': ' + v.name : '') + ']';
+            if (t === 'object') {
+              if (anc.indexOf(v) !== -1) return '[Circular]';
+              if (v instanceof Error)
+                return v.stack || v.name + ': ' + v.message;
+              var next = anc.concat([v]);
+              if (Array.isArray(v))
+                return v.map(function (x) {
+                  return safe(x, next);
+                });
+              var out = {};
+              var keys = Object.keys(v);
+              for (var i = 0; i < keys.length; i++) {
+                try {
+                  out[keys[i]] = safe(v[keys[i]], next);
+                } catch (e) {
+                  out[keys[i]] = '[Unreadable]';
+                }
+              }
+              return out;
+            }
+            return String(v);
+          }
+          // Render one top-level argument as a display string.
+          function disp(a) {
+            if (typeof a === 'string') return a;
+            var s;
+            try {
+              s = safe(a, []);
+            } catch (e) {
+              try {
+                return String(a);
+              } catch (e2) {
+                return '[Unserializable]';
+              }
+            }
+            if (typeof s === 'string') return s;
+            if (s === undefined) return 'undefined';
+            try {
+              return JSON.stringify(s);
+            } catch (e) {
+              return String(s);
+            }
+          }
+          // Join all arguments with spaces, console.log style.
+          function fmt() {
+            var parts = [];
+            for (var i = 0; i < arguments.length; i++)
+              parts.push(disp(arguments[i]));
+            return parts.join(' ');
+          }
+          var log = function () {
+            emit(fmt.apply(null, arguments));
+          };
+          logger = {
+            log: log,
+            info: log,
+            trace: log,
+            debug: log,
+            warn: log,
+            error: log,
+          };
+          console = {
+            log: log,
+            info: log,
+            warn: log,
+            error: log,
+            debug: log,
+          };
+        })();
+        _log = undefined;
        `
       )
       .runSync(tank.getContext(), {});
