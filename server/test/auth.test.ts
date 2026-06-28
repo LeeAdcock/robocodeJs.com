@@ -89,4 +89,23 @@ describe('auth middleware', () => {
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
+
+  it('returns 500 (not 401) when the token is valid but the user lookup fails', async () => {
+    // A valid credential whose downstream resolution throws (e.g. the database
+    // is unreachable) is a server fault, not a bad credential — it must not be
+    // mislabeled as a 401 (which is what masked the RDS SSL outage). The cookie
+    // is left intact so the still-valid session isn't cleared on a server blip.
+    verifyIdToken.mockResolvedValue(payload('g3'));
+    vi.mocked(identityService.get).mockRejectedValue(
+      new Error('no pg_hba.conf entry for host ..., no encryption')
+    );
+    const res = makeRes();
+    const next = vi.fn();
+    await auth(true)({ cookies: { auth: 'tok' } } as never, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.status).not.toHaveBeenCalledWith(401);
+    expect(res.clearCookie).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
 });

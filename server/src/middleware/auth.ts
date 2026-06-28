@@ -66,65 +66,82 @@ export default (required: boolean) =>
         return next();
       }
     }
+    // Step 1 — verify the Google credential. A failure here means the token is
+    // missing/expired/invalid (or minted for another audience): the *client's*
+    // problem, so a gated route answers 401. An ungated route just proceeds
+    // anonymously (e.g. a logged-out visitor with no cookie). The error message
+    // (not token contents) is logged so config problems (audience mismatch, no
+    // egress to fetch Google's certs, clock skew) are diagnosable. Worth
+    // monitoring: a spike of these suggests probing or token issues.
+    let payload: TokenPayload | undefined;
     try {
-      return verifyGoogleCredential(req.cookies.auth)
-        .then((payload) => {
-          if (payload) {
-            return authService.get('google', payload.sub).then((userAuth) => {
-              if (userAuth) {
-                // We recognize this user
-                return userService.get(userAuth.getUserId()).then((user) => {
-                  if (!user) {
-                    // Should not be possible to recognize their auth but not
-                    // have a user record for them.
-                    throw new Error('Missing account.');
-                  }
-                  (req as AuthenticatedRequest).user = user;
-                  return next();
-                });
-              } else {
-                // Create this user
-                return userService
-                  .create(payload.name, payload.picture, payload.email)
-                  .then((user) => {
-                    (req as AuthenticatedRequest).user = user;
-                    return authService
-                      .create(user.getId(), 'google', payload.sub)
-                      .then(next);
-                  });
-              }
-            });
-          }
-        })
-        .catch((err: unknown) => {
-          if (required) {
-            // A gated route rejected an invalid/expired credential. Worth
-            // monitoring: a spike suggests probing or token issues. The error
-            // message (not token contents) is logged so config problems
-            // (audience mismatch, no egress to fetch Google's certs, clock
-            // skew) are diagnosable rather than an opaque 401.
-            logger.warn(
-              {
-                event: LogEvent.AUTH_FAILED,
-                path: req.path,
-                err: err instanceof Error ? err.message : String(err),
-              },
-              'rejected request with invalid credential'
-            );
-            res.clearCookie('auth');
-            res.status(401);
-            res.send('Access forbidden');
-          } else {
-            next();
-          }
-        });
-    } catch (e) {
-      logger.warn(
-        { event: LogEvent.AUTH_FAILED, path: req.path, err: e },
-        'auth middleware error'
+      payload = await verifyGoogleCredential(req.cookies.auth);
+    } catch (err: unknown) {
+      if (required) {
+        logger.warn(
+          {
+            event: LogEvent.AUTH_FAILED,
+            path: req.path,
+            err: err instanceof Error ? err.message : String(err),
+          },
+          'rejected request with invalid credential'
+        );
+        res.clearCookie('auth');
+        res.status(401);
+        res.send('Access forbidden');
+        return;
+      }
+      return next();
+    }
+
+    if (!payload) {
+      // Verified but no payload — treat as unauthenticated.
+      if (required) {
+        res.clearCookie('auth');
+        res.status(401);
+        res.send('Access forbidden');
+        return;
+      }
+      return next();
+    }
+
+    // Step 2 — the token is valid; resolve (or create) the user. A failure here
+    // is a *server-side* problem (e.g. the database is unreachable), NOT a bad
+    // credential, so it must surface as 500 rather than masquerading as a 401.
+    // Conflating the two previously made a DB outage look like a sign-in failure.
+    try {
+      const userAuth = await authService.get('google', payload.sub);
+      let user: User | undefined;
+      if (userAuth) {
+        // We recognize this user.
+        user = await userService.get(userAuth.getUserId());
+        if (!user) {
+          // Should not be possible to recognize their auth but not have a user
+          // record for them.
+          throw new Error('Missing account.');
+        }
+      } else {
+        // First time we've seen this Google user: create their account.
+        user = await userService.create(
+          payload.name,
+          payload.picture,
+          payload.email
+        );
+        await authService.create(user.getId(), 'google', payload.sub);
+      }
+      (req as AuthenticatedRequest).user = user;
+      return next();
+    } catch (err: unknown) {
+      logger.error(
+        {
+          event: LogEvent.DB_ERROR,
+          path: req.path,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        'auth: credential valid but resolving the user failed'
       );
-      res.clearCookie('auth');
-      res.status(401);
-      res.send('Access forbidden');
+      res.status(500);
+      res.send('Internal server error');
+      return;
     }
   };
