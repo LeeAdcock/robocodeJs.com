@@ -180,7 +180,24 @@ function App() {
                 .get(`/api/user/${res.data.id}`)
                 .then((res) => setUser(res.data))
                 .then(() => google.accounts.id.cancel())
-            );
+            )
+            .catch((err) => {
+              // Don't fail silently — a rejected /api/session (e.g. the server
+              // couldn't verify the Google token) used to just close the popup
+              // and do nothing. Surface it so it's diagnosable.
+              const status = err?.response?.status;
+              console.error(
+                `Sign-in failed${status ? ` (HTTP ${status})` : ''}.` +
+                  ' The server could not establish a session from the Google' +
+                  ' credential. Check the server logs (event="auth.failed").',
+                err
+              );
+              window.alert(
+                'Sign-in failed — the server could not verify your Google ' +
+                  'login. Please try again; if it persists, the site may be ' +
+                  'misconfigured.'
+              );
+            });
         },
       });
       google.accounts.id.renderButton(
