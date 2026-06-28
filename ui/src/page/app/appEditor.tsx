@@ -1,6 +1,14 @@
 import React from 'react';
 import { useState, useRef } from 'react';
-import AceEditor from 'react-ace';
+// react-ace is a CommonJS package; under Vite's dependency pre-bundling its
+// default import arrives wrapped as the module namespace object
+// ({ default, split, diff }) rather than the component itself, which makes React
+// throw "Element type is invalid ... got: object". Unwrap the real component
+// (the `?? ` keeps it working if a build hands back the component directly).
+import AceEditorImport from 'react-ace';
+const AceEditor =
+  (AceEditorImport as unknown as { default?: typeof AceEditorImport })
+    .default ?? AceEditorImport;
 import { Ace } from 'ace-builds';
 
 import languageTools from 'ace-builds/src-noconflict/ext-language_tools';
@@ -9,8 +17,9 @@ import 'ace-builds/src-noconflict/theme-github';
 import 'ace-builds/src-noconflict/theme-kr_theme';
 import 'ace-builds/src-noconflict/snippets/javascript';
 
-import prettier from 'prettier/standalone';
-import babel from 'prettier/parser-babel';
+import * as prettier from 'prettier/standalone';
+import babel from 'prettier/plugins/babel';
+import estree from 'prettier/plugins/estree';
 
 import { completionsFor } from '../../util/botApi';
 import { useDarkMode } from '../../util/theme';
@@ -60,7 +69,7 @@ export default function CodeEditor(props: CodeEditorProps) {
     undefined
   );
 
-  const compile = (source: string) => {
+  const compile = async (source: string) => {
     try {
       new Function('x', source);
       if (editor) {
@@ -68,8 +77,11 @@ export default function CodeEditor(props: CodeEditorProps) {
       }
     } catch {
       try {
-        prettier.format(source || ' ', {
-          plugins: [babel],
+        // Prettier 3's format() is async, so await it to surface the parse error
+        // (with its precise loc) for the editor's error annotation below.
+        await prettier.format(source || ' ', {
+          parser: 'babel',
+          plugins: [babel, estree],
         });
       } catch (lintError) {
         const err = lintError as {
