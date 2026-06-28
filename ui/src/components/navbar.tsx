@@ -31,7 +31,19 @@ interface AppLinkProps {
 const AppLink = function (props: AppLinkProps) {
   const appIndex = props.arena?.apps.map((app) => app.id).indexOf(props.app.id);
   if (appIndex === -1) {
-    return <>{titleCase(props.app.name || 'Unknown')}</>;
+    // The bot isn't in the arena (e.g. created via the MCP API rather than the
+    // "new bot" button, which auto-adds it), so it has no arena color. Show a
+    // muted neutral icon rather than a bare name, so the menu stays consistent
+    // and the fade hints that it isn't currently in the arena.
+    return (
+      <>
+        <img
+          src={'/sprites/tank_dark.png'}
+          style={{ height: '1em', marginRight: '5px', opacity: 0.4 }}
+        />
+        {titleCase(props.app.name || 'Unknown')}
+      </>
+    );
   } else {
     return (
       <>

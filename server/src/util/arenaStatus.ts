@@ -59,12 +59,22 @@ export const buildArenaStatus = async (
           radarOrientationTarget: tank.turret.radar.orientationTarget,
           radarOrientationVelocity: tank.turret.radar.orientationVelocity,
           health: tank.health,
-          bullets: tank.bullets.map((bullet) => ({
-            id: bullet.id,
-            x: bullet.x,
-            y: bullet.y,
-            exploded: bullet.exploded,
-          })),
+          // Only live bullets, and include orientation/speed so a client that
+          // bootstraps from this snapshot (a reload, or a freshly connected SSE
+          // client) can both render the bullet (it rotates by orientation) and
+          // interpolate its motion. Omitting them left snapshot bullets with an
+          // undefined orientation — an invalid SVG transform that the browser
+          // drops, stranding the sprite at (0,0). Spent (exploded) bullets are
+          // excluded so they don't re-seed as immovable orphans.
+          bullets: tank.bullets
+            .filter((bullet) => !bullet.exploded)
+            .map((bullet) => ({
+              id: bullet.id,
+              x: bullet.x,
+              y: bullet.y,
+              orientation: bullet.orientation,
+              speed: bullet.speed,
+            })),
         })),
       })),
   };
