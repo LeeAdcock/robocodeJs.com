@@ -52,9 +52,16 @@ code {
   padding-top: 10px;
 }
 
-.markdown p,
-ul {
+.markdown p {
   padding-left: 20px;
+}
+
+/* Indent lists so their markers sit at the body text's left edge instead of
+   hanging out to the left. Scoped to .markdown so it doesn't override the
+   bare `ul` padding Bootstrap relies on for navbar/dropdown menus. */
+.markdown ul,
+.markdown ol {
+  padding-left: 40px;
 }
 
 .markdown h1 {
