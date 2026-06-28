@@ -96,13 +96,19 @@ export default (required: boolean) =>
             });
           }
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (required) {
             // A gated route rejected an invalid/expired credential. Worth
-            // monitoring: a spike suggests probing or token issues. No token
-            // contents are logged.
+            // monitoring: a spike suggests probing or token issues. The error
+            // message (not token contents) is logged so config problems
+            // (audience mismatch, no egress to fetch Google's certs, clock
+            // skew) are diagnosable rather than an opaque 401.
             logger.warn(
-              { event: LogEvent.AUTH_FAILED, path: req.path },
+              {
+                event: LogEvent.AUTH_FAILED,
+                path: req.path,
+                err: err instanceof Error ? err.message : String(err),
+              },
               'rejected request with invalid credential'
             );
             res.clearCookie('auth');

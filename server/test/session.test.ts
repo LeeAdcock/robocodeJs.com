@@ -11,6 +11,7 @@ const { verifyGoogleCredential } = vi.hoisted(() => ({
 vi.mock('../src/middleware/auth', () => ({ verifyGoogleCredential }));
 
 import sessionRouter from '../src/api/session';
+import { logger } from '../src/util/logger';
 
 function makeApp() {
   const app = express();
@@ -49,6 +50,22 @@ describe('session endpoints', () => {
       .post('/api/session')
       .send({ credential: 'bad' });
     expect(res.status).toBe(401);
+  });
+
+  it('POST /api/session returns 401 and logs the reason when verification throws', async () => {
+    const warn = vi.spyOn(logger, 'warn');
+    verifyGoogleCredential.mockRejectedValue(new Error('Wrong recipient'));
+    const res = await request(makeApp())
+      .post('/api/session')
+      .send({ credential: 'bad' });
+    expect(res.status).toBe(401);
+    // The real failure reason is logged (audience mismatch, no egress, etc.)
+    // rather than swallowed into an opaque 401.
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'auth.failed', err: 'Wrong recipient' }),
+      expect.any(String)
+    );
+    warn.mockRestore();
   });
 
   it('DELETE /api/session clears the cookie', async () => {
