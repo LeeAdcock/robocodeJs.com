@@ -115,6 +115,58 @@ _Make it feel good on every screen and connection._
 - **Accessibility.** (S–M) Color-blind-safe team palettes and proper labels for
   menu controls.
 
+## 6. AI / MCP integration
+
+_Let an AI assistant (Claude, or any MCP client) write, run, and watch bots — the
+model as a first-class player and pair-programmer._
+
+- ✅ **In-process MCP server.** (M) _Shipped._ A Model Context Protocol server at
+  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 18
+  user-scoped tools (bot CRUD + compile/reboot, arena create/delete/control,
+  status, `recent_logs`), **resources** (the bot docs, `robocode.d.ts`, sample
+  bots), and **prompts** (`write_bot`, `debug_bot`, `run_match`). Authenticated by
+  a per-user API token; setup guide at `/mcp`.
+- **OAuth remote-connector auth.** (M–L) Today auth is a static bearer token, so
+  only clients that allow a custom header (e.g. Claude Code) can connect.
+  Implement the MCP OAuth 2.1 flow so **claude.ai / Claude Desktop custom
+  connectors** — which expect interactive OAuth — work too. The single biggest
+  lever on reach.
+- **Token-management UI.** (S) A navbar affordance to mint / show-once /
+  regenerate the API token, instead of the unlisted `GET /api/token/new` URL. The
+  endpoints already exist (`server/src/api/token.ts`); this is just UI.
+- **Multiple named tokens + per-token revocation.** (S–M) One token per user
+  today (revoke = regenerate). Support several labeled tokens with individual
+  revocation — needs an id/label column on `identity`, so pair it with the
+  `node-pg-migrate` item in `TASKS.md`.
+- **`check_bot_source` (dry-run compile) tool.** (M) Compile a bot's source in a
+  throwaway `isolated-vm` isolate and return syntax/load errors (and `ErrorCodes`)
+  **without** adding it to an arena, so the model catches mistakes before
+  deploying. Tightens the write → test → debug loop; reuses `util/compiler.ts`.
+- **Error-code reference resource.** (S) Expose the `E0xx`/`W0xx` codes (with
+  human descriptions) as an MCP resource so the model can interpret what shows up
+  in `recent_logs`. Depends on first documenting them (the "Document `ErrorCodes`"
+  TODO in `TASKS.md`).
+- **Tool annotations + structured output.** (S) Mark destructive tools
+  (`delete_bot`, `delete_arena`) with `destructiveHint` and read-only ones with
+  `readOnlyHint`, and add `outputSchema`s, so clients can gate/confirm dangerous
+  actions and consume typed results.
+- **Live battle updates (no polling).** (M) Instead of polling `arena_status`,
+  use MCP resource-update notifications (or a `recent_events` buffer mirroring the
+  `recent_logs` ring) so the model can follow a match as it unfolds.
+- **Spectate other/demo arenas.** (S–M) Read-only `arena_status` / `recent_logs`
+  for the public demo arena (and opt-in shared arenas), so the model can watch
+  battles it isn't a participant in. Pairs with "public live spectating" (§3).
+- **Rate limiting + audit logging.** (M) Non-expiring tokens grant full control of
+  a user's bots/arenas; add per-token rate limits and log MCP mutations (tool,
+  user, token) via the structured logger (`LogEvent`) for security observability.
+  Pairs with the global isolate-cap item in `TASKS.md`.
+- **`run_tournament` prompt/tool.** (S–M) Round-robin a set of bots and report a
+  ranking, building on `run_match` and the multi-arena API — a natural feeder for
+  the leaderboard idea (§3).
+- **End-to-end bearer auth test.** (S) The MCP tools are tested over an in-memory
+  transport and bearer resolution is unit-tested in `auth.test.ts`, but there's no
+  test that drives `/api/mcp` through a real `Authorization: Bearer` request.
+
 ---
 
 ## Suggested "quick wins" (high impact / low effort, leverage existing code)
@@ -125,9 +177,12 @@ _Make it feel good on every screen and connection._
 4. **Surface bot crashes in the UI** — the `bot.fault` data is already there. (S–M)
 5. **Friend/private arenas** — the multi-arena API already supports it. (S–M)
 6. **Match score summary** — `TankStats` is already collected. (S–M)
+7. **MCP token-management UI** — the `/api/token` endpoints already exist. (S)
 
 ## Bigger bets (highest popularity upside)
 
 - **Leaderboard / ranked ladder** + **bot sharing** (the competitive + social flywheel).
 - **Replays** (the most shareable artifact).
 - **Headless sim + deterministic seeds + ML hooks** (the tech-enthusiast magnet).
+- **OAuth remote-MCP auth** (lets claude.ai / Claude Desktop connect — the model
+  as a player and pair-programmer for the broadest audience).
