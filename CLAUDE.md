@@ -33,6 +33,8 @@ Both packages use **Vitest** (`npm test` runs `vitest run`, `npm run test:watch`
 
 `ui build` writes directly into `server/dist/public` (`build.outDir` in `ui/vite.config.ts`, with `emptyOutDir` clearing it first), so the server can serve the built UI as static files in production. Deployment is AWS CodeBuild (`buildspec.yaml`) → Elastic Beanstalk (`server/.ebextensions`).
 
+To cut a release artifact, run `npm run package` from `server/` (build `ui` then `server` first so `dist/` is current). It runs `npm version patch`, regenerates `npm-shrinkwrap.json`, and zips the deploy bundle (`node_modules` excluded — EB installs from the shrinkwrap). **Always commit the resulting version bump (`server/package.json` + `server/npm-shrinkwrap.json`) and push it to `main`** with a `build: bump server to vX.Y.Z (from npm run package)` message — this is the established convention; prior bump commits live on `main`, untagged.
+
 ## Runtime requirements
 
 The server requires `node >=24` (see `server/package.json` engines), pinned by the native `isolated-vm` dependency: isolated-vm 5.x requires Node ≥18, 6.x ≥22, and 7.x ≥26 — so the isolated-vm major and the Node major must move together. We run Node 24 (LTS) with isolated-vm 6.x; bumping to isolated-vm 7.x would require Node ≥26. The dev container (`.devcontainer/devcontainer.json`) runs Node 24, and CI pins `nodejs: 24` in `buildspec.yaml`. If `isolated-vm` fails to build or load, a Node/isolated-vm version mismatch is the first thing to check; the native build needs `gcc`/`gcc-c++` (provided in the container and in `server/.ebextensions/options.config` for Elastic Beanstalk).
