@@ -20,6 +20,16 @@ function createPool(): Pool {
     database: process.env.RDS_DB_NAME,
     password: process.env.RDS_PASSWORD,
     port: parseInt(process.env.RDS_PORT || '5432'),
+    // RDS requires encrypted connections (its pg_hba.conf only accepts
+    // `hostssl` / `rds.force_ssl=1`), so a cleartext connection is rejected with
+    // "no pg_hba.conf entry ... no encryption". Enable TLS. We don't verify the
+    // CA because Amazon's RDS root CA isn't in Node's default trust store; to
+    // harden, download the RDS CA bundle and pass `{ ca, rejectUnauthorized: true }`.
+    // Opt out with RDS_SSL=false for a non-SSL Postgres.
+    ssl:
+      process.env.RDS_SSL === 'false'
+        ? undefined
+        : { rejectUnauthorized: false },
   });
 }
 
