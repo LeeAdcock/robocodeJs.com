@@ -151,6 +151,19 @@ The UI build outputs directly into `server/dist/public`, which the server serves
 
 Other root scripts: `npm test` and `npm run lint` run the respective task across both packages; `npm run install:all` installs all three.
 
+### Packaging a deployable zip
+
+`npm run package` (from the **root**) produces the deployable artifact in one step:
+
+```bash
+npm run install:all   # once, if dependencies aren't installed
+npm run package       # builds everything, then zips the server
+```
+
+It runs the full build (`npm run build` — UI into `server/dist/public`, server into `server/dist/src`) and then the server's packaging step, which bumps the patch version, refreshes `npm-shrinkwrap.json`, and writes `server/robocodejs-<version>.zip`.
+
+The zip contains exactly what Elastic Beanstalk needs to run — `package.json`, the lockfile, the compiled server (`dist/src`), the built UI (`dist/public`), and `.ebextensions` — and **excludes** the TypeScript sources (`src/`), tests (`test/`), coverage, `node_modules` (reinstalled on deploy), and any prior zips. On the instance, EB runs `npm install` then `npm start` (`node ./dist/src/index.js`). This mirrors the AWS CodeBuild pipeline (`buildspec.yaml`) and is the supported way to build a deploy artifact by hand.
+
 ### Code style & the pre-commit hook
 
 Formatting is governed by a single root [`.prettierrc.json`](.prettierrc.json) for the whole repo. A **Husky pre-commit hook** runs [`lint-staged`](https://github.com/lint-staged/lint-staged), which applies `prettier --write` to staged files (JS/TS/CSS/Markdown/JSON/YAML/HTML) so commits stay consistently formatted automatically. The hook is installed by the `prepare` script when you run `npm install` at the root (part of `npm run install:all`); no manual setup is needed. To format the whole repo on demand, run `npx prettier --write .` from the root.
@@ -169,7 +182,7 @@ The app deploys via AWS CodeBuild (`buildspec.yaml`) to Elastic Beanstalk (confi
 1. `ui` is built into `server/dist/public` and `server` is compiled to `server/dist`.
 2. The server runs as the single artifact, serving both the API and the static UI from one process on port `8080`.
 
-The production runtime needs the same configuration as local dev — the `RDS_*` Postgres variables and `GOOGLE_CLIENT_ID` — plus `NODE_ENV=production`, which sets the `Secure` flag on the session cookie. The native `isolated-vm` module is compiled on deploy, so the instance needs `gcc`/`gcc-c++` (installed via `server/.ebextensions/options.config`). To build a versioned deploy zip locally, run `cd server && npm run package`.
+The production runtime needs the same configuration as local dev — the `RDS_*` Postgres variables and `GOOGLE_CLIENT_ID` — plus `NODE_ENV=production`, which sets the `Secure` flag on the session cookie. The native `isolated-vm` module is compiled on deploy, so the instance needs `gcc`/`gcc-c++` (installed via `server/.ebextensions/options.config`). To build a versioned deploy zip by hand, run **`npm run package`** from the root — see [Packaging a deployable zip](#packaging-a-deployable-zip).
 
 ## License
 
