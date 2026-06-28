@@ -65,6 +65,13 @@ export default class Environment {
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
 
+  // Bounded history of the most recent bot console 'log' emits. The SSE /logs
+  // stream is live-only (a late subscriber misses earlier output), so this lets a
+  // request/response caller — notably the MCP `recent_logs` tool — read what was
+  // just logged. Capped to avoid unbounded growth on a long-running arena.
+  private static readonly MAX_RECENT_LOGS = 200;
+  private recentLogs: unknown[] = [];
+
   constructor(arena: Arena) {
     this.arena = arena;
     this.emitter = new EventEmitter();
@@ -138,8 +145,22 @@ export default class Environment {
   };
 
   emit(eventName: string | symbol, ...args: unknown[]): boolean {
+    if (eventName === 'log') {
+      this.recentLogs.push(args[0]);
+      if (this.recentLogs.length > Environment.MAX_RECENT_LOGS) {
+        this.recentLogs.splice(
+          0,
+          this.recentLogs.length - Environment.MAX_RECENT_LOGS
+        );
+      }
+    }
     return this.emitter.emit(eventName, ...args);
   }
+
+  // The most recent bot console logs (oldest first), up to MAX_RECENT_LOGS. Pass
+  // a limit to read only the tail.
+  getRecentLogs = (limit?: number): unknown[] =>
+    limit ? this.recentLogs.slice(-limit) : [...this.recentLogs];
 
   execute(appId: AppId): Promise<unknown> {
     return Promise.all(

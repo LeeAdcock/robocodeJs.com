@@ -39,6 +39,31 @@ class IdentityService {
           : new Identity(res.rows[0]['userId'], source, sourceId)
       );
   };
+
+  // All identities a user holds for a given source — e.g. ('apikey') to answer
+  // "does this user have an API token?" without revealing it (we only store the
+  // token's hash as sourceId).
+  getForUser = (userId: UserId, source: string): Promise<Identity[]> => {
+    return pool
+      .query({
+        text: 'SELECT identity.sourceId as "sourceId" FROM identity WHERE source=$1 AND userId=$2',
+        values: [source, userId],
+      })
+      .then((res) =>
+        res.rows.map((row) => new Identity(userId, source, row['sourceId']))
+      );
+  };
+
+  // Remove all of a user's identities for a source. Used to rotate the single
+  // API token: delete the old row before inserting the new hash.
+  deleteForUser = (userId: UserId, source: string): Promise<void> => {
+    return pool
+      .query({
+        text: 'DELETE FROM identity WHERE source=$1 AND userId=$2',
+        values: [source, userId],
+      })
+      .then(() => undefined);
+  };
 }
 
 export default new IdentityService();

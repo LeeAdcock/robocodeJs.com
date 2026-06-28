@@ -10,6 +10,8 @@ import { logger, LogEvent } from './util/logger';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
+import tokenEndpoints from './api/token';
+import mcpEndpoints from './api/mcp';
 import userEndpoints from './api/user';
 import appEndpoints from './api/app';
 import arenaEndpoints from './api/arena';
@@ -46,6 +48,8 @@ app.use('/api/user', auth(true));
 
 app.use(healthEndpoints);
 app.use(sessionEndpoints);
+app.use(tokenEndpoints);
+app.use(mcpEndpoints);
 app.use(demoEndpoints);
 app.use(helpEndpoints);
 app.use(userEndpoints);

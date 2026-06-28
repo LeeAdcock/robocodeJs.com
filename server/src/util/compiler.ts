@@ -617,6 +617,12 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           write: (entry: Record<string, unknown>) => {
             env.emit('log', {
               ...entry,
+              // Identify the source for non-UI consumers (the MCP recent_logs
+              // tool): the bot's uuid and the tank's 1-based index within that
+              // bot. The bunyan `name` ("<25>") is a compact UI label that's
+              // opaque to API clients.
+              appId: process.getAppId(),
+              tankIndex: process.tanks.map((t) => t.id).indexOf(tank.id) + 1,
               time: env.getTime(),
               id: randomUUID(),
             });

@@ -369,6 +369,8 @@ function App() {
                 />
                 <Route path="/learn" element={<MarkdownPage path="learn" />} />
                 <Route path="/learn/:slug" element={<LessonPage />} />
+                {/* Unlisted: MCP setup guide, reachable only by direct URL. */}
+                <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
 
                 <Route path="user/:userId" element={<>user</>} />
                 <Route path="user/:userId/arena" element={<>user arena</>} />
