@@ -22,9 +22,9 @@ the box's contents later is the whole point of a variable.
 
 To pick the closest enemy, we **compare** distances with `<` ("less than").
 
-To aim, the turret turns to face the target's compass `angle`. Because the turret's
-direction is measured _relative to the robot's body_, we subtract the body's direction:
-`bot.turret.setOrientation(target.angle - bot.getOrientation())`.
+To aim, point the turret at the target's `angle`. A scan's `angle` is a **bearing
+relative to your body**, and the turret also turns relative to the body — so it drops
+straight in: `bot.turret.setOrientation(target.angle)`.
 
 ## Try it
 
@@ -53,7 +53,7 @@ bot.on(Event.SCANNED, (targets) => {
   });
 
   if (closest !== null) {
-    bot.turret.setOrientation(closest.angle - bot.getOrientation());
+    bot.turret.setOrientation(closest.angle);
     if (bot.turret.isReady()) bot.turret.fire();
   }
 });
@@ -91,7 +91,7 @@ teaches how to **wait** for the aim to finish before firing.
 
 - A **variable** (`let name = value`) is a box that remembers a value and can change.
 - `null` means "nothing yet"; `<` / `>` compare numbers; `||` means "or."
-- Aim the turret with `bot.turret.setOrientation(angle - bot.getOrientation())`.
+- Aim the turret with `bot.turret.setOrientation(angle)` (the scan bearing is body-relative).
 
 ---
 

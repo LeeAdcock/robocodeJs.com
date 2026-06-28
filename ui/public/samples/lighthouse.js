@@ -15,12 +15,11 @@ clock.on(Event.TICK, async () => {
 
     // Only if we see an enemy bot
     if (targets.length > 0 && !targets[0].friendly) {
-      // Turn the turret for a more accurate shot
-      return bot.turret
-        .setOrientation(targets[0].angle - bot.getOrientation())
-        .then(() => {
-          if (bot.turret.isReady()) bot.turret.fire();
-        });
+      // Turn the turret onto the target. The scan bearing is relative to the
+      // body, and the turret orientation is too, so it drops straight in.
+      return bot.turret.setOrientation(targets[0].angle).then(() => {
+        if (bot.turret.isReady()) bot.turret.fire();
+      });
     } else return bot.turn(20);
   }
 });

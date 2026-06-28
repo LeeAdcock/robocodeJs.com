@@ -13,7 +13,7 @@ bot.on(Event.START, () => {
 
   // Dash forward for ever 50 clock ticks
   setInterval(() => {
-    bot.setSpeed(10);
+    bot.setSpeed(5);
     setTimeout(() => bot.setSpeed(0), 10);
   }, 50);
 });

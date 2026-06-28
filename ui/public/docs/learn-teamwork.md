@@ -35,15 +35,18 @@ clock.on(Event.TICK, () => {
 bot.on(Event.SCANNED, (targets) => {
   const enemies = targets.filter((t) => !t.friendly);
   if (enemies.length > 0) {
-    bot.send(Math.round(enemies[0].angle)); // tell teammates the direction
-    bot.turret.setOrientation(enemies[0].angle - bot.getOrientation());
+    // A scan's angle is relative to *us*, so share the absolute compass
+    // direction (our heading + the bearing) that any teammate can use.
+    bot.send(Math.round(enemies[0].angle + bot.getOrientation()));
+    bot.turret.setOrientation(enemies[0].angle); // our own aim (body-relative)
     if (bot.turret.isReady()) bot.turret.fire();
   }
 });
 
-// A teammate spotted an enemy at this angle — aim our turret there too.
-bot.on(Event.RECEIVED, (angle) => {
-  bot.turret.setOrientation(angle - bot.getOrientation());
+// A teammate shared an absolute direction to an enemy — point our turret there
+// too, converting the compass heading into an offset from our body.
+bot.on(Event.RECEIVED, (heading) => {
+  bot.turret.setOrientation(heading - bot.getOrientation());
 });
 ```
 

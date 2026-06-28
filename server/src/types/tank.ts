@@ -219,7 +219,9 @@ export default class Tank implements Point, Orientated {
   }
 
   getHealth() {
-    return this.health / 100;
+    // Bot-facing health is 0–100 (matches classic Robocode's energy and reads
+    // more naturally than a fraction). `health` is already stored 0–100.
+    return this.health;
   }
 
   execute(process: Process): Promise<unknown> {

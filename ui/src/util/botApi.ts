@@ -80,13 +80,13 @@ export const EVENTS: ApiEvent[] = [
     name: 'HIT',
     payload: '{ angle: number }',
     channel: 'bot',
-    doc: 'Fires when a bullet hits you. `angle` is the arena-relative direction the shot came from.',
+    doc: 'Fires when a bullet hits you. `angle` is the bearing the shot came from, relative to your heading.',
   },
   {
     name: 'COLLIDED',
     payload: '{ angle: number; friendly: boolean }',
     channel: 'bot',
-    doc: 'Fires when you collide with a wall or another bot (you stop). `angle` is arena-relative; `friendly` is true for a teammate.',
+    doc: 'Fires when you collide with a wall or another bot (you stop). `angle` is relative to your heading (a wall ahead is 0); `friendly` is true for a teammate.',
   },
   {
     name: 'FIRED',
@@ -164,7 +164,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'orientation',
         kind: 'property',
         type: 'number',
-        doc: 'Its body orientation in degrees (arena-relative).',
+        doc: 'Its body heading in degrees (absolute compass, 0 = north).',
       },
       {
         name: 'distance',
@@ -176,7 +176,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'angle',
         kind: 'property',
         type: 'number',
-        doc: 'Bearing from you to it, in degrees (arena-relative).',
+        doc: 'Bearing to it, relative to your heading — so bot.turret.setOrientation(angle) aims at it.',
       },
       {
         name: 'friendly',
@@ -212,7 +212,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'getBearing',
         kind: 'method',
         type: 'number',
-        doc: 'Bearing from the bot to this marker (arena-relative degrees).',
+        doc: 'Bearing from the bot to this marker, relative to your heading (bot.turn(getBearing()) faces it).',
       },
     ],
   },
@@ -268,7 +268,7 @@ export const INTERFACES: ApiInterface[] = [
   },
   {
     name: 'Arena',
-    doc: 'The battlefield. A square; orientation is in degrees (0 = south, 90 = west, 180 = north).',
+    doc: 'The battlefield. A square; headings are degrees on a compass (0 = north, 90 = east, 180 = south, 270 = west).',
     members: [
       {
         name: 'getWidth',
@@ -355,7 +355,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'getHealth',
         kind: 'method',
         type: 'number',
-        doc: 'Returns health from 1 (full) down to 0 (dead).',
+        doc: 'Returns health from 100 (full) down to 0 (dead).',
       },
       {
         name: 'getX',
@@ -373,7 +373,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'getOrientation',
         kind: 'method',
         type: 'number',
-        doc: 'Body orientation in degrees (0–359).',
+        doc: 'Body heading in degrees on a compass (0 = north, clockwise).',
       },
       {
         name: 'setOrientation',

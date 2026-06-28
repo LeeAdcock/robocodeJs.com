@@ -10,11 +10,11 @@ interface ScanResult {
   id: string;
   /** Its speed (-5 to 5). */
   speed: number;
-  /** Its body orientation in degrees (arena-relative). */
+  /** Its body heading in degrees (absolute compass, 0 = north). */
   orientation: number;
   /** Distance from you to it. */
   distance: number;
-  /** Bearing from you to it, in degrees (arena-relative). */
+  /** Bearing to it, relative to your heading — so bot.turret.setOrientation(angle) aims at it. */
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
@@ -28,7 +28,7 @@ interface Marker {
   getY(): number;
   /** Distance from the bot to this marker. */
   getDistance(): number;
-  /** Bearing from the bot to this marker (arena-relative degrees). */
+  /** Bearing from the bot to this marker, relative to your heading (bot.turn(getBearing()) faces it). */
   getBearing(): number;
 }
 
@@ -72,7 +72,7 @@ interface Turret {
   isReady(): boolean;
 }
 
-/** The battlefield. A square; orientation is in degrees (0 = south, 90 = west, 180 = north). */
+/** The battlefield. A square; headings are degrees on a compass (0 = north, 90 = east, 180 = south, 270 = west). */
 interface Arena {
   /** Arena width. */
   getWidth(): number;
@@ -102,9 +102,9 @@ interface Bot {
   on(event: 'SCANNED', handler: (event: ScanResult[]) => void | Promise<unknown>): void;
   /** Fires when another bot's radar sweeps over you — i.e. you have been spotted. */
   on(event: 'DETECTED', handler: () => void | Promise<unknown>): void;
-  /** Fires when a bullet hits you. `angle` is the arena-relative direction the shot came from. */
+  /** Fires when a bullet hits you. `angle` is the bearing the shot came from, relative to your heading. */
   on(event: 'HIT', handler: (event: { angle: number }) => void | Promise<unknown>): void;
-  /** Fires when you collide with a wall or another bot (you stop). `angle` is arena-relative; `friendly` is true for a teammate. */
+  /** Fires when you collide with a wall or another bot (you stop). `angle` is relative to your heading (a wall ahead is 0); `friendly` is true for a teammate. */
   on(event: 'COLLIDED', handler: (event: { angle: number; friendly: boolean }) => void | Promise<unknown>): void;
   /** Fires when your turret fires a shot. */
   on(event: 'FIRED', handler: () => void | Promise<unknown>): void;
@@ -112,13 +112,13 @@ interface Bot {
   on(event: 'RECEIVED', handler: (event: number) => void | Promise<unknown>): void;
   /** Returns this bot’s unique id. */
   getId(): string;
-  /** Returns health from 1 (full) down to 0 (dead). */
+  /** Returns health from 100 (full) down to 0 (dead). */
   getHealth(): number;
   /** Current x position (0 is the left edge). */
   getX(): number;
   /** Current y position (0 is the top edge). */
   getY(): number;
-  /** Body orientation in degrees (0–359). */
+  /** Body heading in degrees on a compass (0 = north, clockwise). */
   getOrientation(): number;
   /** Sets the body target orientation. Resolves when reached; rejects if overridden by a later command. */
   setOrientation(degrees: number): Promise<void>;

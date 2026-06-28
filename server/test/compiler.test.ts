@@ -326,8 +326,24 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('Event.TICK')).toBe('TICK');
   });
 
-  it('copies bot.getHealth() across the boundary as a 0–1 fraction', () => {
-    // tank health 100 -> 1.0
-    expect(ctx.read('bot.getHealth()')).toBe(1);
+  it('copies bot.getHealth() across the boundary on a 0–100 scale', () => {
+    // tank health 100
+    expect(ctx.read('bot.getHealth()')).toBe(100);
+  });
+
+  it('exposes the body heading on a north-zero compass (API boundary)', () => {
+    // Internally orientation is south-zero; the bot API is north-zero (+180).
+    ctx.tank.orientation = 0; // internal south
+    expect(ctx.read('bot.getOrientation()')).toBe(180); // north-zero: south = 180
+    ctx.tank.orientation = 90; // internal west
+    expect(ctx.read('bot.getOrientation()')).toBe(270);
+  });
+
+  it('setOrientation maps a north-zero heading to the internal compass', () => {
+    // Bot asks to face north (0); internally that is south-zero 180.
+    ctx.run('bot.setOrientation(0).catch(() => {})');
+    expect(ctx.tank.orientationTarget).toBe(180);
+    ctx.run('bot.setOrientation(90).catch(() => {})'); // east
+    expect(ctx.tank.orientationTarget).toBe(270);
   });
 });

@@ -10,26 +10,33 @@ elsewhere.
 
 # Directions: the compass
 
-Orientations are degrees from `0` to `359`. **`0°` is south (down) and angles increase
-clockwise.**
+Headings are degrees from `0` to `359`, like a compass. **`0°` is north (up) and angles
+increase clockwise** — the same as classic Robocode.
 
 ```
-                      north
-                     180°  ↑
-                          |
-        west  90°  ←------+------→  270°  east
-                          |
-                      0°  ↓
-                      south        (angles increase clockwise: 0 → 90 → 180 → 270)
+                     north
+                     0°  ↑
+                         |
+       west 270° ←-------+-------→ 90° east
+                         |
+                     180° ↓
+                     south       (angles increase clockwise: 0 → 90 → 180 → 270)
 ```
 
-- `0°` = **south** (down)
-- `90°` = **west** (left)
-- `180°` = **north** (up)
-- `270°` = **east** (right)
+- `0°` = **north** (up)
+- `90°` = **east** (right)
+- `180°` = **south** (down)
+- `270°` = **west** (left)
 
-This applies to your body, turret, and radar orientations, and to the `angle` you get
-from scans, hits, and collisions.
+How the frames fit together:
+
+- Your **body heading** (`bot.getOrientation()` / `setOrientation()`) is an absolute
+  compass heading on the diagram above.
+- The **turret** turns relative to the body; the **radar** turns relative to the turret.
+- **Bearings reported to you** — a scan result's `angle`, the `HIT`/`COLLIDED` `angle`,
+  and `marker.getBearing()` — are **relative to your heading** (`0` = dead ahead). That's
+  why aiming needs no math: `bot.turret.setOrientation(target.angle)` points the gun at a
+  scanned enemy, and `bot.turn(target.angle)` turns the whole tank toward it.
 
 ## Coordinates
 
@@ -38,7 +45,7 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 - **x** grows to the **right** (`bot.getX()`, `0` … `750`)
 - **y** grows **downward** (`bot.getY()`, `0` … `750`)
 
-(So "north"/`180°` means moving toward smaller `y`.)
+(So `0°`/north means moving toward smaller `y`.)
 
 # Movement
 
@@ -61,11 +68,11 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 # Combat & health
 
-| Thing      | Value              | In context                                             |
-| ---------- | ------------------ | ------------------------------------------------------ |
-| Health     | **1.0 → 0**        | `bot.getHealth()`; `1` is full, `0` is destroyed       |
-| Bullet hit | **−0.25**          | a clean hit removes a quarter of full health (~4 hits) |
-| Collision  | **−0.01 per tick** | bumping a wall/bot also stops you (speed → 0)          |
+| Thing      | Value           | In context                                    |
+| ---------- | --------------- | --------------------------------------------- |
+| Health     | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead |
+| Bullet hit | **−25**         | a clean hit removes a quarter of full health  |
+| Collision  | **−1 per tick** | bumping a wall/bot also stops you (speed → 0) |
 
 # Match length
 

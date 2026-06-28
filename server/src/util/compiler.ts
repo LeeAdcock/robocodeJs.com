@@ -8,6 +8,7 @@ import Environment, { Process } from '../types/environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from '../types/ErrorCodes';
 import { logBotFault, logger, LogEvent } from './logger';
+import { toApiHeading, toInternalHeading } from './geometry';
 
 // Identifying context for a faulting bot, for the structured server log.
 const botCtx = (tank: Tank) => ({
@@ -183,7 +184,7 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
     .compileScriptSync(
       `
       bot.radar.turnTowards = (x, y) => {
-        let bearing = Math.atan2(bot.getY() - y, bot.getX() - x) * (180 / Math.PI) - 90 + 180
+        let bearing = Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
         return bot.radar.setOrientation(bearing - bot.getOrientation() - bot.turret.getOrientation())
       }
       `
@@ -237,7 +238,7 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     .compileScriptSync(
       `
       bot.turret.turnTowards = (x, y) => {
-        let bearing = Math.atan2(bot.getY() - y, bot.getX() - x) * (180 / Math.PI) - 90 + 180
+        let bearing = Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
         return bot.turret.setOrientation(bearing - bot.getOrientation())
       }
       `
@@ -332,15 +333,17 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   exposeAsync1(tank, isolate, 'bot.setSpeed', '_bot_setSpeed', (arg) =>
     tank.setSpeed(arg)
   );
+  // The body heading is the one absolute angle the bot sees, so translate it
+  // between the internal south-zero compass and the bot-facing north-zero one.
   exposeGetter(tank, isolate, 'bot.getOrientation', '_bot_getOrientation', () =>
-    tank.getOrientation()
+    toApiHeading(tank.getOrientation())
   );
   exposeAsync1(
     tank,
     isolate,
     'bot.setOrientation',
     '_bot_setOrientation',
-    (arg) => tank.setOrientation(arg)
+    (arg) => tank.setOrientation(toInternalHeading(arg))
   );
 
   isolate
@@ -370,7 +373,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .compileScriptSync(
       `
       bot.turnTowards = (x, y) => {
-        let bearing = Math.atan2(bot.getY() - y, bot.getX() - x) * (180 / Math.PI) - 90 + 180
+        let bearing = Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
         return bot.setOrientation(bearing)
       }
       `
@@ -595,9 +598,11 @@ const init = (env: Environment, process: Process, tank: Tank) => {
                 Math.pow(bot.getX() - x, 2) +
                   Math.pow(bot.getY() - y, 2)
               )),
-            getBearing: () =>
-              Math.atan2(bot.getY() - y, bot.getX() - x) *
-                (180 / Math.PI) - 90 + 180
+            getBearing: () => {
+              const heading =
+                Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
+              return (((heading - bot.getOrientation()) % 360) + 360) % 360
+            }
           }
         }
       `
