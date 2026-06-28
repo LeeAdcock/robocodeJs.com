@@ -153,6 +153,13 @@ model as a first-class player and pair-programmer._
 - **Live battle updates (no polling).** (M) Instead of polling `arena_status`,
   use MCP resource-update notifications (or a `recent_events` buffer mirroring the
   `recent_logs` ring) so the model can follow a match as it unfolds.
+- **Editor live-reload on external edits.** (S–M) When a bot's source changes
+  out-of-band — e.g. an MCP client like Claude calls `set_bot_source` — the open
+  code editor has no idea. If that bot is the one currently visible in the editor,
+  detect the change (an SSE/resource notification, or a version/etag on the app)
+  and reload it live — or, to protect unsaved local edits, surface a non-destructive
+  "this bot was updated elsewhere — reload?" prompt. Keeps the human and the AI
+  pair-programmer working on the same source instead of silently diverging.
 - **Spectate other/demo arenas.** (S–M) Read-only `arena_status` / `recent_logs`
   for the public demo arena (and opt-in shared arenas), so the model can watch
   battles it isn't a participant in. Pairs with "public live spectating" (§3).
@@ -166,6 +173,57 @@ model as a first-class player and pair-programmer._
 - **End-to-end bearer auth test.** (S) The MCP tools are tested over an in-memory
   transport and bearer resolution is unit-tested in `auth.test.ts`, but there's no
   test that drives `/api/mcp` through a real `Authorization: Bearer` request.
+
+### Gaps surfaced while AI-driving the MCP server
+
+_Captured during a live session where an assistant used the MCP server end-to-end:
+writing a bot, iterating it through five versions, running a 3-generation
+evolutionary tournament (20 configs), and stress-testing the champion. Some items
+reinforce ideas above; the rest are new._
+
+- **Simulation speed / tick-stepping control.** (M) _The single biggest limiter._
+  Matches run in real wall-clock time (the `setInterval(…, 100)` in
+  `Environment.resume`), so a model orchestrating matches must sleep ~20–30s for
+  each one — a 3-generation tournament took minutes of pure waiting. Add a
+  `step_arena(ticks)` (advance N ticks synchronously and return) and/or a
+  `set_tick_rate` tool to fast-forward or run-to-completion. Foundational for
+  `run_tournament` (§6) and ML self-play (§4); the steppable match API is
+  half-described in §4 but absent from the MCP surface.
+- **Match-result / scoreboard tool.** (S–M) Scoring a match today means pulling the
+  full `arena_status` (every tank's position + every bullet) and hand-counting
+  survivors and summing health. Add a `match_result` / `arena_score` tool returning
+  per-app aggregates — alive count, total health, kills, accuracy — and a `state`
+  field (`running` | `sudden-death` | `ended` | `winner`). Builds on `TankStats`
+  (§2) and removes a large amount of token overhead per match.
+- **Deterministic seed on the control tools.** (S–M) Expose a `seed` parameter on
+  `restart_arena` / `create_arena` so competing variants face identical spawns —
+  essential for fair A/B fitness comparison (single-match results were visibly noisy
+  due to random spawns). The MCP surface of the §4 "Deterministic seeds" item.
+- **Filterable `recent_logs`.** (S) Add `appId` and minimum-level filters; today one
+  chatty bot's per-tick logging can flush the bounded ring buffer and bury every
+  other bot's output — including the model's own bot.
+- **Partial source / config update.** (S–M) `set_bot_source` replaces the whole
+  program, so tuning a single constant means resending the entire engine each
+  iteration (done ~15× during the tournament). Add a patch path or a
+  `set_bot_config(appId, {...})` that merges a small config object, to shrink
+  iterative-tuning payloads.
+- **Settable arena config.** (S–M) Expose arena size and sudden-death / max-tick
+  timing on `create_arena` so a model can shorten matches (faster tournaments) or
+  vary the battlefield. Pairs with the speed/step item.
+- **Batch setup.** (S) A `create_bot(…, addToArena)` option (or a bulk add) —
+  standing up a 5-bot tournament arena is currently ~10 separate calls.
+- _Already captured above, reconfirmed as valuable in use:_ dry-run
+  `check_bot_source`, the error-code reference resource, live battle updates without
+  polling, and `run_tournament`.
+
+#### Reliability issues observed in use
+
+- **`get_bot_source` returned empty** for a bot that has source (an existing starter
+  bot) — source reads should be reliable before a model trusts them for editing.
+- **Stale display name in `arena_status`.** After `rename_bot` _plus_ a code
+  `setName(...)`, the arena snapshot kept reporting the bot's old in-memory name
+  across `restart`/`reboot` — the arena view appears to serve a cached name rather
+  than the current app/process name.
 
 ---
 
