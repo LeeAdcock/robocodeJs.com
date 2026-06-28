@@ -46,13 +46,15 @@ const ArenaStyle = React.memo((props: { width: number; height: number }) => (
         <feFuncB type="linear" slope=".6" />
       </feComponentTransfer>
       <feComponentTransfer>
-        <feFuncR type="linear" slope=".6" intercept="-(0.5 * .6) + 0.5" />
-        <feFuncG type="linear" slope=".6" intercept="-(0.5 * .6) + 0.5" />
-        <feFuncB type="linear" slope=".4" intercept="-(0.5 * .4) + 0.5" />
+        {/* intercept must be a number; these are the precomputed values of
+            -(0.5 * slope) + 0.5 (centers the contrast adjustment on 0.5). */}
+        <feFuncR type="linear" slope=".6" intercept={0.2} />
+        <feFuncG type="linear" slope=".6" intercept={0.2} />
+        <feFuncB type="linear" slope=".4" intercept={0.3} />
       </feComponentTransfer>
     </filter>
-    <filter id="shadow" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-opacity="0.5" />
+    <filter id="shadow" colorInterpolationFilters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="3" floodOpacity="0.5" />
     </filter>
     <pattern
       id="shadedRelief"

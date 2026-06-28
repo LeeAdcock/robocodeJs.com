@@ -165,6 +165,12 @@ export default function CodeEditor(props: CodeEditorProps) {
         showLineNumbers: true,
         tabSize: 2,
         printMargin: false,
+        // Ace loads its syntax-check worker via a same-origin URL resolved
+        // against the current route (…/app/worker-javascript.js), which doesn't
+        // exist under our Vite build/tunnel and throws an importScripts
+        // NetworkError. We don't rely on the worker's inline linting, so disable
+        // it; editing and highlighting are unaffected.
+        useWorker: false,
       }}
     />
   );

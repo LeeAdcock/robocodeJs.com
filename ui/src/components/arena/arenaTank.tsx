@@ -4,13 +4,25 @@ import Tooltip from 'react-bootstrap/Tooltip';
 import { colors } from '../../util/colors';
 import { shortestAngleDelta } from '../../util/geometry';
 
+// Coordinates and orientations can be momentarily undefined/NaN — e.g. during an
+// arena reload or a between-frames interpolation gap. Feeding those into an SVG
+// `transform` produces `translate(NaN,NaN)` / `rotate(undefined)`, which the
+// browser rejects and logs. Guard the values at the render boundary.
+const finite = (n: number): number => (Number.isFinite(n) ? n : 0);
+const translate = (x: number, y: number): string =>
+  'translate(' + finite(x) + ',' + finite(y) + ')';
+
 // Tracks a target angle (which wraps at 0/360) as a continuously increasing or
 // decreasing value, always moving the short way. Feeding this to a CSS
 // `rotate(...)` transition stops the sprite from spinning the long way around
-// when the underlying angle crosses the 0/360 seam.
+// when the underlying angle crosses the 0/360 seam. A non-finite target (a not-
+// yet-populated orientation) is ignored so the last good angle is kept rather
+// than poisoning the accumulator with NaN.
 function useContinuousAngle(target: number): number {
-  const ref = useRef(target);
-  ref.current += shortestAngleDelta(ref.current, target);
+  const ref = useRef(finite(target));
+  if (Number.isFinite(target)) {
+    ref.current += shortestAngleDelta(ref.current, target);
+  }
   return ref.current;
 }
 
@@ -69,7 +81,7 @@ const TankTurretSvg = (props: TankTurretProps) => {
       height="32"
       width="32"
       transform={[
-        'translate(' + props.x + ',' + props.y + ')',
+        translate(props.x, props.y),
         'rotate(180)',
         'rotate(' + angle + ')',
         'translate(-16, -24)',
@@ -87,10 +99,9 @@ const TankRadarSvg = (props: TankRadarProps) => {
       style={{
         transition: 'all 200ms linear',
       }}
-      transform={[
-        'translate(' + props.x + ',' + props.y + ')',
-        'rotate(' + angle + ')',
-      ].join(' ')}
+      transform={[translate(props.x, props.y), 'rotate(' + angle + ')'].join(
+        ' '
+      )}
     >
       {props.radarOn && (
         <polygon points="-4,0,4,0,60,300,-60,300" fill="url(#radar)"></polygon>
@@ -132,7 +143,7 @@ const TankSvg = React.memo((props: TankProps) => {
               transition: 'all 200ms linear',
             }}
             transform={[
-              'translate(' + props.x + ',' + props.y + ')',
+              translate(props.x, props.y),
               'rotate(' + body + ')',
               'translate(-16, -16)',
             ].join(' ')}
@@ -141,7 +152,7 @@ const TankSvg = React.memo((props: TankProps) => {
             textAnchor="end"
             opacity={0.5}
             transform={[
-              'translate(' + props.x + ',' + props.y + ')',
+              translate(props.x, props.y),
               'rotate(' + body + ')',
               'rotate(180)',
               'translate(10, 14)',
@@ -179,7 +190,7 @@ const TankSvg = React.memo((props: TankProps) => {
                 transition: 'all 200ms linear',
               }}
               opacity={0.75}
-              transform={'translate(' + props.x + ',' + props.y + ')'}
+              transform={translate(props.x, props.y)}
             >
               <rect
                 width={32}
