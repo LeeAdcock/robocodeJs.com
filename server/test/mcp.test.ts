@@ -133,4 +133,40 @@ describe('mcp tools', () => {
     expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
     expect(JSON.parse(textOf(res))).toEqual({ running: true });
   });
+
+  it('exposes reference resources (type definitions + doc/sample templates)', async () => {
+    const client = await connect();
+
+    // The type definitions are a fixed resource, so they list regardless of the
+    // filesystem (the doc/sample lists are filesystem-backed and may be empty
+    // when running from source).
+    const resources = await client.listResources();
+    expect(resources.resources.map((r) => r.uri)).toContain(
+      'robocodejs://types/robocode.d.ts'
+    );
+
+    // Docs and samples are exposed as templates the client can enumerate/read.
+    const templates = await client.listResourceTemplates();
+    const uriTemplates = templates.resourceTemplates.map((t) => t.uriTemplate);
+    expect(uriTemplates).toContain('robocodejs://docs/{slug}');
+    expect(uriTemplates).toContain('robocodejs://samples/{name}');
+  });
+
+  it('exposes workflow prompts and fills in arguments', async () => {
+    const client = await connect();
+
+    const prompts = await client.listPrompts();
+    expect(prompts.prompts.map((p) => p.name)).toEqual(
+      expect.arrayContaining(['write_bot', 'debug_bot', 'run_match'])
+    );
+
+    const filled = await client.getPrompt({
+      name: 'write_bot',
+      arguments: { goal: 'circle and snipe' },
+    });
+    const text = (filled.messages[0].content as { text: string }).text;
+    expect(text).toContain('circle and snipe');
+    // It should steer the model to the API docs resource.
+    expect(text).toContain('robocodejs://docs/dev');
+  });
 });
