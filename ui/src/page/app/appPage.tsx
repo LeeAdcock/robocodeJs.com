@@ -7,8 +7,9 @@ import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import Toolbar from './appEditorToolbar';
-import prettier from 'prettier/standalone';
-import babel from 'prettier/parser-babel';
+import * as prettier from 'prettier/standalone';
+import babel from 'prettier/plugins/babel';
+import estree from 'prettier/plugins/estree';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -130,16 +131,19 @@ export default function AppPage(props: AppPageProps) {
       .then(() => navigate(`/user/${userId}`));
   };
 
-  const doClean = () => {
+  const doClean = async () => {
     try {
-      const prettyCode = prettier.format(code || ' ', {
+      // Prettier 3's format() returns a Promise — await it before setting the
+      // code, otherwise the editor would be filled with "[object Promise]".
+      const prettyCode = await prettier.format(code || ' ', {
+        parser: 'babel',
         semi: false,
         trailingComma: 'none',
-        plugins: [babel],
+        plugins: [babel, estree],
       });
       setCode(prettyCode);
     } catch {
-      // do nothing
+      // Leave the code unchanged if it can't be parsed/formatted.
     }
   };
 
