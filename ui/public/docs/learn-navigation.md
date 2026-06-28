@@ -19,7 +19,8 @@ A marker is a pin on the map. Two ways to make one:
 
 Once you have a marker, ask it:
 
-- `marker.getBearing()` — the compass direction from you to the pin (updates as you move).
+- `marker.getBearing()` — the bearing to the pin **relative to your heading**, so
+  `bot.turn(getBearing())` faces it (updates as you move).
 - `marker.getDistance()` — how far you are from the pin.
 
 (For custom calculations there's also `Math`, a built-in toolbox of number tools like
@@ -38,8 +39,8 @@ bot.on(Event.START, () => {
 });
 
 clock.on(Event.TICK, () => {
-  // Face the pin (slow down as we arrive).
-  bot.setOrientation(this.target.getBearing()).catch(() => {});
+  // Turn toward the pin (the bearing is relative, so we turn BY it).
+  bot.turn(this.target.getBearing()).catch(() => {});
 
   if (this.target.getDistance() < 30) {
     bot.setSpeed(0); // close enough — we've arrived
@@ -59,7 +60,7 @@ latest bearing and distance. The `< 30` is an "are we close enough?" check.
 - Send Rusty to a corner instead: `arena.createMarker(40, 40);`
 - Remember home base and return there when hurt:
   - In START: `this.home = bot.dropMarker();`
-  - In a HIT handler: `bot.setOrientation(this.home.getBearing()).catch(() => {}); bot.setSpeed(5);`
+  - In a HIT handler: `bot.turn(this.home.getBearing()).catch(() => {}); bot.setSpeed(5);`
 - Log the distance as you travel: `console.log('distance to target', this.target.getDistance());`
 
 ## Common questions

@@ -1,7 +1,7 @@
 import { Event } from '../types/event';
 import { timerTick } from './scheduleFactory';
 import Environment from '../types/environment';
-import { normalizeAngle } from './geometry';
+import { normalizeAngle, toRelativeBearing } from './geometry';
 
 /*
   These functions calculate the changes and interaction between active
@@ -89,13 +89,16 @@ export default {
                   otherTank.logger.trace('Collided with tank');
                   if (tank.handlers[Event.COLLIDED]) {
                     tank.handlers[Event.COLLIDED]({
-                      angle,
+                      angle: toRelativeBearing(angle, tank.orientation),
                       friendly: otherProcess.getAppId() === process.getAppId(),
                     });
                   }
                   if (otherTank.handlers[Event.COLLIDED]) {
                     otherTank.handlers[Event.COLLIDED]({
-                      angle: normalizeAngle(180 + angle),
+                      angle: toRelativeBearing(
+                        normalizeAngle(180 + angle),
+                        otherTank.orientation
+                      ),
                       friendly: otherProcess.getAppId() === process.getAppId(),
                     });
                   }
@@ -128,7 +131,10 @@ export default {
                       // We have a hit
                       if (tank.handlers[Event.HIT]) {
                         tank.handlers[Event.HIT]({
-                          angle: normalizeAngle(angle + 180),
+                          angle: toRelativeBearing(
+                            normalizeAngle(angle + 180),
+                            tank.orientation
+                          ),
                         });
                       }
 
@@ -171,7 +177,9 @@ export default {
             tank.logger.trace('Collided with arena boundary');
             if (tank.handlers[Event.COLLIDED]) {
               tank.handlers[Event.COLLIDED]({
-                angle: normalizeAngle(tank.orientation),
+                // A wall is in the direction you drove into it — dead ahead (0)
+                // once expressed relative to your heading.
+                angle: 0,
               });
             }
           }

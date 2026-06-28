@@ -7,29 +7,32 @@ the handful of differences that will trip you up if you don't know them.
 
 ## The big picture
 
-|                | Classic Robocode                                                  | RobocodeJs                                                                 |
-| -------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Language       | Java (`extends Robot` / `AdvancedRobot`)                          | JavaScript (no class — an "app" of event handlers)                         |
-| Program shape  | a `run()` loop + `onX()` event methods                            | register handlers: `bot.on(Event.X, …)`, `clock.on(Event.TICK, …)`         |
-| You control    | one robot per file                                                | a **team of 5 tanks**, all sharing your one app                            |
-| Health         | **energy** `0–100`, spent to fire, gun heat limits fire rate      | **health** `0–1`; no firing cost, no gun heat — a **reload timer** instead |
-| Movement calls | blocking `ahead(100)` / `turnRight(45)` (or `setAhead`+`execute`) | **async** `bot.setSpeed(5)` / `bot.turn(45)` return **Promises**           |
-| Heading `0°`   | **North**, clockwise                                              | **South**, clockwise ⚠️                                                    |
-| Messaging      | `TeamRobot` serializable objects                                  | a single **number** via `bot.send()`                                       |
+|                | Classic Robocode                                                  | RobocodeJs                                                                   |
+| -------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Language       | Java (`extends Robot` / `AdvancedRobot`)                          | JavaScript (no class — an "app" of event handlers)                           |
+| Program shape  | a `run()` loop + `onX()` event methods                            | register handlers: `bot.on(Event.X, …)`, `clock.on(Event.TICK, …)`           |
+| You control    | one robot per file                                                | a **team of 5 tanks**, all sharing your one app                              |
+| Health         | **energy** `0–100`, spent to fire, gun heat limits fire rate      | **health** `0–100`; no firing cost, no gun heat — a **reload timer** instead |
+| Movement calls | blocking `ahead(100)` / `turnRight(45)` (or `setAhead`+`execute`) | **async** `bot.setSpeed(5)` / `bot.turn(45)` return **Promises**             |
+| Heading `0°`   | **North**, clockwise                                              | **North**, clockwise — same                                                  |
+| Bearings       | relative to your heading (`getBearing()`)                         | relative to your heading — same                                              |
+| Messaging      | `TeamRobot` serializable objects                                  | a single **number** via `bot.send()`                                         |
 
-## ⚠️ The gotcha: the compass is rotated
+## Good news: directions work like you expect
 
-Classic Robocode puts `0°` at **North**. RobocodeJs puts **`0°` at South** (angles still
-increase clockwise). If your ported aiming math sends bots the wrong way, this is almost
-always why. See the [compass diagram](/rules#directions-the-compass).
-
-Also note: a scan result's `angle` is **arena-absolute** (like classic's _heading_), not a
-_bearing relative to your body_. To point your turret at a target you subtract your body
-orientation:
+The compass matches classic Robocode: **`0°` is north and angles increase clockwise**
+(see the [compass diagram](/rules#directions-the-compass)). And like classic's
+`getBearing()`, the angles reported to you — a scan result's `angle`, the `HIT`/`COLLIDED`
+`angle`, `marker.getBearing()` — are **relative to your heading**. The turret turns
+relative to the body too, so aiming a scanned target needs no trig at all:
 
 ```
-bot.turret.setOrientation(target.angle - bot.getOrientation());
+bot.turret.setOrientation(target.angle); // point the gun at the enemy
+bot.turn(target.angle); // or turn the whole tank toward it
 ```
+
+(The bot's own heading, `bot.getOrientation()` / `setOrientation()`, is the one absolute
+compass value — exactly like classic's `getHeading()`.)
 
 ## Events you already know
 
@@ -56,7 +59,7 @@ that resolves when it's reached (or rejects if a later command overrides it).
 | `turnGunRight(deg)`        | `bot.turret.turn(deg)` (turret turns relative to the body)                  |
 | `turnRadarRight(deg)`      | `bot.radar.turn(deg)` (radar turns relative to the turret)                  |
 | `fire(power)`              | `bot.turret.fire()` (no power/heat; check `isReady()` / `await onReady()`)  |
-| `getEnergy()`              | `bot.getHealth()` (`1` … `0`)                                               |
+| `getEnergy()`              | `bot.getHealth()` (`100` … `0`)                                             |
 | `getX()` / `getY()`        | `bot.getX()` / `bot.getY()` (and `arena.createMarker(x, y)` for navigation) |
 
 Because actions take time, you sequence them with `await` / `.then()` and tidy cancelled
@@ -74,7 +77,7 @@ clock.on(Event.TICK, async () => {
   const targets = await bot.radar.onReady().then(bot.radar.scan);
   const enemy = targets.find((t) => !t.friendly);
   if (enemy) {
-    await bot.turret.setOrientation(enemy.angle - bot.getOrientation());
+    await bot.turret.setOrientation(enemy.angle); // bearing is body-relative
     if (bot.turret.isReady()) bot.turret.fire();
   }
 });

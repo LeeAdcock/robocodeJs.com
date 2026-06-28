@@ -12,7 +12,7 @@ let secret = 8; // shared by teammates; 0 - 511
 
 bot.on(Event.START, () => {
   bot.turret.setOrientation(0);
-  bot.setSpeed(10);
+  bot.setSpeed(5);
 });
 
 clock.on(Event.TICK, () => {
@@ -39,7 +39,8 @@ bot.on(Event.RECEIVED, (message) => {
   // Decode the sender's position and steer toward it.
   let y = (content >> 2) & 0x3ff;
   let x = (content >> 12) & 0x3ff;
-  let angle = Math.atan2(y - bot.getY(), x - bot.getX()) * (180 / Math.PI) - 90;
+  // North-zero compass heading toward the sender (0 = north/up, clockwise).
+  let angle = Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI);
   let distance = Math.sqrt(
     Math.pow(y - bot.getY(), 2) + Math.pow(x - bot.getX(), 2)
   );

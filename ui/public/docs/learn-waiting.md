@@ -66,7 +66,7 @@ New pieces:
 ## Experiment
 
 - Add aiming from Lesson 8 before firing:
-  `await bot.turret.setOrientation(targets[0].angle - bot.getOrientation());`
+  `await bot.turret.setOrientation(targets[0].angle);`
   then `bot.turret.fire();`. Now it waits to finish aiming, _then_ shoots — much more
   accurate.
 - Remove the `await` before `bot.turret.onReady()` and see how the behavior gets sloppier.

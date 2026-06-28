@@ -106,7 +106,9 @@ describe('sandbox + simulation integration', () => {
 
     await world.tick(20);
 
-    expect(tank.getOrientation()).toBe(90);
+    // The bot API is north-zero (90 = east); internally that's south-zero 270.
+    // `tank.getOrientation()` reads the internal value.
+    expect(tank.getOrientation()).toBe(270);
   });
 
   it('spawns a bullet that travels when the bot fires', async () => {
@@ -156,7 +158,8 @@ describe('sandbox + simulation integration', () => {
 
     expect(tank.appCrashed).toBe(false);
     expect(tank.health).toBe(100); // still alive
-    expect(tank.getOrientation()).toBe(270); // kept running, reached new target
+    // Final API target was north-zero 270 (west) -> internal south-zero 90.
+    expect(tank.getOrientation()).toBe(90); // kept running, reached new target
   });
 
   it('fires a tick-driven setTimeout after its interval elapses', async () => {
@@ -226,6 +229,42 @@ describe('sandbox + simulation integration', () => {
     // and the enemy's own DETECTED handler fired
     expect(enemy.speed).toBe(2);
     expect(enemy.stats.timesDetected).toBeGreaterThan(0);
+  });
+
+  it('aims at a scanned enemy with the body-relative bearing and hits it', async () => {
+    // End-to-end proof of the bearing convention: the bot feeds the scan's
+    // `angle` straight into bot.turret.setOrientation(...) (no subtraction) and
+    // fires. If the bearing weren't body-relative, the shot would miss.
+    const sniper = world.addBot(
+      `bot.on(Event.SCANNED, (targets) => {
+         const enemy = targets.find((t) => !t.friendly)
+         if (enemy) return bot.turret.setOrientation(enemy.angle)
+           .then(() => bot.turret.onReady())
+           .then(() => bot.turret.fire())
+           .catch(() => {})
+       })
+       clock.on(Event.TICK, () => { if (bot.radar.isReady()) bot.radar.scan() })`,
+      'sniper',
+      { x: 375, y: 375, orientation: 0 }
+    );
+    sniper.turret.orientation = 0;
+    sniper.turret.orientationTarget = 0;
+    sniper.turret.radar.orientation = 0;
+    sniper.turret.radar.orientationTarget = 0;
+    sniper.turret.radar.charged = 100;
+    sniper.turret.loaded = 100;
+
+    // Enemy 100 units straight ahead (+y). The body-relative bearing to it is 0,
+    // so turret.setOrientation(0) keeps the gun on target.
+    const enemy = world.addBot(`bot.setName('dummy')`, 'enemy', {
+      x: 375,
+      y: 475,
+    });
+    expect(enemy.health).toBe(100);
+
+    await world.tick(15);
+
+    expect(enemy.health).toBeLessThan(100); // the shot connected
   });
 
   it('fires COLLIDED when a tank drives into a wall', async () => {

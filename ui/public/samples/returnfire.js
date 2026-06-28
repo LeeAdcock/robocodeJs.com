@@ -4,14 +4,11 @@
 */
 bot.setName('ReturnFire');
 
-// Create a function to make this behavior reusable.
-// Turns the tank towards a specific heading and
-// when the turret is ready it fires.
-retaliate = (angle) => {
-  return bot
-    .setOrientation(angle)
-    .then(bot.turret.onReady)
-    .then(bot.turret.fire);
+// Create a function to make this behavior reusable. HIT/COLLIDED report a
+// bearing relative to our body, so we turn BY that amount to face the threat,
+// then fire once the turret is ready.
+retaliate = (bearing) => {
+  return bot.turn(bearing).then(bot.turret.onReady).then(bot.turret.fire);
 };
 
 bot.on(Event.START, () => {

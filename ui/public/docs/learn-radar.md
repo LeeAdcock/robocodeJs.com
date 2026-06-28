@@ -18,7 +18,7 @@ it found. A list (programmers call it an **array**) is just several things in a 
 item is a robot you spotted, and it's an object with useful labels:
 
 - `target.distance` — how far away it is
-- `target.angle` — the compass direction it's in
+- `target.angle` — the bearing to it, relative to your heading (you'll use this to aim)
 - `target.friendly` — `true` if it's a teammate
 - (also `target.id`, `target.speed`, `target.orientation`)
 

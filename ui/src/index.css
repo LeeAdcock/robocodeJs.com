@@ -107,6 +107,22 @@ ul {
   color: var(--link);
 }
 
+/* Tables: indent to match the surrounding text (p/ul/headings use 20px), add
+   breathing room below, and give cells padding + light theme-aware borders so
+   they don't read as a cramped block. */
+.markdown table {
+  margin: 0 0 1.5em 20px;
+  border-collapse: collapse;
+}
+
+.markdown th,
+.markdown td {
+  padding: 6px 12px;
+  border: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+
 /* The bot log output is a console: keep it dark in both themes (its per-level
    text colors are tuned for a dark background) and readable. */
 .logs {
