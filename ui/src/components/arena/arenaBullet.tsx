@@ -10,6 +10,15 @@ interface BulletProps {
   orientation: number;
 }
 
+// A bullet whose coordinates or orientation are momentarily undefined/NaN (e.g.
+// seeded from a snapshot before its motion fields arrive) would produce an
+// invalid SVG transform; the browser then drops the transform entirely and the
+// sprite renders at (0,0). Coerce to finite numbers so a stray bullet can't get
+// stranded in the corner (and to silence the console errors).
+const finite = (n: number): number => (Number.isFinite(n) ? n : 0);
+const translate = (x: number, y: number): string =>
+  'translate(' + finite(x) + ',' + finite(y) + ')';
+
 const BulletSvg = React.memo((props: BulletProps) => (
   <g key={props.id} name="bullet">
     <image
@@ -21,9 +30,9 @@ const BulletSvg = React.memo((props: BulletProps) => (
         transition: 'all 200ms linear',
       }}
       transform={[
-        'translate(' + props.x + ',' + props.y + ')',
+        translate(props.x, props.y),
         'rotate(180)',
-        'rotate(' + props.orientation + ')',
+        'rotate(' + finite(props.orientation) + ')',
         'translate(-6, -32)',
       ].join(' ')}
     />
@@ -41,9 +50,9 @@ const BulletSvg = React.memo((props: BulletProps) => (
       height="14"
       width="4"
       transform={[
-        'translate(' + props.x + ',' + props.y + ')',
+        translate(props.x, props.y),
         'rotate(180)',
-        'rotate(' + props.orientation + ')',
+        'rotate(' + finite(props.orientation) + ')',
         'translate(0, -32)',
       ].join(' ')}
     />
