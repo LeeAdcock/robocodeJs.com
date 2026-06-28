@@ -8,6 +8,7 @@
     "dev": "npm start",
     "install:all": "npm install && npm --prefix server install && npm --prefix ui install",
     "build": "npm --prefix ui run build && npm --prefix server run build",
+    "package": "npm run build && npm --prefix server run package",
     "test": "npm --prefix server test && npm --prefix ui test",
     "lint": "npm --prefix server run lint && npm --prefix ui run lint",
     "prepare": "husky"
