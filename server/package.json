@@ -18,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "browser-bunyan": "^1.8.0",
     "cookie-parser": "^1.4.6",
     "express": "^5.2.1",
@@ -26,7 +27,8 @@
     "ml-classify-text": "^2.0.0",
     "pg": "^8.8.0",
     "pino": "^10.3.1",
-    "pino-http": "^11.0.0"
+    "pino-http": "^11.0.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.7",

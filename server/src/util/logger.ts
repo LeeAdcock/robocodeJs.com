@@ -31,6 +31,8 @@ export const LogEvent = {
   SANDBOX_CATASTROPHIC: 'sandbox.catastrophic', // isolate OOM / fatal V8 error
   AUTH_FAILED: 'auth.failed', // invalid/expired credential
   AUTH_FORBIDDEN: 'auth.forbidden', // authenticated user acting on another's resource
+  AUTH_TOKEN_CREATED: 'auth.token.created', // API token minted/rotated
+  AUTH_TOKEN_REVOKED: 'auth.token.revoked', // API token removed
   HTTP_ERROR: 'http.error', // unhandled error -> 5xx
   DB_ERROR: 'db.error', // database/pool error
   PROCESS_FATAL: 'process.fatal', // uncaught exception / unhandled rejection

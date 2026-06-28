@@ -1,11 +1,13 @@
 import express from 'express';
 
 import appService from '../services/AppService';
-import arenaService from '../services/ArenaService';
-import environmentService from '../services/EnvironmentService';
-import arenaMemberService from '../services/ArenaMemberService';
+import {
+  propagateSource,
+  executeInUserArenas,
+  rebootInUserArenas,
+  deleteAppEverywhere,
+} from '../util/botActions';
 
-import Arena from '../types/arena';
 import {
   loadUser,
   requireOwner,
@@ -50,27 +52,10 @@ app.put(
   (req, res) => {
     const app = scopedApp(req);
     // TODO validate the source code first?
-    return app
-      .setSource(req.body.toString('utf-8'))
-      .then(() => {
-        res.status(200);
-        res.send();
-      })
-      .then(() => {
-        arenaMemberService.getForApp(app.getId()).then((members) => {
-          members.forEach((member) => {
-            environmentService.getByArenaId(member.getArenaId()).then((env) => {
-              if (env) {
-                env.processes
-                  .filter((process) => process.getAppId() == member.getAppId())
-                  .forEach((process) =>
-                    process.tanks.forEach((tank) => tank.execute(process))
-                  );
-              }
-            });
-          });
-        });
-      });
+    return propagateSource(app, req.body.toString('utf-8')).then(() => {
+      res.status(200);
+      res.send();
+    });
   }
 );
 
@@ -84,18 +69,10 @@ app.post(
     const user = scopedUser(req);
     const app = scopedApp(req);
 
-    const arenas: Arena[] = await arenaService.getForUser(user.getId());
-    return Promise.all(
-      arenas
-        .filter((arena) => environmentService.has(arena.getId()))
-        .map((arena) =>
-          environmentService.get(arena).then((env) => env.execute(app.getId()))
-        )
-    ).then(() => {
-      res.status(200);
-      res.send({
-        name: app.getName(),
-      });
+    await executeInUserArenas(user.getId(), app.getId());
+    res.status(200);
+    res.send({
+      name: app.getName(),
     });
   }
 );
@@ -112,18 +89,10 @@ app.post(
     const user = scopedUser(req);
     const app = scopedApp(req);
 
-    const arenas: Arena[] = await arenaService.getForUser(user.getId());
-    return Promise.all(
-      arenas
-        .filter((arena) => environmentService.has(arena.getId()))
-        .map((arena) =>
-          environmentService.get(arena).then((env) => env.reboot(app.getId()))
-        )
-    ).then(() => {
-      res.status(200);
-      res.send({
-        name: app.getName(),
-      });
+    await rebootInUserArenas(user.getId(), app.getId());
+    res.status(200);
+    res.send({
+      name: app.getName(),
     });
   }
 );
@@ -149,23 +118,10 @@ app.delete(
   loadApp,
   (req, res) => {
     const app = scopedApp(req);
-    return arenaMemberService.getForApp(app.getId()).then((memberships) =>
-      Promise.all(
-        memberships.map((membership) =>
-          environmentService
-            .getByArenaId(membership.getArenaId())
-            .then((env) =>
-              env ? env.removeApp(app.getId()) : Promise.resolve()
-            )
-            .then(() => membership.delete())
-        )
-      )
-        .then(() => app.delete())
-        .then(() => {
-          res.status(200);
-          res.send();
-        })
-    );
+    return deleteAppEverywhere(app).then(() => {
+      res.status(200);
+      res.send();
+    });
   }
 );
 

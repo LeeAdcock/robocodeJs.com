@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import appService from '../services/AppService';
 import arenaService from '../services/ArenaService';
 import environmentService from '../services/EnvironmentService';
 import arenaMemberService from '../services/ArenaMemberService';
@@ -13,6 +12,7 @@ import {
   scopedArena,
 } from '../middleware/resource';
 import { openSseStream } from '../util/sse';
+import { buildArenaStatus } from '../util/arenaStatus';
 
 const app = express();
 
@@ -78,65 +78,10 @@ app.delete(
 const getStatus = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
   const env = await environmentService.get(arena);
-
   const members = await arenaMemberService.getForArena(arena.getId());
 
-  const apps = await Promise.all(
-    members.map((member) => appService.get(member.getAppId()))
-  );
-
   res.status(200);
-  res.send({
-    height: arena.getHeight(),
-    width: arena.getWidth(),
-    running: env.isRunning(),
-    clock: { time: env.getTime() },
-    apps: env
-      .getProcesses()
-      .sort((a, b) => {
-        return (
-          (members
-            .find((member) => member?.getAppId() === a.appId)
-            ?.getTimestamp() || 0) -
-          (members
-            .find((member) => member?.getAppId() === b.appId)
-            ?.getTimestamp() || 0)
-        );
-      })
-      .map((process) => ({
-        id: process.getAppId(),
-        name: apps.find((app) => app?.getId() === process.appId)?.getName(),
-        userId: apps.find((app) => app?.getId() === process.appId)?.getUserId(),
-        addedTimestamp: members
-          .find((member) => member?.getAppId() === process.appId)
-          ?.getTimestamp(),
-        tanks: process.tanks.map((tank) => ({
-          id: tank.id,
-          x: tank.x,
-          y: tank.y,
-          speed: tank.speed,
-          speedTarget: tank.speedTarget,
-          speedAcceleration: tank.speedAcceleration,
-          speedMax: tank.speedMax,
-          bodyOrientation: tank.orientation,
-          bodyOrientationTarget: tank.orientationTarget,
-          bodyOrientationVelocity: tank.orientationVelocity,
-          turretOrientation: tank.turret.orientation,
-          turretOrientationTarget: tank.turret.orientationTarget,
-          turretOrientationVelocity: tank.turret.radar.orientationVelocity,
-          radarOrientation: tank.turret.radar.orientation,
-          radarOrientationTarget: tank.turret.radar.orientationTarget,
-          radarOrientationVelocity: tank.turret.radar.orientationVelocity,
-          health: tank.health,
-          bullets: tank.bullets.map((bullet) => ({
-            id: bullet.id,
-            x: bullet.x,
-            y: bullet.y,
-            exploded: bullet.exploded,
-          })),
-        })),
-      })),
-  });
+  res.send(await buildArenaStatus(env, members));
 };
 app.get(dual(''), loadUser, resolveArena, getStatus);
 

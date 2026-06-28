@@ -1,5 +1,6 @@
 import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { Request, Response, NextFunction } from 'express';
+import { createHash } from 'node:crypto';
 import userService from '../services/UserService';
 import authService from '../services/IdentityService';
 import User from '../types/user';
@@ -7,6 +8,13 @@ import { isLocalDev } from '../util/devMode';
 import { logger, LogEvent } from '../util/logger';
 
 export type AuthenticatedRequest = Request & { user: User };
+
+// API tokens (used by non-browser clients such as the MCP server) are stored
+// only as their sha256 hash, never the token itself. The same hashing is applied
+// to a presented Bearer token before lookup. Shared with the /api/token mint
+// endpoint so the two never drift.
+export const hashToken = (token: string): string =>
+  createHash('sha256').update(token).digest('hex');
 
 // Local-dev login bypass: resolve (or lazily create) a single fixed "Local Dev"
 // user so no Google sign-in is needed. Memoized so concurrent requests share one
@@ -66,6 +74,58 @@ export default (required: boolean) =>
         return next();
       }
     }
+    // API token (Bearer) path, for non-browser clients (the MCP server). A token
+    // is a random secret presented as `Authorization: Bearer <token>`; we store
+    // only its hash, so hash the presented value and resolve it as an 'apikey'
+    // identity. Checked before the Google cookie because such clients never carry
+    // a cookie. A malformed/unknown token on a gated route is a 401; on an ungated
+    // route we fall through (it may still carry a valid cookie). `req.headers` is
+    // optional-chained so the unit tests' bare request objects don't throw.
+    const authHeader = req.headers?.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice('Bearer '.length).trim();
+      try {
+        const identity = token
+          ? await authService.get('apikey', hashToken(token))
+          : undefined;
+        const user = identity
+          ? await userService.get(identity.getUserId())
+          : undefined;
+        if (user) {
+          (req as AuthenticatedRequest).user = user;
+          return next();
+        }
+      } catch (err: unknown) {
+        // Resolving the token hit a server-side fault (e.g. DB unreachable).
+        logger.error(
+          {
+            event: LogEvent.DB_ERROR,
+            path: req.path,
+            err: err instanceof Error ? err.message : String(err),
+          },
+          'auth: resolving API token failed'
+        );
+        res.status(500);
+        res.send('Internal server error');
+        return;
+      }
+      // Bearer presented but unrecognized.
+      logger.warn(
+        {
+          event: LogEvent.AUTH_FAILED,
+          path: req.path,
+          reason: 'invalid-bearer',
+        },
+        'rejected request with invalid API token'
+      );
+      if (required) {
+        res.status(401);
+        res.send('Access forbidden');
+        return;
+      }
+      return next();
+    }
+
     // Step 1 — verify the Google credential. A failure here means the token is
     // missing/expired/invalid (or minted for another audience): the *client's*
     // problem, so a gated route answers 401. An ungated route just proceeds

@@ -17,7 +17,7 @@ vi.mock('../src/services/IdentityService', () => ({
   default: { get: vi.fn(), create: vi.fn() },
 }));
 
-import auth from '../src/middleware/auth';
+import auth, { hashToken } from '../src/middleware/auth';
 import userService from '../src/services/UserService';
 import identityService from '../src/services/IdentityService';
 
@@ -107,5 +107,45 @@ describe('auth middleware', () => {
     expect(res.status).not.toHaveBeenCalledWith(401);
     expect(res.clearCookie).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('resolves the user from a valid Bearer API token (by hash)', async () => {
+    const user = { getId: () => 'u9' };
+    vi.mocked(identityService.get).mockResolvedValue({
+      getUserId: () => 'u9',
+    } as never);
+    vi.mocked(userService.get).mockResolvedValue(user as never);
+
+    const req = {
+      cookies: {},
+      headers: { authorization: 'Bearer secret-token' },
+    } as never;
+    const res = makeRes();
+    const next = vi.fn();
+    await auth(true)(req, res, next);
+
+    // Looked up by the token's sha256 hash under the 'apikey' source, never the
+    // raw token; and Google verification is not consulted for a Bearer request.
+    const [source, sourceId] = vi.mocked(identityService.get).mock.calls[0];
+    expect(source).toBe('apikey');
+    expect(sourceId).toBe(hashToken('secret-token'));
+    expect((req as { user: unknown }).user).toBe(user);
+    expect(next).toHaveBeenCalled();
+    expect(verifyIdToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown Bearer token with 401 when required', async () => {
+    vi.mocked(identityService.get).mockResolvedValue(undefined);
+    const req = {
+      cookies: {},
+      headers: { authorization: 'Bearer nope' },
+    } as never;
+    const res = makeRes();
+    const next = vi.fn();
+    await auth(true)(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(verifyIdToken).not.toHaveBeenCalled();
   });
 });
