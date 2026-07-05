@@ -18,7 +18,7 @@ import { makeSimEnv } from './simEnv';
 
 function makeWorld() {
   const world = makeSimEnv({ run: (env) => Simulation.run(env) });
-  const { env, processes, events, tick } = world;
+  const { env, processes, events, faults, tick } = world;
 
   // Compile a bot's source into a fresh isolate-backed tank at a fixed pose.
   const addBot = (
@@ -48,7 +48,7 @@ function makeWorld() {
   const dispose = () =>
     processes.forEach((p) => p.tanks.forEach((t) => t.getContext().release()));
 
-  return { env, processes, events, addBot, tick, dispose };
+  return { env, processes, events, faults, addBot, tick, dispose };
 }
 
 describe('sandbox + simulation integration', () => {
@@ -333,5 +333,30 @@ describe('sandbox + simulation integration', () => {
     await world.tick(8);
 
     expect(tank.getOrientation()).toBe(30);
+  });
+
+  it('reports a structured botFault when a handler throws (E013)', async () => {
+    const tank = world.addBot(
+      `clock.on(Event.TICK, () => { throw new Error('boom') })`,
+      'crasher'
+    );
+
+    await world.tick(2);
+
+    expect(tank.appCrashed).toBe(true);
+    const fault = world.faults.find((f) => f.code === 'E013');
+    expect(fault).toBeDefined();
+    expect(fault).toMatchObject({ kind: 'handler', appId: 'crasher' });
+    expect(String(fault?.message)).toContain('boom');
+    // The isolate stack gives a line inside the bot source.
+    expect(typeof fault?.line).toBe('number');
+    // ...and it was broadcast as a botFault event.
+    expect(
+      world.events.some(
+        (e) =>
+          e.name === 'event' &&
+          (e.payload as { type?: string }).type === 'botFault'
+      )
+    ).toBe(true);
   });
 });

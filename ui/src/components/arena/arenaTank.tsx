@@ -33,6 +33,8 @@ interface TankProps {
 
   id: string;
   health: number;
+  crashed?: boolean;
+  faultCode?: string;
   bodyOrientation: number;
   turretOrientation: number;
   radarOrientation: number;
@@ -215,6 +217,31 @@ const TankSvg = React.memo((props: TankProps) => {
                   transition: 'width 300ms linear, fill 300ms linear',
                 }}
               />
+            </g>
+          )}
+
+          {props.crashed && (
+            // A crisp warning triangle above the tank (outside the dead-tank blur)
+            // marking a bot that crashed rather than died in combat.
+            <g transform={translate(props.x, props.y - 26)}>
+              <title>{`Crashed${props.faultCode ? ` (${props.faultCode})` : ''}`}</title>
+              <polygon
+                points="0,-8 8,6 -8,6"
+                fill="gold"
+                stroke="black"
+                strokeWidth={1}
+                strokeLinejoin="round"
+              />
+              <text
+                x={0}
+                y={5}
+                fontSize={9}
+                fontWeight="bold"
+                textAnchor="middle"
+                fill="black"
+              >
+                !
+              </text>
             </g>
           )}
         </g>

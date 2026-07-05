@@ -89,6 +89,17 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
         }
       })
     );
+  } else if (data.type === 'botFault') {
+    // A bot crashed — flag the tank so the arena can show a warning triangle.
+    // (Cleared naturally when the tank is re-placed on reboot/restart.)
+    apps.forEach((app) =>
+      app.tanks.forEach((tank) => {
+        if (tank.id === data.tankId) {
+          tank.crashed = true;
+          tank.faultCode = data.code;
+        }
+      })
+    );
   } else if (data.type === 'appRenamed') {
     const app = apps.find((app) => app.id === data.appId);
     if (app && app.name !== data.name) {

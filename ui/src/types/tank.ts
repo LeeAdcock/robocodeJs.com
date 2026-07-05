@@ -27,6 +27,11 @@ export default interface Tank extends Point {
 
   health: number;
 
+  // Set when the bot crashed (a fatal fault), so the arena can show a warning
+  // triangle over the tank; `faultCode` is the E0xx code for the tooltip.
+  crashed?: boolean;
+  faultCode?: string;
+
   path: PointInTime[];
   pathIndex: number;
 }

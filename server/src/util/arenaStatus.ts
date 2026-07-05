@@ -66,6 +66,9 @@ export const buildArenaStatus = async (
           radarOrientationTarget: tank.turret.radar.orientationTarget,
           radarOrientationVelocity: tank.turret.radar.orientationVelocity,
           health: tank.health,
+          // Whether the bot crashed (vs. died in combat) — lets a client / AI tell
+          // a fault-death from a bullet-death. Detail is in the fault feed.
+          crashed: tank.appCrashed,
           // Only live bullets, and include orientation/speed so a client that
           // bootstraps from this snapshot (a reload, or a freshly connected SSE
           // client) can both render the bullet (it rotates by orientation) and

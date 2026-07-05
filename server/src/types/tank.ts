@@ -224,13 +224,9 @@ export default class Tank implements Point, Orientated {
     } catch (e) {
       this.logger.error(`${ErrorCodes.E004}: ${e}`);
       this.appCrashed = true;
-
-      this.env.emit('event', {
-        type: 'appError',
-        appId: this.process.appId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-
+      // Surface the crash on the unified fault feed (replaces the old bespoke
+      // `appError` event) — buffered for MCP and broadcast as `botFault` for the UI.
+      compiler.emitBotFault(this, ErrorCodes.E004, 'execute', e);
       return Promise.resolve();
     }
   }

@@ -29,13 +29,13 @@ _Lower the barrier so a first-time visitor writes a working bot in minutes._
   homepage tutorial but live in the editor with "try it" checkpoints.
 - **"Fork this example" buttons.** (S) On the Examples page, one click clones a
   sample into the user's apps and drops it in the arena. Turns reading into doing.
-- **Prominent error/crash surfacing.** (S–M) Bot faults are already logged
-  (`bot.fault` events); show them in the UI with the error message and, where
-  possible, a line number, instead of a tank quietly dying. Pairs with the
-  existing `ErrorCodes`. _Partial:_ the editor now has a **Check** button that
-  dry-run-compiles and shows syntax/load errors before deploy, and the
-  [`/error-codes`](/error-codes) page documents every code; still to do is
-  surfacing live in-match crashes inline.
+- ✅ **Prominent error/crash surfacing.** (S–M) _Shipped._ Every fatal fault now
+  emits a structured `botFault` (code, kind, message, and the failing line where
+  the isolate provides one), buffered per-arena. In the UI a crashed bot shows a
+  ⚠️ warning triangle over its tank, the editor pops a red banner with the code +
+  message and marks the failing line in the gutter; for AI clients a `recent_faults`
+  MCP tool and `arena_status.crashed` expose the same. Complements the pre-deploy
+  **Check** button and the [`/error-codes`](/error-codes) page.
 - **Starter template picker.** (S) "New bot" offers a few skeletons (aggressive,
   defensive, scout) rather than a blank file.
 
@@ -136,11 +136,12 @@ _Let an AI assistant (Claude, or any MCP client) write, run, and watch bots — 
 model as a first-class player and pair-programmer._
 
 - ✅ **In-process MCP server.** (M) _Shipped._ A Model Context Protocol server at
-  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 21
+  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 22
   user-scoped tools (bot CRUD + compile/`check_bot_source`/reboot, arena
-  create/delete/control including `set_arena_speed`/`set_arena_seed`, status,
-  `recent_logs`), **resources** (the bot docs, `robocode.d.ts`, sample bots, the
-  error-code reference), and **prompts** (`write_bot`, `debug_bot`, `run_match`).
+  create/delete/control including `set_arena_speed`/`set_arena_seed`, status, and
+  observation — filterable `recent_logs` + structured `recent_faults`),
+  **resources** (the bot docs, `robocode.d.ts`, sample bots, the error-code
+  reference), and **prompts** (`write_bot`, `debug_bot`, `run_match`).
   Authenticated by a per-user API token; setup guide at `/mcp`.
 - **OAuth remote-connector auth.** (M–L) Today auth is a static bearer token, so
   only clients that allow a custom header (e.g. Claude Code) can connect.

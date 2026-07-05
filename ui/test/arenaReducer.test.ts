@@ -139,6 +139,15 @@ describe('applyArenaEvent — tanks', () => {
     expect([t.speed, t.speedTarget]).toEqual([0, 0]);
   });
 
+  it('botFault flags the matching tank as crashed with its code', () => {
+    const arena = makeArena([makeApp('a1', [makeTank('t1'), makeTank('t2')])]);
+    apply(arena, { type: 'botFault', tankId: 't2', code: 'E017' });
+    const [t1, t2] = arena.apps[0].tanks;
+    expect(t1.crashed).toBeFalsy();
+    expect(t2.crashed).toBe(true);
+    expect(t2.faultCode).toBe('E017');
+  });
+
   it('turret/radar turn set their targets', () => {
     const arena = makeArena([makeApp('a1', [makeTank('t1')])]);
     apply(arena, {

@@ -141,6 +141,8 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     appName={app.name}
                     id={tank.id}
                     health={tank.health}
+                    crashed={tank.crashed}
+                    faultCode={tank.faultCode}
                     bodyOrientation={tank.bodyOrientation}
                     turretOrientation={tank.turretOrientation}
                     radarOrientation={tank.radarOrientation}
@@ -163,6 +165,8 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     appName={app.name}
                     id={tank.id}
                     health={tank.health}
+                    crashed={tank.crashed}
+                    faultCode={tank.faultCode}
                     bodyOrientation={tank.bodyOrientation}
                     turretOrientation={tank.turretOrientation}
                     radarOrientation={tank.radarOrientation}

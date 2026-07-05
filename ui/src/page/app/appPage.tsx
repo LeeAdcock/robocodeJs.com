@@ -32,6 +32,11 @@ export default function AppPage(props: AppPageProps) {
   const [notice, setNotice] = useState('');
   const [code, setCode] = useState('');
   const [app, setApp] = useState<App | null>(null);
+  // A server-reported fault location to mark in the editor gutter (jump-to-line).
+  const [faultAnnotation, setFaultAnnotation] = useState<{
+    line: number;
+    message: string;
+  } | null>(null);
   const { userId, appId } = useParams();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
@@ -66,23 +71,29 @@ export default function AppPage(props: AppPageProps) {
     });
   };
 
-  const appErrorListener = (event: unknown) => {
-    const e = event as { appId: string; error: string };
-    setError((prevError) => {
-      if (e.appId === appId && app) {
-        setTimeout(() => setError(() => ''), 15000);
-        return e.error;
-      }
-      return prevError;
-    });
+  // A crash in this bot (any fatal fault: load/handler/timer/init/…) arrives as a
+  // structured `botFault`. Surface the code + message prominently, and — when the
+  // sandbox reported a line — mark that line in the editor gutter.
+  const botFaultListener = (event: unknown) => {
+    const e = event as {
+      appId: string;
+      code: string;
+      message: string;
+      line?: number;
+    };
+    if (e.appId !== appId) return;
+    setError(`${e.code}: ${e.message}`);
+    setTimeout(() => setError(() => ''), 15000);
+    if (typeof e.line === 'number')
+      setFaultAnnotation({ line: e.line, message: `${e.code}: ${e.message}` });
   };
 
   useEffect(() => {
     props.emitter.addListener('appRenamed', appRenamedListener);
-    props.emitter.addListener('appError', appErrorListener);
+    props.emitter.addListener('botFault', botFaultListener);
     return () => {
       props.emitter.removeListener('appRenamed', appRenamedListener);
-      props.emitter.removeListener('appError', appErrorListener);
+      props.emitter.removeListener('botFault', botFaultListener);
     };
   });
 
@@ -263,7 +274,12 @@ export default function AppPage(props: AppPageProps) {
       )}
       <Editor
         code={code}
-        onChange={setCode}
+        onChange={(value) => {
+          setCode(value);
+          // Editing invalidates a prior server fault marker.
+          setFaultAnnotation(null);
+        }}
+        faultAnnotation={faultAnnotation}
         doExecute={doExecute}
         doReboot={doReboot}
         doClean={doClean}

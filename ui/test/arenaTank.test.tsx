@@ -48,6 +48,30 @@ describe('TankSvg health bar', () => {
   });
 });
 
+describe('TankSvg crash indicator', () => {
+  afterEach(cleanup);
+
+  it('shows a warning triangle with the fault code when crashed', () => {
+    const { container } = render(
+      <svg>
+        <TankSvg {...base} health={0} crashed faultCode="E017" />
+      </svg>
+    );
+    const triangle = container.querySelector('polygon[fill="gold"]');
+    expect(triangle).toBeTruthy();
+    expect(container.querySelector('title')?.textContent).toContain('E017');
+  });
+
+  it('shows no triangle when not crashed', () => {
+    const { container } = render(
+      <svg>
+        <TankSvg {...base} />
+      </svg>
+    );
+    expect(container.querySelector('polygon[fill="gold"]')).toBeNull();
+  });
+});
+
 describe('TankSvg rotation', () => {
   afterEach(cleanup);
 

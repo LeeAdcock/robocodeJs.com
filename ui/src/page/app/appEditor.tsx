@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 // react-ace is a CommonJS package; under Vite's dependency pre-bundling its
 // default import arrives wrapped as the module namespace object
 // ({ default, split, diff }) rather than the component itself, which makes React
@@ -33,6 +33,8 @@ export const EDITOR_FONT_DEFAULT = 12;
 interface CodeEditorProps {
   code: string;
   onChange: (source: string) => void;
+  // A server-reported crash location to mark in the gutter and scroll to.
+  faultAnnotation?: { line: number; message: string } | null;
   doClean: () => void;
   doExecute: () => void;
   doReboot: () => void;
@@ -68,6 +70,20 @@ export default function CodeEditor(props: CodeEditorProps) {
   const compileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
+
+  // Mark a server-reported crash line in the gutter (same shape as the local
+  // syntax-error annotation) and scroll to it. Editing clears the fault upstream,
+  // after which the local compile() below governs annotations again.
+  useEffect(() => {
+    if (!editor || !props.faultAnnotation) return;
+    const { line, message } = props.faultAnnotation;
+    editor
+      .getSession()
+      .setAnnotations([
+        { row: line - 1, column: 0, type: 'error' as const, text: message },
+      ]);
+    editor.gotoLine(line, 0, true);
+  }, [editor, props.faultAnnotation]);
 
   const compile = async (source: string) => {
     try {

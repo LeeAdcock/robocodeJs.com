@@ -207,6 +207,70 @@ describe('mcp tools', () => {
     expect(JSON.parse(textOf(res))).toEqual({ running: true });
   });
 
+  it('recent_logs filters by level, bot, tank, and text', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    const logs = [
+      { level: 30, appId: 'a1', tankIndex: 1, msg: 'hello info' },
+      { level: 50, appId: 'a1', tankIndex: 2, msg: 'E017: boom' },
+      { level: 40, appId: 'a2', tankIndex: 1, msg: 'warn other' },
+    ];
+    vi.mocked(environmentService.getByArenaId).mockResolvedValue({
+      getRecentLogs: () => logs,
+    } as never);
+    const client = await connect();
+    const call = async (args: Record<string, unknown>) =>
+      JSON.parse(
+        textOf(
+          (await client.callTool({
+            name: 'recent_logs',
+            arguments: args,
+          })) as never
+        )
+      );
+
+    // ERROR-and-up only.
+    expect(await call({ minLevel: 'ERROR' })).toEqual([logs[1]]);
+    // A single bot.
+    expect(
+      (await call({ appId: 'a2' })).map((l: { msg: string }) => l.msg)
+    ).toEqual(['warn other']);
+    // A specific tank.
+    expect(await call({ tankIndex: 2 })).toEqual([logs[1]]);
+    // Substring of the message.
+    expect(await call({ contains: 'boom' })).toEqual([logs[1]]);
+  });
+
+  it('recent_faults returns structured crash records', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    const faults = [
+      {
+        appId: 'a1',
+        tankId: 't1',
+        tankIndex: 1,
+        code: 'E017',
+        kind: 'load',
+        message: 'x is not defined',
+        line: 3,
+        timedOut: false,
+        time: 5,
+      },
+    ];
+    const getRecentFaults = vi.fn().mockReturnValue(faults);
+    vi.mocked(environmentService.getByArenaId).mockResolvedValue({
+      getRecentFaults,
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'recent_faults',
+      arguments: { appId: 'a1', limit: 10 },
+    })) as { structuredContent?: unknown };
+
+    expect(getRecentFaults).toHaveBeenCalledWith(10, 'a1');
+    expect(res.structuredContent).toEqual({ faults });
+  });
+
   it('set_arena_speed sets the speed on the resolved arena env', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
