@@ -1,11 +1,18 @@
 import React from 'react';
-import Navbar from 'react-bootstrap/Navbar';
-import NavDropdown from 'react-bootstrap/NavDropdown';
+import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
+import Dropdown from 'react-bootstrap/Dropdown';
 import Form from 'react-bootstrap/Form';
-import FormControl from 'react-bootstrap/FormControl';
-import Container from 'react-bootstrap/Container';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
+import { FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
+
+// Log console font-size bounds (mirrors the editor's zoom controls). Kept local
+// rather than imported from appEditor so this page doesn't pull in Ace.
+const LOG_FONT_MIN = 8;
+const LOG_FONT_MAX = 30;
+const LOG_FONT_DEFAULT = 12;
 
 interface LogEntry {
   id: string;
@@ -42,6 +49,8 @@ interface LogsState {
   // Tanks the user has toggled off, keyed `${appId}:${tankIndex}`. An application
   // is "off" when all of its tanks are hidden — the single source of truth.
   hideTanks: string[];
+  // Console font size, persisted so the preference survives reloads.
+  fontSize: number;
 }
 
 // Identify one tank in the hide set.
@@ -50,11 +59,22 @@ const tankKey = (appId: string, tankIndex: number) => `${appId}:${tankIndex}`;
 export default class Logs extends React.Component<LogsProps, LogsState> {
   constructor(props: LogsProps) {
     super(props);
+    const savedFont = Number(localStorage.getItem('logFontSize'));
     this.state = {
       search: '',
       hideLevels: [],
       hideTanks: [],
+      fontSize:
+        savedFont >= LOG_FONT_MIN && savedFont <= LOG_FONT_MAX
+          ? savedFont
+          : LOG_FONT_DEFAULT,
     };
+  }
+
+  setFont(size: number) {
+    const fontSize = Math.max(LOG_FONT_MIN, Math.min(LOG_FONT_MAX, size));
+    localStorage.setItem('logFontSize', String(fontSize));
+    this.setState({ fontSize });
   }
 
   logRef: React.RefObject<HTMLDivElement | null> =
@@ -169,200 +189,248 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       this.setState({ hideTanks: [...next] });
     };
 
+    const levelColors: Record<string, string> = {
+      trace: 'lightgrey',
+      error: 'red',
+      warn: 'yellow',
+      debug: 'blue',
+      info: 'green',
+    };
+
     return (
-      <Container fluid style={{ padding: '0px' }}>
-        <Row>
-          <Col>
-            <Navbar
-              className="bg-light justify-content-end"
-              style={{ padding: '4px 0px' }}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          paddingRight: '15px',
+        }}
+      >
+        {/* Toolbar — pinned above the scroll area, styled like the editor's. */}
+        <ButtonToolbar
+          style={{
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '5px',
+            padding: '4px 0',
+            flexShrink: 0,
+          }}
+        >
+          <ButtonGroup>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={<Tooltip id="log-zoom-out">Smaller text</Tooltip>}
             >
-              <NavDropdown
-                title="Bots"
-                id="nav-dropdown"
-                style={{ paddingRight: '20px' }}
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Smaller log text"
+                onClick={() => this.setFont(this.state.fontSize - 1)}
+                disabled={this.state.fontSize <= LOG_FONT_MIN}
               >
-                {apps.map((app) => (
-                  <React.Fragment key={app.id}>
-                    <NavDropdown.Item
-                      eventKey={app.id}
-                      // Toggle the whole application (all of its tanks).
-                      onClick={() => setHidden(tanksOf(app), appShown(app))}
-                    >
-                      <Form.Check
-                        checked={appShown(app)}
-                        inline
-                        type="checkbox"
-                        id={`bot-${app.id}`}
-                      />
-                      <strong>{app.name}</strong>
-                    </NavDropdown.Item>
-                    {tanksOf(app).map((key, i) => (
-                      <NavDropdown.Item
-                        key={key}
-                        eventKey={key}
-                        style={{ paddingLeft: '2.5em' }}
-                        // Toggle just this tank.
-                        onClick={() => setHidden([key], !hidden.has(key))}
-                      >
-                        <Form.Check
-                          checked={!hidden.has(key)}
-                          inline
-                          type="checkbox"
-                          id={`tank-${key}`}
-                        />
-                        Bot {readableId(app, i + 1)}
-                      </NavDropdown.Item>
-                    ))}
-                  </React.Fragment>
-                ))}
-                <NavDropdown.Divider />
-                <NavDropdown.Item
-                  eventKey="select-all"
-                  onClick={() => setHidden(allTankKeys, false)}
-                >
-                  Select All
-                </NavDropdown.Item>
-                <NavDropdown.Item
-                  eventKey="deselect-all"
-                  onClick={() => setHidden(allTankKeys, true)}
-                >
-                  Deselect All
-                </NavDropdown.Item>
-              </NavDropdown>
-              <NavDropdown
-                title="Levels"
-                id="nav-dropdown"
-                style={{ paddingRight: '20px' }}
+                <FaSearchMinus />
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={<Tooltip id="log-zoom-reset">Reset text size</Tooltip>}
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Reset log text size"
+                onClick={() => this.setFont(LOG_FONT_DEFAULT)}
+                style={{ minWidth: '2.5em' }}
               >
-                {['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'].map((level) => (
-                  <NavDropdown.Item
-                    key={level}
-                    eventKey={level}
-                    onClick={() => {
-                      // Toggle this log level in the log display
-                      if (this.state.hideLevels.includes(level)) {
-                        this.setState({
-                          hideLevels: this.state.hideLevels.filter(
-                            (l) => l !== level
-                          ),
-                        });
-                      } else
-                        this.setState({
-                          hideLevels: [...this.state.hideLevels, level],
-                        });
-                    }}
+                {this.state.fontSize}
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={<Tooltip id="log-zoom-in">Larger text</Tooltip>}
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Larger log text"
+                onClick={() => this.setFont(this.state.fontSize + 1)}
+                disabled={this.state.fontSize >= LOG_FONT_MAX}
+              >
+                <FaSearchPlus />
+              </Button>
+            </OverlayTrigger>
+          </ButtonGroup>
+
+          {/* autoClose="outside" keeps the menu open while toggling checkboxes. */}
+          <Dropdown as={ButtonGroup} autoClose="outside">
+            <Dropdown.Toggle variant="secondary" size="sm" id="bots-filter">
+              Bots
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              {apps.map((app) => (
+                <React.Fragment key={app.id}>
+                  <Dropdown.Item
+                    as="button"
+                    // Toggle the whole application (all of its tanks).
+                    onClick={() => setHidden(tanksOf(app), appShown(app))}
                   >
                     <Form.Check
-                      checked={!this.state.hideLevels.includes(level)}
+                      checked={appShown(app)}
+                      readOnly
                       inline
                       type="checkbox"
-                      id={`level-${level}`}
+                      id={`bot-${app.id}`}
                     />
-                    {level}
-                  </NavDropdown.Item>
-                ))}
-              </NavDropdown>
-              <Form>
-                <FormControl
-                  value={this.state.search}
-                  onChange={(e) =>
-                    this.setState({
-                      search: e.target.value,
-                    })
+                    <strong>{app.name}</strong>
+                  </Dropdown.Item>
+                  {tanksOf(app).map((key, i) => (
+                    <Dropdown.Item
+                      as="button"
+                      key={key}
+                      style={{ paddingLeft: '2.5em' }}
+                      // Toggle just this tank.
+                      onClick={() => setHidden([key], !hidden.has(key))}
+                    >
+                      <Form.Check
+                        checked={!hidden.has(key)}
+                        readOnly
+                        inline
+                        type="checkbox"
+                        id={`tank-${key}`}
+                      />
+                      Bot {readableId(app, i + 1)}
+                    </Dropdown.Item>
+                  ))}
+                </React.Fragment>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item
+                as="button"
+                onClick={() => setHidden(allTankKeys, false)}
+              >
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item
+                as="button"
+                onClick={() => setHidden(allTankKeys, true)}
+              >
+                Deselect All
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+
+          <Dropdown as={ButtonGroup} autoClose="outside">
+            <Dropdown.Toggle variant="secondary" size="sm" id="levels-filter">
+              Levels
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              {['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'].map((level) => (
+                <Dropdown.Item
+                  as="button"
+                  key={level}
+                  // Toggle this log level in the log display.
+                  onClick={() =>
+                    this.setState((s) => ({
+                      hideLevels: s.hideLevels.includes(level)
+                        ? s.hideLevels.filter((l) => l !== level)
+                        : [...s.hideLevels, level],
+                    }))
                   }
-                  type="text"
-                  placeholder="Filter"
-                  className=" mr-sm-2"
-                  size="sm"
-                />
-              </Form>
-            </Navbar>
-          </Col>
-        </Row>
-        <Row className="flex-fill">
-          <Col className="d-flex flex-column">
-            <div
-              className="logs"
-              style={{
-                maxHeight: 'calc(100% - 70px)',
-                marginRight: '15px',
-                overflowY: 'scroll',
-                fontFamily:
-                  'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-                fontSize: '12px',
-              }}
-              ref={this.logRef}
-            >
-              <div>
-                {this.props.logEntries.logs
-                  .filter(
-                    (record) =>
-                      record &&
-                      record.time <=
-                        (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-                      !hidden.has(tankKey(record.appId, record.tankIndex)) &&
-                      !this.state.hideLevels.includes(
-                        record.levelName.toUpperCase()
-                      ) &&
-                      (this.state.search?.length === 0
-                        ? true
-                        : JSON.stringify(record).includes(this.state.search))
-                  )
-                  .sort((a, b) =>
-                    a !== null && b !== null ? a.time - b.time : 0
-                  )
-                  .map(
-                    (record) =>
-                      record && (
-                        <span key={record.id}>
-                          <span
-                            style={{
-                              marginRight: '5px',
-                            }}
-                          >
-                            [<span className="date">{record.time}</span>]
-                          </span>
-                          <span
-                            style={{
-                              marginRight: '5px',
-                            }}
-                          >
-                            [
-                            <span
-                              style={{
-                                color:
-                                  {
-                                    trace: 'lightgrey',
-                                    error: 'red',
-                                    warn: 'yellow',
-                                    debug: 'blue',
-                                    info: 'green',
-                                  }[record.levelName] || 'white',
-                              }}
-                            >
-                              {record.levelName.toUpperCase()}
-                            </span>
-                            ]
-                          </span>
-                          <span
-                            className="name"
-                            style={{
-                              marginRight: '5px',
-                            }}
-                          >
-                            {record.name}
-                          </span>
-                          <span className="message">{record.msg}</span>
-                          <br />
+                >
+                  <Form.Check
+                    checked={!this.state.hideLevels.includes(level)}
+                    readOnly
+                    inline
+                    type="checkbox"
+                    id={`level-${level}`}
+                  />
+                  {level}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
+
+          <Form.Control
+            value={this.state.search}
+            onChange={(e) => this.setState({ search: e.target.value })}
+            type="search"
+            placeholder="Filter"
+            size="sm"
+            style={{ maxWidth: '12em' }}
+          />
+        </ButtonToolbar>
+
+        {/* Log list — fills the remaining height and scrolls on its own. */}
+        <div
+          className="logs"
+          ref={this.logRef}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            fontFamily:
+              'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
+            fontSize: `${this.state.fontSize}px`,
+          }}
+        >
+          <div>
+            {this.props.logEntries.logs
+              .filter(
+                (record) =>
+                  record &&
+                  record.time <=
+                    (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
+                  !hidden.has(tankKey(record.appId, record.tankIndex)) &&
+                  !this.state.hideLevels.includes(
+                    record.levelName.toUpperCase()
+                  ) &&
+                  (this.state.search?.length === 0
+                    ? true
+                    : JSON.stringify(record).includes(this.state.search))
+              )
+              .sort((a, b) => (a !== null && b !== null ? a.time - b.time : 0))
+              .map(
+                (record) =>
+                  record && (
+                    <span key={record.id}>
+                      <span
+                        style={{
+                          marginRight: '5px',
+                        }}
+                      >
+                        [<span className="date">{record.time}</span>]
+                      </span>
+                      <span
+                        style={{
+                          marginRight: '5px',
+                        }}
+                      >
+                        [
+                        <span
+                          style={{
+                            color: levelColors[record.levelName] || 'white',
+                          }}
+                        >
+                          {record.levelName.toUpperCase()}
                         </span>
-                      )
-                  )}
-              </div>
-            </div>
-          </Col>
-        </Row>
-      </Container>
+                        ]
+                      </span>
+                      <span
+                        className="name"
+                        style={{
+                          marginRight: '5px',
+                        }}
+                      >
+                        {record.name}
+                      </span>
+                      <span className="message">{record.msg}</span>
+                      <br />
+                    </span>
+                  )
+              )}
+          </div>
+        </div>
+      </div>
     );
   }
 }

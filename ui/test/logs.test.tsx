@@ -107,6 +107,28 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('Bot 61')).toBeNull();
   });
 
+  it('zooms the log font in and out and persists the size', () => {
+    localStorage.clear();
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{ logs: [], index: 0 }}
+      />
+    );
+    // The reset button doubles as the current-size indicator (default 12).
+    const reset = screen.getByLabelText('Reset log text size');
+    expect(reset.textContent).toBe('12');
+
+    fireEvent.click(screen.getByLabelText('Larger log text'));
+    expect(reset.textContent).toBe('13');
+    expect(localStorage.getItem('logFontSize')).toBe('13');
+
+    fireEvent.click(screen.getByLabelText('Smaller log text'));
+    fireEvent.click(screen.getByLabelText('Smaller log text'));
+    expect(reset.textContent).toBe('11');
+  });
+
   it('lists all arena bots in the filter even before any logs arrive', () => {
     render(
       <Logs
