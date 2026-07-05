@@ -292,6 +292,7 @@ export default function AppPage(props: AppPageProps) {
         doExecute={doExecute}
         doReboot={doReboot}
         doClean={doClean}
+        doCheck={doCheck}
         fontSize={fontSize}
         doZoomIn={zoomIn}
         doZoomOut={zoomOut}

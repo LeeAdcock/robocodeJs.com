@@ -38,6 +38,7 @@ interface CodeEditorProps {
   // Increment to clear all gutter markers (e.g. after a clean recompile).
   clearMarkersSignal?: number;
   doClean: () => void;
+  doCheck: () => void;
   doExecute: () => void;
   doReboot: () => void;
   fontSize: number;
@@ -147,6 +148,12 @@ export default function CodeEditor(props: CodeEditorProps) {
           name: 'clean',
           bindKey: { win: 'Ctrl-R', mac: 'Cmd-R' },
           exec: () => props.doClean(),
+        },
+        {
+          // Dry-run compile / check for errors.
+          name: 'check',
+          bindKey: { win: 'Ctrl-Enter', mac: 'Cmd-Enter' },
+          exec: () => props.doCheck(),
         },
         {
           name: 'zoomIn',
