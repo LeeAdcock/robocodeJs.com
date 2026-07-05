@@ -184,14 +184,18 @@ export default function NavBar(props: NavBarProps) {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
+                    // Capture the input now; the synthetic event's currentTarget
+                    // is nulled by the time the promise resolves.
+                    const input = event.currentTarget;
                     axios
                       .get(
-                        `/api/ask?question=${encodeURIComponent(
-                          event.currentTarget.value
-                        )}`
+                        `/api/ask?question=${encodeURIComponent(input.value)}`
                       )
                       .then((res) => {
                         navigate(res.data.answer);
+                        // Reset the box and drop focus once we've navigated away.
+                        input.value = '';
+                        input.blur();
                       });
                   }
                 }}

@@ -1,9 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('axios', () => ({ default: { get: vi.fn() } }));
+import axios from 'axios';
 import NavBar from '../src/components/navbar';
 import { getDarkMode, setDarkMode } from '../src/util/theme';
 
@@ -42,5 +49,31 @@ describe('NavBar night-mode toggle', () => {
     expect(getDarkMode()).toBe(true);
     // The control now offers the inverse action.
     expect(screen.getByLabelText('Switch to light mode')).toBeTruthy();
+  });
+});
+
+describe('NavBar search', () => {
+  afterEach(cleanup);
+
+  it('clears the query and drops focus after navigating', async () => {
+    vi.mocked(axios.get).mockResolvedValueOnce({
+      data: { answer: '/examples' },
+    } as never);
+    render(
+      <MemoryRouter>
+        <NavBar {...baseProps} />
+      </MemoryRouter>
+    );
+
+    const search = screen.getByLabelText('Search') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'how do I fire' } });
+    search.focus();
+    expect(search.value).toBe('how do I fire');
+
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    // Once the answer resolves and we navigate, the box empties and blurs.
+    await waitFor(() => expect(search.value).toBe(''));
+    expect(document.activeElement).not.toBe(search);
   });
 });
