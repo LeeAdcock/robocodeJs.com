@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import TankSvg from '../src/components/arena/arenaTank';
 
 const base = {
@@ -69,6 +69,37 @@ describe('TankSvg crash indicator', () => {
       </svg>
     );
     expect(container.querySelector('polygon[fill="gold"]')).toBeNull();
+  });
+});
+
+describe('TankSvg open-bot interaction', () => {
+  afterEach(cleanup);
+
+  it('double-click opens source; shift+double-click opens logs', () => {
+    const onOpen = vi.fn();
+    const { container } = render(
+      <svg>
+        <TankSvg {...base} appId="a1" onOpen={onOpen} />
+      </svg>
+    );
+    // The tank body image sits inside the clickable group; the dblclick bubbles.
+    const body = container.querySelector('image') as SVGElement;
+
+    fireEvent.dblClick(body);
+    expect(onOpen).toHaveBeenLastCalledWith('a1', false);
+
+    fireEvent.dblClick(body, { shiftKey: true });
+    expect(onOpen).toHaveBeenLastCalledWith('a1', true);
+  });
+
+  it('is inert (no pointer, no handler) when onOpen is absent', () => {
+    const { container } = render(
+      <svg>
+        <TankSvg {...base} />
+      </svg>
+    );
+    // No cursor:pointer group when the tank isn't openable (e.g. the demo arena).
+    expect(container.querySelector('g[style*="cursor"]')).toBeNull();
   });
 });
 

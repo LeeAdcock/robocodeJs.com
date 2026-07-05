@@ -32,6 +32,9 @@ interface TankProps {
   tankIndex: number;
 
   id: string;
+  appId?: string;
+  // Open this bot: double-click → source editor, shift+double-click → logs.
+  onOpen?: (appId: string, shiftKey: boolean) => void;
   health: number;
   crashed?: boolean;
   faultCode?: string;
@@ -136,6 +139,11 @@ const TankSvg = React.memo((props: TankProps) => {
           key={props.id}
           opacity={props.health > 0 ? 1 : 0.5}
           filter={props.health > 0 ? undefined : 'url(#blur)'}
+          style={props.onOpen ? { cursor: 'pointer' } : undefined}
+          onDoubleClick={(e) => {
+            if (props.onOpen && props.appId)
+              props.onOpen(props.appId, e.shiftKey);
+          }}
         >
           <image
             href={'/sprites/tankBody_' + colors[props.appIndex] + '.png'}

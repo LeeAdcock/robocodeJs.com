@@ -75,6 +75,8 @@ interface ArenaSvgProps {
   arena: Arena;
   darkMode: boolean;
   time: number;
+  // Open a bot from the arena: double-click → source, shift+double-click → logs.
+  onOpenBot?: (appId: string, shiftKey: boolean) => void;
 }
 
 export default function ArenaSvg(props: ArenaSvgProps) {
@@ -140,6 +142,8 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     appIndex={appIndex}
                     appName={app.name}
                     id={tank.id}
+                    appId={app.id}
+                    onOpen={props.onOpenBot}
                     health={tank.health}
                     crashed={tank.crashed}
                     faultCode={tank.faultCode}
@@ -164,6 +168,8 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     appIndex={appIndex}
                     appName={app.name}
                     id={tank.id}
+                    appId={app.id}
+                    onOpen={props.onOpenBot}
                     health={tank.health}
                     crashed={tank.crashed}
                     faultCode={tank.faultCode}
