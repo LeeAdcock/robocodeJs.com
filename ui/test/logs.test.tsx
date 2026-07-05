@@ -56,6 +56,29 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('from B')).toBeNull();
   });
 
+  it('selectedTank narrows to a single tank instance of the app', () => {
+    render(
+      <Logs
+        bots={bots}
+        selectedApp="a1"
+        selectedTank={2}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ appId: 'a1', tankIndex: 1, msg: 'a1 tank one' }),
+            entry({ appId: 'a1', tankIndex: 2, msg: 'a1 tank two' }),
+            entry({ appId: 'a2', tankIndex: 2, msg: 'a2 tank two' }),
+          ],
+          index: 3,
+        }}
+      />
+    );
+    // Only app a1's tank 2.
+    expect(screen.queryByText('a1 tank two')).toBeTruthy();
+    expect(screen.queryByText('a1 tank one')).toBeNull();
+    expect(screen.queryByText('a2 tank two')).toBeNull();
+  });
+
   it('lists all arena bots in the filter even before any logs arrive', () => {
     render(
       <Logs

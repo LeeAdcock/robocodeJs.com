@@ -30,9 +30,12 @@ export default function ArenaLogsPage() {
     index: 0,
   } as LogEntries);
   const { userId } = useParams();
-  // ?app=<appId> (from double-clicking a bot in the arena) filters to that bot.
+  // ?app=<appId>&tank=<index> (from shift-double-clicking a tank in the arena)
+  // filters to that specific tank instance.
   const [searchParams] = useSearchParams();
   const selectedApp = searchParams.get('app') ?? '';
+  const tankParam = searchParams.get('tank');
+  const selectedTank = tankParam ? Number(tankParam) : undefined;
   // All bots currently in the arena, so the Bots filter is populated up front —
   // not only with bots that have already logged something.
   const [bots, setBots] = useState<
@@ -97,6 +100,7 @@ export default function ArenaLogsPage() {
         logEntries={logEntries}
         bots={bots}
         selectedApp={selectedApp}
+        selectedTank={selectedTank}
         playbackTime={playbackTime}
       />
     </>

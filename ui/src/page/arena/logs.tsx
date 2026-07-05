@@ -22,8 +22,10 @@ interface LogsProps {
   // Every application in the arena and how many tanks it fields, so the Bots
   // filter lists them (and their tanks) regardless of whether they've logged yet.
   bots: { id: string; name: string; tankCount: number }[];
-  // When set (from double-clicking a bot), show only this application's logs.
+  // When set (from shift-double-clicking a tank), show only this application's
+  // logs — and, if selectedTank is also set, only that one tank instance.
   selectedApp?: string;
+  selectedTank?: number;
   // The tick the arena has played up to. Log lines stamped later than this are
   // held back so they surface in step with the (buffered) on-screen motion.
   playbackTime?: number;
@@ -242,6 +244,8 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                       ) &&
                       (!this.props.selectedApp ||
                         record.appId === this.props.selectedApp) &&
+                      (this.props.selectedTank === undefined ||
+                        record.tankIndex === this.props.selectedTank) &&
                       (this.state.search?.length === 0
                         ? true
                         : JSON.stringify(record).includes(this.state.search))

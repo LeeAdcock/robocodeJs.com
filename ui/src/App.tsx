@@ -113,13 +113,14 @@ function App() {
   // renders outside it — can open a bot's source/logs on double-click.
   const navigateRef = useRef<((to: string) => void) | null>(null);
 
-  // Double-click a bot in the arena → open its source; shift+double-click → open
-  // the arena logs. Only for the signed-in user's own arena (not the demo).
-  const openBot = (appId: string, shiftKey: boolean) => {
+  // Double-click a tank in the arena → open its bot's source; shift+double-click →
+  // open the arena logs filtered to just that tank instance. Only for the
+  // signed-in user's own arena (not the demo).
+  const openBot = (appId: string, tankIndex: number, shiftKey: boolean) => {
     if (!user) return;
     navigateRef.current?.(
       shiftKey
-        ? `/user/${user.id}/arena/logs?app=${appId}`
+        ? `/user/${user.id}/arena/logs?app=${appId}&tank=${tankIndex}`
         : `/user/${user.id}/app/${appId}`
     );
   };

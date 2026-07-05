@@ -75,21 +75,22 @@ describe('TankSvg crash indicator', () => {
 describe('TankSvg open-bot interaction', () => {
   afterEach(cleanup);
 
-  it('double-click opens source; shift+double-click opens logs', () => {
+  it('double-click opens source; shift+double-click opens logs (with 1-based tank index)', () => {
     const onOpen = vi.fn();
     const { container } = render(
       <svg>
-        <TankSvg {...base} appId="a1" onOpen={onOpen} />
+        {/* tankIndex 2 (0-based) → the log stream's tank index 3 */}
+        <TankSvg {...base} appId="a1" tankIndex={2} onOpen={onOpen} />
       </svg>
     );
     // The tank body image sits inside the clickable group; the dblclick bubbles.
     const body = container.querySelector('image') as SVGElement;
 
     fireEvent.dblClick(body);
-    expect(onOpen).toHaveBeenLastCalledWith('a1', false);
+    expect(onOpen).toHaveBeenLastCalledWith('a1', 3, false);
 
     fireEvent.dblClick(body, { shiftKey: true });
-    expect(onOpen).toHaveBeenLastCalledWith('a1', true);
+    expect(onOpen).toHaveBeenLastCalledWith('a1', 3, true);
   });
 
   it('is inert (no pointer, no handler) when onOpen is absent', () => {

@@ -76,7 +76,7 @@ interface ArenaSvgProps {
   darkMode: boolean;
   time: number;
   // Open a bot from the arena: double-click → source, shift+double-click → logs.
-  onOpenBot?: (appId: string, shiftKey: boolean) => void;
+  onOpenBot?: (appId: string, tankIndex: number, shiftKey: boolean) => void;
 }
 
 export default function ArenaSvg(props: ArenaSvgProps) {

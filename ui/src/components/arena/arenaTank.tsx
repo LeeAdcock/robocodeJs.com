@@ -33,8 +33,9 @@ interface TankProps {
 
   id: string;
   appId?: string;
-  // Open this bot: double-click → source editor, shift+double-click → logs.
-  onOpen?: (appId: string, shiftKey: boolean) => void;
+  // Open this bot: double-click → source editor, shift+double-click → this tank's
+  // logs. tankIndex is 1-based to match the log stream's tank index.
+  onOpen?: (appId: string, tankIndex: number, shiftKey: boolean) => void;
   health: number;
   crashed?: boolean;
   faultCode?: string;
@@ -142,7 +143,8 @@ const TankSvg = React.memo((props: TankProps) => {
           style={props.onOpen ? { cursor: 'pointer' } : undefined}
           onDoubleClick={(e) => {
             if (props.onOpen && props.appId)
-              props.onOpen(props.appId, e.shiftKey);
+              // props.tankIndex is 0-based; the log stream is 1-based.
+              props.onOpen(props.appId, props.tankIndex + 1, e.shiftKey);
           }}
         >
           <image
