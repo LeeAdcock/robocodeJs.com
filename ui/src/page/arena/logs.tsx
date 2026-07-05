@@ -47,13 +47,6 @@ interface LogsState {
 // Identify one tank in the hide set.
 const tankKey = (appId: string, tankIndex: number) => `${appId}:${tankIndex}`;
 
-// The readable id shown for a tank instance — "Bot 11" is the first app's first
-// tank — matching the log name "<11>": (appIndex + 1) * 10 + tankIndex.
-const botLabel = (appIndex: number | undefined, tankIndex: number) =>
-  appIndex === undefined
-    ? `Bot ${tankIndex}`
-    : `Bot ${(appIndex + 1) * 10 + tankIndex}`;
-
 export default class Logs extends React.Component<LogsProps, LogsState> {
   constructor(props: LogsProps) {
     super(props);
@@ -142,6 +135,27 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       .map(([id, v]) => ({ id, ...v }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    // The readable bot id ("11" = first app's first tank). Prefer the actual log
+    // name "<11>" (authoritative), falling back to computing it from the app's
+    // arena position only for tanks that haven't logged yet.
+    const logIdByTank = new Map<string, string>();
+    this.props.logEntries.logs.forEach((entry) => {
+      if (!entry) return;
+      const key = tankKey(entry.appId, entry.tankIndex);
+      if (!logIdByTank.has(key)) {
+        const num = (entry.name ?? '').replace(/\D/g, '');
+        if (num) logIdByTank.set(key, num);
+      }
+    });
+    const readableId = (
+      app: { id: string; index?: number },
+      tankIndex: number
+    ) =>
+      logIdByTank.get(tankKey(app.id, tankIndex)) ??
+      (app.index !== undefined
+        ? String((app.index + 1) * 10 + tankIndex)
+        : String(tankIndex));
+
     const tanksOf = (app: { id: string; tankCount: number }) =>
       Array.from({ length: app.tankCount }, (_, i) => tankKey(app.id, i + 1));
     const allTankKeys = apps.flatMap(tanksOf);
@@ -197,7 +211,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                           type="checkbox"
                           id={`tank-${key}`}
                         />
-                        {botLabel(app.index, i + 1)}
+                        Bot {readableId(app, i + 1)}
                       </NavDropdown.Item>
                     ))}
                   </React.Fragment>

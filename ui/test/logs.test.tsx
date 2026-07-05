@@ -90,6 +90,23 @@ describe('Logs (per-bot filtering)', () => {
     expect(other.checked).toBe(false);
   });
 
+  it('labels a tank from its actual log name, not the computed index', () => {
+    // index 5 would compute (5+1)*10+1 = 61, but the log name is authoritative.
+    render(
+      <Logs
+        bots={[{ id: 'a1', name: 'Bot A', tankCount: 1, index: 5 }]}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [entry({ appId: 'a1', tankIndex: 1, name: '<99>', msg: 'x' })],
+          index: 1,
+        }}
+      />
+    );
+    fireEvent.click(screen.getByText('Bots'));
+    expect(screen.getByText('Bot 99')).toBeTruthy();
+    expect(screen.queryByText('Bot 61')).toBeNull();
+  });
+
   it('lists all arena bots in the filter even before any logs arrive', () => {
     render(
       <Logs
@@ -111,8 +128,18 @@ describe('Logs (per-bot filtering)', () => {
         playbackTime={Number.POSITIVE_INFINITY}
         logEntries={{
           logs: [
-            entry({ appId: 'a1', tankIndex: 1, msg: 'from tank one' }),
-            entry({ appId: 'a1', tankIndex: 2, msg: 'from tank two' }),
+            entry({
+              appId: 'a1',
+              tankIndex: 1,
+              name: '<11>',
+              msg: 'from tank one',
+            }),
+            entry({
+              appId: 'a1',
+              tankIndex: 2,
+              name: '<12>',
+              msg: 'from tank two',
+            }),
           ],
           index: 2,
         }}
@@ -121,7 +148,8 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('from tank one')).toBeTruthy();
     expect(screen.queryByText('from tank two')).toBeTruthy();
 
-    // Open the Bots dropdown and hide just the first tank (id "Bot 11").
+    // Open the Bots dropdown and hide just the first tank — labelled from its log
+    // name "<11>" → "Bot 11".
     fireEvent.click(screen.getByText('Bots'));
     fireEvent.click(screen.getByText('Bot 11'));
 
