@@ -14,26 +14,11 @@ import compiler from '../src/util/compiler';
 import Tank from '../src/types/tank';
 import { Process } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
-
-// Handlers and timers now run off-thread via async apply, so give each tick a
-// moment for the scheduled work (setTimeout(0) -> apply) to settle before the
-// next tick reads/advances state.
-const SETTLE_MS = 25;
-const settle = () => new Promise((r) => setTimeout(r, SETTLE_MS));
+import { makeSimEnv } from './simEnv';
 
 function makeWorld() {
-  const processes: Process[] = [];
-  let clock = 0;
-  const events: { name: string; payload: unknown }[] = [];
-
-  // The bits of Environment that Simulation, timers, and Tank actually read.
-  const env = {
-    getArena: () => ({ getWidth: () => 750, getHeight: () => 750 }),
-    getProcesses: () => processes,
-    getTime: () => clock,
-    isRunning: () => true,
-    emit: (name: string, payload: unknown) => events.push({ name, payload }),
-  };
+  const world = makeSimEnv({ run: (env) => Simulation.run(env) });
+  const { env, processes, events, tick } = world;
 
   // Compile a bot's source into a fresh isolate-backed tank at a fixed pose.
   const addBot = (
@@ -58,16 +43,6 @@ function makeWorld() {
       .compileScriptSync(source)
       .runSync(tank.getContext(), { timeout: 5000 });
     return tank;
-  };
-
-  // Advance the simulation n ticks, letting async handlers settle each tick.
-  const tick = async (n = 1) => {
-    for (let i = 0; i < n; i++) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      Simulation.run(env as any);
-      clock += 1;
-      await settle();
-    }
   };
 
   const dispose = () =>

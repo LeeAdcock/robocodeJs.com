@@ -10,9 +10,23 @@ import Simulation from '../util/simulation';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
+import { mulberry32 } from '../util/random';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ArenaId = string & {};
+
+// A bot command (e.g. `await bot.setSpeed(5)`) that has not yet completed. Its
+// promise resolves/rejects when the simulation reaches a state the command was
+// waiting for. These are settled once per tick (see settlePendingCommands) rather
+// than on a wall-clock timer, so command latency is measured in ticks — the key to
+// a deterministic simulation that runs identically at any speed.
+interface PendingCommand {
+  success: () => boolean;
+  failure: (() => boolean) | null;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+  msg: string | null;
+}
 
 export class Process {
   public appId: AppId;
@@ -65,6 +79,27 @@ export default class Environment {
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
 
+  // Simulation speed. `1` = the baseline 100 ms/tick (10 ticks/s). Higher values
+  // run proportionally faster; `0` means "unbounded" — run each tick as soon as the
+  // previous one's bot work has settled ("as fast as possible"). In-memory only;
+  // set via the API / MCP tools, never persisted. See BASE_TICK_MS / tickMs().
+  private speed = 1;
+  private static readonly BASE_TICK_MS = 100;
+  // Set while the async tick loop (runLoop) is alive, so resume() doesn't start a
+  // second concurrent loop.
+  private looping = false;
+
+  // Commands the bots are awaiting, settled deterministically each tick.
+  private pendingCommands: PendingCommand[] = [];
+  // In-flight isolate operations (event-handler dispatches, command settlements,
+  // timer callbacks) started during the current tick. The loop awaits these before
+  // advancing so every bot has run to its next await-park — this is what makes
+  // acceleration deterministic instead of dropping bot decisions at speed.
+  private botOps: Set<Promise<unknown>> = new Set();
+  // Safety bound on the per-tick drain loop so a pathological bot that issues an
+  // unbounded chain of immediately-resolving commands can't spin a tick forever.
+  private static readonly MAX_DRAIN_ROUNDS = 10000;
+
   // Bounded history of the most recent bot console 'log' emits. The SSE /logs
   // stream is live-only (a late subscriber misses earlier output), so this lets a
   // request/response caller — notably the MCP `recent_logs` tool — read what was
@@ -72,9 +107,19 @@ export default class Environment {
   private static readonly MAX_RECENT_LOGS = 200;
   private recentLogs: unknown[] = [];
 
+  // Seeded PRNG for the arena's random setup (tank placement + starting
+  // orientations). Fixing the seed makes a match reproducible; by default it is
+  // seeded nondeterministically so arenas still vary. In-memory only, like speed.
+  private seed: number;
+  private rng: () => number;
+
   constructor(arena: Arena) {
     this.arena = arena;
     this.emitter = new EventEmitter();
+    // Default to a nondeterministic seed so behaviour matches the previous
+    // Math.random() setup until a caller pins one.
+    this.seed = Math.floor(Math.random() * 0x100000000);
+    this.rng = mulberry32(this.seed);
   }
 
   dispose = () => {
@@ -162,6 +207,126 @@ export default class Environment {
   getRecentLogs = (limit?: number): unknown[] =>
     limit ? this.recentLogs.slice(-limit) : [...this.recentLogs];
 
+  // --- Random seed (reproducible setup) ----------------------------------
+
+  getSeed = () => this.seed;
+
+  // A seeded random number in [0, 1). Used for tank placement and starting
+  // orientations, so a fixed seed reproduces the match setup exactly.
+  random = () => this.rng();
+
+  // Reseed the arena's PRNG. Resets the stream, so the next restart (which
+  // reconstructs all tanks) lays out an identical match for a given seed. A
+  // non-finite value picks a fresh nondeterministic seed.
+  setSeed(seed: number) {
+    this.seed = Number.isFinite(seed)
+      ? seed >>> 0
+      : Math.floor(Math.random() * 0x100000000);
+    this.rng = mulberry32(this.seed);
+    this.emit('event', { type: 'arenaSeed', seed: this.seed });
+  }
+
+  // --- Simulation speed ---------------------------------------------------
+
+  getSpeed = () => this.speed;
+
+  // Target wall-clock ms between ticks. `0` (unbounded) yields 0, i.e. no pacing
+  // delay — the loop advances as soon as the tick's bot work has settled. Exposed
+  // so the status snapshot and connected UIs can pace playback to match.
+  getTickMs = () =>
+    this.speed > 0 ? Environment.BASE_TICK_MS / this.speed : 0;
+  private tickMs = () => this.getTickMs();
+
+  // Set the simulation speed multiplier. Any non-finite or non-positive value is
+  // treated as `0` (unbounded / "as fast as possible"). The running loop picks up
+  // the new pacing on its next iteration; connected UIs adopt it via the emitted
+  // event.
+  setSpeed(speed: number) {
+    this.speed = Number.isFinite(speed) && speed > 0 ? speed : 0;
+    this.emit('event', {
+      type: 'arenaSpeed',
+      speed: this.speed,
+      tickMs: this.tickMs(),
+    });
+  }
+
+  // --- Deterministic bot execution ---------------------------------------
+
+  // Register an in-flight isolate operation so the tick loop's drain awaits it.
+  // The wrapper swallows rejections (a settled/cancelled command surfacing as a
+  // rejected apply is normal, not a crash) and self-removes when done.
+  trackBotOp = (op: Promise<unknown>) => {
+    const wrapped: Promise<unknown> = Promise.resolve(op)
+      .catch(() => undefined)
+      .finally(() => this.botOps.delete(wrapped));
+    this.botOps.add(wrapped);
+  };
+
+  // Create a promise that settles when the simulation reaches the desired state.
+  // Replaces the old wall-clock (setTimeout) polling: conditions are checked at
+  // call time and then once per tick by settlePendingCommands, so a command's
+  // completion is measured in ticks and is identical at any speed.
+  waitForCondition = (
+    success: () => boolean,
+    failure: (() => boolean) | null,
+    msg: string | null
+  ): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      if (success()) return resolve();
+      if (failure && failure()) return reject(msg);
+      this.pendingCommands.push({ success, failure, resolve, reject, msg });
+    });
+
+  // Settle every pending command whose success/failure condition now holds.
+  // Returns how many settled this pass (the drain loop uses it to detect progress).
+  settlePendingCommands = (): number => {
+    if (this.pendingCommands.length === 0) return 0;
+    const remaining: PendingCommand[] = [];
+    let settled = 0;
+    for (const command of this.pendingCommands) {
+      if (command.success()) {
+        command.resolve();
+        settled += 1;
+      } else if (command.failure && command.failure()) {
+        command.reject(command.msg);
+        settled += 1;
+      } else {
+        remaining.push(command);
+      }
+    }
+    this.pendingCommands = remaining;
+    return settled;
+  };
+
+  // Run all of this tick's bot work to quiescence: settle commands the tick's
+  // physics satisfied (resuming parked handlers), let freshly-dispatched handlers
+  // run to their next await-park, and repeat until nothing is left in flight. Each
+  // isolate apply is independently bounded by SANDBOX_TIMEOUT_MS, and the round
+  // count is capped, so untrusted code can never hang the loop indefinitely.
+  private drainBotWork = async (): Promise<void> => {
+    // A macrotask boundary. Command settlements reach the isolate through a
+    // microtask hop (exposeAsync's `.then(settle)`), and isolate applies complete
+    // on the thread pool; flushing to the next macrotask guarantees both have
+    // registered in botOps before we judge quiescence — without it, work can leak
+    // into the next tick and make the result depend on wall-clock timing.
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+    for (let round = 0; round < Environment.MAX_DRAIN_ROUNDS; round++) {
+      const settled = this.settlePendingCommands();
+      await flush();
+      let hadOps = false;
+      while (this.botOps.size > 0) {
+        hadOps = true;
+        await Promise.all([...this.botOps]);
+        await flush();
+      }
+      if (settled === 0 && !hadOps) return;
+    }
+    logger.warn(
+      { arenaId: this.arena.getId() },
+      'bot work drain exceeded MAX_DRAIN_ROUNDS'
+    );
+  };
+
   execute(appId: AppId): Promise<unknown> {
     return Promise.all(
       this.processes
@@ -188,13 +353,16 @@ export default class Environment {
     });
   }
 
-  // Run the game
-  private simulate = (cancelable: {
-    interval: ReturnType<typeof setInterval> | null;
-  }) => {
+  // Forward the simulation one clock tick, then run this tick's bot work to
+  // completion. Physics is synchronous; drainBotWork awaits the (async) bot
+  // handlers and command settlements so the next tick never starts until every bot
+  // has run — the guarantee that makes the sim deterministic at any speed.
+  private tick = async (): Promise<void> => {
+    // suddenDeathTime is tick-denominated by design (compared against clock.time,
+    // not the wall clock), so its real-time onset scales with speed automatically
+    // and outcomes stay identical across speeds. Do not make it wall-clock based.
     const suddenDeathTime = 10000;
 
-    // Forward the simulation one clock tick
     Simulation.run(this);
     this.clock.time = this.clock.time + 1;
 
@@ -230,8 +398,29 @@ export default class Environment {
       this.running = false;
     }
 
-    if (!this.running && cancelable.interval) {
-      clearInterval(cancelable.interval);
+    // Run the bots' reactions to this tick (handlers, timers, command
+    // resumptions) to their next await-park before the next tick begins.
+    await this.drainBotWork();
+  };
+
+  // The self-scheduling tick loop. Replaces the fixed setInterval so the cadence
+  // can vary with `speed`: after each tick it waits only the remaining time to hit
+  // the target interval (0 when unbounded), yielding to the event loop every
+  // iteration so SSE and other I/O still flow even at "as fast as possible".
+  private runLoop = async (): Promise<void> => {
+    this.looping = true;
+    try {
+      while (this.running) {
+        const started = Date.now();
+        await this.tick();
+        if (!this.running) break;
+        const target = this.tickMs();
+        const delay =
+          target > 0 ? Math.max(0, target - (Date.now() - started)) : 0;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    } finally {
+      this.looping = false;
     }
   };
 
@@ -243,10 +432,9 @@ export default class Environment {
     });
     this.running = true;
 
-    const cancelable = {
-      interval: null as ReturnType<typeof setInterval> | null,
-    };
-    cancelable.interval = setInterval(() => this.simulate(cancelable), 100);
+    // Guard against a second concurrent loop if resume() is called while one is
+    // already draining a tick.
+    if (!this.looping) this.runLoop();
   }
 
   pause() {
@@ -255,12 +443,22 @@ export default class Environment {
     });
     this.running = false;
     this.stoppedAt = new Date();
+    // The loop only rejects a command's failure condition while ticking; settle
+    // once here so bots awaiting a command see it cancelled (!isRunning) on pause
+    // rather than hanging until the next resume.
+    this.settlePendingCommands();
   }
 
   restart(): Promise<void> {
     this.emitter.emit('event', {
       type: 'arenaRestart',
     });
+
+    // The isolates are about to be disposed and rebuilt, so drop any commands or
+    // in-flight operations bound to the old ones rather than settling them into a
+    // released context.
+    this.pendingCommands = [];
+    this.botOps.clear();
 
     // Restart each process
     return Promise.all(

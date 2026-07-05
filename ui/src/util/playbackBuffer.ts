@@ -14,11 +14,23 @@
 // it is given (no internal timers) — so it can be unit-tested directly, matching
 // the convention of arenaReducer.ts / simulate.ts.
 
-// The server emits one tick roughly every 100ms.
+// The server's default tick period (speed = 1). The actual period is now
+// configurable per arena (see setTickMs) — the server reports its current rate in
+// the status snapshot and via `arenaSpeed` events, and the buffer paces playback
+// to match so the arena plays at the speed the server is running it.
 export const NOMINAL_TICK_MS = 100;
+// Floor on the playback period. When the server runs unbounded ("as fast as
+// possible", tickMs = 0) there is no finite rate to match, so we play back at this
+// fastest sane cadence and rely on the catch-up cap below to bound the backlog.
+export const MIN_PLAYBACK_TICK_MS = 8;
 // How many fully-buffered ticks to hold before playback starts (and the depth we
 // aim to keep). ~400ms of cushion absorbs typical network jitter.
 export const BUFFER_TARGET_TICKS = 4;
+// Hard ceiling on buffered depth. If playback falls this far behind (e.g. the
+// server is running much faster than we can animate), release whole groups
+// immediately to catch up — every event still applies, so state stays consistent;
+// only motion smoothness is sacrificed. Bounds memory under unbounded speed.
+export const MAX_BUFFER_DEPTH = 60;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ArenaEvent = { type: string; [key: string]: any };
@@ -37,6 +49,18 @@ export default class PlaybackBuffer {
   // Playback holds until the initial cushion has filled, then runs until a
   // genuine underrun.
   private started = false;
+  // Current playback period (ms per tick), matched to the server's simulation
+  // speed. Defaults to the baseline until the server reports its rate.
+  private tickMs = NOMINAL_TICK_MS;
+
+  // Adopt the server's current tick period (from the status snapshot or an
+  // `arenaSpeed` event). `0`/unbounded maps to the fastest sane playback cadence.
+  setTickMs(ms: number) {
+    this.tickMs = Math.max(
+      ms > 0 ? ms : MIN_PLAYBACK_TICK_MS,
+      MIN_PLAYBACK_TICK_MS
+    );
+  }
 
   // Queue an incoming cadence event.
   push(event: ArenaEvent) {
@@ -81,25 +105,36 @@ export default class PlaybackBuffer {
   // Advance the playhead by `dtMs` of real time and release any tick-groups that
   // are now due. Returns the number of groups released this call.
   drain(dtMs: number, release: (event: ArenaEvent) => void): number {
+    let released = 0;
+
+    // Hard catch-up: if we've fallen far behind (the server is producing ticks
+    // faster than we can animate, e.g. unbounded speed), release whole groups
+    // immediately until back near the target. Bounds memory; state stays correct
+    // because every event still applies.
+    while (this.completeGroups > MAX_BUFFER_DEPTH) {
+      this.releaseGroup(release);
+      released += 1;
+    }
+    if (released > 0) this.started = true;
+
     // Wait for the initial cushion before playing anything.
     if (!this.started) {
-      if (this.completeGroups < BUFFER_TARGET_TICKS) return 0;
+      if (this.completeGroups < BUFFER_TARGET_TICKS) return released;
       this.started = true;
     }
 
     this.credit += dtMs * this.speedFactor();
 
-    let released = 0;
-    while (this.credit >= NOMINAL_TICK_MS && this.completeGroups > 0) {
+    while (this.credit >= this.tickMs && this.completeGroups > 0) {
       this.releaseGroup(release);
-      this.credit -= NOMINAL_TICK_MS;
+      this.credit -= this.tickMs;
       released += 1;
     }
 
     // Underrun: nothing complete to play. Don't let credit run away while we
     // wait for data, or we'd burst-release the whole backlog once it arrives.
-    if (this.completeGroups === 0 && this.credit > NOMINAL_TICK_MS) {
-      this.credit = NOMINAL_TICK_MS;
+    if (this.completeGroups === 0 && this.credit > this.tickMs) {
+      this.credit = this.tickMs;
     }
 
     return released;

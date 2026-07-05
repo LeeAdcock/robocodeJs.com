@@ -141,6 +141,11 @@ function App() {
         .then((res) => {
           setTime(res.data.clock.time);
           setPlaybackTime(res.data.clock.time);
+          // Adopt the server's current simulation speed so playback runs at the
+          // rate the arena is actually being simulated.
+          if (typeof res.data.tickMs === 'number') {
+            buffer.current.setTickMs(res.data.tickMs);
+          }
           res.data.apps.forEach((app: TankApp) =>
             app.tanks.forEach((tank) => {
               tank.path = Array<PointInTime>(20);
@@ -294,6 +299,11 @@ function App() {
         setPaused(true);
       } else if (data.type === 'arenaResumed') {
         setPaused(false);
+      } else if (data.type === 'arenaSpeed') {
+        // The server changed simulation speed; pace playback to match. Applied
+        // immediately (not jitter-buffered) so the cadence tracks the server.
+        buffer.current.setTickMs(data.tickMs);
+        return;
       } else if (data.type === 'appRenamed') {
         if (user) {
           axios.get(`/api/user/${user.id}`).then((res) => setUser(res.data));
