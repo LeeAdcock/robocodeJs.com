@@ -12,6 +12,7 @@ interface LogEntry {
   id: string;
   name: string;
   appId: string;
+  tankIndex: number;
   level: number;
   levelName: string;
   msg: string;
@@ -34,7 +35,9 @@ export default function ArenaLogsPage() {
   const selectedApp = searchParams.get('app') ?? '';
   // All bots currently in the arena, so the Bots filter is populated up front —
   // not only with bots that have already logged something.
-  const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
+  const [bots, setBots] = useState<
+    { id: string; name: string; tankCount: number }[]
+  >([]);
   const eventSource = useRef<EventSource | undefined>(undefined);
   // The tick the arena has actually played up to; hold log lines until display
   // catches up so they appear alongside the motion they describe.
@@ -76,10 +79,13 @@ export default function ArenaLogsPage() {
       .get(`/api/user/${userId}/arena`)
       .then((res) =>
         setBots(
-          (res.data.apps ?? []).map((a: { id: string; name: string }) => ({
-            id: a.id,
-            name: a.name,
-          }))
+          (res.data.apps ?? []).map(
+            (a: { id: string; name: string; tanks?: unknown[] }) => ({
+              id: a.id,
+              name: a.name,
+              tankCount: a.tanks?.length ?? 5,
+            })
+          )
         )
       )
       .catch(() => setBots([]));

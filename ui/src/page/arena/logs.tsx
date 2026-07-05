@@ -11,6 +11,7 @@ interface LogEntry {
   id: string;
   name: string;
   appId: string;
+  tankIndex: number;
   level: number;
   levelName: string;
   msg: string;
@@ -18,10 +19,10 @@ interface LogEntry {
 }
 
 interface LogsProps {
-  // All bots in the arena, so the Bots filter lists them regardless of whether
-  // they've logged yet.
-  bots: { id: string; name: string }[];
-  // When set (from double-clicking a bot), show only this bot's logs.
+  // Every application in the arena and how many tanks it fields, so the Bots
+  // filter lists them (and their tanks) regardless of whether they've logged yet.
+  bots: { id: string; name: string; tankCount: number }[];
+  // When set (from double-clicking a bot), show only this application's logs.
   selectedApp?: string;
   // The tick the arena has played up to. Log lines stamped later than this are
   // held back so they surface in step with the (buffered) on-screen motion.
@@ -35,9 +36,13 @@ interface LogsProps {
 interface LogsState {
   search: string;
   hideLevels: string[];
-  // Bots (by appId) the user has toggled off in the Bots filter.
-  hideApps: string[];
+  // Tanks the user has toggled off, keyed `${appId}:${tankIndex}`. An application
+  // is "off" when all of its tanks are hidden — the single source of truth.
+  hideTanks: string[];
 }
+
+// Identify one tank in the hide set.
+const tankKey = (appId: string, tankIndex: number) => `${appId}:${tankIndex}`;
 
 export default class Logs extends React.Component<LogsProps, LogsState> {
   constructor(props: LogsProps) {
@@ -45,7 +50,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     this.state = {
       search: '',
       hideLevels: [],
-      hideApps: [],
+      hideTanks: [],
     };
   }
 
@@ -65,15 +70,39 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   }
 
   render() {
-    // The bots the filter offers: the arena's current bots, plus any that have
-    // logged but aren't in the list (e.g. removed mid-match), so nothing vanishes.
-    const bots = [...this.props.bots];
+    // The applications (and their tank counts) the filter offers: the arena's
+    // current bots, plus any that have logged but aren't listed (e.g. removed
+    // mid-match), so nothing vanishes from the filter.
+    const appMap = new Map<string, { name: string; tankCount: number }>();
+    this.props.bots.forEach((b) =>
+      appMap.set(b.id, { name: b.name, tankCount: b.tankCount })
+    );
     this.props.logEntries.logs.forEach((entry) => {
-      if (entry && !bots.some((b) => b.id === entry.appId))
-        bots.push({ id: entry.appId, name: entry.appId });
+      if (!entry) return;
+      const cur = appMap.get(entry.appId);
+      if (!cur)
+        appMap.set(entry.appId, {
+          name: entry.appId,
+          tankCount: entry.tankIndex,
+        });
+      else if (entry.tankIndex > cur.tankCount) cur.tankCount = entry.tankIndex;
     });
-    bots.sort((a, b) => a.name.localeCompare(b.name));
-    const allAppIds = bots.map((b) => b.id);
+    const apps = [...appMap.entries()]
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const tanksOf = (app: { id: string; tankCount: number }) =>
+      Array.from({ length: app.tankCount }, (_, i) => tankKey(app.id, i + 1));
+    const allTankKeys = apps.flatMap(tanksOf);
+    const hidden = new Set(this.state.hideTanks);
+    // An application is shown while at least one of its tanks is visible.
+    const appShown = (app: { id: string; tankCount: number }) =>
+      tanksOf(app).some((k) => !hidden.has(k));
+    const setHidden = (keys: string[], hide: boolean) => {
+      const next = new Set(this.state.hideTanks);
+      keys.forEach((k) => (hide ? next.add(k) : next.delete(k)));
+      this.setState({ hideTanks: [...next] });
+    };
 
     return (
       <Container fluid style={{ padding: '0px' }}>
@@ -88,43 +117,50 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                 id="nav-dropdown"
                 style={{ paddingRight: '20px' }}
               >
-                {bots.map((bot) => (
-                  <NavDropdown.Item
-                    key={bot.id}
-                    eventKey={bot.id}
-                    onClick={() => {
-                      // Toggle this bot in the log display
-                      if (this.state.hideApps.includes(bot.id)) {
-                        this.setState({
-                          hideApps: this.state.hideApps.filter(
-                            (id) => id !== bot.id
-                          ),
-                        });
-                      } else
-                        this.setState({
-                          hideApps: [...this.state.hideApps, bot.id],
-                        });
-                    }}
-                  >
-                    <Form.Check
-                      checked={!this.state.hideApps.includes(bot.id)}
-                      inline
-                      type="checkbox"
-                      id={`bot-${bot.id}`}
-                    />
-                    {bot.name}
-                  </NavDropdown.Item>
+                {apps.map((app) => (
+                  <React.Fragment key={app.id}>
+                    <NavDropdown.Item
+                      eventKey={app.id}
+                      // Toggle the whole application (all of its tanks).
+                      onClick={() => setHidden(tanksOf(app), appShown(app))}
+                    >
+                      <Form.Check
+                        checked={appShown(app)}
+                        inline
+                        type="checkbox"
+                        id={`bot-${app.id}`}
+                      />
+                      <strong>{app.name}</strong>
+                    </NavDropdown.Item>
+                    {tanksOf(app).map((key, i) => (
+                      <NavDropdown.Item
+                        key={key}
+                        eventKey={key}
+                        style={{ paddingLeft: '2.5em' }}
+                        // Toggle just this tank.
+                        onClick={() => setHidden([key], !hidden.has(key))}
+                      >
+                        <Form.Check
+                          checked={!hidden.has(key)}
+                          inline
+                          type="checkbox"
+                          id={`tank-${key}`}
+                        />
+                        Tank {i + 1}
+                      </NavDropdown.Item>
+                    ))}
+                  </React.Fragment>
                 ))}
                 <NavDropdown.Divider />
                 <NavDropdown.Item
                   eventKey="select-all"
-                  onClick={() => this.setState({ hideApps: [] })}
+                  onClick={() => setHidden(allTankKeys, false)}
                 >
                   Select All
                 </NavDropdown.Item>
                 <NavDropdown.Item
                   eventKey="deselect-all"
-                  onClick={() => this.setState({ hideApps: allAppIds })}
+                  onClick={() => setHidden(allTankKeys, true)}
                 >
                   Deselect All
                 </NavDropdown.Item>
@@ -200,7 +236,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                       record &&
                       record.time <=
                         (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-                      !this.state.hideApps.includes(record.appId) &&
+                      !hidden.has(tankKey(record.appId, record.tankIndex)) &&
                       !this.state.hideLevels.includes(
                         record.levelName.toUpperCase()
                       ) &&
