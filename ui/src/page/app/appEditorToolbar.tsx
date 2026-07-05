@@ -120,7 +120,8 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`deploy`}>
-                Deploy — save and apply to your running arenas (Ctrl-S)
+                Deploy — save and update the running bot, keeping its current
+                state (does not re-run START). Ctrl-S
               </Tooltip>
             }
           >
@@ -137,8 +138,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`reboot`}>
-                Restart — save, reload the code, and re-run the START handler
-                (Ctrl-Shift-S)
+                Restart — save and re-run START for a fresh start. Ctrl-Shift-S
               </Tooltip>
             }
           >
