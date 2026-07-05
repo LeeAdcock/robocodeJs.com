@@ -18,6 +18,58 @@ const botCtx = (tank: Tank) => ({
   arenaId: tank.env.getArena().getId?.(),
 });
 
+// Pull a bot-code location (line/column) out of an isolated-vm error. Runtime
+// errors carry it in the stack ("at <isolated-vm>:12:5"); syntax errors often
+// embed it in the message ("... [<isolated-vm>:1:1]"). Best-effort — undefined
+// when V8 didn't attach one.
+const parseIsolateLocation = (
+  err: unknown
+): { line?: number; column?: number } => {
+  const text =
+    (err instanceof Error && (err.stack || err.message)) || String(err);
+  const match = text.match(/<isolated-vm>:(\d+):(\d+)/);
+  return match ? { line: Number(match[1]), column: Number(match[2]) } : {};
+};
+
+// isolated-vm names the sandbox source `<isolated-vm>` in its error messages,
+// e.g. "Unexpected end of input [<isolated-vm>:22:1]". That internal detail is
+// noise to a bot author, so rewrite the location to a friendly "(line 22, char 1)"
+// and scrub any stray reference to the sandbox name.
+const cleanErrorMessage = (message: string): string =>
+  message
+    .replace(/\s*\[<isolated-vm>:(\d+):(\d+)\]/g, ' (line $1, char $2)')
+    .replace(/<isolated-vm>/g, 'bot code');
+
+// Record a fatal bot fault on the environment's fault feed (a bounded buffer plus
+// a `botFault` SSE event) so a crash is surfaced prominently — in the UI (banner /
+// in-arena indicator / jump-to-line) and to MCP (`recent_faults`). This is
+// additive: the per-site tank.logger + logBotFault calls stay as they are.
+const emitBotFault = (
+  tank: Tank,
+  code: ErrorCodes,
+  kind: string,
+  err: unknown
+) => {
+  // Parse the location from the raw error (its stack/message still has the
+  // <isolated-vm> marker), then clean the message shown to the author.
+  const { line, column } = parseIsolateLocation(err);
+  const message = cleanErrorMessage(
+    err instanceof Error ? err.message : String(err)
+  );
+  tank.env.reportFault({
+    appId: tank.process.appId,
+    tankId: tank.id,
+    tankIndex: tank.process.tanks.map((t) => t.id).indexOf(tank.id) + 1,
+    code,
+    kind,
+    message,
+    line,
+    column,
+    timedOut: /timed out|timeout/i.test(message),
+    time: tank.env.getTime(),
+  });
+};
+
 // Wall-clock ceiling, in ms, for any single synchronous entry into untrusted
 // bot code (top-level script load, event handlers, and timer callbacks).
 // Without it a bot can hang the host thread forever — e.g. an interval whose
@@ -44,13 +96,11 @@ function runInIsolate(
   return ref
     .apply(undefined, args, { timeout: sandboxTimeoutMs() })
     .catch((e: unknown) => {
+      const kind = code === ErrorCodes.E020 ? 'timer' : 'callback';
       tank.logger.error(`${code}: ${e}`);
       tank.appCrashed = true;
-      logBotFault(
-        botCtx(tank),
-        code === ErrorCodes.E020 ? 'timer' : 'callback',
-        e
-      );
+      logBotFault(botCtx(tank), kind, e);
+      emitBotFault(tank, code, kind, e);
     });
 }
 
@@ -328,6 +378,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
         tank.logger.error(`${ErrorCodes.E013}: ${e}`);
         tank.appCrashed = true;
         logBotFault(botCtx(tank), 'handler', e);
+        emitBotFault(tank, ErrorCodes.E013, 'handler', e);
         done_reject(e);
       });
     return { parked, done };
@@ -414,6 +465,7 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
       tank.logger.error(`${ErrorCodes.E017}: ${e}`);
       tank.appCrashed = true;
       logBotFault(botCtx(tank), 'load', e);
+      emitBotFault(tank, ErrorCodes.E017, 'load', e);
     };
     let script: ivm.Script;
     try {
@@ -849,6 +901,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     tank.logger.error(`${ErrorCodes.E018}: ${e}`);
     tank.appCrashed = true;
     logBotFault(botCtx(tank), 'init', e);
+    emitBotFault(tank, ErrorCodes.E018, 'init', e);
   }
 };
 
@@ -876,7 +929,9 @@ const check = async (source: string): Promise<CheckResult> => {
   const env = new Environment(new Arena('dry-run', 'dry-run'));
   const process = new Process('dry-run');
   const failure = (stage: 'compile' | 'load', e: unknown): CheckResult => {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = cleanErrorMessage(
+      e instanceof Error ? e.message : String(e)
+    );
     return {
       valid: false,
       stage,
@@ -915,4 +970,5 @@ export default {
   execute,
   init,
   check,
+  emitBotFault,
 };

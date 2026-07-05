@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 
 import Logs from './logs';
 import {
@@ -10,6 +11,8 @@ import {
 interface LogEntry {
   id: string;
   name: string;
+  appId: string;
+  tankIndex: number;
   level: number;
   levelName: string;
   msg: string;
@@ -27,6 +30,17 @@ export default function ArenaLogsPage() {
     index: 0,
   } as LogEntries);
   const { userId } = useParams();
+  // ?app=<appId>&tank=<index> (from shift-double-clicking a tank in the arena)
+  // filters to that specific tank instance.
+  const [searchParams] = useSearchParams();
+  const selectedApp = searchParams.get('app') ?? '';
+  const tankParam = searchParams.get('tank');
+  const selectedTank = tankParam ? Number(tankParam) : undefined;
+  // All bots currently in the arena, so the Bots filter is populated up front —
+  // not only with bots that have already logged something.
+  const [bots, setBots] = useState<
+    { id: string; name: string; tankCount: number; index: number }[]
+  >([]);
   const eventSource = useRef<EventSource | undefined>(undefined);
   // The tick the arena has actually played up to; hold log lines until display
   // catches up so they appear alongside the motion they describe.
@@ -62,11 +76,35 @@ export default function ArenaLogsPage() {
     };
   }, [userId]);
 
+  // Fetch the arena's current bots so the filter lists them all immediately.
+  useEffect(() => {
+    axios
+      .get(`/api/user/${userId}/arena`)
+      .then((res) =>
+        setBots(
+          (res.data.apps ?? []).map(
+            (
+              a: { id: string; name: string; tanks?: unknown[] },
+              index: number
+            ) => ({
+              id: a.id,
+              name: a.name,
+              tankCount: a.tanks?.length ?? 5,
+              index,
+            })
+          )
+        )
+      )
+      .catch(() => setBots([]));
+  }, [userId]);
+
   return (
     <>
       <Logs
         logEntries={logEntries}
-        selectedTankApp={''}
+        bots={bots}
+        selectedApp={selectedApp}
+        selectedTank={selectedTank}
         playbackTime={playbackTime}
       />
     </>

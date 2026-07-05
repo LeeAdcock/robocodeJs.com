@@ -15,6 +15,24 @@ import { mulberry32 } from '../util/random';
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ArenaId = string & {};
 
+// A structured record of a bot fault (a crash), captured for prominent surfacing.
+// Unlike the raw console text in `recentLogs`, this carries the error code, the
+// fault kind, and (where the isolate provided it) the failing line — so the UI can
+// show a jump-to-line banner / in-arena indicator and the MCP `recent_faults` tool
+// can hand an AI actionable structure instead of a log string to parse.
+export interface BotFault {
+  appId: string;
+  tankId: string;
+  tankIndex: number;
+  code: string; // ErrorCodes value, e.g. "E017"
+  kind: string; // where it happened: load | init | handler | timer | execute | catastrophic
+  message: string;
+  line?: number;
+  column?: number;
+  timedOut: boolean;
+  time: number; // simulation tick
+}
+
 // A bot command (e.g. `await bot.setSpeed(5)`) that has not yet completed. Its
 // promise resolves/rejects when the simulation reaches a state the command was
 // waiting for. These are settled once per tick (see settlePendingCommands) rather
@@ -55,6 +73,12 @@ export class Process {
           this.tanks.forEach((tank) => {
             tank.appCrashed = true;
             tank.logger.error(new Error(`${ErrorCodes.E001}: ${msg}`));
+            compiler.emitBotFault(
+              tank,
+              ErrorCodes.E001,
+              'catastrophic',
+              new Error(msg)
+            );
           });
           this.sandbox?.dispose();
         },
@@ -106,6 +130,13 @@ export default class Environment {
   // just logged. Capped to avoid unbounded growth on a long-running arena.
   private static readonly MAX_RECENT_LOGS = 200;
   private recentLogs: unknown[] = [];
+
+  // Bounded history of the most recent structured bot faults (crashes), the
+  // counterpart to recentLogs for the MCP `recent_faults` tool and the SSE
+  // `botFault` event. Smaller than the log buffer — crashes are rare and each
+  // matters.
+  private static readonly MAX_RECENT_FAULTS = 100;
+  private recentFaults: BotFault[] = [];
 
   // Seeded PRNG for the arena's random setup (tank placement + starting
   // orientations). Fixing the seed makes a match reproducible; by default it is
@@ -206,6 +237,29 @@ export default class Environment {
   // a limit to read only the tail.
   getRecentLogs = (limit?: number): unknown[] =>
     limit ? this.recentLogs.slice(-limit) : [...this.recentLogs];
+
+  // Record a bot fault: buffer it for later retrieval (MCP `recent_faults`) and
+  // broadcast it on the SSE `event` stream as a `botFault` so the UI can surface
+  // the crash prominently (banner, in-arena indicator, jump-to-line).
+  reportFault = (fault: BotFault) => {
+    this.recentFaults.push(fault);
+    if (this.recentFaults.length > Environment.MAX_RECENT_FAULTS) {
+      this.recentFaults.splice(
+        0,
+        this.recentFaults.length - Environment.MAX_RECENT_FAULTS
+      );
+    }
+    this.emit('event', { type: 'botFault', ...fault });
+  };
+
+  // The most recent bot faults (oldest first), optionally limited to a bot and/or
+  // capped to the tail.
+  getRecentFaults = (limit?: number, appId?: string): BotFault[] => {
+    const faults = appId
+      ? this.recentFaults.filter((f) => f.appId === appId)
+      : this.recentFaults;
+    return limit ? faults.slice(-limit) : [...faults];
+  };
 
   // --- Random seed (reproducible setup) ----------------------------------
 
@@ -456,9 +510,10 @@ export default class Environment {
 
     // The isolates are about to be disposed and rebuilt, so drop any commands or
     // in-flight operations bound to the old ones rather than settling them into a
-    // released context.
+    // released context. Faults from the previous match are now stale too.
     this.pendingCommands = [];
     this.botOps.clear();
+    this.recentFaults = [];
 
     // Restart each process
     return Promise.all(

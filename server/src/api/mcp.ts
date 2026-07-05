@@ -612,8 +612,9 @@ export const buildServer = (user: User): McpServer => {
       title: 'Recent bot logs',
       description:
         'Recent bot console output for an arena (oldest first). The live ' +
-        'log stream is not replayable, so this returns a bounded buffer. ' +
-        'Omit arenaId for your default arena.',
+        'log stream is not replayable, so this returns a bounded buffer. Use the ' +
+        'filters to narrow to one bot, a severity, or a substring. Omit arenaId ' +
+        'for your default arena.',
       inputSchema: {
         arenaId: z
           .string()
@@ -624,16 +625,105 @@ export const buildServer = (user: User): McpServer => {
           .int()
           .positive()
           .optional()
-          .describe('Return only the most recent N entries'),
+          .describe('Return only the most recent N matching entries'),
+        minLevel: z
+          .enum(['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'])
+          .optional()
+          .describe('Only entries at this level or higher (e.g. ERROR)'),
+        appId: z.string().optional().describe('Only entries from this bot'),
+        tankIndex: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Only entries from this tank (1-based within the bot)'),
+        contains: z
+          .string()
+          .optional()
+          .describe('Only entries whose message contains this text'),
       },
       annotations: READ_ONLY,
     },
-    async ({ arenaId, limit }) => {
+    async ({ arenaId, limit, minLevel, appId, tankIndex, contains }) => {
       const arena = await ownedArena(user, arenaId);
       if (!arena) return fail('No such arena, or it is not yours.');
       const env = await environmentService.getByArenaId(arena.getId());
       if (!env) return ok([]);
-      return ok(env.getRecentLogs(limit));
+      const LEVELS: Record<string, number> = {
+        TRACE: 10,
+        DEBUG: 20,
+        INFO: 30,
+        WARN: 40,
+        ERROR: 50,
+        FATAL: 60,
+      };
+      const threshold = minLevel ? LEVELS[minLevel] : 0;
+      let logs = env.getRecentLogs() as Array<Record<string, unknown>>;
+      logs = logs.filter((entry) => {
+        if (
+          threshold &&
+          typeof entry.level === 'number' &&
+          entry.level < threshold
+        )
+          return false;
+        if (appId && entry.appId !== appId) return false;
+        if (tankIndex !== undefined && entry.tankIndex !== tankIndex)
+          return false;
+        if (contains && !String(entry.msg ?? '').includes(contains))
+          return false;
+        return true;
+      });
+      // Cap AFTER filtering so `limit` counts matching entries, not raw ones.
+      return ok(limit ? logs.slice(-limit) : logs);
+    }
+  );
+
+  server.registerTool(
+    'recent_faults',
+    {
+      title: 'Recent bot faults',
+      description:
+        'Recent bot crashes for an arena (oldest first) as structured records: ' +
+        'the error code, the fault kind, the message, and the failing line where ' +
+        'the sandbox provided one. Richer and more reliable than grepping ' +
+        'recent_logs — look codes up in robocodejs://reference/error-codes. Omit ' +
+        'arenaId for your default arena.',
+      inputSchema: {
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+        appId: z.string().optional().describe('Only faults from this bot'),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Return only the most recent N faults'),
+      },
+      outputSchema: {
+        faults: z.array(
+          z.object({
+            appId: z.string(),
+            tankId: z.string(),
+            tankIndex: z.number(),
+            code: z.string(),
+            kind: z.string(),
+            message: z.string(),
+            line: z.number().optional(),
+            column: z.number().optional(),
+            timedOut: z.boolean(),
+            time: z.number(),
+          })
+        ),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ arenaId, appId, limit }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.getByArenaId(arena.getId());
+      return ok({ faults: env ? env.getRecentFaults(limit, appId) : [] });
     }
   );
 
@@ -815,8 +905,10 @@ const registerPrompts = (server: McpServer): void => {
             type: 'text',
             text:
               `Debug RobocodeJs bot ${appId}.\n\n` +
-              `Read its current source (get_bot_source), then recent_logs` +
-              `${arenaId ? ` (arenaId ${arenaId})` : ''} and arena_status to see ` +
+              `Read its current source (get_bot_source), then recent_faults` +
+              `${arenaId ? ` (arenaId ${arenaId})` : ''} for structured crash ` +
+              `records (code, kind, message, line) — if it crashed, this is the ` +
+              `fastest signal. Also read recent_logs and arena_status to see ` +
               `how it's behaving and any E0xx/W0xx error codes (look them up in ` +
               `robocodejs://reference/error-codes). Cross-reference the API at ` +
               `robocodejs://docs/dev and the signatures at ` +

@@ -39,20 +39,6 @@ const ArenaStyle = React.memo((props: { width: number; height: number }) => (
     <filter id="blur" x="0" y="0">
       <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
     </filter>
-    <filter id="darkMode">
-      <feComponentTransfer>
-        <feFuncR type="linear" slope=".8" />
-        <feFuncG type="linear" slope=".8" />
-        <feFuncB type="linear" slope=".6" />
-      </feComponentTransfer>
-      <feComponentTransfer>
-        {/* intercept must be a number; these are the precomputed values of
-            -(0.5 * slope) + 0.5 (centers the contrast adjustment on 0.5). */}
-        <feFuncR type="linear" slope=".6" intercept={0.2} />
-        <feFuncG type="linear" slope=".6" intercept={0.2} />
-        <feFuncB type="linear" slope=".4" intercept={0.3} />
-      </feComponentTransfer>
-    </filter>
     <filter id="shadow" colorInterpolationFilters="sRGB">
       <feDropShadow dx="0" dy="0" stdDeviation="3" floodOpacity="0.5" />
     </filter>
@@ -75,6 +61,8 @@ interface ArenaSvgProps {
   arena: Arena;
   darkMode: boolean;
   time: number;
+  // Open a bot from the arena: double-click → source, shift+double-click → logs.
+  onOpenBot?: (appId: string, tankIndex: number, shiftKey: boolean) => void;
 }
 
 export default function ArenaSvg(props: ArenaSvgProps) {
@@ -88,14 +76,14 @@ export default function ArenaSvg(props: ArenaSvgProps) {
       xmlns="http://www.w3.org/2000/svg"
       style={{
         border: '2px solid rgb(33,37,41)',
+        // Contain the night-mode blend overlay so it multiplies only the arena,
+        // not whatever is painted behind the SVG.
+        isolation: 'isolate',
       }}
     >
       <ArenaStyle width={props.arena.width} height={props.arena.height} />
       <rect x="-200%" y="-200%" height="500%" width="500%" fill="url(#ocean)" />
-      <g
-        clipPath="url(#trim-extra)"
-        filter={props.darkMode ? 'url(#darkMode)' : undefined}
-      >
+      <g clipPath="url(#trim-extra)">
         <TerrainSvg>
           <g name="craters">
             {apps.map((app) =>
@@ -140,7 +128,11 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     appIndex={appIndex}
                     appName={app.name}
                     id={tank.id}
+                    appId={app.id}
+                    onOpen={props.onOpenBot}
                     health={tank.health}
+                    crashed={tank.crashed}
+                    faultCode={tank.faultCode}
                     bodyOrientation={tank.bodyOrientation}
                     turretOrientation={tank.turretOrientation}
                     radarOrientation={tank.radarOrientation}
@@ -162,7 +154,11 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     appIndex={appIndex}
                     appName={app.name}
                     id={tank.id}
+                    appId={app.id}
+                    onOpen={props.onOpenBot}
                     health={tank.health}
+                    crashed={tank.crashed}
+                    faultCode={tank.faultCode}
                     bodyOrientation={tank.bodyOrientation}
                     turretOrientation={tank.turretOrientation}
                     radarOrientation={tank.radarOrientation}
@@ -196,6 +192,19 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           </g>
         </TerrainSvg>
       </g>
+      {props.darkMode && (
+        // Night mode: multiply the whole arena (terrain, padding, and tanks) by a
+        // dark red, so it reads as a darker, warmer scene rather than a washed-out
+        // grey. pointerEvents none keeps the tanks double-clickable underneath.
+        <rect
+          x="-200%"
+          y="-200%"
+          height="500%"
+          width="500%"
+          fill="rgb(150, 85, 85)"
+          style={{ mixBlendMode: 'multiply', pointerEvents: 'none' }}
+        />
+      )}
     </svg>
   );
 }

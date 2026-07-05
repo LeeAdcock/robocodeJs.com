@@ -84,6 +84,22 @@ const Nav = (props: NavProps) => {
 
 const emitter = new Emitter();
 
+// The arena SVG is rendered outside the <Router> (in the right pane), so it can't
+// call useNavigate itself. This tiny component lives inside the Router and hands
+// its navigate function up, letting the arena drive client-side navigation
+// (double-click a bot → its source / logs) without a full page reload.
+function NavBridge({
+  onReady,
+}: {
+  onReady: (nav: (to: string) => void) => void;
+}) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    onReady(navigate);
+  }, [navigate, onReady]);
+  return null;
+}
+
 function App() {
   const [user, setUser] = useState(null as unknown as User);
   const [arena, setArena] = useState({
@@ -93,6 +109,21 @@ function App() {
   const [time, setTime] = useState(0);
   const [isPaused, setPaused] = useState(true);
   const eventSource = useRef<EventSource | undefined>(undefined);
+  // navigate captured from inside the Router (see NavBridge), so the arena — which
+  // renders outside it — can open a bot's source/logs on double-click.
+  const navigateRef = useRef<((to: string) => void) | null>(null);
+
+  // Double-click a tank in the arena → open its bot's source; shift+double-click →
+  // open the arena logs filtered to just that tank instance. Only for the
+  // signed-in user's own arena (not the demo).
+  const openBot = (appId: string, tankIndex: number, shiftKey: boolean) => {
+    if (!user) return;
+    navigateRef.current?.(
+      shiftKey
+        ? `/user/${user.id}/arena/logs?app=${appId}&tank=${tankIndex}`
+        : `/user/${user.id}/app/${appId}`
+    );
+  };
 
   // The jitter buffer plus refs the rAF playback loop reads, so the loop sees
   // the latest arena/time without being re-created on every render.
@@ -341,6 +372,7 @@ function App() {
         }}
       >
         <Router>
+          <NavBridge onReady={(nav) => (navigateRef.current = nav)} />
           <Nav
             user={user}
             arena={arena}
@@ -438,7 +470,12 @@ function App() {
             />
           </div>
         )}
-        <ArenaSvg darkMode={darkMode} arena={arena} time={time}></ArenaSvg>
+        <ArenaSvg
+          darkMode={darkMode}
+          arena={arena}
+          time={time}
+          onOpenBot={openBot}
+        ></ArenaSvg>
       </div>
     </>
   );

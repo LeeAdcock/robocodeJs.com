@@ -104,7 +104,10 @@ Once connected, these tools are available (all scoped to your account):
 
 **Observation**
 
-- `recent_logs` — recent bot console output for an arena
+- `recent_logs` — recent bot console output for an arena, with optional filters
+  (`minLevel`, `appId`, `tankIndex`, `contains`)
+- `recent_faults` — recent bot crashes as structured records (error code, kind,
+  message, failing line) — richer than grepping the logs
 
 Arena tools take an optional `arenaId`; omit it to act on your default arena.
 

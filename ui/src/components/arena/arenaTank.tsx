@@ -32,7 +32,13 @@ interface TankProps {
   tankIndex: number;
 
   id: string;
+  appId?: string;
+  // Open this bot: double-click → source editor, shift+double-click → this tank's
+  // logs. tankIndex is 1-based to match the log stream's tank index.
+  onOpen?: (appId: string, tankIndex: number, shiftKey: boolean) => void;
   health: number;
+  crashed?: boolean;
+  faultCode?: string;
   bodyOrientation: number;
   turretOrientation: number;
   radarOrientation: number;
@@ -134,6 +140,12 @@ const TankSvg = React.memo((props: TankProps) => {
           key={props.id}
           opacity={props.health > 0 ? 1 : 0.5}
           filter={props.health > 0 ? undefined : 'url(#blur)'}
+          style={props.onOpen ? { cursor: 'pointer' } : undefined}
+          onDoubleClick={(e) => {
+            if (props.onOpen && props.appId)
+              // props.tankIndex is 0-based; the log stream is 1-based.
+              props.onOpen(props.appId, props.tankIndex + 1, e.shiftKey);
+          }}
         >
           <image
             href={'/sprites/tankBody_' + colors[props.appIndex] + '.png'}
@@ -215,6 +227,31 @@ const TankSvg = React.memo((props: TankProps) => {
                   transition: 'width 300ms linear, fill 300ms linear',
                 }}
               />
+            </g>
+          )}
+
+          {props.crashed && (
+            // A crisp warning triangle above the tank (outside the dead-tank blur)
+            // marking a bot that crashed rather than died in combat.
+            <g transform={translate(props.x, props.y - 26)}>
+              <title>{`Crashed${props.faultCode ? ` (${props.faultCode})` : ''}`}</title>
+              <polygon
+                points="0,-8 8,6 -8,6"
+                fill="gold"
+                stroke="black"
+                strokeWidth={1}
+                strokeLinejoin="round"
+              />
+              <text
+                x={0}
+                y={5}
+                fontSize={9}
+                fontWeight="bold"
+                textAnchor="middle"
+                fill="black"
+              >
+                !
+              </text>
             </g>
           )}
         </g>

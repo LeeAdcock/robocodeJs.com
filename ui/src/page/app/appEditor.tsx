@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 // react-ace is a CommonJS package; under Vite's dependency pre-bundling its
 // default import arrives wrapped as the module namespace object
 // ({ default, split, diff }) rather than the component itself, which makes React
@@ -33,7 +33,12 @@ export const EDITOR_FONT_DEFAULT = 12;
 interface CodeEditorProps {
   code: string;
   onChange: (source: string) => void;
+  // A server-reported crash location to mark in the gutter and scroll to.
+  faultAnnotation?: { line: number; message: string } | null;
+  // Increment to clear all gutter markers (e.g. after a clean recompile).
+  clearMarkersSignal?: number;
   doClean: () => void;
+  doCheck: () => void;
   doExecute: () => void;
   doReboot: () => void;
   fontSize: number;
@@ -68,6 +73,27 @@ export default function CodeEditor(props: CodeEditorProps) {
   const compileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
+
+  // Mark a server-reported crash line in the gutter (same shape as the local
+  // syntax-error annotation) and scroll to it. Editing clears the fault upstream,
+  // after which the local compile() below governs annotations again.
+  useEffect(() => {
+    if (!editor || !props.faultAnnotation) return;
+    const { line, message } = props.faultAnnotation;
+    editor
+      .getSession()
+      .setAnnotations([
+        { row: line - 1, column: 0, type: 'error' as const, text: message },
+      ]);
+    editor.gotoLine(line, 0, true);
+  }, [editor, props.faultAnnotation]);
+
+  // A clean recompile (signal bump) clears every gutter marker — the server fault
+  // and any stale local syntax marker.
+  useEffect(() => {
+    if (editor && props.clearMarkersSignal)
+      editor.getSession().setAnnotations([]);
+  }, [editor, props.clearMarkersSignal]);
 
   const compile = async (source: string) => {
     try {
@@ -122,6 +148,12 @@ export default function CodeEditor(props: CodeEditorProps) {
           name: 'clean',
           bindKey: { win: 'Ctrl-R', mac: 'Cmd-R' },
           exec: () => props.doClean(),
+        },
+        {
+          // Dry-run compile / check for errors.
+          name: 'check',
+          bindKey: { win: 'Ctrl-Enter', mac: 'Cmd-Enter' },
+          exec: () => props.doCheck(),
         },
         {
           name: 'zoomIn',

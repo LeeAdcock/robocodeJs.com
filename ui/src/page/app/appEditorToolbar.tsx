@@ -83,19 +83,8 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           </OverlayTrigger>
         </ButtonGroup>
 
+        {/* Ordered by a typical edit workflow: tidy → check → deploy → restart. */}
         <ButtonGroup style={{ marginRight: '5px' }}>
-          <OverlayTrigger
-            placement={'bottom'}
-            overlay={<Tooltip id={`save`}>Save (Ctrl-S)</Tooltip>}
-          >
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => props.doExecute()}
-            >
-              <FaSave />
-            </Button>
-          </OverlayTrigger>
           <OverlayTrigger
             placement={'bottom'}
             overlay={<Tooltip id={`reformat`}>Reformat code (Ctrl-R)</Tooltip>}
@@ -103,6 +92,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             <Button
               variant="secondary"
               size="sm"
+              aria-label="Reformat code"
               onClick={() => props.doClean()}
             >
               <FaCode />
@@ -113,6 +103,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             overlay={
               <Tooltip id={`check`}>
                 Check for errors — dry-run compile without deploying
+                (Ctrl-Enter)
               </Tooltip>
             }
           >
@@ -128,16 +119,34 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           <OverlayTrigger
             placement={'bottom'}
             overlay={
-              <Tooltip id={`reboot`}>
-                Reboot — save, reload the code, and re-run the START handler
-                (Ctrl-Shift-S)
+              <Tooltip id={`deploy`}>
+                Deploy — save and update the running bot, keeping its current
+                state (does not re-run START). Ctrl-S
               </Tooltip>
             }
           >
             <Button
               variant="secondary"
               size="sm"
-              aria-label="Reboot bot"
+              aria-label="Deploy bot"
+              onClick={() => props.doExecute()}
+            >
+              <FaSave />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement={'bottom'}
+            overlay={
+              <Tooltip id={`reboot`}>
+                Restart — save and update the running bot, then re-run START for
+                a fresh start. Ctrl-Shift-S
+              </Tooltip>
+            }
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Restart bot"
               onClick={() => props.doReboot()}
             >
               <FaPowerOff />

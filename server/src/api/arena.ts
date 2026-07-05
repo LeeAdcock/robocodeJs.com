@@ -250,6 +250,9 @@ const logs = async (req: Request, res: Response) => {
 
   const arena = scopedArena(req);
   return environmentService.get(arena).then((env) => {
+    // The live log stream is not replayable, so a page that opens mid-match would
+    // otherwise start blank. Replay the recent-logs buffer first, then stream live.
+    env.getRecentLogs().forEach((entry) => listener(entry));
     env.addListener('log', listener);
 
     req.on('close', () => {
