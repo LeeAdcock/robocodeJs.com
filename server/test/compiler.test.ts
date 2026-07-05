@@ -403,6 +403,14 @@ describe('compiler.check — dry-run compile (throwaway isolate)', () => {
     expect(result.message).toBeTruthy();
   });
 
+  it('cleans the sandbox internals out of the error message', async () => {
+    // The raw V8 message is like "Unexpected end of input [<isolated-vm>:1:12]";
+    // authors should see a friendly "(line N, char M)" and no sandbox name.
+    const result = await compiler.check(`const x = {`);
+    expect(result.message).not.toContain('<isolated-vm>');
+    expect(result.message).toMatch(/\(line \d+, char \d+\)/);
+  });
+
   it('reports a top-level throw at the load stage (E017)', async () => {
     const result = await compiler.check(`throw new Error('boom at load')`);
     expect(result.valid).toBe(false);

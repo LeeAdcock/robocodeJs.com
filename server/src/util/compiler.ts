@@ -31,6 +31,15 @@ const parseIsolateLocation = (
   return match ? { line: Number(match[1]), column: Number(match[2]) } : {};
 };
 
+// isolated-vm names the sandbox source `<isolated-vm>` in its error messages,
+// e.g. "Unexpected end of input [<isolated-vm>:22:1]". That internal detail is
+// noise to a bot author, so rewrite the location to a friendly "(line 22, char 1)"
+// and scrub any stray reference to the sandbox name.
+const cleanErrorMessage = (message: string): string =>
+  message
+    .replace(/\s*\[<isolated-vm>:(\d+):(\d+)\]/g, ' (line $1, char $2)')
+    .replace(/<isolated-vm>/g, 'bot code');
+
 // Record a fatal bot fault on the environment's fault feed (a bounded buffer plus
 // a `botFault` SSE event) so a crash is surfaced prominently — in the UI (banner /
 // in-arena indicator / jump-to-line) and to MCP (`recent_faults`). This is
@@ -41,8 +50,12 @@ const emitBotFault = (
   kind: string,
   err: unknown
 ) => {
-  const message = err instanceof Error ? err.message : String(err);
+  // Parse the location from the raw error (its stack/message still has the
+  // <isolated-vm> marker), then clean the message shown to the author.
   const { line, column } = parseIsolateLocation(err);
+  const message = cleanErrorMessage(
+    err instanceof Error ? err.message : String(err)
+  );
   tank.env.reportFault({
     appId: tank.process.appId,
     tankId: tank.id,
@@ -916,7 +929,9 @@ const check = async (source: string): Promise<CheckResult> => {
   const env = new Environment(new Arena('dry-run', 'dry-run'));
   const process = new Process('dry-run');
   const failure = (stage: 'compile' | 'load', e: unknown): CheckResult => {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = cleanErrorMessage(
+      e instanceof Error ? e.message : String(e)
+    );
     return {
       valid: false,
       stage,
