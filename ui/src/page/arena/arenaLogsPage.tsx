@@ -39,7 +39,7 @@ export default function ArenaLogsPage() {
   // All bots currently in the arena, so the Bots filter is populated up front —
   // not only with bots that have already logged something.
   const [bots, setBots] = useState<
-    { id: string; name: string; tankCount: number }[]
+    { id: string; name: string; tankCount: number; index: number }[]
   >([]);
   const eventSource = useRef<EventSource | undefined>(undefined);
   // The tick the arena has actually played up to; hold log lines until display
@@ -83,10 +83,14 @@ export default function ArenaLogsPage() {
       .then((res) =>
         setBots(
           (res.data.apps ?? []).map(
-            (a: { id: string; name: string; tanks?: unknown[] }) => ({
+            (
+              a: { id: string; name: string; tanks?: unknown[] },
+              index: number
+            ) => ({
               id: a.id,
               name: a.name,
               tankCount: a.tanks?.length ?? 5,
+              index,
             })
           )
         )

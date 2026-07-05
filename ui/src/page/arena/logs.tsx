@@ -19,9 +19,10 @@ interface LogEntry {
 }
 
 interface LogsProps {
-  // Every application in the arena and how many tanks it fields, so the Bots
-  // filter lists them (and their tanks) regardless of whether they've logged yet.
-  bots: { id: string; name: string; tankCount: number }[];
+  // Every application in the arena, its position (for the readable bot id), and how
+  // many tanks it fields, so the filter lists them regardless of whether they've
+  // logged yet.
+  bots: { id: string; name: string; tankCount: number; index: number }[];
   // When set (from shift-double-clicking a tank), show only this application's
   // logs — and, if selectedTank is also set, only that one tank instance.
   selectedApp?: string;
@@ -46,6 +47,13 @@ interface LogsState {
 // Identify one tank in the hide set.
 const tankKey = (appId: string, tankIndex: number) => `${appId}:${tankIndex}`;
 
+// The readable id shown for a tank instance — "Bot 11" is the first app's first
+// tank — matching the log name "<11>": (appIndex + 1) * 10 + tankIndex.
+const botLabel = (appIndex: number | undefined, tankIndex: number) =>
+  appIndex === undefined
+    ? `Bot ${tankIndex}`
+    : `Bot ${(appIndex + 1) * 10 + tankIndex}`;
+
 export default class Logs extends React.Component<LogsProps, LogsState> {
   constructor(props: LogsProps) {
     super(props);
@@ -59,7 +67,20 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   logRef: React.RefObject<HTMLDivElement | null> =
     React.createRef<HTMLDivElement>();
 
+  // Which URL selection (app[:tank]) we've already seeded the filter from, so a
+  // shift-double-click applies once but the user's later toggles are preserved.
+  appliedSelectionKey: string | null = null;
+
+  componentDidMount() {
+    this.applySelection();
+  }
+
   componentDidUpdate() {
+    // Once the bot list has loaded, reflect a shift-double-click selection in the
+    // Bots filter itself (hide everything except the chosen app / tank), so the
+    // dropdown matches what's shown and the user can toggle others back on.
+    this.applySelection();
+
     // Pin to the bottom of the scroll area
     const el = this.logRef.current;
     if (!el) return;
@@ -71,13 +92,41 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     }
   }
 
+  applySelection() {
+    const { selectedApp, selectedTank, bots } = this.props;
+    const hasSelection = !!selectedApp || selectedTank !== undefined;
+    const selKey = `${selectedApp ?? ''}:${selectedTank ?? ''}`;
+    if (!hasSelection) {
+      this.appliedSelectionKey = selKey;
+      return;
+    }
+    if (this.appliedSelectionKey === selKey) return;
+    if (bots.length === 0) return; // wait until the bot list is known
+
+    // Hide every tank except the selected app (and, if given, the selected tank).
+    const hide: string[] = [];
+    bots.forEach((bot) => {
+      for (let i = 1; i <= bot.tankCount; i++) {
+        const keep =
+          bot.id === selectedApp &&
+          (selectedTank === undefined || i === selectedTank);
+        if (!keep) hide.push(tankKey(bot.id, i));
+      }
+    });
+    this.appliedSelectionKey = selKey;
+    this.setState({ hideTanks: hide });
+  }
+
   render() {
     // The applications (and their tank counts) the filter offers: the arena's
     // current bots, plus any that have logged but aren't listed (e.g. removed
     // mid-match), so nothing vanishes from the filter.
-    const appMap = new Map<string, { name: string; tankCount: number }>();
+    const appMap = new Map<
+      string,
+      { name: string; tankCount: number; index?: number }
+    >();
     this.props.bots.forEach((b) =>
-      appMap.set(b.id, { name: b.name, tankCount: b.tankCount })
+      appMap.set(b.id, { name: b.name, tankCount: b.tankCount, index: b.index })
     );
     this.props.logEntries.logs.forEach((entry) => {
       if (!entry) return;
@@ -148,7 +197,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                           type="checkbox"
                           id={`tank-${key}`}
                         />
-                        Tank {i + 1}
+                        {botLabel(app.index, i + 1)}
                       </NavDropdown.Item>
                     ))}
                   </React.Fragment>
@@ -242,10 +291,6 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                       !this.state.hideLevels.includes(
                         record.levelName.toUpperCase()
                       ) &&
-                      (!this.props.selectedApp ||
-                        record.appId === this.props.selectedApp) &&
-                      (this.props.selectedTank === undefined ||
-                        record.tankIndex === this.props.selectedTank) &&
                       (this.state.search?.length === 0
                         ? true
                         : JSON.stringify(record).includes(this.state.search))

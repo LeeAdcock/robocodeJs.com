@@ -30,8 +30,8 @@ const entry = (over: Partial<Entry> = {}): Entry => ({
   ...over,
 });
 const bots = [
-  { id: 'a1', name: 'Bot A', tankCount: 2 },
-  { id: 'a2', name: 'Bot B', tankCount: 2 },
+  { id: 'a1', name: 'Bot A', tankCount: 2, index: 0 },
+  { id: 'a2', name: 'Bot B', tankCount: 2, index: 1 },
 ];
 
 afterEach(cleanup);
@@ -56,8 +56,8 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('from B')).toBeNull();
   });
 
-  it('selectedTank narrows to a single tank instance of the app', () => {
-    render(
+  it('selectedTank narrows to one tank instance and reflects it in the filter', () => {
+    const { container } = render(
       <Logs
         bots={bots}
         selectedApp="a1"
@@ -73,10 +73,21 @@ describe('Logs (per-bot filtering)', () => {
         }}
       />
     );
-    // Only app a1's tank 2.
+    // Only app a1's tank 2 is shown.
     expect(screen.queryByText('a1 tank two')).toBeTruthy();
     expect(screen.queryByText('a1 tank one')).toBeNull();
     expect(screen.queryByText('a2 tank two')).toBeNull();
+
+    // ...and the Bots filter reflects it: only that tank's checkbox is checked.
+    fireEvent.click(screen.getByText('Bots'));
+    const selected = container.querySelector(
+      '[id="tank-a1:2"]'
+    ) as HTMLInputElement;
+    const other = container.querySelector(
+      '[id="tank-a1:1"]'
+    ) as HTMLInputElement;
+    expect(selected.checked).toBe(true);
+    expect(other.checked).toBe(false);
   });
 
   it('lists all arena bots in the filter even before any logs arrive', () => {
@@ -93,10 +104,10 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.getByText('Bot B')).toBeTruthy();
   });
 
-  it('can hide an individual tank within an application', () => {
+  it('can hide an individual tank (labelled by its bot id) within an application', () => {
     render(
       <Logs
-        bots={[{ id: 'a1', name: 'Bot A', tankCount: 2 }]}
+        bots={[{ id: 'a1', name: 'Bot A', tankCount: 2, index: 0 }]}
         playbackTime={Number.POSITIVE_INFINITY}
         logEntries={{
           logs: [
@@ -110,9 +121,9 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('from tank one')).toBeTruthy();
     expect(screen.queryByText('from tank two')).toBeTruthy();
 
-    // Open the Bots dropdown and hide just Tank 1.
+    // Open the Bots dropdown and hide just the first tank (id "Bot 11").
     fireEvent.click(screen.getByText('Bots'));
-    fireEvent.click(screen.getByText('Tank 1'));
+    fireEvent.click(screen.getByText('Bot 11'));
 
     expect(screen.queryByText('from tank one')).toBeNull();
     expect(screen.queryByText('from tank two')).toBeTruthy();
