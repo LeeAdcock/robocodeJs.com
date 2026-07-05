@@ -24,6 +24,14 @@ body.dark {
   --bs-body-color: var(--fg);
 }
 
+/* Bootstrap's default placeholder is a dark muted grey — barely legible on the
+   dark form fields in night mode (e.g. the "How do I..." search). Lighten it. */
+body.dark input::placeholder,
+body.dark textarea::placeholder {
+  color: #adb5bd;
+  opacity: 1; /* Firefox dims placeholders by default */
+}
+
 body {
   margin: 0;
   transition:
