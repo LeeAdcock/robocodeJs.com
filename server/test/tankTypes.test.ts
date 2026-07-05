@@ -8,6 +8,8 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import Tank, { waitUntil } from '../src/types/tank';
+import Environment from '../src/types/environment';
+import Arena from '../src/types/arena';
 import { normalizeAngle } from '../src/util/geometry';
 import { Event } from '../src/types/event';
 
@@ -26,7 +28,23 @@ function makeRealTank() {
     getProcesses: () => [proc],
     getTime: () => 0,
     isRunning: () => false,
+    random: () => 0.5,
     emit,
+    // isRunning() is false, so every movement command's failure condition holds
+    // and it settles (rejects) immediately at call time — matching the previous
+    // wall-clock waitUntil behaviour without leaving a polling timer running.
+    waitForCondition: (
+      success: () => boolean,
+      failure: (() => boolean) | null,
+      msg: string | null
+    ) =>
+      new Promise<void>((resolve, reject) => {
+        if (success()) return resolve();
+        if (failure && failure()) return reject(msg ?? undefined);
+      }),
+    trackBotOp: (op: Promise<unknown>) => {
+      void Promise.resolve(op).catch(() => undefined);
+    },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tank = new Tank(env as any, proc as any);
@@ -59,14 +77,17 @@ describe('normalizeAngle (util/geometry)', () => {
   });
 });
 
-describe('waitUntil', () => {
+describe('waitUntil (tick-driven via Environment)', () => {
+  const makeEnv = () => new Environment(new Arena('arena1', 'user1'));
+
   it('resolves immediately when the success condition holds', async () => {
-    await expect(waitUntil(() => true)).resolves.toBeUndefined();
+    await expect(waitUntil(makeEnv(), () => true)).resolves.toBeUndefined();
   });
 
   it('rejects with the message when the failure condition holds', async () => {
     await expect(
       waitUntil(
+        makeEnv(),
         () => false,
         () => true,
         'nope'
@@ -74,17 +95,19 @@ describe('waitUntil', () => {
     ).rejects.toBe('nope');
   });
 
-  it('polls until the success condition becomes true', async () => {
-    vi.useFakeTimers();
-    try {
-      let ready = false;
-      const p = waitUntil(() => ready);
-      ready = true;
-      await vi.advanceTimersByTimeAsync(50);
-      await expect(p).resolves.toBeUndefined();
-    } finally {
-      vi.useRealTimers();
-    }
+  it('settles on a later tick once the success condition becomes true', async () => {
+    const env = makeEnv();
+    let ready = false;
+    const p = waitUntil(env, () => ready);
+
+    // Not yet satisfied: settling this tick leaves it pending.
+    expect(env.settlePendingCommands()).toBe(0);
+
+    // The simulation reaches the awaited state; the next settle resolves it —
+    // deterministically, independent of any wall-clock timer.
+    ready = true;
+    expect(env.settlePendingCommands()).toBe(1);
+    await expect(p).resolves.toBeUndefined();
   });
 });
 

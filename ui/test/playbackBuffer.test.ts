@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import PlaybackBuffer, {
   NOMINAL_TICK_MS,
   BUFFER_TARGET_TICKS,
+  MAX_BUFFER_DEPTH,
+  MIN_PLAYBACK_TICK_MS,
   ArenaEvent,
 } from '../src/util/playbackBuffer';
 
@@ -127,5 +129,37 @@ describe('PlaybackBuffer', () => {
     // Back to the unstarted state: must refill the cushion before playing.
     pushTicks(b, BUFFER_TARGET_TICKS - 1);
     expect(b.drain(10_000, () => {})).toBe(0);
+  });
+
+  it('paces playback to the server tick period set via setTickMs', () => {
+    const b = new PlaybackBuffer();
+    b.setTickMs(50); // server running at 2x (50ms/tick)
+    pushTicks(b, BUFFER_TARGET_TICKS + 4); // deep enough to stay in the 1.0 band
+
+    // One nominal (100ms) slice now releases ~2 groups instead of 1.
+    expect(b.drain(50, () => {})).toBe(1);
+    expect(b.drain(50, () => {})).toBe(1);
+  });
+
+  it('clamps an unbounded (0) tick period to the fast playback floor', () => {
+    const b = new PlaybackBuffer();
+    b.setTickMs(0); // unbounded / "as fast as possible"
+    pushTicks(b, BUFFER_TARGET_TICKS + 4);
+
+    // A slice shorter than the floor releases nothing; one floor's worth releases one.
+    expect(b.drain(MIN_PLAYBACK_TICK_MS - 1, () => {})).toBe(0);
+    expect(b.drain(1, () => {})).toBe(1);
+  });
+
+  it('hard-catches-up (without dumping unbounded memory) past the depth ceiling', () => {
+    const b = new PlaybackBuffer();
+    // Server far outruns the client: a huge backlog piles up.
+    pushTicks(b, MAX_BUFFER_DEPTH + 25);
+
+    // Even a tiny time slice drains the overflow immediately so depth is bounded,
+    // and every event still gets released (state stays consistent).
+    const released = b.drain(0, () => {});
+    expect(released).toBeGreaterThanOrEqual(25);
+    expect(b.depth()).toBeLessThanOrEqual(MAX_BUFFER_DEPTH);
   });
 });

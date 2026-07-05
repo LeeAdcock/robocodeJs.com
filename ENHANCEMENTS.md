@@ -81,12 +81,24 @@ _The features that make hacker-news-type users want to play and share._
   `/arenas` API) to run a match between bots without the UI — enables scripting,
   local iteration, and CI for your bot. The multi-arena API was built for exactly
   this kind of tooling.
-- **Self-play / ML hooks.** (L) A deterministic, headless, steppable match API
-  (fixed seed, run-N-ticks, read state) so people can train bots with
-  reinforcement learning. Catnip for the ML crowd. Needs seeded RNG first.
-- **Deterministic seeds.** (S–M) Seed the simulation's randomness (spawn
-  positions, etc.) so matches are reproducible — essential for debugging,
-  replays, and fair ranked play. (Today `Math.random` is used directly.)
+- ✅ **Configurable, deterministic simulation speed.** (M) _Shipped._ The arena
+  tick rate is set via `POST .../arena/speed` and the `set_arena_speed` MCP tool —
+  a multiplier (1 = the default ~10 ticks/s) or `"max"` for unbounded ("as fast as
+  possible", for headless/tooling). The tick loop now **awaits each tick's bot
+  work** and command completion is **tick-driven** (not wall-clock), so a match
+  plays out identically at any speed; the UI adopts the server's rate for playback
+  (`Environment.runLoop`/`drainBotWork`, `ui/src/util/playbackBuffer.ts`).
+- **Self-play / ML hooks.** (L) A headless, **steppable** match API (run-N-ticks,
+  read state) so people can train bots with reinforcement learning. Catnip for the
+  ML crowd. The hard prerequisites — a **deterministic** simulation and **seeded
+  RNG** — now exist (see below); what remains is an explicit step/read-state
+  control (today you approximate it with `set_arena_speed "max"` + `arena_status`).
+- ✅ **Deterministic seeds.** (S–M) _Shipped._ Each arena has a seeded PRNG
+  (`server/src/util/random.ts`, mulberry32) driving tank placement, starting
+  orientations, and each bot's in-isolate `Math.random`, so a fixed seed
+  reproduces a match exactly. Set via `POST .../arena/seed`, the `set_arena_seed`
+  MCP tool, and reported in the arena status snapshot. In-memory per arena; the
+  default seed is nondeterministic, so unseeded arenas still vary.
 - **Bot debug-draw.** (S–M) Extend `dropMarker` into a small debug-overlay API
   (draw points/lines/text) so authors can visualize their bot's targeting and
   decisions while it runs.
@@ -121,9 +133,10 @@ _Let an AI assistant (Claude, or any MCP client) write, run, and watch bots — 
 model as a first-class player and pair-programmer._
 
 - ✅ **In-process MCP server.** (M) _Shipped._ A Model Context Protocol server at
-  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 18
-  user-scoped tools (bot CRUD + compile/reboot, arena create/delete/control,
-  status, `recent_logs`), **resources** (the bot docs, `robocode.d.ts`, sample
+  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 20
+  user-scoped tools (bot CRUD + compile/reboot, arena create/delete/control
+  including `set_arena_speed`/`set_arena_seed`, status, `recent_logs`),
+  **resources** (the bot docs, `robocode.d.ts`, sample
   bots), and **prompts** (`write_bot`, `debug_bot`, `run_match`). Authenticated by
   a per-user API token; setup guide at `/mcp`.
 - **OAuth remote-connector auth.** (M–L) Today auth is a static bearer token, so
@@ -183,6 +196,8 @@ model as a first-class player and pair-programmer._
 
 - **Leaderboard / ranked ladder** + **bot sharing** (the competitive + social flywheel).
 - **Replays** (the most shareable artifact).
-- **Headless sim + deterministic seeds + ML hooks** (the tech-enthusiast magnet).
+- **Headless sim + ML hooks** (the tech-enthusiast magnet) — the groundwork is now
+  in place (deterministic simulation, seeded RNG, and unbounded `"max"` speed
+  ✅); what remains is an explicit step/read-state API and a CLI.
 - **OAuth remote-MCP auth** (lets claude.ai / Claude Desktop connect — the model
   as a player and pair-programmer for the broadest audience).

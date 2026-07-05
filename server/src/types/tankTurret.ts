@@ -16,7 +16,7 @@ export class TankTurret implements Orientated {
 
   constructor(tank: Tank) {
     this.tank = tank;
-    this.orientation = Math.random() * 360;
+    this.orientation = tank.env.random() * 360;
     this.orientationTarget = this.orientation;
     this.orientationVelocity = 2;
     this.radar = new TankRadar(tank);
@@ -40,6 +40,7 @@ export class TankTurret implements Orientated {
     this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
+      this.tank.env,
       () => this.orientation === target % 360,
       () =>
         !this.tank.env.isRunning() ||
@@ -74,6 +75,7 @@ export class TankTurret implements Orientated {
     this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
+      this.tank.env,
       () => this.orientation === target,
       () =>
         !this.tank.env.isRunning() ||
@@ -86,6 +88,7 @@ export class TankTurret implements Orientated {
   onReady() {
     let peakValue = this.loaded;
     return waitUntil(
+      this.tank.env,
       () => this.loaded >= 100,
       () => {
         // Reject if the value decreases, or bot dies
