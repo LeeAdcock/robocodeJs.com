@@ -138,7 +138,8 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`reboot`}>
-                Restart — save and re-run START for a fresh start. Ctrl-Shift-S
+                Restart — save and update the running bot, then re-run START for
+                a fresh start. Ctrl-Shift-S
               </Tooltip>
             }
           >
