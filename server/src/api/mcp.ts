@@ -13,6 +13,7 @@ import User from '../types/user';
 import Arena from '../types/arena';
 import TankApp from '../types/app';
 import appService from '../services/AppService';
+import compiler from '../util/compiler';
 import arenaService from '../services/ArenaService';
 import arenaMemberService from '../services/ArenaMemberService';
 import environmentService from '../services/EnvironmentService';
@@ -67,22 +68,46 @@ const readPublic = (sub: string, filename: string): string | null => {
 
 type ToolResult = {
   content: { type: 'text'; text: string }[];
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 };
 
-const ok = (data: unknown): ToolResult => ({
-  content: [
-    {
-      type: 'text',
-      text: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-    },
-  ],
-});
+// Wrap a tool's result. In addition to the human-readable text part, a plain
+// object is also returned as `structuredContent` so clients can consume a typed
+// result (and it satisfies the validated `outputSchema` on tools that declare
+// one). Arrays and strings have no object shape, so they stay text-only.
+const ok = (data: unknown): ToolResult => {
+  const structured =
+    typeof data === 'object' && data !== null && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : undefined;
+  return {
+    content: [
+      {
+        type: 'text',
+        text: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+      },
+    ],
+    ...(structured ? { structuredContent: structured } : {}),
+  };
+};
 
 const fail = (message: string): ToolResult => ({
   content: [{ type: 'text', text: message }],
   isError: true,
 });
+
+// Behaviour hints so clients can gate/confirm actions (e.g. prompt before a
+// destructive tool, or run a read-only one freely). All tools act only on the
+// authenticated user's own resources, so none touch an "open world".
+const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
+const DESTRUCTIVE = {
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+const IDEMPOTENT = { idempotentHint: true, openWorldHint: false } as const;
+const WRITE = { openWorldHint: false } as const;
 
 // Resolve an app that belongs to the authenticated user, or null. Stops a tool
 // from touching another user's bot (the MCP equivalent of requireOwner).
@@ -122,6 +147,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'List bots',
       description: "List the authenticated user's bots (id and name).",
       inputSchema: {},
+      annotations: READ_ONLY,
     },
     async () => {
       const apps = await appService.getForUser(user.getId());
@@ -135,6 +161,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Get bot source',
       description: "Return a bot's JavaScript source code.",
       inputSchema: { appId: z.string().describe('The bot (app) id') },
+      annotations: READ_ONLY,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
@@ -165,6 +192,8 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Optional initial JavaScript source'),
       },
+      outputSchema: { appId: z.string(), name: z.string() },
+      annotations: WRITE,
     },
     async ({ name, source }) => {
       const app = await appService.create(user.getId());
@@ -185,6 +214,8 @@ export const buildServer = (user: User): McpServer => {
         appId: z.string().describe('The bot (app) id'),
         source: z.string().describe('New JavaScript source'),
       },
+      outputSchema: { appId: z.string(), updated: z.boolean() },
+      annotations: IDEMPOTENT,
     },
     async ({ appId, source }) => {
       const app = await ownedApp(user, appId);
@@ -203,6 +234,8 @@ export const buildServer = (user: User): McpServer => {
         appId: z.string().describe('The bot (app) id'),
         name: z.string().describe('New name'),
       },
+      outputSchema: { appId: z.string(), name: z.string() },
+      annotations: IDEMPOTENT,
     },
     async ({ appId, name }) => {
       const app = await ownedApp(user, appId);
@@ -218,6 +251,8 @@ export const buildServer = (user: User): McpServer => {
       title: 'Compile bot',
       description: "Re-run a bot's current source in each of your live arenas.",
       inputSchema: { appId: z.string().describe('The bot (app) id') },
+      outputSchema: { appId: z.string(), compiled: z.boolean() },
+      annotations: WRITE,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
@@ -228,12 +263,52 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
+    'check_bot_source',
+    {
+      title: 'Check bot source',
+      description:
+        'Dry-run compile a bot WITHOUT deploying it: loads the source in a ' +
+        'throwaway sandbox and reports any syntax or load error (with its error ' +
+        'code — see the robocodejs://reference/error-codes resource). Pass ' +
+        '`source` to check arbitrary code before creating a bot, or `appId` to ' +
+        'check a saved bot. A clean result is `{ valid: true }`.',
+      inputSchema: {
+        source: z.string().optional().describe('Bot source to check'),
+        appId: z
+          .string()
+          .optional()
+          .describe("A saved bot to check (used when 'source' is omitted)"),
+      },
+      outputSchema: {
+        valid: z.boolean(),
+        stage: z.enum(['compile', 'load']).optional(),
+        errorCode: z.string().optional(),
+        message: z.string().optional(),
+        timedOut: z.boolean().optional(),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ source, appId }) => {
+      let code = source;
+      if (code === undefined) {
+        if (!appId) return fail('Provide `source` or `appId`.');
+        const app = await ownedApp(user, appId);
+        if (!app) return fail('No such bot, or it is not yours.');
+        code = app.getSource();
+      }
+      return ok(await compiler.check(code));
+    }
+  );
+
+  server.registerTool(
     'reboot_bot',
     {
       title: 'Reboot bot',
       description:
         'Reload a bot and re-fire its START handler in each of your live arenas.',
       inputSchema: { appId: z.string().describe('The bot (app) id') },
+      outputSchema: { appId: z.string(), rebooted: z.boolean() },
+      annotations: WRITE,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
@@ -249,6 +324,8 @@ export const buildServer = (user: User): McpServer => {
       title: 'Delete bot',
       description: 'Remove a bot from every arena and delete it.',
       inputSchema: { appId: z.string().describe('The bot (app) id') },
+      outputSchema: { appId: z.string(), deleted: z.boolean() },
+      annotations: DESTRUCTIVE,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
@@ -266,6 +343,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'List arenas',
       description: "List the authenticated user's arenas (ids).",
       inputSchema: {},
+      annotations: READ_ONLY,
     },
     async () => {
       const arenas = await arenaService.getForUser(user.getId());
@@ -279,6 +357,8 @@ export const buildServer = (user: User): McpServer => {
       title: 'Create arena',
       description: `Create a new arena (up to ${MAX_ARENAS_PER_USER} per user).`,
       inputSchema: {},
+      outputSchema: { id: z.string() },
+      annotations: WRITE,
     },
     async () => {
       const existing = await arenaService.getForUser(user.getId());
@@ -296,6 +376,8 @@ export const buildServer = (user: User): McpServer => {
       title: 'Delete arena',
       description: 'Tear down an arena and delete it.',
       inputSchema: { arenaId: z.string().describe('The arena id') },
+      outputSchema: { arenaId: z.string(), deleted: z.boolean() },
+      annotations: DESTRUCTIVE,
     },
     async ({ arenaId }) => {
       const arena = await ownedArena(user, arenaId);
@@ -321,6 +403,9 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Arena id; defaults to your default arena'),
       },
+      // The snapshot is large and evolving, so it's returned as structuredContent
+      // without a formal outputSchema rather than pinning a brittle shape here.
+      annotations: READ_ONLY,
     },
     async ({ arenaId }) => {
       const arena = await ownedArena(user, arenaId);
@@ -343,6 +428,12 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Arena id; defaults to your default arena'),
       },
+      outputSchema: {
+        appId: z.string(),
+        arenaId: z.string(),
+        added: z.boolean(),
+      },
+      annotations: WRITE,
     },
     async ({ appId, arenaId }) => {
       const botApp = await ownedApp(user, appId);
@@ -377,6 +468,12 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Arena id; defaults to your default arena'),
       },
+      outputSchema: {
+        appId: z.string(),
+        arenaId: z.string(),
+        removed: z.boolean(),
+      },
+      annotations: IDEMPOTENT,
     },
     async ({ appId, arenaId }) => {
       const arena = await ownedArena(user, arenaId);
@@ -396,7 +493,10 @@ export const buildServer = (user: User): McpServer => {
     name: string,
     title: string,
     description: string,
-    action: (env: Awaited<ReturnType<typeof environmentService.get>>) => unknown
+    action: (
+      env: Awaited<ReturnType<typeof environmentService.get>>
+    ) => unknown,
+    annotations: Record<string, boolean> = {}
   ) =>
     server.registerTool(
       name,
@@ -409,6 +509,8 @@ export const buildServer = (user: User): McpServer => {
             .optional()
             .describe('Arena id; defaults to your default arena'),
         },
+        outputSchema: { arenaId: z.string(), ok: z.boolean() },
+        annotations: { openWorldHint: false, ...annotations },
       },
       async ({ arenaId }) => {
         const arena = await ownedArena(user, arenaId);
@@ -419,14 +521,21 @@ export const buildServer = (user: User): McpServer => {
       }
     );
 
-  control('pause_arena', 'Pause arena', 'Pause an arena’s simulation.', (env) =>
-    env.pause()
+  // Pausing/resuming twice lands in the same state (idempotent); restart always
+  // re-runs, so it is not.
+  control(
+    'pause_arena',
+    'Pause arena',
+    'Pause an arena’s simulation.',
+    (env) => env.pause(),
+    { idempotentHint: true }
   );
   control(
     'resume_arena',
     'Resume arena',
     'Resume a paused arena’s simulation.',
-    (env) => env.resume()
+    (env) => env.resume(),
+    { idempotentHint: true }
   );
   control(
     'restart_arena',
@@ -457,6 +566,7 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Return only the most recent N entries'),
       },
+      annotations: READ_ONLY,
     },
     async ({ arenaId, limit }) => {
       const arena = await ownedArena(user, arenaId);
@@ -556,6 +666,29 @@ const registerResources = (server: McpServer): void => {
       return { contents: [{ uri: uri.href, mimeType: 'text/plain', text }] };
     }
   );
+
+  // The E0xx/W0xx error-code reference — lets the model interpret the codes that
+  // show up in recent_logs and check_bot_source results.
+  server.registerResource(
+    'error-codes',
+    'robocodejs://reference/error-codes',
+    {
+      title: 'Bot error-code reference',
+      description:
+        'The E0xx/W0xx codes that appear in a bot’s console logs and dry-run ' +
+        'results, with human descriptions — use it to interpret recent_logs and ' +
+        'check_bot_source output.',
+      mimeType: 'text/markdown',
+    },
+    async (uri) => {
+      const text = readPublic('docs', 'error-codes.md');
+      if (text === null)
+        throw new Error('Error-code reference is unavailable.');
+      return {
+        contents: [{ uri: uri.href, mimeType: 'text/markdown', text }],
+      };
+    }
+  );
 };
 
 // Reusable, parameterized workflows surfaced to the client (slash-command style).
@@ -624,10 +757,12 @@ const registerPrompts = (server: McpServer): void => {
               `Debug RobocodeJs bot ${appId}.\n\n` +
               `Read its current source (get_bot_source), then recent_logs` +
               `${arenaId ? ` (arenaId ${arenaId})` : ''} and arena_status to see ` +
-              `how it's behaving and any E0xx/W0xx error codes. Cross-reference ` +
-              `the API at robocodejs://docs/dev and the signatures at ` +
+              `how it's behaving and any E0xx/W0xx error codes (look them up in ` +
+              `robocodejs://reference/error-codes). Cross-reference the API at ` +
+              `robocodejs://docs/dev and the signatures at ` +
               `robocodejs://types/robocode.d.ts. Explain the root cause, then fix ` +
-              `it with set_bot_source and reboot_bot, and confirm via recent_logs.`,
+              `it with set_bot_source and reboot_bot, and confirm via recent_logs. ` +
+              `Validate fixes with check_bot_source before deploying.`,
           },
         },
       ],

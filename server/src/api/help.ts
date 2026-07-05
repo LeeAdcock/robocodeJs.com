@@ -113,6 +113,15 @@ app.get('/api/ask', [
   auth(false),
   async (req: Request, res: Response) => {
     if (req.query.question) {
+      // An error code (e.g. "E017") isn't natural language and won't classify —
+      // deep-link straight to its entry in the error-code docs. Lowercase to match
+      // showdown's auto-generated heading anchor (## E017 -> id "e017").
+      const codeMatch = String(req.query.question).match(/\b([EW]0\d\d)\b/i);
+      if (codeMatch) {
+        return res.send({
+          answer: `/error-codes#${codeMatch[1].toLowerCase()}`,
+        });
+      }
       const predictions = classifier.predict(req.query.question);
       if (predictions.length) {
         switch (predictions[0]['_label']) {

@@ -347,3 +347,42 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.tank.orientationTarget).toBe(270);
   });
 });
+
+describe('compiler.check — dry-run compile (throwaway isolate)', () => {
+  it('accepts valid source', async () => {
+    const result = await compiler.check(
+      `clock.on(Event.TICK, () => { bot.setSpeed(5) })`
+    );
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('reports a syntax error at the compile stage (E017)', async () => {
+    const result = await compiler.check(`function ( {`);
+    expect(result.valid).toBe(false);
+    expect(result.stage).toBe('compile');
+    expect(result.errorCode).toBe('E017');
+    expect(result.message).toBeTruthy();
+  });
+
+  it('reports a top-level throw at the load stage (E017)', async () => {
+    const result = await compiler.check(`throw new Error('boom at load')`);
+    expect(result.valid).toBe(false);
+    expect(result.stage).toBe('load');
+    expect(result.errorCode).toBe('E017');
+    expect(result.message).toContain('boom at load');
+  });
+
+  it('bounds an infinite top-level loop by the sandbox timeout', async () => {
+    const prev = process.env.SANDBOX_TIMEOUT_MS;
+    process.env.SANDBOX_TIMEOUT_MS = '200';
+    try {
+      const result = await compiler.check(`while (true) {}`);
+      expect(result.valid).toBe(false);
+      expect(result.stage).toBe('load');
+      expect(result.timedOut).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.SANDBOX_TIMEOUT_MS;
+      else process.env.SANDBOX_TIMEOUT_MS = prev;
+    }
+  });
+});

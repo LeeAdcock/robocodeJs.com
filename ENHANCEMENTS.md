@@ -32,7 +32,10 @@ _Lower the barrier so a first-time visitor writes a working bot in minutes._
 - **Prominent error/crash surfacing.** (S–M) Bot faults are already logged
   (`bot.fault` events); show them in the UI with the error message and, where
   possible, a line number, instead of a tank quietly dying. Pairs with the
-  existing `ErrorCodes`.
+  existing `ErrorCodes`. _Partial:_ the editor now has a **Check** button that
+  dry-run-compiles and shows syntax/load errors before deploy, and the
+  [`/error-codes`](/error-codes) page documents every code; still to do is
+  surfacing live in-match crashes inline.
 - **Starter template picker.** (S) "New bot" offers a few skeletons (aggressive,
   defensive, scout) rather than a blank file.
 
@@ -121,11 +124,12 @@ _Let an AI assistant (Claude, or any MCP client) write, run, and watch bots — 
 model as a first-class player and pair-programmer._
 
 - ✅ **In-process MCP server.** (M) _Shipped._ A Model Context Protocol server at
-  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 18
-  user-scoped tools (bot CRUD + compile/reboot, arena create/delete/control,
-  status, `recent_logs`), **resources** (the bot docs, `robocode.d.ts`, sample
-  bots), and **prompts** (`write_bot`, `debug_bot`, `run_match`). Authenticated by
-  a per-user API token; setup guide at `/mcp`.
+  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 19
+  user-scoped tools (bot CRUD + compile/`check_bot_source`/reboot, arena
+  create/delete/control, status, `recent_logs`), **resources** (the bot docs,
+  `robocode.d.ts`, sample bots, the error-code reference), and **prompts**
+  (`write_bot`, `debug_bot`, `run_match`). Authenticated by a per-user API token;
+  setup guide at `/mcp`.
 - **OAuth remote-connector auth.** (M–L) Today auth is a static bearer token, so
   only clients that allow a custom header (e.g. Claude Code) can connect.
   Implement the MCP OAuth 2.1 flow so **claude.ai / Claude Desktop custom
@@ -138,18 +142,22 @@ model as a first-class player and pair-programmer._
   today (revoke = regenerate). Support several labeled tokens with individual
   revocation — needs an id/label column on `identity`, so pair it with the
   `node-pg-migrate` item in `TASKS.md`.
-- **`check_bot_source` (dry-run compile) tool.** (M) Compile a bot's source in a
-  throwaway `isolated-vm` isolate and return syntax/load errors (and `ErrorCodes`)
-  **without** adding it to an arena, so the model catches mistakes before
-  deploying. Tightens the write → test → debug loop; reuses `util/compiler.ts`.
-- **Error-code reference resource.** (S) Expose the `E0xx`/`W0xx` codes (with
-  human descriptions) as an MCP resource so the model can interpret what shows up
-  in `recent_logs`. Depends on first documenting them (the "Document `ErrorCodes`"
-  TODO in `TASKS.md`).
-- **Tool annotations + structured output.** (S) Mark destructive tools
-  (`delete_bot`, `delete_arena`) with `destructiveHint` and read-only ones with
-  `readOnlyHint`, and add `outputSchema`s, so clients can gate/confirm dangerous
-  actions and consume typed results.
+- ✅ **`check_bot_source` (dry-run compile) tool.** (M) _Shipped._ Compiles a bot's
+  source in a throwaway `isolated-vm` isolate and returns the syntax/load error
+  (with its `ErrorCode`) **without** adding it to an arena (`compiler.check`). Also
+  surfaced as `POST /api/user/:userId/app/:appId/check` and an editor **Check**
+  button, so authors and the model catch mistakes before deploying.
+- ✅ **Error-code reference resource.** (S) _Shipped._ The `E0xx`/`W0xx` codes now
+  have human descriptions authored in `ui/public/docs/error-codes.md`, exposed as
+  the `robocodejs://reference/error-codes` MCP resource (for interpreting
+  `recent_logs` / `check_bot_source`) and as a `/error-codes` docs page — searching
+  a code in the UI deep-links to its entry.
+- ✅ **Tool annotations + structured output.** (S) _Shipped._ Every tool carries
+  behaviour hints — `readOnlyHint` on reads (`list_bots`, `arena_status`,
+  `check_bot_source`, …), `destructiveHint` on `delete_bot`/`delete_arena`,
+  `idempotentHint` where applicable — and the object-returning tools declare an
+  `outputSchema` and return validated `structuredContent`, so clients can gate
+  dangerous actions and consume typed results.
 - **Live battle updates (no polling).** (M) Instead of polling `arena_status`,
   use MCP resource-update notifications (or a `recent_events` buffer mirroring the
   `recent_logs` ring) so the model can follow a match as it unfolds.

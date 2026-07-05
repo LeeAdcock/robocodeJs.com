@@ -7,6 +7,7 @@ import Tooltip from 'react-bootstrap/Tooltip';
 
 import {
   FaCode,
+  FaCheck,
   FaDownload,
   FaTrash,
   FaSave,
@@ -22,6 +23,7 @@ interface EditorToolbarProps {
   appName: string;
   doDelete: () => void;
   doClean: () => void;
+  doCheck: () => void;
   doExecute: () => void;
   doReboot: () => void;
   fontSize: number;
@@ -104,6 +106,23 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               onClick={() => props.doClean()}
             >
               <FaCode />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement={'bottom'}
+            overlay={
+              <Tooltip id={`check`}>
+                Check for errors — dry-run compile without deploying
+              </Tooltip>
+            }
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Check for errors"
+              onClick={() => props.doCheck()}
+            >
+              <FaCheck />
             </Button>
           </OverlayTrigger>
           <OverlayTrigger

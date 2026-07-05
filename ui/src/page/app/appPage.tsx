@@ -29,6 +29,7 @@ interface AppPageProps {
 
 export default function AppPage(props: AppPageProps) {
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [code, setCode] = useState('');
   const [app, setApp] = useState<App | null>(null);
   const { userId, appId } = useParams();
@@ -131,6 +132,40 @@ export default function AppPage(props: AppPageProps) {
       .then(() => navigate(`/user/${userId}`));
   };
 
+  // Dry-run compile the current (possibly unsaved) buffer without deploying it,
+  // and surface the result: a green notice when clean, or the error code + message
+  // in the red banner when not. See the /error-codes docs for what each code means.
+  const doCheck = () => {
+    setError('');
+    setNotice('');
+    axios
+      .post(`/api/user/${userId}/app/${appId}/check`, code, {
+        headers: { 'content-type': 'application/octet-stream' },
+      })
+      .then((res) => {
+        const result = res.data as {
+          valid: boolean;
+          errorCode?: string;
+          message?: string;
+        };
+        if (result.valid) {
+          setNotice('No errors found.');
+          setTimeout(() => setNotice(''), 4000);
+        } else {
+          setError(
+            `${result.errorCode ?? 'Error'}: ${
+              result.message ?? 'The bot has errors.'
+            }`
+          );
+          setTimeout(() => setError(''), 15000);
+        }
+      })
+      .catch(() => {
+        setError('Could not check the bot right now.');
+        setTimeout(() => setError(''), 15000);
+      });
+  };
+
   const doClean = async () => {
     try {
       // Prettier 3's format() returns a Promise — await it before setting the
@@ -189,6 +224,7 @@ export default function AppPage(props: AppPageProps) {
               doExecute={doExecute}
               doReboot={doReboot}
               doClean={doClean}
+              doCheck={doCheck}
               fontSize={fontSize}
               doZoomIn={zoomIn}
               doZoomOut={zoomOut}
@@ -209,6 +245,20 @@ export default function AppPage(props: AppPageProps) {
           }}
         >
           {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert
+          variant="success"
+          style={{
+            position: 'absolute',
+            width: '90%',
+            left: '5%',
+            bottom: '10px',
+            zIndex: '100',
+          }}
+        >
+          {notice}
         </Alert>
       )}
       <Editor

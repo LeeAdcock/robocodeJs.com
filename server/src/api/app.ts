@@ -1,6 +1,7 @@
 import express from 'express';
 
 import appService from '../services/AppService';
+import compiler from '../util/compiler';
 import {
   propagateSource,
   executeInUserArenas,
@@ -51,11 +52,27 @@ app.put(
   loadApp,
   (req, res) => {
     const app = scopedApp(req);
-    // TODO validate the source code first?
+    // Saves are not gated on validity (authors save work-in-progress); the
+    // editor's Check button / POST .../check dry-run surfaces errors separately.
     return propagateSource(app, req.body.toString('utf-8')).then(() => {
       res.status(200);
       res.send();
     });
+  }
+);
+
+// Dry-run compile the posted source (the current editor buffer, which may be
+// unsaved) in a throwaway isolate and return any syntax/load error — WITHOUT
+// deploying it to an arena. Powers the editor's Check button.
+app.post(
+  '/api/user/:userId/app/:appId/check',
+  loadUser,
+  requireOwner,
+  loadApp,
+  async (req, res) => {
+    const result = await compiler.check(req.body.toString('utf-8'));
+    res.status(200);
+    res.send(result);
   }
 );
 
