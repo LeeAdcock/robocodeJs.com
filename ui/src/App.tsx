@@ -118,7 +118,9 @@ function App() {
   const openBot = (appId: string, shiftKey: boolean) => {
     if (!user) return;
     navigateRef.current?.(
-      shiftKey ? `/user/${user.id}/arena/logs` : `/user/${user.id}/app/${appId}`
+      shiftKey
+        ? `/user/${user.id}/arena/logs?app=${appId}`
+        : `/user/${user.id}/app/${appId}`
     );
   };
 

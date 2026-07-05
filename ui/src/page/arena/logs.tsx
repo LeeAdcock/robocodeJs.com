@@ -10,6 +10,7 @@ import Col from 'react-bootstrap/Col';
 interface LogEntry {
   id: string;
   name: string;
+  appId: string;
   level: number;
   levelName: string;
   msg: string;
@@ -17,7 +18,11 @@ interface LogEntry {
 }
 
 interface LogsProps {
-  selectedTankApp: string;
+  // All bots in the arena, so the Bots filter lists them regardless of whether
+  // they've logged yet.
+  bots: { id: string; name: string }[];
+  // When set (from double-clicking a bot), show only this bot's logs.
+  selectedApp?: string;
   // The tick the arena has played up to. Log lines stamped later than this are
   // held back so they surface in step with the (buffered) on-screen motion.
   playbackTime?: number;
@@ -30,7 +35,8 @@ interface LogsProps {
 interface LogsState {
   search: string;
   hideLevels: string[];
-  hideNames: string[];
+  // Bots (by appId) the user has toggled off in the Bots filter.
+  hideApps: string[];
 }
 
 export default class Logs extends React.Component<LogsProps, LogsState> {
@@ -39,7 +45,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     this.state = {
       search: '',
       hideLevels: [],
-      hideNames: [],
+      hideApps: [],
     };
   }
 
@@ -59,14 +65,15 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   }
 
   render() {
-    const names: string[] = this.props.logEntries.logs
-      .reduce(
-        (prev, cur) =>
-          !cur || prev.includes(cur?.name) ? prev : [...prev, cur.name],
-        [] as string[]
-      )
-      .filter((name) => name.startsWith(this.props.selectedTankApp))
-      .sort();
+    // The bots the filter offers: the arena's current bots, plus any that have
+    // logged but aren't in the list (e.g. removed mid-match), so nothing vanishes.
+    const bots = [...this.props.bots];
+    this.props.logEntries.logs.forEach((entry) => {
+      if (entry && !bots.some((b) => b.id === entry.appId))
+        bots.push({ id: entry.appId, name: entry.appId });
+    });
+    bots.sort((a, b) => a.name.localeCompare(b.name));
+    const allAppIds = bots.map((b) => b.id);
 
     return (
       <Container fluid style={{ padding: '0px' }}>
@@ -81,43 +88,43 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                 id="nav-dropdown"
                 style={{ paddingRight: '20px' }}
               >
-                {names.map((name) => (
+                {bots.map((bot) => (
                   <NavDropdown.Item
-                    key={name}
-                    eventKey={name}
+                    key={bot.id}
+                    eventKey={bot.id}
                     onClick={() => {
-                      // Toggle this tank in the log display
-                      if (this.state.hideNames.includes(name)) {
+                      // Toggle this bot in the log display
+                      if (this.state.hideApps.includes(bot.id)) {
                         this.setState({
-                          hideNames: this.state.hideNames.filter(
-                            (n) => n !== name
+                          hideApps: this.state.hideApps.filter(
+                            (id) => id !== bot.id
                           ),
                         });
                       } else
                         this.setState({
-                          hideNames: [...this.state.hideNames, name],
+                          hideApps: [...this.state.hideApps, bot.id],
                         });
                     }}
                   >
                     <Form.Check
-                      checked={!this.state.hideNames.includes(name)}
+                      checked={!this.state.hideApps.includes(bot.id)}
                       inline
                       type="checkbox"
-                      id={`bot-${name}`}
+                      id={`bot-${bot.id}`}
                     />
-                    {name}
+                    {bot.name}
                   </NavDropdown.Item>
                 ))}
                 <NavDropdown.Divider />
                 <NavDropdown.Item
                   eventKey="select-all"
-                  onClick={() => this.setState({ hideNames: [] })}
+                  onClick={() => this.setState({ hideApps: [] })}
                 >
                   Select All
                 </NavDropdown.Item>
                 <NavDropdown.Item
                   eventKey="deselect-all"
-                  onClick={() => this.setState({ hideNames: names })}
+                  onClick={() => this.setState({ hideApps: allAppIds })}
                 >
                   Deselect All
                 </NavDropdown.Item>
@@ -193,11 +200,12 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                       record &&
                       record.time <=
                         (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-                      !this.state.hideNames.includes(record.name) &&
+                      !this.state.hideApps.includes(record.appId) &&
                       !this.state.hideLevels.includes(
                         record.levelName.toUpperCase()
                       ) &&
-                      record.name.startsWith(this.props.selectedTankApp) &&
+                      (!this.props.selectedApp ||
+                        record.appId === this.props.selectedApp) &&
                       (this.state.search?.length === 0
                         ? true
                         : JSON.stringify(record).includes(this.state.search))

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 
 import Logs from './logs';
 import {
@@ -10,6 +11,7 @@ import {
 interface LogEntry {
   id: string;
   name: string;
+  appId: string;
   level: number;
   levelName: string;
   msg: string;
@@ -27,6 +29,12 @@ export default function ArenaLogsPage() {
     index: 0,
   } as LogEntries);
   const { userId } = useParams();
+  // ?app=<appId> (from double-clicking a bot in the arena) filters to that bot.
+  const [searchParams] = useSearchParams();
+  const selectedApp = searchParams.get('app') ?? '';
+  // All bots currently in the arena, so the Bots filter is populated up front —
+  // not only with bots that have already logged something.
+  const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
   const eventSource = useRef<EventSource | undefined>(undefined);
   // The tick the arena has actually played up to; hold log lines until display
   // catches up so they appear alongside the motion they describe.
@@ -62,11 +70,27 @@ export default function ArenaLogsPage() {
     };
   }, [userId]);
 
+  // Fetch the arena's current bots so the filter lists them all immediately.
+  useEffect(() => {
+    axios
+      .get(`/api/user/${userId}/arena`)
+      .then((res) =>
+        setBots(
+          (res.data.apps ?? []).map((a: { id: string; name: string }) => ({
+            id: a.id,
+            name: a.name,
+          }))
+        )
+      )
+      .catch(() => setBots([]));
+  }, [userId]);
+
   return (
     <>
       <Logs
         logEntries={logEntries}
-        selectedTankApp={''}
+        bots={bots}
+        selectedApp={selectedApp}
         playbackTime={playbackTime}
       />
     </>
