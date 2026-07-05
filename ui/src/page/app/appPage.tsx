@@ -37,6 +37,9 @@ export default function AppPage(props: AppPageProps) {
     line: number;
     message: string;
   } | null>(null);
+  // Bumped to tell the editor to clear all gutter markers (e.g. after a clean
+  // recompile), regardless of whether a fault annotation was set.
+  const [clearMarkers, setClearMarkers] = useState(0);
   const { userId, appId } = useParams();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
@@ -160,6 +163,11 @@ export default function AppPage(props: AppPageProps) {
           message?: string;
         };
         if (result.valid) {
+          // A clean recompile clears any lingering error banner and the editor's
+          // gutter marker from the previous failure.
+          setError('');
+          setFaultAnnotation(null);
+          setClearMarkers((n) => n + 1);
           setNotice('No errors found.');
           setTimeout(() => setNotice(''), 4000);
         } else {
@@ -280,6 +288,7 @@ export default function AppPage(props: AppPageProps) {
           setFaultAnnotation(null);
         }}
         faultAnnotation={faultAnnotation}
+        clearMarkersSignal={clearMarkers}
         doExecute={doExecute}
         doReboot={doReboot}
         doClean={doClean}

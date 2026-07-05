@@ -35,6 +35,8 @@ interface CodeEditorProps {
   onChange: (source: string) => void;
   // A server-reported crash location to mark in the gutter and scroll to.
   faultAnnotation?: { line: number; message: string } | null;
+  // Increment to clear all gutter markers (e.g. after a clean recompile).
+  clearMarkersSignal?: number;
   doClean: () => void;
   doExecute: () => void;
   doReboot: () => void;
@@ -84,6 +86,13 @@ export default function CodeEditor(props: CodeEditorProps) {
       ]);
     editor.gotoLine(line, 0, true);
   }, [editor, props.faultAnnotation]);
+
+  // A clean recompile (signal bump) clears every gutter marker — the server fault
+  // and any stale local syntax marker.
+  useEffect(() => {
+    if (editor && props.clearMarkersSignal)
+      editor.getSession().setAnnotations([]);
+  }, [editor, props.clearMarkersSignal]);
 
   const compile = async (source: string) => {
     try {

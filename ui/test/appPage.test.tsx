@@ -9,8 +9,17 @@ vi.mock('axios', () => ({
 // The Ace editor is heavy/DOM-hungry; stub it so we test the page's wiring
 // (loading source, rendering the editor + toolbar) rather than Ace itself.
 vi.mock('../src/page/app/appEditor', () => ({
-  default: (props: { code: string }) => (
-    <textarea data-testid="editor" defaultValue={props.code} />
+  default: (props: {
+    code: string;
+    clearMarkersSignal?: number;
+    faultAnnotation?: unknown;
+  }) => (
+    <textarea
+      data-testid="editor"
+      data-clear-markers={props.clearMarkersSignal ?? 0}
+      data-fault={props.faultAnnotation ? 'set' : 'none'}
+      defaultValue={props.code}
+    />
   ),
   // The toolbar and page import these bounds from appEditor; the real module
   // pulls in Ace, so the mock supplies them directly.
@@ -90,5 +99,35 @@ describe('AppPage (bot editor)', () => {
     renderPage();
     await screen.findByTestId('editor');
     expect(screen.getByLabelText('Reset text size').textContent).toBe('18');
+  });
+
+  it('a clean recompile hides the previous error and clears editor markers', async () => {
+    renderPage();
+    const editor = (await screen.findByTestId('editor')) as HTMLTextAreaElement;
+    const check = screen.getByLabelText('Check for errors');
+    const markersBefore = editor.getAttribute('data-clear-markers');
+
+    // First Check fails → the red banner shows the code + message.
+    vi.mocked(axios.post).mockResolvedValueOnce({
+      data: {
+        valid: false,
+        errorCode: 'E017',
+        message: 'Unexpected end of input (line 1, char 12)',
+      },
+    } as never);
+    fireEvent.click(check);
+    expect(
+      await screen.findByText(/E017: Unexpected end of input/)
+    ).toBeTruthy();
+
+    // Second Check is clean → banner gone, success notice shown, and the editor
+    // is told to clear its gutter markers.
+    vi.mocked(axios.post).mockResolvedValueOnce({
+      data: { valid: true },
+    } as never);
+    fireEvent.click(check);
+    expect(await screen.findByText('No errors found.')).toBeTruthy();
+    expect(screen.queryByText(/E017:/)).toBeNull();
+    expect(editor.getAttribute('data-clear-markers')).not.toBe(markersBefore);
   });
 });
