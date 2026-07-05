@@ -22,6 +22,13 @@ export const buildArenaStatus = async (
     height: arena.getHeight(),
     width: arena.getWidth(),
     running: env.isRunning(),
+    // Current simulation speed so a bootstrapping client can pace playback to the
+    // server's rate. `speed` is the multiplier (0 = unbounded); `tickMs` is the
+    // matching target ms/tick (0 = as fast as possible).
+    speed: env.getSpeed(),
+    tickMs: env.getTickMs(),
+    // Current PRNG seed for reproducible match setup (see Environment.setSeed).
+    seed: env.getSeed(),
     clock: { time: env.getTime() },
     apps: env
       .getProcesses()

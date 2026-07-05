@@ -544,6 +544,66 @@ export const buildServer = (user: User): McpServer => {
     (env) => env.restart()
   );
 
+  server.registerTool(
+    'set_arena_speed',
+    {
+      title: 'Set arena speed',
+      description:
+        'Set an arena’s simulation speed. `speed` is a multiplier (1 = the ' +
+        'default ~10 ticks/second); higher values run proportionally faster. ' +
+        'Pass 0 or "max" to run unbounded — as fast as the bots can be driven. ' +
+        'The simulation stays deterministic (bots make the same decisions) at ' +
+        'any speed. Omit arenaId for your default arena.',
+      inputSchema: {
+        speed: z
+          .union([z.number().nonnegative(), z.literal('max')])
+          .describe('Speed multiplier (1 = default); 0 or "max" = unbounded'),
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+      },
+    },
+    async ({ speed, arenaId }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      env.setSpeed(speed === 'max' ? 0 : speed);
+      return ok({
+        arenaId: arena.getId(),
+        speed: env.getSpeed(),
+        tickMs: env.getTickMs(),
+      });
+    }
+  );
+
+  server.registerTool(
+    'set_arena_seed',
+    {
+      title: 'Set arena seed',
+      description:
+        'Set an arena’s random seed. Fixing the seed makes the match setup — ' +
+        'tank placement and starting orientations — reproducible: restart the ' +
+        'arena after setting it to lay out an identical match. Combined with the ' +
+        'deterministic simulation, this makes accelerated headless runs fully ' +
+        'repeatable. Omit arenaId for your default arena.',
+      inputSchema: {
+        seed: z.number().int().describe('Integer seed for the arena PRNG'),
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+      },
+    },
+    async ({ seed, arenaId }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      env.setSeed(seed);
+      return ok({ arenaId: arena.getId(), seed: env.getSeed() });
+    }
+  );
+
   // ---- Observation ----
 
   server.registerTool(

@@ -299,23 +299,39 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .getContext()
     .evalSync('__dispatch', { reference: true });
 
-  const dispatchEvent = (event: string, x: unknown) =>
-    new Promise((resolve, reject) => {
-      // apply (async) runs the handler off the main thread under the timeout;
-      // the handler settles this promise via the resolve/reject host callbacks.
-      // The apply promise itself only surfaces synchronous failures (e.g. a
-      // handler that loops past the timeout).
-      dispatchRef
-        .apply(undefined, [event, JSON.stringify([x]), resolve, reject], {
-          timeout: sandboxTimeoutMs(),
-        })
-        .catch((e: unknown) => {
-          tank.logger.error(`${ErrorCodes.E013}: ${e}`);
-          tank.appCrashed = true;
-          logBotFault(botCtx(tank), 'handler', e);
-          reject(e);
-        });
+  // Returns two promises for one handler invocation:
+  //   done   — resolves when the handler fully finishes (may be many ticks later,
+  //            if it awaits multi-tick commands); drives tank.on's re-entry guard.
+  //   parked — resolves when the apply returns, i.e. the handler has run to its
+  //            first await-park this tick; the tick loop awaits this so bot code
+  //            has executed before the next tick advances.
+  const dispatchEvent = (event: string, x: unknown) => {
+    let done_resolve!: (value?: unknown) => void;
+    let done_reject!: (reason?: unknown) => void;
+    const done = new Promise((resolve, reject) => {
+      done_resolve = resolve;
+      done_reject = reject;
     });
+    // apply (async) runs the handler off the main thread under the timeout; the
+    // handler settles `done` via the resolve/reject host callbacks. The apply
+    // promise itself resolves at the first await-park and surfaces synchronous
+    // failures (e.g. a handler that loops past the timeout).
+    const parked = dispatchRef
+      .apply(
+        undefined,
+        [event, JSON.stringify([x]), done_resolve, done_reject],
+        {
+          timeout: sandboxTimeoutMs(),
+        }
+      )
+      .catch((e: unknown) => {
+        tank.logger.error(`${ErrorCodes.E013}: ${e}`);
+        tank.appCrashed = true;
+        logBotFault(botCtx(tank), 'handler', e);
+        done_reject(e);
+      });
+    return { parked, done };
+  };
 
   tank.getContext().global.setSync(
     '_bot_register',
@@ -464,9 +480,13 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       // as a crash. In particular, rejecting a command promise the bot chose not
       // to await (e.g. a cancelled `bot.setSpeed`) surfaces here as a rejected
       // apply — that's normal, so swallow it rather than killing the bot.
-      settleRef
-        .apply(undefined, [id, ok, transfer], { timeout: sandboxTimeoutMs() })
-        .catch(() => undefined);
+      // Tracked so the tick loop's drain awaits the resumed handler running to its
+      // next await-park before advancing.
+      env.trackBotOp(
+        settleRef
+          .apply(undefined, [id, ok, transfer], { timeout: sandboxTimeoutMs() })
+          .catch(() => undefined)
+      );
     };
     settlers.set(tank, settle);
 
@@ -507,7 +527,11 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       .getContext()
       .evalSync('__runTimer', { reference: true });
     const fireTimer = (id: number, oneShot: boolean) =>
-      runInIsolate(runTimerRef, [id, oneShot], tank, ErrorCodes.E020);
+      // Tracked so the tick loop awaits the timer callback running to its next
+      // await-park, keeping timer-driven bots deterministic under acceleration.
+      env.trackBotOp(
+        runInIsolate(runTimerRef, [id, oneShot], tank, ErrorCodes.E020)
+      );
 
     tank
       .getContext()
@@ -554,6 +578,12 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         '_clock_getTime',
         () => new ivm.ExternalCopy(env.getTime())
       );
+    // Seed this tank's Math.random from the arena PRNG so bot randomness is
+    // reproducible when the arena seed is fixed (and still varies by default,
+    // since the default seed is nondeterministic). Each tank draws a distinct
+    // sub-seed, so tanks behave differently but repeatably. The generator is pure
+    // in-isolate JS (mulberry32) — no host round-trip per call.
+    const mathSeed = Math.floor(env.random() * 0x100000000);
     process
       .getSandbox()
       .compileScriptSync(
@@ -566,6 +596,15 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           _bot_register(event)
         }
         Date = undefined
+        {
+          let __rng = ${mathSeed} >>> 0
+          Math.random = () => {
+            __rng = (__rng + 0x6D2B79F5) | 0
+            let t = Math.imul(__rng ^ (__rng >>> 15), 1 | __rng)
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+          }
+        }
         `
       )
       .runSync(tank.getContext(), {});

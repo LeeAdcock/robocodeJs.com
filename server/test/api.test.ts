@@ -318,6 +318,82 @@ describe('arena endpoints', () => {
     expect(res.status).toBe(201);
     expect(addApp).toHaveBeenCalled();
   });
+
+  it('POST /api/user/:userId/arena/speed sets a numeric speed multiplier', async () => {
+    const setSpeed = vi.fn();
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({ setSpeed } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/speed')
+      .send({ speed: 4 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ speed: 4 });
+    expect(setSpeed).toHaveBeenCalledWith(4);
+  });
+
+  it('POST /api/user/:userId/arena/speed accepts "max" as unbounded (0)', async () => {
+    const setSpeed = vi.fn();
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({ setSpeed } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/speed')
+      .send({ speed: 'max' });
+    expect(res.status).toBe(200);
+    expect(setSpeed).toHaveBeenCalledWith(0);
+  });
+
+  it('POST /api/user/:userId/arena/speed rejects a non-numeric speed', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/speed')
+      .send({ speed: 'fast' });
+    expect(res.status).toBe(400);
+    expect(environmentService.get).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/user/:userId/arena/seed sets the arena seed', async () => {
+    const setSeed = vi.fn();
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      setSeed,
+      getSeed: () => 99,
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/seed')
+      .send({ seed: 99 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ seed: 99 });
+    expect(setSeed).toHaveBeenCalledWith(99);
+  });
+
+  it('POST /api/user/:userId/arena/seed rejects a non-numeric seed', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/seed')
+      .send({ seed: 'abc' });
+    expect(res.status).toBe(400);
+    expect(environmentService.get).not.toHaveBeenCalled();
+  });
 });
 
 describe('multi-arena endpoints', () => {

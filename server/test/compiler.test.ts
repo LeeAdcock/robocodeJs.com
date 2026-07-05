@@ -25,8 +25,24 @@ function makeCompiledTank() {
     getArena: () => ({ getWidth: () => 750, getHeight: () => 600 }),
     getProcesses: () => [proc],
     getTime: () => 42,
-    isRunning: () => false, // waitUntil-based bot calls settle immediately
+    isRunning: () => false, // command failure conditions settle immediately
+    random: () => 0.5,
     emit,
+    // Commands resolve/reject at call time here (no simulation loop drives ticks
+    // in these unit tests); with isRunning() false every command's failure
+    // condition holds, so bot calls settle immediately as before.
+    waitForCondition: (
+      success: () => boolean,
+      failure: (() => boolean) | null,
+      msg: string | null
+    ) =>
+      new Promise<void>((resolve, reject) => {
+        if (success()) return resolve();
+        if (failure && failure()) return reject(msg ?? undefined);
+      }),
+    trackBotOp: (op: Promise<unknown>) => {
+      void Promise.resolve(op).catch(() => undefined);
+    },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tank = new Tank(env as any, proc as any);
@@ -93,6 +109,29 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('typeof process')).toBe('undefined');
     expect(ctx.read('typeof require')).toBe('undefined');
     expect(ctx.read('typeof globalThis.setInterval')).toBe('function');
+  });
+
+  it('seeds Math.random from the arena RNG so bot randomness is reproducible', () => {
+    // The mock env.random() is constant, so both tanks draw the same sub-seed and
+    // therefore replay the identical Math.random stream — the reproducibility a
+    // fixed arena seed provides.
+    const a = makeCompiledTank();
+    const b = makeCompiledTank();
+    const seqA = a.read(
+      '[Math.random(), Math.random(), Math.random()]'
+    ) as number[];
+    const seqB = b.read(
+      '[Math.random(), Math.random(), Math.random()]'
+    ) as number[];
+
+    expect(seqA).toEqual(seqB);
+    // Real numbers in [0, 1) that actually advance (not a constant).
+    expect(seqA[0]).toBeGreaterThanOrEqual(0);
+    expect(seqA[0]).toBeLessThan(1);
+    expect(seqA[0]).not.toEqual(seqA[1]);
+
+    a.proc.dispose();
+    b.proc.dispose();
   });
 
   it('applies mutating commands to the underlying tank', () => {

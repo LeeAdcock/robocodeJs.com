@@ -47,6 +47,7 @@ import appService from '../src/services/AppService';
 import compiler from '../src/util/compiler';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
+import environmentService from '../src/services/EnvironmentService';
 import { propagateSource } from '../src/util/botActions';
 import { buildArenaStatus } from '../src/util/arenaStatus';
 
@@ -204,6 +205,54 @@ describe('mcp tools', () => {
 
     expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
     expect(JSON.parse(textOf(res))).toEqual({ running: true });
+  });
+
+  it('set_arena_speed sets the speed on the resolved arena env', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    const env = { setSpeed: vi.fn(), getSpeed: () => 4, getTickMs: () => 25 };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_arena_speed',
+      arguments: { speed: 4 },
+    })) as never;
+
+    expect(env.setSpeed).toHaveBeenCalledWith(4);
+    expect(JSON.parse(textOf(res))).toEqual({
+      arenaId: 'ar1',
+      speed: 4,
+      tickMs: 25,
+    });
+  });
+
+  it('set_arena_speed maps "max" to unbounded (0)', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    const env = { setSpeed: vi.fn(), getSpeed: () => 0, getTickMs: () => 0 };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    await client.callTool({
+      name: 'set_arena_speed',
+      arguments: { speed: 'max' },
+    });
+
+    expect(env.setSpeed).toHaveBeenCalledWith(0);
+  });
+
+  it('set_arena_seed sets the seed on the resolved arena env', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    const env = { setSeed: vi.fn(), getSeed: () => 99 };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_arena_seed',
+      arguments: { seed: 99 },
+    })) as never;
+
+    expect(env.setSeed).toHaveBeenCalledWith(99);
+    expect(JSON.parse(textOf(res))).toEqual({ arenaId: 'ar1', seed: 99 });
   });
 
   it('exposes reference resources (type definitions + doc/sample templates)', async () => {

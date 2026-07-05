@@ -14,6 +14,7 @@ import Tank from '../src/types/tank';
 import { Process } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
 import { Event } from '../src/types/event';
+import { makeSimEnv } from './simEnv';
 
 const SAMPLES_DIR = path.join(process.cwd(), '..', 'ui', 'public', 'samples');
 const samples = fs.readdirSync(SAMPLES_DIR).filter((f) => f.endsWith('.js'));
@@ -22,17 +23,24 @@ describe('sample bots run without crashing', () => {
   it.each(samples)('%s loads, runs, and handles its events', async (file) => {
     const source = fs.readFileSync(path.join(SAMPLES_DIR, file), 'utf-8');
 
-    const procs: Process[] = [];
-    let clock = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const env: any = {
-      getArena: () => ({ getWidth: () => 750, getHeight: () => 750 }),
-      getProcesses: () => procs,
-      getTime: () => clock,
-      isRunning: () => true,
-      emit: () => undefined,
-    };
+    // Keep turret/radar ready before each physics step so firing/scanning chains
+    // actually progress (otherwise a bot awaiting onReady stalls for ~50 ticks and
+    // deep code paths never run within the test).
     const proc = new Process('app1');
+    const {
+      env,
+      processes: procs,
+      tick,
+    } = makeSimEnv({
+      run: (e) => {
+        const t = proc.tanks[0];
+        if (t) {
+          t.turret.loaded = 100;
+          t.turret.radar.charged = 100;
+        }
+        Simulation.run(e);
+      },
+    });
     procs.push(proc);
     const tank = new Tank(env, proc);
     proc.tanks.push(tank);
@@ -47,19 +55,6 @@ describe('sample bots run without crashing', () => {
       .getSandbox()
       .compileScriptSync(source)
       .runSync(tank.getContext(), { timeout: 5000 });
-
-    const tick = async (n: number) => {
-      for (let i = 0; i < n; i++) {
-        // Keep turret/radar ready so firing/scanning chains actually progress
-        // (otherwise a bot awaiting onReady stalls for ~50 ticks and deep code
-        // paths never run within the test).
-        tank.turret.loaded = 100;
-        tank.turret.radar.charged = 100;
-        Simulation.run(env);
-        clock++;
-        await new Promise((r) => setTimeout(r, 15));
-      }
-    };
 
     // START + TICK run via the simulation; then fire the inbound events a bot
     // might subscribe to (no-ops if it doesn't), and drive long enough for the

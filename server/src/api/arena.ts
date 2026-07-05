@@ -178,6 +178,49 @@ const resume = async (req: Request, res: Response) => {
 };
 app.post(dual('/resume'), loadUser, requireOwner, resolveArena, resume);
 
+// Set the simulation speed multiplier. Accepts a positive number (1 = the
+// baseline 10 ticks/s) or "max"/0 for unbounded ("as fast as possible"). This is
+// a tooling/MCP control — the UI adopts the rate but does not set it.
+const setSpeed = async (req: Request, res: Response) => {
+  const raw = (req.body ?? {}).speed;
+  const speed = raw === 'max' || raw === 'unbounded' ? 0 : Number(raw);
+  if (raw !== 'max' && raw !== 'unbounded' && !Number.isFinite(speed)) {
+    res.status(400);
+    res.send('speed must be a number or "max"');
+    return;
+  }
+  const arena = scopedArena(req);
+  return environmentService
+    .get(arena)
+    .then((env) => env.setSpeed(speed))
+    .then(() => {
+      res.status(200);
+      res.send({ speed: Math.max(0, speed) });
+    });
+};
+app.post(dual('/speed'), loadUser, requireOwner, resolveArena, setSpeed);
+
+// Set the arena's random seed. Fixing the seed makes the match setup (tank
+// placement + starting orientations) reproducible; the change takes effect on the
+// next restart, which rebuilds the tanks from the reseeded stream. A tooling/MCP
+// control.
+const setSeed = async (req: Request, res: Response) => {
+  const raw = (req.body ?? {}).seed;
+  const seed = Number(raw);
+  if (!Number.isFinite(seed)) {
+    res.status(400);
+    res.send('seed must be a number');
+    return;
+  }
+  const arena = scopedArena(req);
+  return environmentService.get(arena).then((env) => {
+    env.setSeed(seed);
+    res.status(200);
+    res.send({ seed: env.getSeed() });
+  });
+};
+app.post(dual('/seed'), loadUser, requireOwner, resolveArena, setSeed);
+
 // Listen to an arena's game events
 const events = async (req: Request, res: Response) => {
   openSseStream(res);

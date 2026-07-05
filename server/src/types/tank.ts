@@ -28,27 +28,16 @@ export interface Logger {
 // Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
 const MAX_NAME_LENGTH = 50;
 
-// Convenience method to create a promise that resolves/rejects
-// when specific conditions are met.
+// Convenience method to create a promise that resolves/rejects when specific
+// conditions are met. Delegates to the environment's per-tick command registry so
+// completion is driven by simulation ticks rather than a wall-clock timer — the
+// same command takes the same number of ticks at any simulation speed.
 export const waitUntil = (
+  env: Environment,
   successCondition: () => boolean,
   failureCondition: (() => boolean) | null = null,
   msg: string | null = null
-) => {
-  return new Promise<void>(function (resolve, reject) {
-    (function waitForFoo() {
-      if (successCondition()) return resolve(undefined);
-      if (failureCondition && failureCondition()) {
-        try {
-          return reject(msg);
-        } catch {
-          // discard if we can't reject
-        }
-      }
-      setTimeout(waitForFoo, 50);
-    })();
-  });
-};
+) => env.waitForCondition(successCondition, failureCondition, msg);
 
 export default class Tank implements Point, Orientated {
   private context: ivm.Context | null = null;
@@ -88,8 +77,8 @@ export default class Tank implements Point, Orientated {
 
     let overallClosestTank: number | null = null;
     do {
-      this.x = 16 + (env.getArena().getWidth() - 32) * Math.random();
-      this.y = 16 + (env.getArena().getHeight() - 32) * Math.random();
+      this.x = 16 + (env.getArena().getWidth() - 32) * env.random();
+      this.y = 16 + (env.getArena().getHeight() - 32) * env.random();
 
       // Keep iterating if we placed this tank too close to another
       overallClosestTank = env
@@ -121,7 +110,7 @@ export default class Tank implements Point, Orientated {
         );
     } while (overallClosestTank !== null && overallClosestTank < 50);
 
-    this.orientation = Math.random() * 360;
+    this.orientation = env.random() * 360;
     this.orientationTarget = this.orientation;
     this.turret = new TankTurret(this);
   }
@@ -145,51 +134,55 @@ export default class Tank implements Point, Orientated {
       Promise<unknown>
     >();
 
-    this.handlers[event] = (x?: unknown) =>
-      eventPromiseMap.get(event)
-        ? undefined
-        : setTimeout(() => {
-            try {
-              if (event !== Event.TICK) {
-                if (x)
-                  this.logger.trace(
-                    "Called event handler '" + event + "' with ",
-                    x
-                  );
-                else this.logger.trace("Called event handler '" + event + "'");
-              }
-              const startTime = new Date();
-              const result = handler(x) as Promise<unknown> | undefined;
-              if (result) {
-                eventPromiseMap.set(event, result);
-                result
-                  .then(() => eventPromiseMap.delete(event))
-                  .catch((e: unknown) => {
-                    // An uncaught rejection from a handler's promise is NOT
-                    // fatal. It is almost always a command the bot didn't
-                    // .catch() being superseded by a later one — a documented,
-                    // expected rejection (e.g. "Turn cancelled" when a HIT
-                    // handler retargets the body mid-turn). Surface it so the
-                    // author can debug, free the slot so the handler can run
-                    // again, and let the bot keep playing. This mirrors the
-                    // synchronous handler path (E003) and the fire-and-forget
-                    // settle path in compiler.ts, both of which log-and-continue
-                    // rather than killing the bot.
-                    this.logger.warn(`${ErrorCodes.E019}: ${e}`);
-                    eventPromiseMap.delete(event);
-                  });
-              }
+    this.handlers[event] = (x?: unknown) => {
+      // Backpressure: ignore a new invocation while the previous one is still in
+      // flight (a handler parked mid multi-tick await). Same semantics as before,
+      // now without the wall-clock setTimeout(0) indirection so the tick loop can
+      // await the dispatch deterministically.
+      if (eventPromiseMap.get(event)) return;
 
-              const endTime = new Date();
-              const duration = endTime.getTime() - startTime.getTime();
-              if (duration > 25)
-                this.logger.warn(
-                  `${ErrorCodes.W002}: Handler ${event} took a long time`
-                );
-            } catch (e) {
-              this.logger.error(`${ErrorCodes.E003}: ${e}`);
-            }
-          }, 0);
+      if (event !== Event.TICK) {
+        if (x)
+          this.logger.trace("Called event handler '" + event + "' with ", x);
+        else this.logger.trace("Called event handler '" + event + "'");
+      }
+
+      // handler() bridges into the isolate (compiler.ts dispatchEvent) and returns
+      // { parked, done } without running any bot code synchronously — the isolate
+      // apply is async, so a bot cannot mutate state during this tick's physics.
+      let dispatch:
+        { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
+      try {
+        dispatch = handler(x) as
+          { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
+      } catch (e) {
+        this.logger.error(`${ErrorCodes.E003}: ${e}`);
+        return;
+      }
+      if (!dispatch) return;
+
+      const { parked, done } = dispatch;
+      // `done` resolves only when the handler fully completes (possibly many ticks
+      // later); hold the slot until then so re-entry stays dropped.
+      eventPromiseMap.set(event, done);
+      done
+        .then(() => eventPromiseMap.delete(event))
+        .catch((e: unknown) => {
+          // An uncaught rejection from a handler's promise is NOT fatal. It is
+          // almost always a command the bot didn't .catch() being superseded by a
+          // later one — a documented, expected rejection (e.g. "Turn cancelled"
+          // when a HIT handler retargets the body mid-turn). Surface it so the
+          // author can debug, free the slot so the handler can run again, and let
+          // the bot keep playing. This mirrors the synchronous handler path (E003)
+          // and the fire-and-forget settle path in compiler.ts, both of which
+          // log-and-continue rather than killing the bot.
+          this.logger.warn(`${ErrorCodes.E019}: ${e}`);
+          eventPromiseMap.delete(event);
+        });
+      // `parked` resolves when the handler reaches its next await; the tick loop
+      // awaits it (via drainBotWork) so the bot has run before the next tick.
+      this.env.trackBotOp(parked);
+    };
   }
 
   setName(name: string) {
@@ -262,6 +255,7 @@ export default class Tank implements Point, Orientated {
     this.logger.trace('Turning to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
+      this.env,
       () => this.orientation === target,
       () =>
         !this.env.isRunning() ||
@@ -299,6 +293,7 @@ export default class Tank implements Point, Orientated {
     this.logger.trace('Turning to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
+      this.env,
       () => this.orientation === target,
       () =>
         !this.env.isRunning() ||
@@ -331,6 +326,7 @@ export default class Tank implements Point, Orientated {
       speedMax: this.speedMax,
     });
     return waitUntil(
+      this.env,
       () => this.speed === Math.min(d, this.speedMax),
       () =>
         !this.env.isRunning() ||
