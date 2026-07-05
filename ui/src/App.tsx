@@ -374,6 +374,10 @@ function App() {
                 <Route path="/dev" element={<MarkdownPage path="dev" />} />
                 <Route path="/rules" element={<MarkdownPage path="rules" />} />
                 <Route
+                  path="/error-codes"
+                  element={<MarkdownPage path="error-codes" />}
+                />
+                <Route
                   path="/classic"
                   element={<MarkdownPage path="classic-robocode" />}
                 />

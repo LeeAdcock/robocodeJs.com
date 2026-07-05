@@ -38,9 +38,13 @@ vi.mock('../src/util/botActions', () => ({
   deleteAppEverywhere: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../src/util/arenaStatus', () => ({ buildArenaStatus: vi.fn() }));
+// Mock the compiler so check_bot_source doesn't spin a real isolate in this suite
+// (the real dry-run behaviour is covered in compiler.test.ts).
+vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
 
 import { buildServer } from '../src/api/mcp';
 import appService from '../src/services/AppService';
+import compiler from '../src/util/compiler';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
 import environmentService from '../src/services/EnvironmentService';
@@ -120,6 +124,74 @@ describe('mcp tools', () => {
     expect(propagateSource).toHaveBeenCalledWith(app, 'NEW');
   });
 
+  it('check_bot_source dry-run compiles raw source', async () => {
+    vi.mocked(compiler.check).mockResolvedValue({ valid: true } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'check_bot_source',
+      arguments: { source: 'clock.on(Event.TICK, () => {})' },
+    })) as never;
+
+    expect(compiler.check).toHaveBeenCalledWith(
+      'clock.on(Event.TICK, () => {})'
+    );
+    expect(JSON.parse(textOf(res))).toEqual({ valid: true });
+  });
+
+  it('check_bot_source reports an invalid bot (still a successful call)', async () => {
+    vi.mocked(compiler.check).mockResolvedValue({
+      valid: false,
+      stage: 'compile',
+      errorCode: 'E017',
+      message: 'Unexpected token',
+      timedOut: false,
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'check_bot_source',
+      arguments: { source: 'function ( {' },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(res.isError).toBeFalsy();
+    expect(JSON.parse(textOf(res)).errorCode).toBe('E017');
+  });
+
+  it('check_bot_source resolves a saved bot by appId and enforces ownership', async () => {
+    vi.mocked(compiler.check).mockResolvedValue({ valid: true } as never);
+    vi.mocked(appService.get).mockResolvedValue({
+      getUserId: () => 'u1',
+      getSource: () => 'SAVED',
+    } as never);
+    const client = await connect();
+    await client.callTool({
+      name: 'check_bot_source',
+      arguments: { appId: 'a1' },
+    });
+    expect(compiler.check).toHaveBeenCalledWith('SAVED');
+
+    // A bot owned by someone else is rejected and never compiled.
+    vi.mocked(compiler.check).mockClear();
+    vi.mocked(appService.get).mockResolvedValue({
+      getUserId: () => 'someone-else',
+      getSource: () => 'SECRET',
+    } as never);
+    const res = (await client.callTool({
+      name: 'check_bot_source',
+      arguments: { appId: 'a1' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+    expect(compiler.check).not.toHaveBeenCalled();
+  });
+
+  it('check_bot_source requires source or appId', async () => {
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'check_bot_source',
+      arguments: {},
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+  });
+
   it('arena_status resolves the default arena and returns the snapshot', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
@@ -190,15 +262,44 @@ describe('mcp tools', () => {
     // filesystem (the doc/sample lists are filesystem-backed and may be empty
     // when running from source).
     const resources = await client.listResources();
-    expect(resources.resources.map((r) => r.uri)).toContain(
-      'robocodejs://types/robocode.d.ts'
-    );
+    const resourceUris = resources.resources.map((r) => r.uri);
+    expect(resourceUris).toContain('robocodejs://types/robocode.d.ts');
+    expect(resourceUris).toContain('robocodejs://reference/error-codes');
 
     // Docs and samples are exposed as templates the client can enumerate/read.
     const templates = await client.listResourceTemplates();
     const uriTemplates = templates.resourceTemplates.map((t) => t.uriTemplate);
     expect(uriTemplates).toContain('robocodejs://docs/{slug}');
     expect(uriTemplates).toContain('robocodejs://samples/{name}');
+  });
+
+  it('marks tool behaviour with annotations and declares output schemas', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+
+    // Read-only tools are hinted so a client can run them freely.
+    expect(byName['list_bots'].annotations?.readOnlyHint).toBe(true);
+    expect(byName['arena_status'].annotations?.readOnlyHint).toBe(true);
+    expect(byName['check_bot_source'].annotations?.readOnlyHint).toBe(true);
+    // Destructive tools are hinted so a client can confirm first.
+    expect(byName['delete_bot'].annotations?.destructiveHint).toBe(true);
+    expect(byName['delete_arena'].annotations?.destructiveHint).toBe(true);
+    // Typed tools advertise an output schema.
+    expect(byName['check_bot_source'].outputSchema).toBeTruthy();
+    expect(byName['set_bot_source'].outputSchema).toBeTruthy();
+  });
+
+  it('returns typed structuredContent for object results', async () => {
+    const app = { getId: () => 'a1', getUserId: () => 'u1' };
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_bot_source',
+      arguments: { appId: 'a1', source: 'NEW' },
+    })) as { structuredContent?: unknown };
+
+    expect(res.structuredContent).toEqual({ appId: 'a1', updated: true });
   });
 
   it('exposes workflow prompts and fills in arguments', async () => {

@@ -5,6 +5,7 @@ import ivm from 'isolated-vm';
 import { createLogger } from 'browser-bunyan';
 import { randomUUID } from 'node:crypto';
 import Environment, { Process } from '../types/environment';
+import Arena from '../types/arena';
 import appService from '../services/AppService';
 import { ErrorCodes } from '../types/ErrorCodes';
 import { logBotFault, logger, LogEvent } from './logger';
@@ -851,7 +852,67 @@ const init = (env: Environment, process: Process, tank: Tank) => {
   }
 };
 
+// The outcome of a dry-run compile (see `check`). `valid` is the only field on
+// success; a failure carries the stage, the error code, the message, and whether
+// it was a sandbox timeout.
+export interface CheckResult {
+  valid: boolean;
+  stage?: 'compile' | 'load';
+  errorCode?: ErrorCodes;
+  message?: string;
+  timedOut?: boolean;
+}
+
+// Dry-run compile: load a bot's source in a throwaway isolate WITHOUT adding it to
+// an arena, and RETURN any syntax/load error instead of logging it (as `execute`
+// does). Powers the `check_bot_source` MCP tool, the `/check` REST endpoint, and
+// the editor Check button, so authors and AI catch mistakes before deploying.
+//
+// It reuses the real Environment/Process/Tank/init path against a fresh throwaway
+// Environment (which runs no tick loop and touches no database), then disposes the
+// isolate. It deliberately does NOT call logBotFault / set appCrashed — a dry-run
+// is not a real fault and must not pollute logs or fault alerting.
+const check = async (source: string): Promise<CheckResult> => {
+  const env = new Environment(new Arena('dry-run', 'dry-run'));
+  const process = new Process('dry-run');
+  const failure = (stage: 'compile' | 'load', e: unknown): CheckResult => {
+    const message = e instanceof Error ? e.message : String(e);
+    return {
+      valid: false,
+      stage,
+      // Mirrors execute()'s onError: both a syntax error and a top-level load
+      // failure surface as E017; `stage` disambiguates which.
+      errorCode: ErrorCodes.E017,
+      message,
+      timedOut: /timed out|timeout/i.test(message),
+    };
+  };
+  try {
+    const tank = new Tank(env, process);
+    process.tanks.push(tank);
+    init(env, process, tank);
+    let script: ivm.Script;
+    try {
+      // Synchronous compile — throws on a syntax error.
+      script = process.getSandbox().compileScriptSync(source);
+    } catch (e) {
+      return failure('compile', e);
+    }
+    try {
+      // Top-level load — runs the bot's setup (registering handlers, etc.),
+      // bounded by the sandbox timeout so an infinite top-level loop is caught.
+      await script.run(tank.getContext(), { timeout: sandboxTimeoutMs() });
+    } catch (e) {
+      return failure('load', e);
+    }
+    return { valid: true };
+  } finally {
+    process.dispose();
+  }
+};
+
 export default {
   execute,
   init,
+  check,
 };

@@ -89,6 +89,8 @@ Once connected, these tools are available (all scoped to your account):
 - `set_bot_source` — replace a bot's source (live arenas pick it up)
 - `rename_bot` — rename a bot
 - `compile_bot` — re-run a bot's current source in your live arenas
+- `check_bot_source` — dry-run compile source (pass `source`, or `appId` for a
+  saved bot) and report any syntax/load error with its code — without deploying it
 - `reboot_bot` — reload a bot and re-fire its `START` handler
 - `delete_bot` — remove a bot from every arena and delete it
 
@@ -105,6 +107,16 @@ Once connected, these tools are available (all scoped to your account):
 - `recent_logs` — recent bot console output for an arena
 
 Arena tools take an optional `arenaId`; omit it to act on your default arena.
+
+**Resources**
+
+The server also exposes read-only reference material the AI can pull in:
+
+- `robocodejs://docs/{slug}` — the bot documentation pages
+- `robocodejs://samples/{name}` — the sample bots
+- `robocodejs://types/robocode.d.ts` — the bot API type definitions
+- `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,
+  for interpreting `recent_logs` and `check_bot_source` output
 
 ## Troubleshooting
 

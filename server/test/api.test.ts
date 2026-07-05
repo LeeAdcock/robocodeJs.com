@@ -36,9 +36,13 @@ vi.mock('../src/services/EnvironmentService', () => ({
     dispose: vi.fn(),
   },
 }));
+// Mock the compiler so the /check route test doesn't spin a real isolate (the
+// dry-run behaviour itself is covered in compiler.test.ts).
+vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
 
 import userService from '../src/services/UserService';
 import appService from '../src/services/AppService';
+import compiler from '../src/util/compiler';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
 import environmentService from '../src/services/EnvironmentService';
@@ -243,6 +247,38 @@ describe('app endpoints', () => {
       makeApp(appRouter, mockUser('someone-else'))
     ).post('/api/user/u1/app/a1/reboot');
     expect(res.status).toBe(401);
+  });
+
+  it('POST /api/user/:userId/app/:appId/check dry-run compiles the posted source', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(compiler.check).mockResolvedValue({
+      valid: false,
+      stage: 'compile',
+      errorCode: 'E017',
+      message: 'Unexpected token',
+      timedOut: false,
+    } as never);
+
+    const res = await request(makeApp(appRouter, mockUser('u1')))
+      .post('/api/user/u1/app/a1/check')
+      .set('content-type', 'application/octet-stream')
+      .send('function ( {');
+
+    expect(res.status).toBe(200);
+    expect(compiler.check).toHaveBeenCalledWith('function ( {');
+    expect(res.body).toMatchObject({ valid: false, errorCode: 'E017' });
+  });
+
+  it('POST /api/user/:userId/app/:appId/check is forbidden for a non-owner', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    const res = await request(makeApp(appRouter, mockUser('someone-else')))
+      .post('/api/user/u1/app/a1/check')
+      .set('content-type', 'application/octet-stream')
+      .send('// code');
+    expect(res.status).toBe(401);
+    expect(compiler.check).not.toHaveBeenCalled();
   });
 });
 

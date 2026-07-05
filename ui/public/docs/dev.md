@@ -213,6 +213,8 @@ Synchronous syntax-errors or runtime-errors in the application code will cause t
 
 An _unhandled promise rejection_ is treated more leniently. For example, an `await bot.turn(...)` that is cancelled because newer logic changed the target will reject, and if you don't `.catch()` it that rejection escapes your handler — but it is only logged to your bot's log panel, it does not terminate the bot. The same is true of a rejection thrown from inside a timer callback.
 
+Faults are written to your bot's log panel with a short code (like `E017`). See the [error code reference](/error-codes) for what each one means and how to fix it. You can also validate your code before a match with the editor's **Check** button.
+
 ## State and the START event
 
 When a bot's code is loaded — when it first starts, and again every time you save a change — it is re-executed to pick up your new handlers, and the `START` event fires so your setup code runs again. Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
