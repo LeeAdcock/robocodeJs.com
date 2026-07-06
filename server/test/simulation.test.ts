@@ -2,6 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import Simulation from '../src/util/simulation';
 import { Event } from '../src/types/event';
 
+// Simulation → Environment → AppService runs a CREATE TABLE query at import; stub
+// the pool so importing it here doesn't reach for a real Postgres (these tests
+// drive mock envs and never touch the database).
+vi.mock('../src/util/db', () => ({
+  default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
+}));
+
 // Simulation.run only reads/writes plain tank fields and invokes
 // tank.handlers[...] functions, so we can drive the real physics with
 // lightweight mock tanks (no isolates). Angles are in degrees; 0° points

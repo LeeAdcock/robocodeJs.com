@@ -205,6 +205,29 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           style={{ mixBlendMode: 'multiply', pointerEvents: 'none' }}
         />
       )}
+      {(props.arena.deployTick ?? 0) - props.time > 0 && (
+        // Deployment countdown: turrets are weapons-held until deployTick, so show
+        // the seconds remaining (~10 ticks/s) centered over the arena. In night
+        // mode use the theme's link accent (--link, the same warm tone as dark-mode
+        // anchor links) so it reads against the warm night tint; white in light
+        // mode. A dark outline keeps it legible over terrain either way, and
+        // pointerEvents none keeps tanks clickable underneath.
+        <text
+          x={(props.arena.width || 750) / 2}
+          y={(props.arena.height || 750) / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize="110"
+          fontWeight="bold"
+          fill={props.darkMode ? 'var(--link)' : '#fff'}
+          stroke="rgba(0,0,0,0.55)"
+          strokeWidth="3"
+          paintOrder="stroke"
+          style={{ pointerEvents: 'none' }}
+        >
+          {Math.ceil(((props.arena.deployTick ?? 0) - props.time) / 10)}
+        </text>
+      )}
     </svg>
   );
 }

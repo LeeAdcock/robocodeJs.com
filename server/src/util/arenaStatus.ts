@@ -1,4 +1,4 @@
-import Environment from '../types/environment';
+import Environment, { DEPLOY_TICKS } from '../types/environment';
 import ArenaMember from '../types/arenaMember';
 import appService from '../services/AppService';
 
@@ -29,6 +29,9 @@ export const buildArenaStatus = async (
     tickMs: env.getTickMs(),
     // Current PRNG seed for reproducible match setup (see Environment.setSeed).
     seed: env.getSeed(),
+    // Tick at which the damage-free deployment window ends and turrets go live.
+    // The UI shows a countdown while clock.time < deployTick.
+    deployTick: DEPLOY_TICKS,
     clock: { time: env.getTime() },
     apps: env
       .getProcesses()

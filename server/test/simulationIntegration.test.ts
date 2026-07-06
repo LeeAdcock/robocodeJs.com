@@ -12,13 +12,17 @@ vi.mock('../src/util/db', () => ({
 
 import compiler from '../src/util/compiler';
 import Tank from '../src/types/tank';
-import { Process } from '../src/types/environment';
+import { Process, DEPLOY_TICKS } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
 import { makeSimEnv } from './simEnv';
 
 function makeWorld() {
   const world = makeSimEnv({ run: (env) => Simulation.run(env) });
-  const { env, processes, events, faults, tick } = world;
+  const { env, processes, events, faults, tick, setClock } = world;
+  // These scenarios exercise live combat, so start past the damage-free
+  // deployment window — turrets are weapons-held until DEPLOY_TICKS. The warm-up
+  // gate itself is unit-tested in tankTypes.test.ts.
+  setClock(DEPLOY_TICKS);
 
   // Compile a bot's source into a fresh isolate-backed tank at a fixed pose.
   const addBot = (
@@ -48,7 +52,7 @@ function makeWorld() {
   const dispose = () =>
     processes.forEach((p) => p.tanks.forEach((t) => t.getContext().release()));
 
-  return { env, processes, events, faults, addBot, tick, dispose };
+  return { env, processes, events, faults, addBot, tick, setClock, dispose };
 }
 
 describe('sandbox + simulation integration', () => {
@@ -302,6 +306,7 @@ describe('sandbox + simulation integration', () => {
   });
 
   it('lets a bot read the advancing clock via clock.getTime()', async () => {
+    world.setClock(0); // this test asserts on absolute clock values, not combat
     const tank = world.addBot(
       `clock.on(Event.TICK, () => { if (clock.getTime() >= 5) bot.setSpeed(2) })`,
       'clockreader'
