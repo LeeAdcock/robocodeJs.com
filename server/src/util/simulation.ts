@@ -26,13 +26,19 @@ export default {
         });
     });
 
-    // Ensure the tank has started
+    // Ensure the tank has started. A tank whose START handler runs THIS tick is
+    // recorded so the TICK loop below skips it: its first TICK arrives next tick,
+    // after this tick's drainBotWork has fully run the (async) START. That makes
+    // startup order deterministic — START always runs (and settles) before a
+    // tank's first TICK — instead of racing START and TICK within one tick.
+    const startedThisTick = new Set<unknown>();
     env.getProcesses().forEach((process) => {
       process.tanks.forEach((tank) => {
         if (tank.health > 0) {
           if (tank.needsStarting === true) {
             if (tank.handlers[Event.START]) {
               tank.handlers[Event.START]();
+              startedThisTick.add(tank);
             }
             tank.needsStarting = false;
           }
@@ -43,12 +49,13 @@ export default {
     // Then execute all timers
     timerTick(env);
 
-    // Then execute the tank's tick handlers
+    // Then execute the tank's tick handlers (skipping any tank just started this
+    // tick, so START runs before that tank ever sees a TICK).
     env.getProcesses().forEach((process) => {
       process.tanks
         .filter((tank) => tank.health > 0)
         .forEach((tank) => {
-          if (tank.handlers[Event.TICK]) {
+          if (!startedThisTick.has(tank) && tank.handlers[Event.TICK]) {
             tank.handlers[Event.TICK]();
           }
 
