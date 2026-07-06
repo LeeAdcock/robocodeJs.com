@@ -38,6 +38,7 @@ vi.mock('../src/util/botActions', () => ({
   deleteAppEverywhere: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../src/util/arenaStatus', () => ({ buildArenaStatus: vi.fn() }));
+vi.mock('../src/util/matchSummary', () => ({ buildMatchSummary: vi.fn() }));
 // Mock the compiler so check_bot_source doesn't spin a real isolate in this suite
 // (the real dry-run behaviour is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
@@ -51,6 +52,7 @@ import arenaMemberService from '../src/services/ArenaMemberService';
 import environmentService from '../src/services/EnvironmentService';
 import { propagateSource } from '../src/util/botActions';
 import { buildArenaStatus } from '../src/util/arenaStatus';
+import { buildMatchSummary } from '../src/util/matchSummary';
 
 const user = { getId: () => 'u1' } as never;
 
@@ -206,6 +208,25 @@ describe('mcp tools', () => {
 
     expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
     expect(JSON.parse(textOf(res))).toEqual({ running: true });
+  });
+
+  it('match_summary resolves the default arena and returns the summary', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1' } },
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'match_summary',
+      arguments: {},
+    })) as never;
+
+    expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
+    expect(JSON.parse(textOf(res))).toEqual({
+      match: { decided: true, winner: { id: 'a1' } },
+    });
   });
 
   it('recent_logs filters by level, bot, tank, and text', async () => {

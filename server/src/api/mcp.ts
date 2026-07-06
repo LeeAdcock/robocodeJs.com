@@ -29,6 +29,7 @@ import {
   deleteAppEverywhere,
 } from '../util/botActions';
 import { buildArenaStatus } from '../util/arenaStatus';
+import { buildMatchSummary } from '../util/matchSummary';
 import { logger } from '../util/logger';
 
 const app = express();
@@ -430,6 +431,38 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
       return ok(await buildArenaStatus(env, members));
+    }
+  );
+
+  server.registerTool(
+    'match_summary',
+    {
+      title: 'Match summary',
+      description:
+        'Outcome-oriented summary of an arena: a leaderboard ranked by who is ' +
+        'winning/won, the resolved winner, per-bot aggregated stats (shots, ' +
+        'accuracy, damage taken, distance, collisions), survival (tanks alive, ' +
+        'total health), and elimination order. Complements arena_status (which is ' +
+        'the raw per-tank snapshot); this is the "who won and how" view and is ' +
+        'most useful once the match is decided (`match.decided`). A match is ' +
+        'decided when at most one bot still has living tanks. Omit arenaId for ' +
+        'your default arena.',
+      inputSchema: {
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+      },
+      // Like arena_status: the shape is broad and evolving, so it is returned as
+      // structuredContent without pinning a brittle outputSchema.
+      annotations: READ_ONLY,
+    },
+    async ({ arenaId }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      const members = await arenaMemberService.getForArena(arena.getId());
+      return ok(await buildMatchSummary(env, members));
     }
   );
 

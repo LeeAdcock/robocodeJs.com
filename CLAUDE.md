@@ -33,6 +33,8 @@ Both packages use **Vitest** (`npm test` runs `vitest run`, `npm run test:watch`
 
 `ui build` writes directly into `server/dist/public` (`build.outDir` in `ui/vite.config.ts`, with `emptyOutDir` clearing it first), so the server can serve the built UI as static files in production. Deployment is AWS CodeBuild (`buildspec.yaml`) → Elastic Beanstalk (`server/.ebextensions`).
 
+**CI** runs on every PR/push (`.github/workflows/ci.yml`): per package, `npm ci` → lint → build (`tsc`) → test → `npm audit --audit-level=high` (the native `isolated-vm` build needs Node 24 + `gcc`/`gcc-c++`, provided on the runner). `.github/dependabot.yml` opens weekly npm + github-actions update PRs.
+
 To cut a release artifact, run `npm run package` from `server/` (build `ui` then `server` first so `dist/` is current). It runs `npm version patch`, regenerates `npm-shrinkwrap.json`, and zips the deploy bundle (`node_modules` excluded — EB installs from the shrinkwrap). **Always commit the resulting version bump (`server/package.json` + `server/npm-shrinkwrap.json`) and push it to `main`** with a `build: bump server to vX.Y.Z (from npm run package)` message — this is the established convention; prior bump commits live on `main`, untagged.
 
 ## Runtime requirements
@@ -56,19 +58,33 @@ User bot code is untrusted JavaScript run in `isolated-vm` isolates — this is 
 
 ### Simulation loop
 
-- `Environment.resume()` starts a `setInterval(..., 100)` that calls `simulate()` each tick; `clock.time` increments by 1 per tick.
-- `util/simulation.ts` (`Simulation.run`) is the physics/interaction engine: runs START/TICK handlers, fires timers (`scheduleFactory.timerTick`), moves tanks, detects collisions and bullet hits, applies damage, and emits events. After a "sudden death" time it decays health to force a winner. A crashed bot (`tank.appCrashed`) is killed.
+- `Environment.resume()` runs a **self-scheduling async loop** (`runLoop` → `tick` → `drainBotWork`), _not_ a fixed `setInterval`: each tick runs the physics, then **awaits** that tick's bot work (handlers, timers, command settlements) before the next tick begins — the guarantee that makes the sim deterministic at any speed. Cadence is set by `setSpeed` (a multiplier; `1` = the default ~10 ticks/s, `0`/`"max"` = unbounded). `clock.time` increments by 1 per tick and **resets to 0 on `restart()`** (so a new match never inherits the prior match's sudden-death state).
+- `util/simulation.ts` (`Simulation.run`) is the physics/interaction engine: runs START/TICK handlers, fires timers (`scheduleFactory.timerTick`), moves tanks, detects collisions and bullet hits, applies damage, and emits events. After `SUDDEN_DEATH_TIME` ticks it decays health to force a winner. A crashed bot (`tank.appCrashed`) is killed; a tank's death tick is recorded on `Tank.eliminatedAt` for the match summary.
 - Timers are **monkey-patched** (`util/scheduleFactory.ts`): bot `setInterval`/`setTimeout` are driven by simulation ticks, not real time, so the game can pause/resume/stop them.
+- **Determinism:** each `Environment` has a seeded PRNG (`util/random.ts`, mulberry32) driving tank placement/orientation and each bot's in-isolate `Math.random` — a fixed seed (`setSeed`, `POST .../arena/seed`, `set_arena_seed`) reproduces a match. Combined with the tick-driven loop, accelerated headless runs are repeatable.
 
 ### Server <-> UI communication
 
-- REST endpoints live in `server/src/api/*.ts` (`app`, `arena`, `user`, `demo`, `help`, `health`), wired up in `index.ts`. Most are namespaced under `/api/user/:userId/...`.
+- REST endpoints live in `server/src/api/*.ts` (`app`, `arena`, `user`, `demo`, `help`, `health`, `session`, `token`, `mcp`), wired up in `index.ts`. Most are namespaced under `/api/user/:userId/...`. Two shared builders back both REST and MCP: `util/arenaStatus.ts` (`buildArenaStatus` — the live per-tank snapshot, `GET .../arena`) and `util/matchSummary.ts` (`buildMatchSummary` — the outcome-oriented leaderboard/winner/elimination view, `GET .../arena/summary`).
 - Live arena state streams to the browser via **Server-Sent Events**: `GET /api/user/:userId/arena/events` (game events) and `/arena/logs` (bot console output). The `Environment` is an `EventEmitter`; adding an `event` listener replays current state (place app/tank events) so a new client can bootstrap.
 - The UI (`ui/src/App.tsx`) consumes the SSE stream and applies a large per-event-type reducer to its arena state. Between server ticks it runs its **own** client-side physics (`ui/src/util/simulate.ts`, a partial mirror of the server's `simulation.ts`) to interpolate smooth motion. Keep these two simulations consistent when changing movement math.
+- **Theme:** a whole-app light/dark theme lives in `ui/src/util/theme.ts` (a `useSyncExternalStore` store — header toggle, persisted to `localStorage`, OS-default). The boolean drives a `body.dark` CSS-variable theme (`ui/src/index.css`), the Ace editor theme, and the arena SVG's night-mode tint.
 
-### Auth
+### Auth & access control
 
-`server/src/middleware/auth.ts` verifies a Google OAuth id token (checking its **audience** against `GOOGLE_CLIENT_ID`, which must match the client id the UI signs in with) stored in the `auth` cookie. The cookie is set **server-side and HttpOnly** by `POST /api/session` (the UI posts the Google credential there; `DELETE /api/session` logs out) — see `server/src/api/session.ts`. A user record is auto-created on first login. Only `/api/user` is hard-gated (`auth(true)`); mutating endpoints additionally enforce ownership via the `requireOwner` middleware.
+`server/src/middleware/auth.ts` verifies a Google OAuth id token (checking its **audience** against `GOOGLE_CLIENT_ID`, which must match the client id the UI signs in with) stored in the `auth` cookie. The cookie is set **server-side and HttpOnly** by `POST /api/session` (the UI posts the Google credential there; `DELETE /api/session` logs out) — see `server/src/api/session.ts`. A user record is auto-created on first login (rejected if `email_verified` is false). Both `/api/user` and `POST /api/mcp` are hard-gated by `auth(true)` — the latter resolves the acting user from a **bearer API token** (`api/token.ts`, stored only as a sha256 hash). Ownership is enforced by two middlewares (`middleware/resource.ts`): `requireOwner` (the actor owns the `:userId`/arena) and `requireAppOwner` (the confidential/destructive app routes — source read/write, delete, compile, reboot — the A01 IDOR fix). Metadata reads and add-by-reference stay open by design (spectating / share-links). Full model + rationale in `SECURITY.md`.
+
+### AI integration (MCP)
+
+`server/src/api/mcp.ts` is an in-process **Model Context Protocol** server at `POST /api/mcp` (Streamable HTTP, stateless, bearer-token auth) exposing ~23 user-scoped tools (bot CRUD + `check_bot_source`/compile/reboot; arena create/delete/control incl. `set_arena_speed`/`set_arena_seed`; `arena_status`, `match_summary`; `recent_logs`/`recent_faults`), **resources** (bot docs, `robocode.d.ts`, samples, error codes), and **prompts** (`write_bot`, `debug_bot`, `run_match`). Every tool acts only on the token owner's own resources (`ownedApp`/`ownedArena` mirror the REST ownership checks) — keep the MCP caps in sync with the REST caps by hand. User-facing setup guide at `/mcp` (`ui/public/docs/mcp.md`).
+
+### Bot roster & membership
+
+An arena's **roster** is its `ArenaMember` rows. A member can be **enabled or disabled** (`ArenaMember.enabled`): disabled = pulled from the live match (no `Process`/tanks) but kept in the roster so it can be re-enabled. Apps can be **added by reference** — another user's app id, e.g. via the `/add-app/:appId` **share link** — which links the app into the arena without ever exposing its source (only its live bots are visible). Roster/enable/add-by-reference routes live in `api/arena.ts`; the live status snapshot omits disabled members (they have no `Process`), and so does `match_summary`.
+
+### Security & resource limits
+
+Untrusted code + shared multi-user arenas make **access control, sandbox integrity, and resource exhaustion** the primary concerns. Hardening in place: `helmet` + CSP (`middleware/securityHeaders.ts`), rate limiting (`middleware/rateLimit.ts` — auth/compute/write/api limiters, `429` + error `E022`), RDS TLS **CA verification** (`db.ts` `sslConfig`), and resource caps — per-tank timers (`MAX_TIMERS_PER_TANK`, `E021`), per-user apps (`MAX_APPS_PER_USER`) and arenas (`MAX_ARENAS_PER_USER`) plus a global `MAX_TOTAL_ARENAS` ceiling, and the 8 MB isolate limit. `SECURITY.md` is the full OWASP audit (findings, fixes, and accepted risks); `TASKS.md`/`ENHANCEMENTS.md` are the engineering + product backlogs.
 
 ### Services & types
 

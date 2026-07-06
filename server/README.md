@@ -6,7 +6,7 @@ Part of the [RobocodeJs monorepo](../README.md). Runs on port `8080` (reached th
 
 ## Requirements
 
-- **Node.js ≥ 22** — required by the native [`isolated-vm`](https://github.com/laverdet/isolated-vm) dependency. The isolated-vm major and Node major are coupled: isolated-vm 5.x needs Node ≥18, 6.x ≥22, 7.x ≥26. We pin `isolated-vm@^6` for Node 22. Building the native module needs `gcc`/`gcc-c++` (present in the dev container and in `.ebextensions/options.config` for Elastic Beanstalk).
+- **Node.js ≥ 24** (`engines` in `package.json`) — required by the native [`isolated-vm`](https://github.com/laverdet/isolated-vm) dependency. The isolated-vm major and Node major are coupled: isolated-vm 5.x needs Node ≥18, 6.x ≥22, 7.x ≥26. We run **Node 24** with `isolated-vm@^6` (the dev container, `buildspec.yaml`, and CI all pin Node 24); bumping to isolated-vm 7.x would require Node ≥26. Building the native module needs `gcc`/`gcc-c++` (present in the dev container and in `.ebextensions/options.config` for Elastic Beanstalk).
 - **PostgreSQL** — only for a real/production setup; see [Environment variables](#environment-variables). For local dev it is optional (see below).
 
 ### Local-dev mode
@@ -30,17 +30,19 @@ npm run package # version bump + shrinkwrap + zip the deploy artifact
 
 PostgreSQL connection (see `src/util/db.ts`):
 
-| Variable             | Purpose                                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RDS_HOSTNAME`       | database host                                                                                                                                           |
-| `RDS_PORT`           | database port (default `5432`)                                                                                                                          |
-| `RDS_DB_NAME`        | database name                                                                                                                                           |
-| `RDS_USERNAME`       | database user                                                                                                                                           |
-| `RDS_PASSWORD`       | database password                                                                                                                                       |
-| `GOOGLE_CLIENT_ID`   | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with.                        |
-| `NODE_ENV`           | `production` enables the `Secure` flag on the session cookie                                                                                            |
-| `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`)                     |
-| `LOG_LEVEL`          | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test |
+| Variable                        | Purpose                                                                                                                                                                                                                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RDS_HOSTNAME`                  | database host                                                                                                                                                                                                                                                                            |
+| `RDS_PORT`                      | database port (default `5432`)                                                                                                                                                                                                                                                           |
+| `RDS_DB_NAME`                   | database name                                                                                                                                                                                                                                                                            |
+| `RDS_USERNAME`                  | database user                                                                                                                                                                                                                                                                            |
+| `RDS_PASSWORD`                  | database password                                                                                                                                                                                                                                                                        |
+| `GOOGLE_CLIENT_ID`              | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with.                                                                                                                                                         |
+| `NODE_ENV`                      | `production` enables the `Secure` flag on the session cookie                                                                                                                                                                                                                             |
+| `SANDBOX_TIMEOUT_MS`            | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`)                                                                                                                                                      |
+| `LOG_LEVEL`                     | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test                                                                                                                                  |
+| `RDS_SSL` / `RDS_SSL_NO_VERIFY` | TLS to Postgres — verified against the vendored RDS CA bundle (`certs/rds-global-bundle.pem`) by default. `RDS_SSL_NO_VERIFY=true` encrypts without verifying the CA (old behaviour, for a non-RDS cert); `RDS_SSL=false` disables TLS. See A02-1 in [`../SECURITY.md`](../SECURITY.md). |
+| `MAX_TOTAL_ARENAS`              | global ceiling on concurrently-created arenas across **all** users (default `1000`); creation past it returns `503`                                                                                                                                                                      |
 
 Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema is created lazily on first connection.
 
@@ -55,18 +57,23 @@ Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema i
 
 ### API endpoints (`src/api/`)
 
-Most routes are namespaced under `/api/user/:userId/...`. Mutating routes additionally require `req.user.id === :userId`.
+Most routes are namespaced under `/api/user/:userId/...`. Mutating routes require ownership: `requireOwner` (the actor owns the `:userId`/arena) and, for confidential/destructive **app** routes, `requireAppOwner` (source read/write, delete, compile, reboot — the A01 IDOR fix). Metadata reads and add-by-reference are intentionally open (spectating / share-links). See [Security](#security--resource-limits).
 
-| Router      | Highlights                                                                                                                                                                             |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `health.ts` | `GET /health` liveness check                                                                                                                                                           |
-| `demo.ts`   | public demo arena + its SSE streams (no auth)                                                                                                                                          |
-| `help.ts`   | help responses, classified with `ml-classify-text`                                                                                                                                     |
-| `user.ts`   | `GET /api/user` (current user) and `/api/user/:userId`                                                                                                                                 |
-| `app.ts`    | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile`                                                                                                                          |
-| `arena.ts`  | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); arena status, add/remove app, `restart`/`pause`/`resume`, and the live `.../events` & `.../logs` SSE streams |
+| Router       | Highlights                                                                                                                                                                                                                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `health.ts`  | `GET /health` liveness check                                                                                                                                                                                                                                                                              |
+| `demo.ts`    | public demo arena + its SSE streams (no auth)                                                                                                                                                                                                                                                             |
+| `help.ts`    | help responses, classified with `ml-classify-text`                                                                                                                                                                                                                                                        |
+| `session.ts` | `POST`/`DELETE /api/session` — sign in / out (sets the HttpOnly `auth` cookie); see [Auth](#auth)                                                                                                                                                                                                         |
+| `token.ts`   | mint / rotate the per-user **MCP bearer API token** (stored only as a sha256 hash)                                                                                                                                                                                                                        |
+| `user.ts`    | `GET /api/user` (current user) and `/api/user/:userId`                                                                                                                                                                                                                                                    |
+| `app.ts`     | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile` / `.../reboot` / `.../check` (dry-run compile), capped at `MAX_APPS_PER_USER`                                                                                                                                                               |
+| `arena.ts`   | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); status (`buildArenaStatus`) and `.../summary` (`buildMatchSummary`); roster add/remove + enable/disable (incl. add-by-reference); `restart`/`pause`/`resume`/`speed`/`seed`; and the live `.../events` & `.../logs` SSE streams |
+| `mcp.ts`     | in-process **Model Context Protocol** server at `POST /api/mcp`; see [MCP server](#mcp-server)                                                                                                                                                                                                            |
 
-> **Multi-arena:** a user can own several arenas. Each action route is registered at **two paths sharing one handler** (the `dual()` helper): `/api/user/:userId/arena/...` resolves the user's **default arena** (lazily created if none) — this is what the UI uses — while `/api/user/:userId/arenas/:arenaId/...` addresses a **specific arena** for external tooling. The `resolveArena` middleware enforces that an `:arenaId` belongs to `:userId`. Creation is capped at `MAX_ARENAS_PER_USER` (10). Keep arena management out of the UI; build it against `/arenas`.
+> **Multi-arena:** a user can own several arenas. Each action route is registered at **two paths sharing one handler** (the `dual()` helper): `/api/user/:userId/arena/...` resolves the user's **default arena** (lazily created if none) — this is what the UI uses — while `/api/user/:userId/arenas/:arenaId/...` addresses a **specific arena** for external tooling. The `resolveArena` middleware enforces that an `:arenaId` belongs to `:userId`. Creation is capped at `MAX_ARENAS_PER_USER` (10) per user and `MAX_TOTAL_ARENAS` globally. Keep arena management out of the UI; build it against `/arenas`.
+
+> **Bot roster:** an arena's members (`ArenaMember` rows) can be **enabled or disabled** — a disabled member is pulled from the live match (no `Process`/tanks) but stays in the roster to be re-enabled. Apps may be **added by reference** (another user's app id, e.g. via the `/add-app/:appId` share link): the app is linked in without exposing its source — only its live bots are visible. The live status snapshot and `match_summary` omit disabled members.
 
 ## The sandbox (the core of the system)
 
@@ -104,22 +111,47 @@ The host pins the `__settle`, `__dispatch`, and `__runTimer` references at init 
 
 ## The simulation loop
 
-- `Environment.resume()` starts a `setInterval(…, 100)` that calls `simulate()` each tick; the clock advances by 1 per tick.
-- `src/util/simulation.ts` (`Simulation.run`) is the physics/interaction engine: it kills crashed bots, runs `START` then `TICK` handlers, fires timers, recharges radar/turret, moves tanks, detects tank collisions and bullet hits, applies damage, and emits events. After a "sudden death" time it decays health to force a winner.
-- **Timers are tick-driven** (`src/util/scheduleFactory.ts`): bot `setInterval`/`setTimeout` are monkey-patched to advance with simulation ticks rather than wall-clock time, so the game can pause, resume, and reset them. Keep this in mind — a bot's `setTimeout(fn, 50)` means 50 _ticks_, not 50 ms.
+- `Environment.resume()` runs a **self-scheduling async loop** (`runLoop` → `tick` → `drainBotWork`), _not_ a fixed `setInterval`: each tick runs the physics, then **awaits** that tick's bot work (handlers, timers, command settlements) before the next tick starts. That await is what makes the sim **deterministic at any speed**. Cadence is set by `setSpeed` (`POST .../arena/speed`, `set_arena_speed`): a multiplier (`1` = the default ~10 ticks/s) or `0`/`"max"` for unbounded. The clock advances by 1 per tick and **resets to 0 on `restart()`**, so a new match never inherits the previous match's sudden-death state.
+- `src/util/simulation.ts` (`Simulation.run`) is the physics/interaction engine: it kills crashed bots, runs `START` then `TICK` handlers, fires timers, recharges radar/turret, moves tanks, detects tank collisions and bullet hits, applies damage, and emits events. After `SUDDEN_DEATH_TIME` ticks it decays health to force a winner; `Environment.tick` records each tank's death tick on `Tank.eliminatedAt` for the match summary.
+- **Deterministic seeds:** each `Environment` has a seeded PRNG (`src/util/random.ts`, mulberry32) driving tank placement/orientation and each bot's in-isolate `Math.random`. A fixed seed (`setSeed`, `POST .../arena/seed`, `set_arena_seed`) reproduces a match exactly; combined with the tick-driven loop and unbounded speed, accelerated headless runs are fully repeatable. The default seed is nondeterministic, so unseeded arenas still vary.
+- **Timers are tick-driven** (`src/util/scheduleFactory.ts`): bot `setInterval`/`setTimeout` are monkey-patched to advance with simulation ticks rather than wall-clock time, so the game can pause, resume, and reset them. Keep this in mind — a bot's `setTimeout(fn, 50)` means 50 _ticks_, not 50 ms. Each tank is capped at `MAX_TIMERS_PER_TANK` (excess registrations refused with error `E021`).
 
 ## Services & data model
 
 `src/services/*Service.ts` are singleton data-access objects:
 
-- **Postgres-backed:** `UserService`, `AppService`, `ArenaService`, `ArenaMemberService`, `IdentityService`, `DemoService`.
+- **Postgres-backed:** `UserService`, `AppService`, `ArenaService`, `ArenaMemberService` (the arena roster — each `ArenaMember` row carries an `enabled` flag), `IdentityService`, `DemoService`.
 - **In-memory:** `EnvironmentService` keeps a `Map<arenaId, Environment>` of running arenas and disposes an environment (freeing its isolates) 30 minutes after it stops.
 
-Domain types and DTOs live in `src/types/` (`Tank`, `Arena`, `Environment`/`Process`, `Bullet`, `Clock`, plus plain DTOs). `ErrorCodes.ts` defines the `E0xx` codes surfaced in bot logs.
+Domain types and DTOs live in `src/types/` (`Tank`, `Arena`, `Environment`/`Process`, `Bullet`, `Clock`, `TankStats`, plus plain DTOs). `ErrorCodes.ts` defines the `E0xx`/`W0xx` codes surfaced in bot logs (e.g. `E021` timer cap, `E022` rate limit).
 
 ## Auth
 
-The UI posts the Google credential to **`POST /api/session`**, which verifies it and sets an **HttpOnly, `SameSite=Lax`** `auth` cookie server-side (`Secure` when `NODE_ENV=production`); `DELETE /api/session` logs out (`src/api/session.ts`). `src/middleware/auth.ts` then verifies that cookie's id token on each request — checking its **audience** against `GOOGLE_CLIENT_ID` — and attaches `req.user`. A user record is auto-created on first login. Only `/api/user` is hard-gated (`auth(true)`); mutating endpoints additionally enforce ownership via the `requireOwner` middleware.
+The UI posts the Google credential to **`POST /api/session`**, which verifies it and sets an **HttpOnly, `SameSite=Lax`** `auth` cookie server-side (`Secure` when `NODE_ENV=production`); `DELETE /api/session` logs out (`src/api/session.ts`). `src/middleware/auth.ts` then verifies that cookie's id token on each request — checking its **audience** against `GOOGLE_CLIENT_ID` — and attaches `req.user`. A user record is auto-created on first login (rejected when `email_verified` is false). `/api/user` and `POST /api/mcp` are hard-gated by `auth(true)`; the MCP route resolves the actor from a **bearer API token** instead of the cookie (`src/api/token.ts`, stored only as a sha256 hash).
+
+Ownership is enforced by two middlewares (`src/middleware/resource.ts`): **`requireOwner`** asserts the actor owns the `:userId`/arena (scopes mutating arena + user routes), and **`requireAppOwner`** guards the confidential/destructive app routes — source read/write, delete, compile, reboot (the A01 IDOR fix). Cross-user **metadata** reads (names + ids, never source) and **add-by-reference** stay open by design, for spectating and share-links. The full access model, plus the rest of the security posture, is in [`../SECURITY.md`](../SECURITY.md) and summarized under [Security](#security--resource-limits).
+
+## MCP server
+
+`src/api/mcp.ts` is an in-process [Model Context Protocol](https://modelcontextprotocol.io) server at **`POST /api/mcp`** (Streamable HTTP, stateless — a fresh server + transport per request), so an AI client (Claude, or any MCP client) can write, run, and watch bots. It's gated by `auth(true)`, resolving the acting user from a **bearer API token** (minted via `src/api/token.ts`); every tool acts only on that user's own resources — `ownedApp`/`ownedArena` mirror the REST ownership checks, so there's no cross-user addressing.
+
+`buildServer(user)` registers ~23 user-scoped **tools**:
+
+- **Bots:** `list_bots`, `get_bot_source`, `create_bot`, `set_bot_source`, `rename_bot`, `compile_bot`, `check_bot_source` (dry-run compile), `reboot_bot`, `delete_bot`.
+- **Arenas:** `list_arenas`, `create_arena`, `delete_arena`, `arena_status`, **`match_summary`** (leaderboard / winner / elimination order), `add_bot_to_arena`, `remove_bot_from_arena`, `pause_arena`, `resume_arena`, `restart_arena`, `set_arena_speed`, `set_arena_seed`.
+- **Observation:** `recent_logs` (filterable), `recent_faults` (structured crash records).
+
+Plus **resources** (`robocodejs://` — the bot docs, `robocode.d.ts`, sample bots, and the error-code reference) and **prompts** (`write_bot`, `debug_bot`, `run_match`). Tools carry behaviour annotations (`readOnlyHint`/`destructiveHint`/`idempotentHint`) and object-returning tools return validated `structuredContent`. The user-facing setup guide is served at `/mcp` (`../ui/public/docs/mcp.md`). The REST caps (`MAX_APPS_PER_ARENA`, etc.) are mirrored by hand in `mcp.ts` — keep them in sync.
+
+## Security & resource limits
+
+Untrusted user code plus shared, multi-user arenas make **access control, sandbox integrity, and resource exhaustion** the top concerns. The hardening in place (see [`../SECURITY.md`](../SECURITY.md) for the full OWASP audit — findings, fixes, and accepted risks):
+
+- **Access control** — `requireOwner` + `requireAppOwner` (above); metadata/spectating open by design.
+- **HTTP hardening** — `helmet` with a CSP tuned to the real bundle (`src/middleware/securityHeaders.ts`): `frame-ancestors`/`X-Frame-Options`, `nosniff`, HSTS, `object-src 'none'`.
+- **Rate limiting** — `src/middleware/rateLimit.ts`: IP-keyed auth limiter (sign-in/token), user-keyed compute (isolate-spawning check/compile/reboot) and write (app/arena creation) limiters, and a broad `api` backstop. Refusals return `429` with error code `E022`.
+- **Resource caps** — per-tank timers (`MAX_TIMERS_PER_TANK`, `E021`), per-user apps (`MAX_APPS_PER_USER`) and arenas (`MAX_ARENAS_PER_USER`), a global `MAX_TOTAL_ARENAS` ceiling, the 8 MB per-isolate memory limit, and `SANDBOX_TIMEOUT_MS` per synchronous entry into bot code.
+- **Transport** — RDS connections verify the server cert against a vendored CA bundle by default (`sslConfig` in `src/util/db.ts`).
 
 ## Server ↔ UI communication
 

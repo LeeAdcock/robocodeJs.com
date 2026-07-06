@@ -76,6 +76,8 @@ Once connected, these tools are available (all scoped to your account):
 - `list_arenas` / `create_arena` / `delete_arena`
 - `arena_status` — full snapshot (size, running state, clock, and every bot's
   tanks: position, orientation, health, bullets)
+- `match_summary` — outcome view: leaderboard, winner, per-bot accuracy/damage/
+  survival, and elimination order (most useful once a match is decided)
 - `add_bot_to_arena` / `remove_bot_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
 

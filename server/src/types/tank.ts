@@ -62,6 +62,11 @@ export default class Tank implements Point, Orientated {
   public handlers: any = {};
   public bullets: Bullet[] = [];
   public health = 100;
+  // The clock tick at which this tank first reached 0 health (crashed, shot,
+  // collided, or decayed), or null while still alive. Written once by
+  // Environment.tick; never read by the physics, so it can't affect determinism.
+  // A restart builds fresh Tank instances, so it resets to null automatically.
+  public eliminatedAt: number | null = null;
   public stats: TankStats = new TankStats();
   public timers: TimersContainer = new TimersContainer();
   public logger!: Logger;
