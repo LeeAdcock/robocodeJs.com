@@ -122,6 +122,12 @@ export default function NavBar(props: NavBarProps) {
               </Link>
             </Navbar.Text>
             <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text>
+              <Link to="/about" className="nav-link" style={{ padding: '0px' }}>
+                About
+              </Link>
+            </Navbar.Text>
+            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
 
             {props.user && (
               <>

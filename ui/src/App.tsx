@@ -430,6 +430,7 @@ function App() {
                 />
                 <Route path="/learn" element={<MarkdownPage path="learn" />} />
                 <Route path="/learn/:slug" element={<LessonPage />} />
+                <Route path="/about" element={<MarkdownPage path="about" />} />
                 {/* Unlisted: MCP setup guide, reachable only by direct URL. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
                 {/* OAuth approval landing for MCP clients (see api/oauth.ts). */}

@@ -80,3 +80,7 @@ There are several other ways to define and pass functions in JavaScript, and you
 You've created your first bot! This simple logic is probably not likely to dominate the arena, but it's a great first step as you begin to learn RobocodeJs.
 
 Next you may want to skim through the detailed [RobocodeJs documentation](/dev), study a few [more examples](/examples), or [deepen your knowledge](https://learnjavascript.online/) on the JavaScript programming language.
+
+---
+
+_RobocodeJs is a passion project by **Lee Adcock** — a love letter to the classic Robocode. [Read the story](/about), or say hi at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com)._
