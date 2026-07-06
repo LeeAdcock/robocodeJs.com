@@ -15,8 +15,6 @@ copy**. The server speaks MCP over **streamable HTTP** at:
 https://robocodejs.com/api/mcp
 ```
 
-(Replace `robocodejs.com` with the host you use.)
-
 When your client connects, it discovers the sign-in flow automatically and opens
 your browser to RobocodeJs. If you're not already signed in, you'll sign in with
 Google; then the connection is authorized and you're returned to your client.
@@ -86,7 +84,7 @@ Once connected, these tools are available (all scoped to your account):
 **Observation**
 
 - `recent_logs` — recent bot console output for an arena, with optional filters
-  (`minLevel`, `appId`, `tankIndex`, `contains`)
+  (`minLevel`, `appId`, `botIndex`, `contains`)
 - `recent_faults` — recent bot crashes as structured records (error code, kind,
   message, failing line) — richer than grepping the logs
 
