@@ -12,13 +12,13 @@ vi.mock('../src/util/db', () => ({
 
 import compiler from '../src/util/compiler';
 import Tank from '../src/types/tank';
-import { Process } from '../src/types/environment';
+import { Process, DEPLOY_TICKS } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
 import { makeSimEnv } from './simEnv';
 
 function makeWorld() {
   const world = makeSimEnv({ run: (env) => Simulation.run(env) });
-  const { env, processes, events, faults, tick } = world;
+  const { env, processes, events, faults, tick, setClock } = world;
 
   // Compile a bot's source into a fresh isolate-backed tank at a fixed pose.
   const addBot = (
@@ -48,7 +48,7 @@ function makeWorld() {
   const dispose = () =>
     processes.forEach((p) => p.tanks.forEach((t) => t.getContext().release()));
 
-  return { env, processes, events, faults, addBot, tick, dispose };
+  return { env, processes, events, faults, addBot, tick, setClock, dispose };
 }
 
 describe('sandbox + simulation integration', () => {
@@ -168,6 +168,8 @@ describe('sandbox + simulation integration', () => {
     });
 
     const startHealth = target.health;
+    // Past the damage-free deployment window so shots are lethal.
+    world.setClock(DEPLOY_TICKS);
     await world.tick(40);
 
     expect(target.health).toBeLessThan(startHealth); // took bullet damage
@@ -237,6 +239,8 @@ describe('sandbox + simulation integration', () => {
     });
     expect(enemy.health).toBe(100);
 
+    // Past the damage-free deployment window so the shot is lethal.
+    world.setClock(DEPLOY_TICKS);
     await world.tick(15);
 
     expect(enemy.health).toBeLessThan(100); // the shot connected

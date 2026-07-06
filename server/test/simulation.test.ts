@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import Simulation from '../src/util/simulation';
 import { Event } from '../src/types/event';
+import { DEPLOY_TICKS } from '../src/types/environment';
+
+// Simulation → Environment → AppService runs a CREATE TABLE query at import; stub
+// the pool so importing it here doesn't reach for a real Postgres (these tests
+// drive mock envs and never touch the database).
+vi.mock('../src/util/db', () => ({
+  default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
+}));
 
 // Simulation.run only reads/writes plain tank fields and invokes
 // tank.handlers[...] functions, so we can drive the real physics with
@@ -184,10 +192,11 @@ describe('Simulation.run — bullets', () => {
       callback: vi.fn(),
     };
     const shooter = makeTank({ id: 'b', x: 375, y: 300, bullets: [bullet] });
-    const env = makeEnv([
-      makeProcess('a', [target]),
-      makeProcess('b', [shooter]),
-    ]);
+    // Past the damage-free deployment window so the hit is lethal.
+    const env = makeEnv(
+      [makeProcess('a', [target]), makeProcess('b', [shooter])],
+      { time: DEPLOY_TICKS }
+    );
     run(env);
     expect(target.health).toBe(75);
     expect(hit).toHaveBeenCalledTimes(1);
@@ -198,6 +207,45 @@ describe('Simulation.run — bullets', () => {
       'event',
       expect.objectContaining({ type: 'bulletExploded', id: 'b1' })
     );
+  });
+
+  it('deals no damage during the deployment window but still resolves the shot', () => {
+    const hit = vi.fn();
+    const target = makeTank({
+      id: 'a',
+      x: 375,
+      y: 375,
+      handlers: { [Event.HIT]: hit },
+    });
+    const bullet = {
+      id: 'b1',
+      x: 375,
+      y: 375,
+      speed: 5,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 365 },
+      callback: vi.fn(),
+    };
+    const shooter = makeTank({ id: 'b', x: 375, y: 300, bullets: [bullet] });
+    // Inside the deployment window (time 0 < DEPLOY_TICKS).
+    const env = makeEnv(
+      [makeProcess('a', [target]), makeProcess('b', [shooter])],
+      { time: 0 }
+    );
+    run(env);
+    // No damage / stats during warm-up...
+    expect(target.health).toBe(100);
+    expect(target.stats.timesHit).toBe(0);
+    expect(shooter.stats.shotsHit).toBe(0);
+    expect(env.emit).not.toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'tankDamaged' })
+    );
+    // ...but the shot still lands: HIT fires and the bullet is consumed.
+    expect(hit).toHaveBeenCalledTimes(1);
+    expect(bullet.exploded).toBe(true);
+    expect(bullet.callback).toHaveBeenCalledWith({ id: 'a' });
   });
 
   it('moves a live bullet along its orientation', () => {
