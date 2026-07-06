@@ -9,7 +9,7 @@ vi.mock('../src/services/AppService', () => ({
   default: { get: vi.fn() },
 }));
 
-import { buildMatchSummary } from '../src/util/matchSummary';
+import { buildMatchSummary, buildMatchStatus } from '../src/util/matchSummary';
 import { SUDDEN_DEATH_TIME } from '../src/types/environment';
 import { TankStats } from '../src/types/tankStats';
 import appService from '../src/services/AppService';
@@ -174,5 +174,68 @@ describe('buildMatchSummary', () => {
 
     const a2 = summary.leaderboard.find((e) => e.id === 'a2')!;
     expect(a2.stats.accuracy).toBe(0);
+  });
+});
+
+describe('buildMatchStatus', () => {
+  it('returns coarse standings with no stat blocks or per-tank arrays', async () => {
+    const env = makeEnv([
+      makeProcess('a1', [
+        makeTank('t1', 80, null, { shotsFired: 6, shotsHit: 3 }),
+        makeTank('t2', 0, 300),
+      ]),
+      makeProcess('a2', [makeTank('t3', 50, null), makeTank('t4', 40, null)]),
+    ]);
+    const members = [makeMember('a1', 1), makeMember('a2', 2)];
+
+    const status = await buildMatchStatus(env, members);
+
+    expect(status.running).toBe(true);
+    expect(status.clock.time).toBe(900);
+    expect(status.match.appCount).toBe(2);
+    expect(status.match.appsAlive).toBe(2);
+    expect(status.match.decided).toBe(false);
+    expect(status.match.winner).toBeNull();
+    // Both alive → ranked by total health: a2 (90) above a1 (80).
+    expect(status.standings.map((s) => s.id)).toEqual(['a2', 'a1']);
+    expect(status.standings[0]).toEqual({
+      rank: 1,
+      id: 'a2',
+      name: 'Wanderer',
+      alive: true,
+      tanksAlive: 2,
+      totalHealth: 90,
+      eliminatedAt: null,
+    });
+    // Lean shape: no per-bot stats, no per-tank arrays, no ranking-only fields.
+    const row = status.standings[0] as Record<string, unknown>;
+    expect(row.stats).toBeUndefined();
+    expect(row.tanks).toBeUndefined();
+    expect(row.shotsHit).toBeUndefined();
+    expect(row.userId).toBeUndefined();
+  });
+
+  it('agrees with buildMatchSummary on order, decided, and winner', async () => {
+    const processes = [
+      makeProcess('a1', [makeTank('t1', 0, 420), makeTank('t2', 0, 500)]),
+      makeProcess('a2', [makeTank('t3', 25, null), makeTank('t4', 0, 480)]),
+    ];
+    const members = [makeMember('a1', 1), makeMember('a2', 2)];
+
+    const status = await buildMatchStatus(makeEnv(processes), members);
+    const summary = await buildMatchSummary(makeEnv(processes), members);
+
+    expect(status.match.decided).toBe(true);
+    expect(status.match.winner).toEqual({
+      id: 'a2',
+      name: 'Wanderer',
+      userId: 'u2',
+    });
+    // The two views must never disagree — they share the ranking/outcome helpers.
+    expect(status.match).toEqual(summary.match);
+    expect(status.standings.map((s) => s.id)).toEqual(
+      summary.leaderboard.map((e) => e.id)
+    );
+    expect(status.standings[1].eliminatedAt).toBe(500);
   });
 });

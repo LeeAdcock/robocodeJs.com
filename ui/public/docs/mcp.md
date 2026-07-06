@@ -78,6 +78,10 @@ Once connected, these tools are available (all scoped to your account):
   tanks: position, orientation, health, bullets)
 - `match_summary` — outcome view: leaderboard, winner, per-bot accuracy/damage/
   survival, and elimination order (most useful once a match is decided)
+- `match_status` — the cheap-to-poll companion: just `decided`, the `winner`, and
+  a coarse standings list (rank, tanks alive, total health) — no per-bot stat
+  blocks or per-tank positions. Use it to watch a running match ("is it decided
+  yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
 - `add_bot_to_arena` / `remove_bot_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
 - `run_match` — run one match to a decision (optional `seed`) and return the

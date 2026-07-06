@@ -29,7 +29,7 @@ import {
   deleteAppEverywhere,
 } from '../util/botActions';
 import { buildArenaStatus } from '../util/arenaStatus';
-import { buildMatchSummary } from '../util/matchSummary';
+import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
 import { logger, LogEvent } from '../util/logger';
 
 const app = express();
@@ -494,6 +494,36 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
       return ok(await buildMatchSummary(env, members));
+    }
+  );
+
+  server.registerTool(
+    'match_status',
+    {
+      title: 'Match status',
+      description:
+        'Lightweight, cheap-to-poll status of an arena: whether the match is ' +
+        'decided (`match.decided`), the winner once it is, and a coarse ' +
+        'standings list (each bot’s rank, tanks alive, total health) — with NONE ' +
+        'of match_summary’s per-bot stat blocks or arena_status’s per-tank ' +
+        'positions. Use this to watch a running match ("is it decided yet / ' +
+        'who’s ahead?") without pulling the large payloads; once decided, call ' +
+        'match_summary for the full outcome + stats, or arena_status for exact ' +
+        'tank positions. Omit arenaId for your default arena.',
+      inputSchema: {
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ arenaId }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      const members = await arenaMemberService.getForArena(arena.getId());
+      return ok(await buildMatchStatus(env, members));
     }
   );
 

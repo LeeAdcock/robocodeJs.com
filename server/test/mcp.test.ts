@@ -38,7 +38,10 @@ vi.mock('../src/util/botActions', () => ({
   deleteAppEverywhere: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../src/util/arenaStatus', () => ({ buildArenaStatus: vi.fn() }));
-vi.mock('../src/util/matchSummary', () => ({ buildMatchSummary: vi.fn() }));
+vi.mock('../src/util/matchSummary', () => ({
+  buildMatchSummary: vi.fn(),
+  buildMatchStatus: vi.fn(),
+}));
 // Mock the compiler so check_bot_source doesn't spin a real isolate in this suite
 // (the real dry-run behaviour is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
@@ -53,7 +56,7 @@ import arenaMemberService from '../src/services/ArenaMemberService';
 import environmentService from '../src/services/EnvironmentService';
 import { propagateSource } from '../src/util/botActions';
 import { buildArenaStatus } from '../src/util/arenaStatus';
-import { buildMatchSummary } from '../src/util/matchSummary';
+import { buildMatchSummary, buildMatchStatus } from '../src/util/matchSummary';
 
 const user = { getId: () => 'u1' } as never;
 
@@ -227,6 +230,27 @@ describe('mcp tools', () => {
     expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
     expect(JSON.parse(textOf(res))).toEqual({
       match: { decided: true, winner: { id: 'a1' } },
+    });
+  });
+
+  it('match_status resolves the default arena and returns the status', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildMatchStatus).mockResolvedValue({
+      match: { decided: false, winner: null },
+      standings: [],
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'match_status',
+      arguments: {},
+    })) as never;
+
+    expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
+    expect(JSON.parse(textOf(res))).toEqual({
+      match: { decided: false, winner: null },
+      standings: [],
     });
   });
 

@@ -16,7 +16,7 @@ import {
 import { writeRateLimit } from '../middleware/rateLimit';
 import { openSseStream } from '../util/sse';
 import { buildArenaStatus } from '../util/arenaStatus';
-import { buildMatchSummary } from '../util/matchSummary';
+import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
 
 const app = express();
 
@@ -115,6 +115,19 @@ const getSummary = async (req: Request, res: Response) => {
   res.send(await buildMatchSummary(env, members));
 };
 app.get(dual('/summary'), loadUser, resolveArena, getSummary);
+
+// Get the lightweight match status (decided flag, winner, coarse standings) —
+// the cheap-to-poll companion to getSummary, without the per-bot stat blocks or
+// per-tank arrays. Same open, un-owner-gated access (spectating is intentional).
+const getMatchStatus = async (req: Request, res: Response) => {
+  const arena = scopedArena(req);
+  const env = await environmentService.get(arena);
+  const members = await arenaMemberService.getForArena(arena.getId());
+
+  res.status(200);
+  res.send(await buildMatchStatus(env, members));
+};
+app.get(dual('/match-status'), loadUser, resolveArena, getMatchStatus);
 
 // Remove an app from an arena
 const removeApp = async (req: Request, res: Response) => {
