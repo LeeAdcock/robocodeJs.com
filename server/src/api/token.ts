@@ -45,14 +45,38 @@ const mintToken = async (
 // and return the plaintext this one time. For programmatic clients.
 app.post('/api/token', auth(true), mintToken);
 
+// Reject cross-site requests to the token-minting GET. Because that route is a
+// state-changing GET reachable by a top-level navigation, a page on another site
+// could otherwise link a signed-in victim to it and rotate (invalidate) their
+// token — a CSRF denial-of-service on their MCP connection (it can't read the
+// token, only churn it). `Sec-Fetch-Site: cross-site` marks exactly that case;
+// legitimate flows are 'same-origin' (link within the app) or 'none' (typed into
+// the address bar — the point of this route). Absent header (older/non-browser
+// clients) falls through, preserving prior behavior.
+const rejectCrossSite = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  if (req.get('sec-fetch-site') === 'cross-site') {
+    logger.warn(
+      { event: LogEvent.AUTH_FORBIDDEN, path: req.path },
+      'blocked cross-site token mint'
+    );
+    res.status(403).send('Cross-site token requests are not allowed');
+    return;
+  }
+  next();
+};
+
 // Browser-friendly minting: navigating the address bar to this URL while signed
 // in sends the HttpOnly session cookie automatically, so a user can obtain a
 // token without any UI. Each visit mints a *fresh* token and invalidates the
 // previous one (we only store the hash, so it can't be re-shown). It is a GET so
-// the address bar works; the response is uncacheable and, because the cookie is
-// SameSite=lax, a cross-site page can't read it — at worst a tricked top-level
-// navigation rotates the token, it can't steal it.
-app.get('/api/token/new', auth(true), mintToken);
+// the address bar works; the response is uncacheable, the cookie is
+// SameSite=lax so a cross-site page can't read it, and rejectCrossSite blocks a
+// tricked cross-site navigation from rotating it.
+app.get('/api/token/new', auth(true), rejectCrossSite, mintToken);
 
 // Report whether the user has a token, without revealing it (we only hold the
 // hash). Lets the UI show "connected" vs "generate" without a show-once value.

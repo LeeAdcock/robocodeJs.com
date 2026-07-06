@@ -181,7 +181,22 @@ export default (required: boolean) =>
           throw new Error('Missing account.');
         }
       } else {
-        // First time we've seen this Google user: create their account.
+        // First time we've seen this Google user: create their account. Require
+        // a Google-verified email before persisting it — the account is keyed on
+        // the immutable `sub`, but the stored `email` must be trustworthy so no
+        // downstream logic ever treats an attacker-controllable, unverified
+        // address as identifying. (Google sets email_verified=true for normal
+        // accounts, so this only rejects genuinely unverified ones.)
+        if (payload.email_verified !== true) {
+          logger.warn(
+            { event: LogEvent.AUTH_FAILED, sub: payload.sub },
+            'sign-up rejected: Google email not verified'
+          );
+          res.clearCookie('auth');
+          res.status(401);
+          res.send('Access forbidden');
+          return;
+        }
         user = await userService.create(
           payload.name,
           payload.picture,

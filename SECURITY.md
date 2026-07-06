@@ -1,6 +1,6 @@
 # Security Overview — OWASP Top 10 Audit
 
-> **Status:** All medium-and-above findings remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A02-1 (RDS CA verification), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A06-1 (CI + dependency scanning), A07-1 (rate limiting). **Still open:** only the 🟡 low-severity items (A02-2, A03 mcp `sub` allowlist, A05-2, A07-2/3/4). A08 (markdown XSS) is mitigated by the A05-1 CSP + React inertness — decision recorded to rely on CSP rather than add a sanitizer. Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
+> **Status:** All medium-and-above findings remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A02-1 (RDS CA verification), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A06-1 (CI + dependency scanning), A07-1 (rate limiting). Also fixed the cheap 🟡 wins: A03 (mcp `sub` allowlist), A07-2 (`email_verified`), A07-4 (token-rotation CSRF). **Remaining (all 🟡 low, accepted/deferred):** A02-2 (token entropy — `randomUUID` is adequate), A05-2 (DDL startup robustness), A07-3 (session revocation — accepted for the ~1 h TTL), A06-2 (eslint 9 migration chore). A08 (markdown XSS) is mitigated by the A05-1 CSP + React inertness — decision recorded to rely on CSP rather than add a sanitizer. Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
 
 ## Threat model
 
@@ -62,8 +62,7 @@ These authenticate but don't verify the caller owns the `:userId` resource, so a
 
 **No host-side RCE.** Bot source runs only inside `isolated-vm` (`compiler.ts:474-481`); no host `eval`/`new Function`. Sandbox-definition template strings interpolate only internal constants, never user input.
 
-**Path traversal mitigated.** The only request-driven file reads are in `api/mcp.ts`; `readPublic` reduces filenames via `path.basename` (`mcp.ts:58-67`). ⚠️ Latent: the `sub` arg is **not** sanitized (`mcp.ts:48,61`) but is only ever passed hardcoded literals today.
-**Fix (defense-in-depth):** allowlist `sub` so it can't regress into a traversal vector.
+**✅ Path traversal mitigated.** The only request-driven file reads are in `api/mcp.ts`; `readPublic` reduces filenames via `path.basename`. The `sub` arg was previously unsanitized (though only ever passed hardcoded literals). **Fixed** (`feat/security-hardening`): `listPublic`/`readPublic` now allowlist `sub` to `docs`/`samples`/`ts` via `isAllowedSub`, so it can't regress into a traversal vector even if a future caller sources it from request input.
 
 **No mass assignment** — records are built field-by-field from typed getters / verified token payload, never spread from `req.body`.
 
@@ -137,16 +136,21 @@ No `express-rate-limit` present. Unthrottled: `POST /api/session` (unauthenticat
 
 ### 🟡 A07-2 — No `email_verified` / hosted-domain check on account creation
 
-`userService.create(payload.name, payload.picture, payload.email)` (`auth.ts:185-190`) trusts the token's `email` without checking `payload.email_verified`. Identity key is `payload.sub` (correct), so low severity today — but the **stored email is untrusted**; flag before any logic keys on email.
+### ✅ 🟡 A07-2 — No `email_verified` check on account creation
+
+`userService.create(...)` trusted the token's `email` without checking `payload.email_verified`. Identity key is `payload.sub` (correct), so low severity — but the stored email was untrusted.
+
+> **Fixed** (`feat/security-hardening`). First-login account creation in `auth.ts` now rejects (401 + `clearCookie`) when `payload.email_verified !== true`, so an unverified address is never persisted. Test in `test/auth.test.ts`.
 
 ### 🟡 A07-3 — No server-side session revocation
 
-Logout just clears the cookie (`session.ts:66-70`); a stolen still-valid id token works until its ~1 h expiry. Acceptable for this app; note it.
+Logout just clears the cookie (`session.ts:66-70`); a stolen still-valid id token works until its ~1 h expiry. **Accepted:** a revocation denylist is disproportionate work for the short (~1 h) token TTL. No action.
 
-### 🟡 A07-4 — Token-rotation CSRF via GET
+### ✅ 🟡 A07-4 — Token-rotation CSRF via GET
 
-`GET /api/token/new` (`token.ts:55`) rotates a token; SameSite=lax cookies ride top-level GET navigations, so a tricked navigation can force-rotate a victim's token (DoS on their MCP connection; cannot exfiltrate). SameSite=lax is otherwise the sole (adequate) CSRF defense for state-changing POST/PUT/DELETE.
-**Fix:** require POST + CSRF token or an Origin check for token rotation.
+`GET /api/token/new` rotates a token; SameSite=lax cookies ride top-level GET navigations, so a tricked navigation could force-rotate a victim's token (DoS on their MCP connection; cannot exfiltrate).
+
+> **Fixed** (`feat/security-hardening`). A `rejectCrossSite` guard on `GET /api/token/new` returns 403 when `Sec-Fetch-Site: cross-site` — blocking the cross-site navigation vector while still allowing `same-origin` links and address-bar (`none`) use. Tests in `test/token.test.ts`.
 
 ---
 
@@ -173,18 +177,19 @@ Logging hygiene is **good**: structured pino logger, no tokens/cookies logged (`
 
 ## Prioritized remediation backlog
 
-| #   | Finding                                                                                       | Category            | Severity    | Status  |
-| --- | --------------------------------------------------------------------------------------------- | ------------------- | ----------- | ------- |
-| 1   | `requireAppOwner` on source/delete/compile/reboot (IDOR)                                      | A01-1               | 🔴 Critical | ✅ Done |
-| 2   | Owner-gate `/arena/logs` (status/events open by design for spectating)                        | A01-2               | 🟠 High     | ✅ Done |
-| 3   | Cap per-tank timers (host DoS) → E021                                                         | A04-1               | 🔴 High     | ✅ Done |
-| 4   | Add rate limiting (sign-in, token, isolate-spawning routes) → E022                            | A07-1               | 🟠 High     | ✅ Done |
-| 5   | Global arena cap + `MAX_APPS_PER_USER`                                                        | A04-2/3             | 🟠 Med      | ✅ Done |
-| 6   | Add `helmet` + CSP + `X-Frame-Options`                                                        | A05-1               | 🟠 Med      | ✅ Done |
-| 7   | Add CI dependency scanning; `npm ci`                                                          | A06-1               | 🟠 Med      | ✅ Done |
-| 8   | Pin RDS CA, `rejectUnauthorized: true`                                                        | A02-1               | 🟠 Med      | ✅ Done |
-| 9   | Sanitize markdown pipeline / rely on CSP                                                      | A08                 | 🟡 Low      | ✅ CSP  |
-| 10  | `email_verified` check; allowlist mcp `sub`; token-rotation CSRF; `crypto.randomBytes` tokens | A07-2/4, A03, A02-2 | 🟡 Low      | ⬜ Open |
+| #   | Finding                                                                        | Category                   | Severity    | Status          |
+| --- | ------------------------------------------------------------------------------ | -------------------------- | ----------- | --------------- |
+| 1   | `requireAppOwner` on source/delete/compile/reboot (IDOR)                       | A01-1                      | 🔴 Critical | ✅ Done         |
+| 2   | Owner-gate `/arena/logs` (status/events open by design for spectating)         | A01-2                      | 🟠 High     | ✅ Done         |
+| 3   | Cap per-tank timers (host DoS) → E021                                          | A04-1                      | 🔴 High     | ✅ Done         |
+| 4   | Add rate limiting (sign-in, token, isolate-spawning routes) → E022             | A07-1                      | 🟠 High     | ✅ Done         |
+| 5   | Global arena cap + `MAX_APPS_PER_USER`                                         | A04-2/3                    | 🟠 Med      | ✅ Done         |
+| 6   | Add `helmet` + CSP + `X-Frame-Options`                                         | A05-1                      | 🟠 Med      | ✅ Done         |
+| 7   | Add CI dependency scanning; `npm ci`                                           | A06-1                      | 🟠 Med      | ✅ Done         |
+| 8   | Pin RDS CA, `rejectUnauthorized: true`                                         | A02-1                      | 🟠 Med      | ✅ Done         |
+| 9   | Sanitize markdown pipeline / rely on CSP                                       | A08                        | 🟡 Low      | ✅ CSP          |
+| 10  | `email_verified` check · allowlist mcp `sub` · token-rotation CSRF             | A07-2, A03, A07-4          | 🟡 Low      | ✅ Done         |
+| 11  | Token entropy (`randomBytes`) · DDL robustness · session revocation · eslint 9 | A02-2, A05-2, A07-3, A06-2 | 🟡 Low      | ⬜ Accept/defer |
 
 ## Verification approach (when fixes are implemented)
 

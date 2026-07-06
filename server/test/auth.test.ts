@@ -21,8 +21,15 @@ import auth, { hashToken } from '../src/middleware/auth';
 import userService from '../src/services/UserService';
 import identityService from '../src/services/IdentityService';
 
-const payload = (sub: string) => ({
-  getPayload: () => ({ sub, name: 'Ada', picture: 'pic', email: 'a@b.c' }),
+const payload = (sub: string, extra: Record<string, unknown> = {}) => ({
+  getPayload: () => ({
+    sub,
+    name: 'Ada',
+    picture: 'pic',
+    email: 'a@b.c',
+    email_verified: true,
+    ...extra,
+  }),
 });
 const makeRes = () => ({
   status: vi.fn().mockReturnThis(),
@@ -67,6 +74,21 @@ describe('auth middleware', () => {
     expect(identityService.create).toHaveBeenCalledWith('u2', 'google', 'g2');
     expect((req as { user: unknown }).user).toBe(user);
     expect(next).toHaveBeenCalled();
+  });
+
+  it('rejects first-login sign-up when the Google email is not verified', async () => {
+    verifyIdToken.mockResolvedValue(payload('g4', { email_verified: false }));
+    vi.mocked(identityService.get).mockResolvedValue(undefined);
+
+    const req = { cookies: { auth: 'tok' } } as never;
+    const res = makeRes();
+    const next = vi.fn();
+    await auth(true)(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.clearCookie).toHaveBeenCalledWith('auth');
+    expect(userService.create).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid token with 401 when auth is required', async () => {
