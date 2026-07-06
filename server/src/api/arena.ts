@@ -267,13 +267,15 @@ app.get(dual('/members'), loadUser, requireOwner, resolveArena, listMembers);
 
 const restart = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
-  return environmentService
-    .get(arena)
-    .then((env) => env.restart())
-    .then(() => {
+  return environmentService.get(arena).then((env) =>
+    env.restart().then(() => {
+      // A reset starts a fresh match running, not paused — env.restart() on its
+      // own leaves the arena paused.
+      env.resume();
       res.status(200);
       res.send();
-    });
+    })
+  );
 };
 app.post(dual('/restart'), loadUser, requireOwner, resolveArena, restart);
 

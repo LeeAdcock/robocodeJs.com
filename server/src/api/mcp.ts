@@ -590,8 +590,12 @@ export const buildServer = (user: User): McpServer => {
   control(
     'restart_arena',
     'Restart arena',
-    'Restart an arena: reset and re-run all of its bots.',
-    (env) => env.restart()
+    'Restart an arena: reset and re-run all of its bots, and start it running ' +
+      '(a reset begins a fresh match, not a paused one).',
+    async (env) => {
+      await env.restart();
+      env.resume();
+    }
   );
 
   server.registerTool(
