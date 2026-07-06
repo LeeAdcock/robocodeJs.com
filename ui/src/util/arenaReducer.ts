@@ -16,11 +16,14 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
 
   if (data.type === 'tick') {
     if (arena.clock.time !== data.time) {
+      // Arena dimensions come from the server status snapshot (always present
+      // after bootstrap); fall back to the 750² default if a tick somehow lands
+      // before the first snapshot.
       Simulate(
         arena.clock.time,
         arena.apps,
-        750, //todo get this from the server
-        750
+        arena.width || 750,
+        arena.height || 750
       );
       arena.clock.time = data.time;
     }

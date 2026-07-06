@@ -134,3 +134,55 @@ describe('simulate — bullets', () => {
     expect(bullet.y).toBeCloseTo(380); // its bullet still does
   });
 });
+
+describe('simulate — path trail', () => {
+  // By design the trail records only turn vertices, not every step: a tank
+  // driving straight (orientation === target) leaves no breadcrumbs.
+  it('records nothing while driving straight', () => {
+    const tank = makeTank({ speed: 10 }); // orientation 0 === target 0
+    sim([tank]);
+    expect(tank.path).toBeUndefined();
+    expect(tank.pathIndex).toBeUndefined();
+  });
+
+  it('records a point while turning', () => {
+    // Still rotating toward the target → a vertex is recorded (at the
+    // post-move position, which used the pre-rotation heading of 0 → +y).
+    const tank = makeTank({
+      speed: 10,
+      bodyOrientationTarget: 90,
+      bodyOrientationVelocity: 10,
+    });
+    sim([tank]);
+    expect(tank.pathIndex).toBe(1);
+    expect(tank.path?.[0]).toMatchObject({ x: 375, y: 385 });
+  });
+
+  it('dedups an unchanged position while still turning', () => {
+    const tank = makeTank({
+      speed: 0, // stays in place
+      bodyOrientationTarget: 90,
+      bodyOrientationVelocity: 1, // still turning after one step
+    });
+    sim([tank]);
+    sim([tank]);
+    expect(tank.pathIndex).toBe(1); // one vertex, then deduped
+  });
+
+  it('wraps the dedup read at index 0 instead of reading path[-1]', () => {
+    // A turning, stationary tank whose current position already sits in the
+    // *last* buffer slot. With the positive-modulo read, (0 - 1 + len) % len
+    // wraps to that tail slot and dedups (no new point). The old
+    // `pathIndex - (1 % len)` read path[-1] (undefined) and recorded a dup.
+    const tank = makeTank({
+      speed: 0,
+      bodyOrientation: 10,
+      bodyOrientationTarget: 90,
+      bodyOrientationVelocity: 1,
+      path: [undefined, undefined, { x: 375, y: 375, time: 0 }],
+      pathIndex: 0,
+    });
+    sim([tank]);
+    expect(tank.pathIndex).toBe(0); // deduped via the wrap, not incremented
+  });
+});
