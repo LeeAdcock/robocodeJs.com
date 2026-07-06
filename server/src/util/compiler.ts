@@ -448,6 +448,25 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     .runSync(tank.getContext(), {});
 }
 
+// Bot source is (re)run in the SAME persisted isolate context on every reload:
+// a live save re-registers handlers without re-firing START, so the context —
+// and its global lexical scope — is intentionally kept (see `execute` below).
+// Running the author's code directly in that scope means a top-level `const` or
+// `let` is re-declared on the second load and throws "Identifier '…' has already
+// been declared" (surfaced as E017), even though the docs promise top-level
+// variables simply "reset every time the code is reloaded". Wrapping the source
+// in an immediately-invoked arrow gives every load its own fresh function scope,
+// so top-level `const`/`let`/`var` no longer collide across reloads.
+//
+// Why an ARROW (not `function`): the arrow keeps `this` bound to the enclosing
+// script's `this`, which for a classic isolated-vm script is the context's
+// global object. Bots share state across handlers (and across reloads) by
+// assigning to `this` — the documented pattern — so preserving that binding is
+// required. The opener adds NO newline, so bot-code line numbers in fault
+// reports (parsed from `<isolated-vm>:line:col`) are unchanged; the closing
+// `})()` sits on its own trailing line, after all author code.
+const wrapSource = (source: string): string => `(() => {${source}\n})()`;
+
 // Execute the tank code
 const execute = (process: Process, tank: Tank): Promise<unknown> => {
   tank.handlers = {};
@@ -470,7 +489,11 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
     try {
       // Compile is synchronous (and can throw on a syntax error); the top-level
       // run goes async so the bot's startup code runs off the main thread.
-      script = process.getSandbox().compileScriptSync(app.getSource());
+      // wrapSource gives each (re)load a fresh scope so top-level const/let don't
+      // collide when this same context is re-run on a live save.
+      script = process
+        .getSandbox()
+        .compileScriptSync(wrapSource(app.getSource()));
     } catch (e) {
       onError(e);
       return;
@@ -953,8 +976,10 @@ const check = async (source: string): Promise<CheckResult> => {
     init(env, process, tank);
     let script: ivm.Script;
     try {
-      // Synchronous compile — throws on a syntax error.
-      script = process.getSandbox().compileScriptSync(source);
+      // Synchronous compile — throws on a syntax error. Wrap identically to
+      // execute() so the dry-run's scoping (and thus what it accepts/rejects)
+      // matches a real load.
+      script = process.getSandbox().compileScriptSync(wrapSource(source));
     } catch (e) {
       return failure('compile', e);
     }

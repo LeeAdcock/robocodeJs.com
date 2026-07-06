@@ -433,3 +433,52 @@ describe('compiler.check — dry-run compile (throwaway isolate)', () => {
     }
   });
 });
+
+describe('compiler — reload scoping (top-level const/let, E017 regression)', () => {
+  let ctx: ReturnType<typeof makeCompiledTank>;
+
+  beforeEach(() => {
+    ctx = makeCompiledTank();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    ctx.proc.dispose();
+  });
+
+  it('documents the hazard: re-running raw top-level const in one context throws', () => {
+    // The bot context is reused across a live save; running author code directly
+    // in it re-declares any top-level const/let. This is exactly what wrapSource
+    // exists to prevent.
+    ctx.run('const DUP = 1;');
+    expect(() => ctx.run('const DUP = 1;')).toThrow(/already been declared/);
+  });
+
+  it('reloads a bot with top-level const/let without crashing, and keeps this-state', async () => {
+    // Top-level const (would collide on reload) + this-state (must survive reload).
+    const code = [
+      'const FLEE = 40;',
+      'let loads = (this.loads || 0) + 1;',
+      'this.loads = loads;',
+      'this.flee = FLEE;',
+      'bot.on(Event.START, () => {});',
+    ].join('\n');
+    vi.spyOn(appService, 'get').mockResolvedValue({
+      getSource: () => code,
+    } as unknown as Awaited<ReturnType<typeof appService.get>>);
+
+    // First load.
+    await compiler.execute(ctx.proc, ctx.tank);
+    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(ctx.read('this.loads')).toBe(1);
+    expect(ctx.read('this.flee')).toBe(40);
+
+    // Reload in the SAME context — this is what threw "Identifier 'FLEE' has
+    // already been declared" (E017) before wrapSource.
+    await compiler.execute(ctx.proc, ctx.tank);
+    expect(ctx.tank.appCrashed).toBeFalsy();
+    // Top-level const gets a fresh per-load scope (no redeclare error)...
+    expect(ctx.read('this.flee')).toBe(40);
+    // ...while this-state (globalThis) persists across the reload, as documented.
+    expect(ctx.read('this.loads')).toBe(2);
+  });
+});
