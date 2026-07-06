@@ -28,6 +28,8 @@ interface ScanResult {
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
+  /** Its current health (0–100) — target the weakest enemy or judge a threat. */
+  health: number;
 }
 
 /** Details about the sender of a received message (the second RECEIVED argument). */

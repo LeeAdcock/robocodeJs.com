@@ -188,6 +188,12 @@ export const INTERFACES: ApiInterface[] = [
         type: 'boolean',
         doc: 'True if it is on your team.',
       },
+      {
+        name: 'health',
+        kind: 'property',
+        type: 'number',
+        doc: 'Its current health (0–100) — target the weakest enemy or judge a threat.',
+      },
     ],
   },
   {

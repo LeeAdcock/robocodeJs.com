@@ -124,6 +124,7 @@ export class TankRadar implements Orientated {
       distance: number;
       angle: number;
       friendly: boolean;
+      health: number;
     }> = [];
     this.tank.env.getProcesses().forEach((otherProcess) => {
       otherProcess.tanks.forEach((otherTank) => {
@@ -161,6 +162,9 @@ export class TankRadar implements Orientated {
               angle: toRelativeBearing(angle, this.tank.getOrientation()),
               friendly:
                 otherProcess.getAppId() === this.tank.process.getAppId(),
+              // The detected tank's current health (0–100), so bots can prioritize
+              // the weakest enemy or judge a threat. Symmetric — every bot sees it.
+              health: otherTank.health,
             });
           }
         }

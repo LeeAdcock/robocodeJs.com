@@ -230,6 +230,102 @@ describe('mcp tools', () => {
     });
   });
 
+  it('run_match reseeds, restarts+resumes, runs to a decision, and returns the winner', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      {},
+      {},
+    ] as never);
+    const env = {
+      getProcesses: () => [{}, {}],
+      setSeed: vi.fn(),
+      getSpeed: () => 1,
+      setSpeed: vi.fn(),
+      restart: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
+      pause: vi.fn(),
+      isRunning: () => true,
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    // Already decided on the first read, so the poll loop exits immediately.
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1', name: 'Winner' } },
+      leaderboard: [{ rank: 1, id: 'a1' }],
+    } as never);
+
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'run_match',
+      arguments: { seed: 42 },
+    })) as never;
+
+    expect(env.setSeed).toHaveBeenCalledWith(42);
+    expect(env.restart).toHaveBeenCalled();
+    expect(env.resume).toHaveBeenCalled(); // restart alone leaves it paused
+    expect(env.pause).toHaveBeenCalled(); // paused at the decided state
+    const out = JSON.parse(textOf(res));
+    expect(out.timedOut).toBe(false);
+    expect(out.match.winner.id).toBe('a1');
+  });
+
+  it('run_match requires at least two active bots', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([{}] as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      getProcesses: () => [{}],
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'run_match',
+      arguments: {},
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+  });
+
+  it('run_tournament runs the seed panel and returns an aggregate ranking', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      {},
+      {},
+    ] as never);
+    const env = {
+      getProcesses: () => [{}, {}],
+      setSeed: vi.fn(),
+      getSpeed: () => 1,
+      setSpeed: vi.fn(),
+      restart: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
+      pause: vi.fn(),
+      isRunning: () => true,
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    // a1 wins every match; leaderboard of 2 apps.
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1', name: 'Alpha' } },
+      leaderboard: [
+        { rank: 1, id: 'a1', name: 'Alpha' },
+        { rank: 2, id: 'a2', name: 'Beta' },
+      ],
+    } as never);
+
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'run_tournament',
+      arguments: { seeds: [1, 2] },
+    })) as never;
+
+    const out = JSON.parse(textOf(res));
+    expect(out.matchCount).toBe(2);
+    expect(out.seeds).toEqual([1, 2]);
+    expect(env.restart).toHaveBeenCalledTimes(2); // one match per seed
+    // a1 wins both: 2 wins, 2 pts/match (1st of 2) × 2 = 4; a2: 0 wins, 1 pt × 2 = 2.
+    expect(out.ranking[0]).toMatchObject({ id: 'a1', wins: 2, points: 4 });
+    expect(out.ranking[1]).toMatchObject({ id: 'a2', wins: 0, points: 2 });
+  });
+
   it('recent_logs filters by level, bot, tank, and text', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
