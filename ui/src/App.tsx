@@ -472,6 +472,11 @@ function App() {
               position: 'absolute',
               top: '22px',
               left: '22px',
+              // The arena SVG below sets `isolation: isolate`, which gives it its
+              // own stacking context in the positioned-paint layer; being later
+              // in the DOM it would otherwise paint over this toolbar. Lift the
+              // toolbar above it so the pause/resume/restart controls stay visible.
+              zIndex: 1,
             }}
           >
             <ArenaToolbar
