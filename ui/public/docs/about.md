@@ -1,13 +1,13 @@
 # About RobocodeJs
 
-Hi — I'm **Lee Adcock**, and RobocodeJs is my passion project.
+Hi — I'm **Lee**, and RobocodeJs is my passion project: my **web-enabled version
+of the classic [Robocode](https://robocode.sourceforge.io/)** — the game that first
+made me fall for programming as a kid.
 
-It's a love letter to the game that first made me fall for programming as a kid:
-[Robocode](https://robocode.sourceforge.io/), the classic where you wrote little
-Java tank AIs and set them loose to battle. I spent hours tuning radar sweeps and
-firing angles — and learned, without really noticing, how to think like a
-programmer. That feeling of _my code, alive in the arena_ is a big part of why I
-write software today.
+It's a love letter to that classic, where you wrote little Java tank AIs and set
+them loose to battle. I spent hours tuning radar sweeps and firing angles — and
+learned, without really noticing, how to think like a programmer. That feeling of
+_my code, alive in the arena_ is a big part of why I write software today.
 
 RobocodeJs is my attempt to hand that same spark to the next person. I rebuilt the
 idea for the browser and JavaScript so there's nothing to install and nothing

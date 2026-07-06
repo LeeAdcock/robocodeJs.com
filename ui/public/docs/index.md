@@ -83,4 +83,4 @@ Next you may want to skim through the detailed [RobocodeJs documentation](/dev),
 
 ---
 
-_RobocodeJs is a passion project by **Lee Adcock** — a love letter to the classic Robocode. [Read the story](/about), or say hi at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com)._
+_RobocodeJs is a passion project by **Lee** — a web-enabled version of, and love letter to, the classic Robocode. [Read the story](/about), or say hi at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com)._
