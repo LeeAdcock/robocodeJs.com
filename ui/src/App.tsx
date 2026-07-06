@@ -236,10 +236,6 @@ function App() {
             });
         },
       });
-      google.accounts.id.renderButton(
-        document.getElementById('GoogleLoginButton'),
-        { theme: 'outline', size: 'medium' } // customization attributes
-      );
     }
 
     // On window open, try to authenticate
@@ -264,6 +260,22 @@ function App() {
       window.removeEventListener('blur', pause);
     };
   }, []);
+
+  // (Re)render the Google sign-in button whenever the theme changes so it
+  // matches light/dark mode. GSI has no post-render theme setter, so we
+  // re-invoke renderButton with the matching variant (`filled_black` reads
+  // correctly on the dark navbar; `outline` on the light one). The container
+  // only exists while signed out (see navbar), so guard on both the GSI global
+  // and the element; `user` in the deps re-renders it after a sign-out.
+  useEffect(() => {
+    const el = document.getElementById('GoogleLoginButton');
+    if (typeof google !== 'undefined' && google.accounts?.id && el) {
+      google.accounts.id.renderButton(el, {
+        theme: darkMode ? 'filled_black' : 'outline',
+        size: 'medium',
+      });
+    }
+  }, [darkMode, user]);
 
   useEffect(() => {
     doReloadArena();

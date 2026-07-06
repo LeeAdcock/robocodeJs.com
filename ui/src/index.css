@@ -147,8 +147,29 @@ code {
   padding: 4px 8px;
 }
 
-/* The doc h1 sits on a light grass-tile background image (which doesn't darken
-   in night mode), so keep its text black so it stays readable. */
+/* The doc h1 sits on a light grass-tile background image that doesn't respond
+   to the theme. In night mode, layer a translucent dark overlay over the tile
+   (via a two-stop gradient stacked on the same background) so the header reads
+   dark like the rest of the night UI, and switch the text to the light
+   foreground colour — black is unreadable once the tile is darkened. A soft
+   shadow keeps the text legible over the tile's texture. */
 body.dark .markdown h1 {
-  color: black;
+  background:
+    linear-gradient(rgba(40, 44, 52, 0.62), rgba(40, 44, 52, 0.62)),
+    url('/sprites/tileGrass1.png');
+  color: var(--fg);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Tooltips: Bootstrap 5.3 derives tooltip text from --bs-body-bg and the
+   background from --bs-emphasis-color. In night mode we re-point --bs-body-bg
+   to the dark surface, so the tooltip text turns dark-gray while the background
+   stays near-black (light-theme emphasis color) — unreadable. Pin an explicit
+   dark-background / light-gray-text tooltip so it reads consistently in both
+   themes. Scoped to `body .tooltip` (not bare `.tooltip`) so it out-specifies
+   Bootstrap's own `.tooltip` token defaults, which are imported after this file
+   in index.tsx and would otherwise win at equal specificity. */
+body .tooltip {
+  --bs-tooltip-bg: #3a3f4b;
+  --bs-tooltip-color: #d6d6d6;
 }
