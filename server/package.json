@@ -48,7 +48,7 @@
     "prettier": "^3.9.4",
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "npm": ">=10.0.0",
