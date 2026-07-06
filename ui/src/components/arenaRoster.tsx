@@ -61,6 +61,9 @@ export default function ArenaRoster(props: ArenaRosterProps) {
   const navigate = useNavigate();
 
   const [members, setMembers] = useState<ArenaMember[]>([]);
+  // The signed-in user's own apps (id + name only) so they can be added to the
+  // arena with one click, instead of pasting an id. Fetched alongside the roster.
+  const [myApps, setMyApps] = useState<{ id: string; name?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // appIds with an in-flight mutation, so their row controls disable + spin.
@@ -82,6 +85,12 @@ export default function ArenaRoster(props: ArenaRosterProps) {
 
   const refetch = useCallback(() => {
     setLoading(true);
+    // The user's own apps power the one-click add list; a failure there is
+    // non-critical (the add-by-id form still works), so it's fetched separately.
+    axios
+      .get(`/api/user/${userId}/apps`)
+      .then((res) => setMyApps(res.data))
+      .catch(() => setMyApps([]));
     return axios
       .get(`/api/user/${userId}/arena/members`)
       .then((res) => setMembers(res.data))
@@ -133,6 +142,12 @@ export default function ArenaRoster(props: ArenaRosterProps) {
       a.addedTimestamp - b.addedTimestamp || a.appId.localeCompare(b.appId)
   );
 
+  // Your own apps not already in this arena — offered as a one-click add.
+  const memberIds = new Set(members.map((m) => m.appId));
+  const availableApps = myApps
+    .filter((a) => !memberIds.has(a.id))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
   const toggleEnabled = (member: ArenaMember) => {
     setBusyFor(member.appId, true);
     axios
@@ -164,6 +179,17 @@ export default function ArenaRoster(props: ArenaRosterProps) {
       .then(() => refetch())
       .then(() => onChanged?.())
       .catch(() => setError('Could not create a new app.'));
+  };
+
+  const addOwnApp = (appId: string) => {
+    setBusyFor(appId, true);
+    setError(null);
+    axios
+      .put(`/api/user/${userId}/arena/app/${appId}`)
+      .then(() => refetch())
+      .then(() => onChanged?.())
+      .catch(() => setError('Could not add that app.'))
+      .finally(() => setBusyFor(appId, false));
   };
 
   const addExisting = () => {
@@ -305,8 +331,81 @@ export default function ArenaRoster(props: ArenaRosterProps) {
 
         <hr />
 
+        {availableApps.length > 0 && (
+          <>
+            <div
+              style={{
+                fontSize: '0.9em',
+                color: '#888',
+                marginBottom: '6px',
+              }}
+            >
+              Add one of your apps
+            </div>
+            <div
+              style={{
+                maxHeight: '180px',
+                overflowY: 'auto',
+                marginBottom: '12px',
+              }}
+            >
+              {availableApps.map((app) => (
+                <div
+                  key={app.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 0',
+                  }}
+                >
+                  <MemberIcon arena={arena} appId={app.id} />
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {titleCase(app.name || 'Unnamed app')}
+                  </div>
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id={`roster-add-tip-${app.id}`}>
+                        {atCapacity
+                          ? 'Arena is full — remove an app first'
+                          : 'Add this app to the arena'}
+                      </Tooltip>
+                    }
+                  >
+                    <span style={{ display: 'inline-flex' }}>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        disabled={atCapacity || busy.has(app.id)}
+                        onClick={() => addOwnApp(app.id)}
+                        aria-label={`Add ${app.name || 'app'} to the arena`}
+                        style={{ color: '#6c757d', padding: '0 6px' }}
+                      >
+                        {busy.has(app.id) ? (
+                          <Spinner animation="border" size="sm" />
+                        ) : (
+                          <FaPlus />
+                        )}
+                      </Button>
+                    </span>
+                  </OverlayTrigger>
+                </div>
+              ))}
+            </div>
+            <hr />
+          </>
+        )}
+
         <div style={{ fontSize: '0.9em', color: '#888', marginBottom: '6px' }}>
-          Add an existing app by its id (or share link)
+          Add someone else’s app by its id (or share link)
         </div>
         <InputGroup>
           <Form.Control

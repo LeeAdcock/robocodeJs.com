@@ -56,9 +56,21 @@ const renderRoster = () =>
     </MemoryRouter>
   );
 
+// Route GET mocks by URL: the roster (members), the user's own apps (the
+// one-click pick-list), and the single-app metadata lookup the add-by-id preview
+// uses. Defaults: the two members, and no own apps offered.
+const setApi = (opts: { members?: unknown[]; apps?: unknown[] } = {}) =>
+  vi.mocked(axios.get).mockImplementation((url: string) => {
+    if (url.endsWith('/arena/members'))
+      return Promise.resolve({ data: opts.members ?? members } as never);
+    if (url.endsWith('/apps'))
+      return Promise.resolve({ data: opts.apps ?? [] } as never);
+    return Promise.resolve({ data: {} } as never); // /api/app/:id preview
+  });
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(axios.get).mockResolvedValue({ data: members } as never);
+  setApi();
   vi.mocked(axios.post).mockResolvedValue({ data: {} } as never);
   vi.mocked(axios.put).mockResolvedValue({ data: {} } as never);
   vi.mocked(axios.delete).mockResolvedValue({ data: {} } as never);
@@ -83,7 +95,7 @@ describe('ArenaRoster', () => {
       { ...members[1], appId: 'z9', name: 'zeta', addedTimestamp: 5 },
       { ...members[0], appId: 'a0', name: 'alpha', addedTimestamp: 5 },
     ];
-    vi.mocked(axios.get).mockResolvedValue({ data: tied } as never);
+    setApi({ members: tied });
     renderRoster();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
 
@@ -138,6 +150,28 @@ describe('ArenaRoster', () => {
     fireEvent.click(screen.getByText('Add'));
     await waitFor(() =>
       expect(axios.put).toHaveBeenCalledWith(`/api/user/u1/arena/app/${id}`)
+    );
+  });
+
+  it('offers your own apps not already in the arena and adds one on click', async () => {
+    // a1 is already in the arena (a member); a3 is not.
+    setApi({
+      apps: [
+        { id: 'a1', name: 'alpha' },
+        { id: 'a3', name: 'gamma' },
+      ],
+    });
+    renderRoster();
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
+
+    expect(axios.get).toHaveBeenCalledWith('/api/user/u1/apps');
+    // gamma (not a member) is offered; alpha (already a member) is not re-offered.
+    const addGamma = await screen.findByLabelText('Add gamma to the arena');
+    expect(screen.queryByLabelText('Add alpha to the arena')).toBeNull();
+
+    fireEvent.click(addGamma);
+    await waitFor(() =>
+      expect(axios.put).toHaveBeenCalledWith('/api/user/u1/arena/app/a3')
     );
   });
 
