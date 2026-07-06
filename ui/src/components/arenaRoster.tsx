@@ -121,6 +121,14 @@ export default function ArenaRoster(props: ArenaRosterProps) {
 
   const atCapacity = members.length >= 5;
 
+  // Render in a stable, deterministic order (add-time, then appId) so toggling a
+  // bot's enabled state never reshuffles the list, regardless of the order the
+  // server happens to return.
+  const orderedMembers = [...members].sort(
+    (a, b) =>
+      a.addedTimestamp - b.addedTimestamp || a.appId.localeCompare(b.appId)
+  );
+
   const toggleEnabled = (member: ArenaMember) => {
     setBusyFor(member.appId, true);
     axios
@@ -202,7 +210,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
           </div>
         ) : (
           <div>
-            {members.map((member) => {
+            {orderedMembers.map((member) => {
               const isBusy = busy.has(member.appId);
               return (
                 <div

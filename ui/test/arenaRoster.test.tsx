@@ -76,6 +76,21 @@ describe('ArenaRoster', () => {
     expect(axios.get).toHaveBeenCalledWith('/api/user/u1/arena/members');
   });
 
+  it('renders in a stable order (add-time, then appId) regardless of server order', async () => {
+    // Same addedTimestamp (a tie) and returned out of appId order — the roster
+    // must still render deterministically so toggles never reshuffle.
+    const tied = [
+      { ...members[1], appId: 'z9', name: 'zeta', addedTimestamp: 5 },
+      { ...members[0], appId: 'a0', name: 'alpha', addedTimestamp: 5 },
+    ];
+    vi.mocked(axios.get).mockResolvedValue({ data: tied } as never);
+    renderRoster();
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
+
+    const names = screen.getAllByText(/Alpha|Zeta/).map((el) => el.textContent);
+    expect(names).toEqual(['Alpha', 'Zeta']);
+  });
+
   it('toggling an enabled bot disables it via the enabled endpoint', async () => {
     renderRoster();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());

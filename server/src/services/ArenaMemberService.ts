@@ -46,7 +46,7 @@ export class ArenaMemberService {
   getForApp = (appId: AppId): Promise<ArenaMember[]> => {
     return pool
       .query({
-        text: 'SELECT arena_member.arenaId as "arenaId", arena_member.enabled as "enabled", arena_member.createdTimestamp as "createdTimestamp" FROM arena_member WHERE appId=$1 ORDER BY arena_member.createdTimestamp',
+        text: 'SELECT arena_member.arenaId as "arenaId", arena_member.enabled as "enabled", arena_member.createdTimestamp as "createdTimestamp" FROM arena_member WHERE appId=$1 ORDER BY arena_member.createdTimestamp, arena_member.arenaId',
         values: [appId],
       })
       .then((res) =>
@@ -74,7 +74,12 @@ export class ArenaMemberService {
   getForArena = (arenaId: ArenaId): Promise<ArenaMember[]> => {
     return pool
       .query({
-        text: 'SELECT arena_member.appId as "appId", arena_member.enabled as "enabled", arena_member.createdTimestamp as "createdTimestamp" FROM arena_member WHERE arenaId=$1 ORDER BY arena_member.createdTimestamp',
+        // createdTimestamp ties (bots added in the same instant — e.g. the
+        // starter bots, and pg-mem's per-statement CURRENT_TIMESTAMP) would make
+        // the order non-deterministic, so a toggle/refetch could reshuffle the
+        // roster (and arena colors, which key off member order). Break ties by
+        // appId for a stable, deterministic order.
+        text: 'SELECT arena_member.appId as "appId", arena_member.enabled as "enabled", arena_member.createdTimestamp as "createdTimestamp" FROM arena_member WHERE arenaId=$1 ORDER BY arena_member.createdTimestamp, arena_member.appId',
         values: [arenaId],
       })
       .then((res) =>
