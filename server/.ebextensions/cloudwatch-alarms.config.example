@@ -1,0 +1,198 @@
+# CloudWatch metric-filter alarms on the security events the server emits (see
+# the "Logging & monitoring" section of server/README.md).
+#
+# ── OPT-IN by rename ──────────────────────────────────────────────────────────
+# Elastic Beanstalk only processes files ending in `.config`. This file ends in
+# `.config.example`, so it is IGNORED until you rename it — a deliberate,
+# reversible activation with zero risk to deploys while it sits here. To turn the
+# alarms on:
+#
+#   1. First deploy cloudwatch-logs.config (StreamLogs=true) and confirm the log
+#      group /aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log exists in
+#      CloudWatch Logs. (The metric filters below require the log group to already
+#      exist, which is why this is a separate second step.)
+#   2. `git mv cloudwatch-alarms.config.example cloudwatch-alarms.config` and
+#      deploy again. Alarms publish to the SNS topic below.
+#
+# ── Notification target ───────────────────────────────────────────────────────
+# Defaults to the existing account SNS topic `Alerts` (a confirmed email
+# subscription). Override per environment by setting the env property
+# ALERT_SNS_TOPIC_ARN (and ALERT_LOG_GROUP if your log-group name differs).
+#
+# ── Filter patterns ───────────────────────────────────────────────────────────
+# Quoted SUBSTRING patterns (not JSON `{ $.x = }` patterns). Verified with
+# `aws logs test-metric-filter` against the real pino JSON output — they match
+# whether or not the platform prefixes the stdout line, and the two space-
+# separated quoted terms in the bot-timeout filter are ANDed. Thresholds are
+# starting points; tune per event.
+
+Resources:
+  # event="sandbox.catastrophic" — isolate OOM / fatal V8 error. Investigate any.
+  SandboxCatastrophicMetricFilter:
+    Type: 'AWS::Logs::MetricFilter'
+    Properties:
+      LogGroupName:
+        'Fn::GetOptionSetting':
+          Namespace: 'aws:elasticbeanstalk:application:environment'
+          OptionName: 'ALERT_LOG_GROUP'
+          DefaultValue: '/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log'
+      FilterPattern: '"\"event\":\"sandbox.catastrophic\""'
+      MetricTransformations:
+        - MetricNamespace: 'RobocodeJs/Security'
+          MetricName: 'SandboxCatastrophic'
+          MetricValue: '1'
+          DefaultValue: 0
+  SandboxCatastrophicAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 'robocodejs-sandbox-catastrophic'
+      AlarmDescription: 'Isolate OOM / fatal V8 error (event=sandbox.catastrophic).'
+      Namespace: 'RobocodeJs/Security'
+      MetricName: 'SandboxCatastrophic'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - 'Fn::GetOptionSetting':
+            Namespace: 'aws:elasticbeanstalk:application:environment'
+            OptionName: 'ALERT_SNS_TOPIC_ARN'
+            DefaultValue: 'arn:aws:sns:us-east-1:095207682014:Alerts'
+
+  # event="process.fatal" — uncaught exception / unhandled rejection. Any.
+  ProcessFatalMetricFilter:
+    Type: 'AWS::Logs::MetricFilter'
+    Properties:
+      LogGroupName:
+        'Fn::GetOptionSetting':
+          Namespace: 'aws:elasticbeanstalk:application:environment'
+          OptionName: 'ALERT_LOG_GROUP'
+          DefaultValue: '/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log'
+      FilterPattern: '"\"event\":\"process.fatal\""'
+      MetricTransformations:
+        - MetricNamespace: 'RobocodeJs/Security'
+          MetricName: 'ProcessFatal'
+          MetricValue: '1'
+          DefaultValue: 0
+  ProcessFatalAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 'robocodejs-process-fatal'
+      AlarmDescription: 'uncaughtException / unhandledRejection escaped to the process (event=process.fatal).'
+      Namespace: 'RobocodeJs/Security'
+      MetricName: 'ProcessFatal'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - 'Fn::GetOptionSetting':
+            Namespace: 'aws:elasticbeanstalk:application:environment'
+            OptionName: 'ALERT_SNS_TOPIC_ARN'
+            DefaultValue: 'arn:aws:sns:us-east-1:095207682014:Alerts'
+
+  # event="bot.fault" timedOut=true — runaway loop / possible sandbox-escape.
+  BotTimeoutMetricFilter:
+    Type: 'AWS::Logs::MetricFilter'
+    Properties:
+      LogGroupName:
+        'Fn::GetOptionSetting':
+          Namespace: 'aws:elasticbeanstalk:application:environment'
+          OptionName: 'ALERT_LOG_GROUP'
+          DefaultValue: '/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log'
+      FilterPattern: '"\"event\":\"bot.fault\"" "\"timedOut\":true"'
+      MetricTransformations:
+        - MetricNamespace: 'RobocodeJs/Security'
+          MetricName: 'BotTimeout'
+          MetricValue: '1'
+          DefaultValue: 0
+  BotTimeoutAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 'robocodejs-bot-timeout'
+      AlarmDescription: 'Bots tripping SANDBOX_TIMEOUT_MS (event=bot.fault timedOut=true) — runaway/abuse spike.'
+      Namespace: 'RobocodeJs/Security'
+      MetricName: 'BotTimeout'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - 'Fn::GetOptionSetting':
+            Namespace: 'aws:elasticbeanstalk:application:environment'
+            OptionName: 'ALERT_SNS_TOPIC_ARN'
+            DefaultValue: 'arn:aws:sns:us-east-1:095207682014:Alerts'
+
+  # event="auth.forbidden" — a user acting on another's resource (cross-user probing).
+  AuthForbiddenMetricFilter:
+    Type: 'AWS::Logs::MetricFilter'
+    Properties:
+      LogGroupName:
+        'Fn::GetOptionSetting':
+          Namespace: 'aws:elasticbeanstalk:application:environment'
+          OptionName: 'ALERT_LOG_GROUP'
+          DefaultValue: '/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log'
+      FilterPattern: '"\"event\":\"auth.forbidden\""'
+      MetricTransformations:
+        - MetricNamespace: 'RobocodeJs/Security'
+          MetricName: 'AuthForbidden'
+          MetricValue: '1'
+          DefaultValue: 0
+  AuthForbiddenAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 'robocodejs-auth-forbidden'
+      AlarmDescription: 'Cross-user access attempts (event=auth.forbidden). Alert on repeated hits.'
+      Namespace: 'RobocodeJs/Security'
+      MetricName: 'AuthForbidden'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - 'Fn::GetOptionSetting':
+            Namespace: 'aws:elasticbeanstalk:application:environment'
+            OptionName: 'ALERT_SNS_TOPIC_ARN'
+            DefaultValue: 'arn:aws:sns:us-east-1:095207682014:Alerts'
+
+  # event="rate.limited" — sustained limiter refusals (abuse / broken client).
+  RateLimitedMetricFilter:
+    Type: 'AWS::Logs::MetricFilter'
+    Properties:
+      LogGroupName:
+        'Fn::GetOptionSetting':
+          Namespace: 'aws:elasticbeanstalk:application:environment'
+          OptionName: 'ALERT_LOG_GROUP'
+          DefaultValue: '/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log'
+      FilterPattern: '"\"event\":\"rate.limited\""'
+      MetricTransformations:
+        - MetricNamespace: 'RobocodeJs/Security'
+          MetricName: 'RateLimited'
+          MetricValue: '1'
+          DefaultValue: 0
+  RateLimitedAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 'robocodejs-rate-limited'
+      AlarmDescription: 'Sustained rate-limit refusals (event=rate.limited) — abuse or a misbehaving client.'
+      Namespace: 'RobocodeJs/Security'
+      MetricName: 'RateLimited'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 20
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - 'Fn::GetOptionSetting':
+            Namespace: 'aws:elasticbeanstalk:application:environment'
+            OptionName: 'ALERT_SNS_TOPIC_ARN'
+            DefaultValue: 'arn:aws:sns:us-east-1:095207682014:Alerts'

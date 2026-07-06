@@ -33,7 +33,7 @@ app.post('/api/session', async (req: Request, res: Response) => {
         return;
       }
       logger.info(
-        { event: 'auth.signin', sub: payload.sub },
+        { event: LogEvent.AUTH_SIGNIN, sub: payload.sub },
         'session: established for verified Google user'
       );
       res.cookie('auth', credential, {

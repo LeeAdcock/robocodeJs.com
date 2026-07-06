@@ -173,12 +173,40 @@ Beyond ordinary info/debug logs, a set of **named fault/security events** is log
 | `bot.fault`            | warn        | A bot crashed (`kind`: `load`/`init`/`handler`/`timer`/`callback`, or `log-flood`). **`timedOut: true`** means it tripped `SANDBOX_TIMEOUT_MS` — a runaway loop or possible sandbox-escape attempt; alert on these specifically. A rising overall rate signals broken bots. |
 | `sandbox.catastrophic` | error       | A fatal V8 error in an isolate — typically the 8 MB memory limit (runaway allocation / abuse).                                                                                                                                                                              |
 | `auth.failed`          | warn        | A gated route rejected an invalid/expired credential. A spike suggests probing or a token problem.                                                                                                                                                                          |
-| `auth.forbidden`       | warn        | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse.                                                                                                                                                                     |
+| `auth.forbidden`       | warn        | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse; the sharpest access-control signal.                                                                                                                                 |
+| `auth.signin`          | info        | A verified Google sign-in established a session (`sub`). Baseline for sign-in rate.                                                                                                                                                                                         |
+| `auth.token.created`   | info        | An MCP API token was minted/rotated (`userId`, `clientId`).                                                                                                                                                                                                                 |
+| `auth.token.revoked`   | info        | An MCP API token was revoked (`clientId`).                                                                                                                                                                                                                                  |
+| `rate.limited`         | warn        | A request was refused by a rate limiter (`limiter`, `key`, `method`, `path`; `429`/`E022`). Sustained hits = abuse or a misbehaving client.                                                                                                                                 |
+| `mcp.tool`             | info        | An MCP tool was invoked (`userId`, `tool`). Audit trail for the bearer-token surface, which grants full control of a user's bots/arenas — attribute actions and spot anomalous automation.                                                                                  |
 | `db.error`             | error       | Database/pool error (lost connection, auth failure).                                                                                                                                                                                                                        |
 | `http.error`           | error       | An unhandled error reached the Express error handler (a 5xx).                                                                                                                                                                                                               |
 | `process.fatal`        | error/fatal | An `unhandledRejection` or `uncaughtException` escaped to the process.                                                                                                                                                                                                      |
 
 Note: a bot choosing **not** to await a command whose promise later rejects (e.g. a cancelled `bot.setSpeed`) is normal and is **not** logged as a fault or treated as a crash.
+
+### Alerting
+
+The app emits these signals; **wiring alarms is a deploy-time/ops concern** (the app can't page anyone itself). In production the logger emits JSON, so any pipeline that ingests the container's stdout — CloudWatch Logs metric filters, Datadog, Grafana Loki, etc. — can match on the `event` field and alarm. Suggested starting points:
+
+| Condition                                        | Why / suggested threshold                                                         |
+| ------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `event="sandbox.catastrophic"`                   | Any occurrence — isolate OOM / fatal V8 error. Page on ≥1.                        |
+| `event="bot.fault" timedOut=true`                | Runaway/possible sandbox-escape attempt. Alert on a rising rate.                  |
+| `event="auth.forbidden"` from one `actor`        | Cross-user probing. Alert on repeated hits from the same actor in a short window. |
+| `event="rate.limited"` sustained                 | Abuse or a broken client hammering a limiter; correlate by `key`.                 |
+| `event="auth.failed"` spike                      | Credential probing.                                                               |
+| `event="process.fatal"` / `event="db.error"`     | Process/DB health — page on any.                                                  |
+| `event="mcp.tool"` anomalous volume per `userId` | A compromised or runaway token; the audit trail to review after an incident.      |
+
+**AWS wiring (this deployment).** Two `.ebextensions` files turn the above into CloudWatch alarms:
+
+- **`cloudwatch-logs.config`** (active) — streams the instance's stdout (where the pino JSON lands) to a CloudWatch Logs group, `/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log`. Required for any log-based alarm; also makes the logs queryable in Logs Insights.
+- **`cloudwatch-alarms.config.example`** (opt-in) — metric filters + alarms for `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, and `rate.limited`, publishing to the `Alerts` SNS topic by default (override via the `ALERT_SNS_TOPIC_ARN` / `ALERT_LOG_GROUP` env properties). EB only processes `*.config`, so this `.example` is inert until renamed — a deliberate, reversible activation.
+
+  **Activate (two deploys):** (1) deploy with `cloudwatch-logs.config` and confirm the log group exists; (2) `git mv cloudwatch-alarms.config.example cloudwatch-alarms.config` and deploy again (the metric filters require the log group to already exist).
+
+  The filter patterns are quoted **substring** patterns (not JSON `{ $.x = }` patterns, which wouldn't match the platform's stdout-line prefix) and are verified with `aws logs test-metric-filter` against the real pino output. The resource definitions pass `aws cloudformation validate-template`. Thresholds are starting points — tune per event. What remains deploy-only is EB's `Fn::GetOptionSetting` substitution and the metric filter binding to the EB-managed log group (the two-step rename rollout above handles the ordering), so still treat the first activation as a staging validation.
 
 ## Tests
 

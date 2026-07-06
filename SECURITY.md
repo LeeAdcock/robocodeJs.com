@@ -168,8 +168,11 @@ Logout just clears the cookie (`session.ts:66-70`); a stolen still-valid id toke
 
 ## A09 — Security Logging & Monitoring Failures
 
-Logging hygiene is **good**: structured pino logger, no tokens/cookies logged (`session.ts:37-38`, `token.ts:34-37`), API tokens stored as sha256 hashes, stable `event` fields for fault/security conditions (`bot.fault`, `auth.forbidden`, `sandbox.catastrophic`; `logger.ts`), generic 500s to clients with details logged server-side only (`index.ts:69-75`, `auth.ts`).
-**Gaps:** no rate-limit/abuse alerting (ties to A07-1), no CI-based monitoring/alerting pipeline. Consider alerting on repeated `AUTH_FORBIDDEN` (already logged at `resource.ts:54-62`) and `bot.fault` spikes.
+Logging hygiene is **good**: structured pino logger, no tokens/cookies logged (`session.ts`, `token.ts`), API tokens stored as sha256 hashes, generic 500s to clients with details logged server-side only (`index.ts`, `auth.ts`).
+
+> **✅ Addressed** (`security/a09-logging-monitoring`). Every security-relevant condition is emitted with a **stable `event` field** and context, via the `LogEvent` catalogue in `util/logger.ts`, so a log pipeline can match and alarm on them: `bot.fault` (+`timedOut`), `sandbox.catastrophic`, `auth.failed`, `auth.forbidden`, `auth.signin`, `auth.token.created`, **`auth.token.revoked`** (was defined but never emitted — now logged in `oauthProvider.revokeToken`), `rate.limited` (the A07-1 limiter refusals, `middleware/rateLimit.ts`), **`mcp.tool`** (new — an audit trail of MCP tool invocations by `userId`/`tool`, since a bearer token grants full control of a user's bots/arenas), `db.error`, `http.error`, and `process.fatal`. The full catalogue, per-event monitoring guidance, and a suggested **Alerting** table (thresholds + where CloudWatch metric-filter/alarm config would live) are documented in the server README "Logging & monitoring". Tests assert the audit events fire.
+
+**Alarm wiring (this deployment).** CloudWatch metric-filter alarms are now provided as `.ebextensions` config: `cloudwatch-logs.config` streams stdout to CloudWatch Logs, and the opt-in `cloudwatch-alarms.config.example` (rename to activate) defines alarms for the key events → the `Alerts` SNS topic. The substring filter patterns are validated against real pino output with `aws logs test-metric-filter`, and the resource definitions pass `aws cloudformation validate-template`. See the server README "Logging & monitoring → Alerting". **Residual:** EB's `Fn::GetOptionSetting` substitution and the metric-filter/log-group binding are only exercised on deploy, so first activation is a staging validation; thresholds and the notification target remain environment-tunable.
 
 ---
 
