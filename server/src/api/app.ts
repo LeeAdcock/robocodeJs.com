@@ -13,27 +13,48 @@ import {
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   scopedUser,
   scopedApp,
 } from '../middleware/resource';
+import { computeRateLimit, writeRateLimit } from '../middleware/rateLimit';
 
 const app = express();
+
+// Caps the number of apps (bots) a single user can own. Each app compiles into
+// an 8 MB isolate per arena it runs in, so this bounds a user's isolate/memory
+// footprint alongside MAX_ARENAS_PER_USER (see api/arena.ts).
+const MAX_APPS_PER_USER = 20;
 
 // Get user apps
 app.get('/api/user/:userId/apps', loadUser, async (req, res) => {
   const user = scopedUser(req);
-  // TODO filter this response
+  // Metadata only (id + name) — never source. Left readable so an app id can be
+  // resolved to a name for cross-user reference flows; source stays behind the
+  // owner-gated /app/:appId/source route.
   const apps = await appService.getForUser(user.getId());
   res.json(apps.map((app) => ({ id: app.getId(), name: app.getName() })));
 });
 
 // Create an app
-app.post('/api/user/:userId/app/', loadUser, requireOwner, async (req, res) => {
-  const user = scopedUser(req);
-  const tankApp = await appService.create(user.getId());
-  res.status(201);
-  res.send({ appId: tankApp.getId() });
-});
+app.post(
+  '/api/user/:userId/app/',
+  writeRateLimit,
+  loadUser,
+  requireOwner,
+  async (req, res) => {
+    const user = scopedUser(req);
+    const existing = await appService.getForUser(user.getId());
+    if (existing.length >= MAX_APPS_PER_USER) {
+      res.status(400);
+      res.send('App limit reached');
+      return;
+    }
+    const tankApp = await appService.create(user.getId());
+    res.status(201);
+    res.send({ appId: tankApp.getId() });
+  }
+);
 
 // Get an app
 app.get('/api/user/:userId/app/:appId', loadUser, loadApp, (req, res) => {
@@ -50,6 +71,7 @@ app.put(
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   (req, res) => {
     const app = scopedApp(req);
     // Saves are not gated on validity (authors save work-in-progress); the
@@ -66,9 +88,11 @@ app.put(
 // deploying it to an arena. Powers the editor's Check button.
 app.post(
   '/api/user/:userId/app/:appId/check',
+  computeRateLimit,
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   async (req, res) => {
     const result = await compiler.check(req.body.toString('utf-8'));
     res.status(200);
@@ -79,9 +103,11 @@ app.post(
 // Execute app source code
 app.post(
   '/api/user/:userId/app/:appId/compile',
+  computeRateLimit,
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   async (req, res) => {
     const user = scopedUser(req);
     const app = scopedApp(req);
@@ -99,9 +125,11 @@ app.post(
 // for a fresh initialization on demand.
 app.post(
   '/api/user/:userId/app/:appId/reboot',
+  computeRateLimit,
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   async (req, res) => {
     const user = scopedUser(req);
     const app = scopedApp(req);
@@ -120,6 +148,7 @@ app.get(
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   (req, res) => {
     const app = scopedApp(req);
     res.status(200);
@@ -133,6 +162,7 @@ app.delete(
   loadUser,
   requireOwner,
   loadApp,
+  requireAppOwner,
   (req, res) => {
     const app = scopedApp(req);
     return deleteAppEverywhere(app).then(() => {

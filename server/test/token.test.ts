@@ -74,6 +74,26 @@ describe('token endpoints', () => {
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
+  it('GET /api/token/new blocks a cross-site request (CSRF DoS) with 403', async () => {
+    const res = await request(makeApp())
+      .get('/api/token/new')
+      .set('Sec-Fetch-Site', 'cross-site');
+
+    expect(res.status).toBe(403);
+    // The victim's existing token is left untouched (not rotated).
+    expect(identityService.deleteForUser).not.toHaveBeenCalled();
+    expect(identityService.create).not.toHaveBeenCalled();
+  });
+
+  it('GET /api/token/new allows a same-origin request', async () => {
+    const res = await request(makeApp())
+      .get('/api/token/new')
+      .set('Sec-Fetch-Site', 'same-origin');
+
+    expect(res.status).toBe(201);
+    expect(identityService.create).toHaveBeenCalled();
+  });
+
   it('GET /api/token reports existence without revealing a value', async () => {
     vi.mocked(identityService.getForUser).mockResolvedValueOnce([{}] as never);
     const present = await request(makeApp()).get('/api/token');

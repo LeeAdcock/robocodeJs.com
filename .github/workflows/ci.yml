@@ -1,0 +1,56 @@
+name: CI
+
+# Continuous integration for pull requests and pushes to main (OWASP A06-1:
+# there was previously no CI at all — no lint/test gate and no dependency
+# scanning). Runs the two packages independently.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: server (lint · build · test · audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/npm-shrinkwrap.json
+      # Strict install from the lockfile (also what buildspec.yaml uses).
+      - run: npm ci
+      - run: npx eslint src
+      - run: npm run build
+      - run: npm test
+      # Dependency vulnerability gate. Fails the build on high/critical
+      # advisories; moderate/low are reported but non-blocking.
+      - run: npm audit --audit-level=high
+
+  ui:
+    name: ui (lint · build · test · audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - run: npx eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src
+      - run: npm run build
+      - run: npm test
+      - run: npm audit --audit-level=high

@@ -3,6 +3,7 @@ import {
   scheduleFactory,
   timerTick,
   TimersContainer,
+  MAX_TIMERS_PER_TANK,
 } from '../src/util/scheduleFactory';
 
 // Bot setInterval/setTimeout are monkey-patched to advance with simulation
@@ -12,7 +13,7 @@ import {
 function makeTank(health = 100) {
   return {
     health,
-    logger: { trace: vi.fn() },
+    logger: { trace: vi.fn(), warn: vi.fn() },
     timers: new TimersContainer(),
   };
 }
@@ -104,5 +105,44 @@ describe('scheduleFactory + timerTick', () => {
     env.state.time = 5;
     timerTick(env as never);
     expect(fn).not.toHaveBeenCalled();
+  });
+
+  // Resource-exhaustion guard (A04-1): a bot cannot register an unbounded number
+  // of timers. Each host-side timer costs memory and per-tick CPU, so past the
+  // cap registration is refused (returns the falsy sentinel 0) and E021 is
+  // warned to the bot console once.
+  it('rejects timers past MAX_TIMERS_PER_TANK and warns E021 once', () => {
+    const tank = makeTank();
+    const env = makeEnv(tank);
+    const sched = scheduleFactory(tank);
+
+    for (let i = 0; i < MAX_TIMERS_PER_TANK; i++) {
+      expect(sched.setInterval(i + 1, vi.fn(), 5, env as never)).toBe(i + 1);
+    }
+    expect(tank.timers.size()).toBe(MAX_TIMERS_PER_TANK);
+
+    // Two more registrations (interval + timeout) are both refused, and the map
+    // does not grow.
+    expect(sched.setInterval(9001, vi.fn(), 5, env as never)).toBe(0);
+    expect(sched.setTimeout(9002, vi.fn(), 5, env as never)).toBe(0);
+    expect(tank.timers.size()).toBe(MAX_TIMERS_PER_TANK);
+
+    // Warned exactly once despite multiple rejections (no console flooding).
+    expect(tank.logger.warn).toHaveBeenCalledTimes(1);
+    expect(String(tank.logger.warn.mock.calls[0][0])).toContain('E021');
+  });
+
+  it('frees a slot after clearInterval so a new timer can register again', () => {
+    const tank = makeTank();
+    const env = makeEnv(tank);
+    const sched = scheduleFactory(tank);
+
+    for (let i = 0; i < MAX_TIMERS_PER_TANK; i++) {
+      sched.setInterval(i + 1, vi.fn(), 5, env as never);
+    }
+    expect(sched.setInterval(9001, vi.fn(), 5, env as never)).toBe(0); // full
+
+    sched.clearInterval(1); // free one slot
+    expect(sched.setInterval(9002, vi.fn(), 5, env as never)).toBe(9002);
   });
 });

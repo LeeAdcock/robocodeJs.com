@@ -80,6 +80,40 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 - To prevent stalemates, after a long match a **sudden-death** phase begins (around
   **10,000 ticks**, ~16 minutes) during which health slowly decays, forcing a finish.
 
+# Limits
+
+To keep the shared server fast and fair for everyone, a few limits apply. These
+are generous for normal play — you'll usually only meet them if something is
+looping.
+
+| Limit                   | Value                                          |
+| ----------------------- | ---------------------------------------------- |
+| Bots (apps) per account | **20**                                         |
+| Arenas per account      | **10**                                         |
+| Bots per arena          | **5**                                          |
+| Active timers per tank  | **64** (`setInterval` + `setTimeout` combined) |
+
+Going over the timer limit surfaces code **E021** in the bot's console and the
+extra `setInterval`/`setTimeout` is ignored — it isn't fatal. (Timers are counted
+per tank, and each app fields five tanks.)
+
+## Rate limits
+
+The API is also **rate limited**. If requests arrive too quickly — signing in,
+saving/checking/deploying code, or creating apps and arenas — the server replies
+with **HTTP 429** and error code **E022**, and the action is skipped. Wait a moment
+and retry; if a script is driving the API, add a small delay between calls. Typical
+budgets (per account, or per IP address for sign-in):
+
+| Action                             | Budget      |
+| ---------------------------------- | ----------- |
+| Sign in                            | 20 / 10 min |
+| Check, deploy, or reboot code      | 60 / min    |
+| Create an app or arena             | 30 / min    |
+| Any API request (overall backstop) | 600 / min   |
+
+See [Error codes](/error-codes) for **E021** and **E022**.
+
 ---
 
 See also: the [API reference](/dev) for every method and event, and the

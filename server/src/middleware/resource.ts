@@ -67,7 +67,11 @@ export const requireOwner = (
   next();
 };
 
-// Loads the :appId path param into req.targetApp, or 404s.
+// Loads the :appId path param into req.targetApp, or 404s. Intentionally NOT
+// scoped to the :userId user: an app id may be *referenced* by other users (e.g.
+// to add someone's bot to your own arena by id). Ownership is enforced
+// separately by requireAppOwner on the routes that expose or mutate private
+// state (source, delete, compile, reboot) — see requireAppOwner.
 export const loadApp = async (
   req: Request,
   res: Response,
@@ -80,6 +84,36 @@ export const loadApp = async (
     return;
   }
   (req as AppScopedRequest).targetApp = app;
+  next();
+};
+
+// Requires the authenticated user to OWN the loaded :appId app. Run after
+// loadApp. This is the object-level guard that keeps a bot's source private and
+// editable only by its author: because loadApp resolves an app id regardless of
+// who owns it (so add-by-reference works), a route that returns or mutates the
+// source/lifecycle MUST additionally pass through this check. Without it, an
+// attacker could pass their own :userId (satisfying requireOwner) with a
+// victim's :appId and read or overwrite the victim's source.
+export const requireAppOwner = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const r = req as AppScopedRequest;
+  if (!r.user || r.targetApp.getUserId() !== r.user.getId()) {
+    logger.warn(
+      {
+        event: LogEvent.AUTH_FORBIDDEN,
+        actor: r.user?.getId(),
+        target: r.targetApp.getUserId(),
+        path: req.path,
+      },
+      'app ownership check failed'
+    );
+    res.status(401);
+    res.send('Unauthorized');
+    return;
+  }
   next();
 };
 

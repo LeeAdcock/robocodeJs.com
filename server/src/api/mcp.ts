@@ -40,9 +40,19 @@ const MAX_APPS_PER_ARENA = 4;
 // same way index.ts locates the SPA shell.
 const PUBLIC_DIR = path.join(__dirname, '../../public');
 
+// The only public subdirectories these helpers ever serve. Every call site
+// passes one of these literals; the runtime allowlist below is defense-in-depth
+// so `sub` can never regress into a path-traversal vector even if a future
+// caller sourced it from request input (the `filename`/basename guard only
+// covers the last path segment, not `sub`).
+const PUBLIC_SUBDIRS = ['docs', 'samples', 'ts'] as const;
+const isAllowedSub = (sub: string): boolean =>
+  (PUBLIC_SUBDIRS as readonly string[]).includes(sub);
+
 // List files in a public subdirectory with the given extension (basename only).
 // Returns [] if the directory is absent (e.g. running from source in tests).
 const listPublic = (sub: string, ext: string): string[] => {
+  if (!isAllowedSub(sub)) return [];
   try {
     return fs
       .readdirSync(path.join(PUBLIC_DIR, sub))
@@ -53,9 +63,11 @@ const listPublic = (sub: string, ext: string): string[] => {
   }
 };
 
-// Read one public file, guarding against path traversal by reducing the name to
-// its basename before joining. Returns null if it can't be read.
+// Read one public file, guarding against path traversal by allow-listing the
+// subdirectory and reducing the name to its basename before joining. Returns
+// null if it can't be read.
 const readPublic = (sub: string, filename: string): string | null => {
+  if (!isAllowedSub(sub)) return null;
   try {
     return fs.readFileSync(
       path.join(PUBLIC_DIR, sub, path.basename(filename)),
