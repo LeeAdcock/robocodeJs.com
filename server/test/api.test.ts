@@ -685,11 +685,15 @@ describe('multi-arena endpoints', () => {
 
   it('POST /api/user/:userId/arenas/:arenaId/restart targets that arena', async () => {
     const restart = vi.fn().mockResolvedValue(undefined);
+    const resume = vi.fn();
     vi.mocked(arenaService.get).mockResolvedValue({
       getId: () => 'ar2',
       getUserId: () => 'u1',
     } as never);
-    vi.mocked(environmentService.get).mockResolvedValue({ restart } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      restart,
+      resume,
+    } as never);
 
     const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
       '/api/user/u1/arenas/ar2/restart'
@@ -698,6 +702,7 @@ describe('multi-arena endpoints', () => {
     expect(arenaService.get).toHaveBeenCalledWith('ar2');
     expect(arenaService.getDefaultForUser).not.toHaveBeenCalled();
     expect(restart).toHaveBeenCalled();
+    expect(resume).toHaveBeenCalled(); // a reset starts the arena running
   });
 
   it('rejects addressing an arena owned by another user with 404', async () => {

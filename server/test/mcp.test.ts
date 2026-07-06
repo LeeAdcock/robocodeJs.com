@@ -230,6 +230,20 @@ describe('mcp tools', () => {
     });
   });
 
+  it('restart_arena restarts then resumes (a reset starts the arena running)', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    const env = {
+      restart: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    await client.callTool({ name: 'restart_arena', arguments: {} });
+    expect(env.restart).toHaveBeenCalled();
+    expect(env.resume).toHaveBeenCalled();
+  });
+
   it('run_match reseeds, restarts+resumes, runs to a decision, and returns the winner', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
