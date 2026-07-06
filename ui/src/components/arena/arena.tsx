@@ -217,11 +217,11 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           y={(props.arena.height || 750) / 2}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize="220"
+          fontSize="110"
           fontWeight="bold"
           fill={props.darkMode ? 'var(--link)' : '#fff'}
           stroke="rgba(0,0,0,0.55)"
-          strokeWidth="5"
+          strokeWidth="3"
           paintOrder="stroke"
           style={{ pointerEvents: 'none' }}
         >
