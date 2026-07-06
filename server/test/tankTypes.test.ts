@@ -278,6 +278,7 @@ describe('TankRadar.scan', () => {
       id: 'enemy',
       friendly: false,
       distance: 100,
+      health: target.health,
     });
     expect(target.stats.timesDetected).toBe(1);
     expect(target.handlers[Event.DETECTED]).toHaveBeenCalled();
