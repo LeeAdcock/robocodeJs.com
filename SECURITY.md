@@ -1,6 +1,6 @@
 # Security Overview — OWASP Top 10 Audit
 
-> **Status:** All medium-and-above findings remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A02-1 (RDS CA verification), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A06-1 (CI + dependency scanning), A07-1 (rate limiting). **Still open:** only the 🟡 low-severity items (A02-2, A03 mcp `sub` allowlist, A05-2, A07-2/3/4, A08 — the last now partly mitigated by the A05-1 CSP). Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
+> **Status:** All medium-and-above findings remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A02-1 (RDS CA verification), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A06-1 (CI + dependency scanning), A07-1 (rate limiting). **Still open:** only the 🟡 low-severity items (A02-2, A03 mcp `sub` allowlist, A05-2, A07-2/3/4). A08 (markdown XSS) is mitigated by the A05-1 CSP + React inertness — decision recorded to rely on CSP rather than add a sanitizer. Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
 
 ## Threat model
 
@@ -152,9 +152,9 @@ Logout just clears the cookie (`session.ts:66-70`); a stolen still-valid id toke
 
 ## A08 — Software & Data Integrity Failures
 
-- **XSS — none live, one latent.** No `dangerouslySetInnerHTML`/`innerHTML` in `ui/src/`. Bot logs (`page/arena/logs.tsx:340-342`), bot names (`arenaTank.tsx:134`), and bot source (Ace editor) are all React-escaped. ⚠️ **Latent:** the markdown pipeline `showdown.makeHtml` → `html-react-parser` (`markdownPage.tsx:94,110`) is **unsanitized** — safe _only_ because input is the app's own static `/docs/*.md`. If untrusted markdown is ever routed through it, it becomes an XSS sink (no DOMPurify in the tree).
-  **Fix (defense-in-depth):** add sanitization (DOMPurify) before rendering, and/or the CSP from A05-1.
-- **Supply-chain integrity:** production installs pinned via `npm-shrinkwrap.json` (good); CI uses `npm i` not `npm ci` (A06-1).
+- **✅ XSS — none live, latent markdown gap mitigated.** No `dangerouslySetInnerHTML`/`innerHTML` in `ui/src/`. Bot logs (`page/arena/logs.tsx:340-342`), bot names (`arenaTank.tsx:134`), and bot source (Ace editor) are all React-escaped. The markdown pipeline `showdown.makeHtml` → `html-react-parser` (`markdownPage.tsx`) is unsanitized, but the latent risk is now **mitigated three ways** (decision: rely on CSP rather than add a sanitizer dependency): (1) input is only ever the app's own static `/docs/*.md`, never user data; (2) `html-react-parser` builds React elements, so injected inline `<script>` / string `on*=` handlers are inert; (3) the **A05-1 CSP** blocks `javascript:` URLs and inline/foreign scripts as a backstop. The tradeoff and the one-line DOMPurify escalation path are documented at the render site in `markdownPage.tsx`.
+  **Residual:** if this ever renders untrusted markdown, add `DOMPurify.sanitize` before `parse()`.
+- **Supply-chain integrity:** production installs pinned via `npm-shrinkwrap.json`; deploy + CI now use `npm ci` (A06-1).
 
 ---
 
@@ -183,7 +183,7 @@ Logging hygiene is **good**: structured pino logger, no tokens/cookies logged (`
 | 6   | Add `helmet` + CSP + `X-Frame-Options`                                                        | A05-1               | 🟠 Med      | ✅ Done |
 | 7   | Add CI dependency scanning; `npm ci`                                                          | A06-1               | 🟠 Med      | ✅ Done |
 | 8   | Pin RDS CA, `rejectUnauthorized: true`                                                        | A02-1               | 🟠 Med      | ✅ Done |
-| 9   | Sanitize markdown pipeline / rely on CSP                                                      | A08                 | 🟡 Low      | ⬜ Open |
+| 9   | Sanitize markdown pipeline / rely on CSP                                                      | A08                 | 🟡 Low      | ✅ CSP  |
 | 10  | `email_verified` check; allowlist mcp `sub`; token-rotation CSRF; `crypto.randomBytes` tokens | A07-2/4, A03, A02-2 | 🟡 Low      | ⬜ Open |
 
 ## Verification approach (when fixes are implemented)

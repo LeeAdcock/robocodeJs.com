@@ -105,6 +105,18 @@ export default function MarkdownPage(props: MarkdownPageProps) {
     }
   }, [html, location]);
 
+  // ACCEPTED SECURITY FINDING (XSS, defense-in-depth): showdown's HTML output is
+  // handed to html-react-parser without an explicit sanitizer. Not exploitable,
+  // and mitigated three independent ways:
+  //   1. `md` is only ever our own static /docs/*.md content (fetched above),
+  //      never user input — there is no untrusted-markdown path into here.
+  //   2. html-react-parser builds React elements, so an injected inline <script>
+  //      or string `on*=` handler is inert (React does not execute either).
+  //   3. The server sets a Content-Security-Policy (server middleware/
+  //      securityHeaders.ts) that blocks `javascript:` URLs and inline/foreign
+  //      scripts as a backstop.
+  // If this ever needs to render untrusted markdown, add an HTML sanitizer
+  // (e.g. DOMPurify.sanitize(html)) between makeHtml() and parse().
   return (
     <div ref={divRef} id="markdown" className="markdown">
       {parse(html, parseOptions)}
