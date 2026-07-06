@@ -147,6 +147,37 @@ const ownedArena = async (
   return arenaService.getDefaultForUser(user.getId());
 };
 
+// Run one match in an arena to a decision (or a timeout) and return its match
+// summary. Optionally reseeds first, then runs unbounded ("as fast as the bots
+// can be driven"): it restarts the arena — re-firing every bot's START — and
+// resumes it (restart() alone silently leaves the arena PAUSED), polls until at
+// most one bot still has living tanks (`match.decided`) or the arena stops (all
+// dead) or the wall-clock timeout elapses, then pauses and restores the arena's
+// prior speed. Shared by the run_match and run_tournament tools.
+const DEFAULT_MATCH_TIMEOUT_MS = 60000;
+const runMatchToDecision = async (
+  env: Awaited<ReturnType<typeof environmentService.get>>,
+  members: Awaited<ReturnType<typeof arenaMemberService.getForArena>>,
+  opts: { seed?: number; timeoutMs?: number } = {}
+): Promise<Awaited<ReturnType<typeof buildMatchSummary>>> => {
+  if (opts.seed !== undefined) env.setSeed(opts.seed);
+  const priorSpeed = env.getSpeed();
+  env.setSpeed(0); // unbounded — decide the match as quickly as possible
+  await env.restart();
+  env.resume(); // restart() does not resume
+
+  const deadline = Date.now() + (opts.timeoutMs ?? DEFAULT_MATCH_TIMEOUT_MS);
+  let summary = await buildMatchSummary(env, members);
+  while (!summary.match.decided && env.isRunning() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    summary = await buildMatchSummary(env, members);
+  }
+
+  env.pause();
+  env.setSpeed(priorSpeed);
+  return buildMatchSummary(env, members);
+};
+
 // Build a fresh MCP server bound to one authenticated user. All tools act on
 // that user's own resources only, so there is no cross-user addressing (and no
 // :userId argument): the bearer token already identifies the actor. Exported so
@@ -651,6 +682,60 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       env.setSeed(seed);
       return ok({ arenaId: arena.getId(), seed: env.getSeed() });
+    }
+  );
+
+  server.registerTool(
+    'run_match',
+    {
+      title: 'Run a match',
+      description:
+        'Run one match to a decision and return the outcome (winner + ' +
+        'leaderboard). A blocking convenience for the manual set_seed → restart → ' +
+        'resume → poll-match_summary loop: it optionally sets `seed` for a ' +
+        'reproducible match, restarts the arena (re-firing every bot’s START), ' +
+        'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
+        'fast as possible until at most one bot still has living tanks ' +
+        '(match.decided), then pauses and returns the match_summary. Needs at ' +
+        'least two active bots. Omit arenaId for your default arena.',
+      inputSchema: {
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+        seed: z
+          .number()
+          .int()
+          .optional()
+          .describe(
+            'Optional integer seed for a reproducible match (tank placement + orientations)'
+          ),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            'Max wall-clock ms to wait for a decision (default 60000); returns the current summary flagged timedOut if exceeded'
+          ),
+      },
+      // The summary shape is broad/evolving (same as match_summary), so it is
+      // returned as structuredContent without pinning a brittle outputSchema.
+      annotations: WRITE,
+    },
+    async ({ arenaId, seed, timeoutMs }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      const members = await arenaMemberService.getForArena(arena.getId());
+      if (env.getProcesses().length < 2) {
+        return fail('A match needs at least two active bots in the arena.');
+      }
+      const summary = await runMatchToDecision(env, members, {
+        seed,
+        timeoutMs,
+      });
+      return ok({ timedOut: !summary.match.decided, ...summary });
     }
   );
 

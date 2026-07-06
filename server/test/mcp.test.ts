@@ -230,6 +230,60 @@ describe('mcp tools', () => {
     });
   });
 
+  it('run_match reseeds, restarts+resumes, runs to a decision, and returns the winner', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      {},
+      {},
+    ] as never);
+    const env = {
+      getProcesses: () => [{}, {}],
+      setSeed: vi.fn(),
+      getSpeed: () => 1,
+      setSpeed: vi.fn(),
+      restart: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
+      pause: vi.fn(),
+      isRunning: () => true,
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    // Already decided on the first read, so the poll loop exits immediately.
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1', name: 'Winner' } },
+      leaderboard: [{ rank: 1, id: 'a1' }],
+    } as never);
+
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'run_match',
+      arguments: { seed: 42 },
+    })) as never;
+
+    expect(env.setSeed).toHaveBeenCalledWith(42);
+    expect(env.restart).toHaveBeenCalled();
+    expect(env.resume).toHaveBeenCalled(); // restart alone leaves it paused
+    expect(env.pause).toHaveBeenCalled(); // paused at the decided state
+    const out = JSON.parse(textOf(res));
+    expect(out.timedOut).toBe(false);
+    expect(out.match.winner.id).toBe('a1');
+  });
+
+  it('run_match requires at least two active bots', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([{}] as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      getProcesses: () => [{}],
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'run_match',
+      arguments: {},
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+  });
+
   it('recent_logs filters by level, bot, tank, and text', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
