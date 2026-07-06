@@ -30,6 +30,18 @@ None of this would exist without the original **Robocode**, created by Mathew
 Nelson and kept alive by a wonderful open-source community. RobocodeJs is a
 tribute, not a replacement — if you enjoy it, go play the original too.
 
+And what a life it's had. Robocode first appeared in **2000**, built at IBM as a
+fun way to learn Java, and after it was open-sourced in **2005** a devoted
+community — led for many years by Flemming N. Larsen — carried it forward and
+turned it into something remarkable. The [RoboWiki](https://robowiki.net) grew
+into a deep well of strategy, where players reverse-engineered ideas like _wave
+surfing_ and _guess-factor targeting_ and shared gloriously over-engineered bots,
+while the **RoboRumble** ladder ran a never-ending tournament between hundreds of
+community entries. More than two decades on it's still going strong: the project
+lives on today, and its creator has even built a modern successor —
+[Robocode Tank Royale](https://github.com/robocode-dev/tank-royale) — that lets
+you write bots in almost any language. RobocodeJs proudly stands on all of it.
+
 ## Say hi
 
 I build this in my spare time, driven by my passion for software engineering and a
