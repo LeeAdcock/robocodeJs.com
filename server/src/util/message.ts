@@ -7,7 +7,7 @@ export type JsonValue =
   number | string | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 // Max length of the JSON-encoded message (in characters). A broadcast is
-// re-serialized to every other tank in the arena, so this bounds the amplified
+// re-serialized to every other bot in the arena, so this bounds the amplified
 // work as well as any single payload.
 export const MAX_MESSAGE_CHARS = 4096;
 // Max nesting depth, so validating (and re-serializing per receiver) a hostile

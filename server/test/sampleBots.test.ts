@@ -10,7 +10,7 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import compiler from '../src/util/compiler';
-import Tank from '../src/types/tank';
+import Bot from '../src/types/bot';
 import { Process } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
 import { Event } from '../src/types/event';
@@ -33,7 +33,7 @@ describe('sample bots run without crashing', () => {
       tick,
     } = makeSimEnv({
       run: (e) => {
-        const t = proc.tanks[0];
+        const t = proc.bots[0];
         if (t) {
           t.turret.loaded = 100;
           t.turret.radar.charged = 100;
@@ -42,31 +42,31 @@ describe('sample bots run without crashing', () => {
       },
     });
     procs.push(proc);
-    const tank = new Tank(env, proc);
-    proc.tanks.push(tank);
-    tank.x = 375;
-    tank.y = 375;
+    const bot = new Bot(env, proc);
+    proc.bots.push(bot);
+    bot.x = 375;
+    bot.y = 375;
     // Let scanning/firing actually happen.
-    tank.turret.radar.charged = 100;
-    tank.turret.loaded = 100;
+    bot.turret.radar.charged = 100;
+    bot.turret.loaded = 100;
 
-    compiler.init(env, proc, tank);
+    compiler.init(env, proc, bot);
     proc
       .getSandbox()
       .compileScriptSync(source)
-      .runSync(tank.getContext(), { timeout: 5000 });
+      .runSync(bot.getContext(), { timeout: 5000 });
 
     // START + TICK run via the simulation; then fire the inbound events a bot
     // might subscribe to (no-ops if it doesn't), and drive long enough for the
     // resulting async chains (turn/aim/fire/scan) to fully play out.
     await tick(10);
-    tank.handlers[Event.HIT]?.({ angle: 45 });
-    tank.handlers[Event.COLLIDED]?.({ angle: 45, friendly: false });
-    tank.handlers[Event.RECEIVED]?.(123456);
-    tank.handlers[Event.DETECTED]?.();
+    bot.handlers[Event.HIT]?.({ angle: 45 });
+    bot.handlers[Event.COLLIDED]?.({ angle: 45, friendly: false });
+    bot.handlers[Event.RECEIVED]?.(123456);
+    bot.handlers[Event.DETECTED]?.();
     await tick(30);
 
-    expect(tank.appCrashed).toBe(false);
+    expect(bot.appCrashed).toBe(false);
     proc.dispose();
   });
 });

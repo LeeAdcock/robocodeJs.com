@@ -1,7 +1,7 @@
 import Clock from './clock';
 import { EventEmitter } from 'node:events';
-import TankApp, { AppId } from './app';
-import Tank from './tank';
+import App, { AppId } from './app';
+import Bot from './bot';
 import ivm from 'isolated-vm';
 import Arena from './arena';
 import compiler from '../util/compiler';
@@ -22,8 +22,8 @@ export type ArenaId = string & {};
 // can hand an AI actionable structure instead of a log string to parse.
 export interface BotFault {
   appId: string;
-  tankId: string;
-  tankIndex: number;
+  botId: string;
+  botIndex: number;
   code: string; // ErrorCodes value, e.g. "E017"
   kind: string; // where it happened: load | init | handler | timer | execute | catastrophic
   message: string;
@@ -48,7 +48,7 @@ interface PendingCommand {
 
 export class Process {
   public appId: AppId;
-  public tanks: Tank[] = [];
+  public bots: Bot[] = [];
 
   private sandbox: ivm.Isolate | null = null;
 
@@ -70,11 +70,11 @@ export class Process {
             { event: LogEvent.SANDBOX_CATASTROPHIC, appId: this.appId, msg },
             'isolate catastrophic error'
           );
-          this.tanks.forEach((tank) => {
-            tank.appCrashed = true;
-            tank.logger.error(new Error(`${ErrorCodes.E001}: ${msg}`));
+          this.bots.forEach((bot) => {
+            bot.appCrashed = true;
+            bot.logger.error(new Error(`${ErrorCodes.E001}: ${msg}`));
             compiler.emitBotFault(
-              tank,
+              bot,
               ErrorCodes.E001,
               'catastrophic',
               new Error(msg)
@@ -105,8 +105,8 @@ export class Process {
   }
 
   dispose() {
-    this.tanks.forEach((tank) => tank.getContext().release());
-    this.tanks = [];
+    this.bots.forEach((bot) => bot.getContext().release());
+    this.bots = [];
     this.disposeSandbox();
   }
 }
@@ -160,7 +160,7 @@ export default class Environment {
   private static readonly MAX_RECENT_FAULTS = 100;
   private recentFaults: BotFault[] = [];
 
-  // Seeded PRNG for the arena's random setup (tank placement + starting
+  // Seeded PRNG for the arena's random setup (bot placement + starting
   // orientations). Fixing the seed makes a match reproducible; by default it is
   // seeded nondeterministically so arenas still vary. In-memory only, like speed.
   private seed: number;
@@ -201,22 +201,22 @@ export default class Environment {
             });
           }
         });
-        process.tanks.forEach((tank) => {
-          // Emit new tank event
+        process.bots.forEach((bot) => {
+          // Emit new bot event
           listener({
-            type: 'arenaPlaceTank',
-            id: tank.id,
+            type: 'arenaPlaceBot',
+            id: bot.id,
             appId: process.getAppId(),
-            bodyOrientation: tank.orientation,
-            bodyOrientationVelocity: tank.orientationVelocity,
-            turretOrientation: tank.turret.orientation,
-            turretOrientationVelocity: tank.turret.orientationVelocity,
-            radarOrientation: tank.turret.radar.orientation,
-            radarOrientationVelocity: tank.turret.radar.orientationVelocity,
-            speed: tank.speed,
-            speedMax: tank.speedMax,
-            x: tank.x,
-            y: tank.y,
+            bodyOrientation: bot.orientation,
+            bodyOrientationVelocity: bot.orientationVelocity,
+            turretOrientation: bot.turret.orientation,
+            turretOrientationVelocity: bot.turret.orientationVelocity,
+            radarOrientation: bot.turret.radar.orientation,
+            radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+            speed: bot.speed,
+            speedMax: bot.speedMax,
+            x: bot.x,
+            y: bot.y,
           });
         });
       });
@@ -287,12 +287,12 @@ export default class Environment {
 
   getSeed = () => this.seed;
 
-  // A seeded random number in [0, 1). Used for tank placement and starting
+  // A seeded random number in [0, 1). Used for bot placement and starting
   // orientations, so a fixed seed reproduces the match setup exactly.
   random = () => this.rng();
 
   // Reseed the arena's PRNG. Resets the stream, so the next restart (which
-  // reconstructs all tanks) lays out an identical match for a given seed. A
+  // reconstructs all bots) lays out an identical match for a given seed. A
   // non-finite value picks a fresh nondeterministic seed.
   setSeed(seed: number) {
     this.seed = Number.isFinite(seed)
@@ -408,7 +408,7 @@ export default class Environment {
       this.processes
         .filter((process) => process.getAppId() === appId)
         .map((process) =>
-          Promise.all(process.tanks.map((tank) => tank.execute(process)))
+          Promise.all(process.bots.map((bot) => bot.execute(process)))
         )
     );
   }
@@ -422,8 +422,8 @@ export default class Environment {
       this.processes
         .filter((process) => process.getAppId() === appId)
         .forEach((process) =>
-          process.tanks.forEach((tank) => {
-            tank.needsStarting = true;
+          process.bots.forEach((bot) => {
+            bot.needsStarting = true;
           })
         );
     });
@@ -440,21 +440,21 @@ export default class Environment {
     // Health decays after sudden death time
     if (this.clock.time > SUDDEN_DEATH_TIME && this.clock.time % 50 === 0) {
       this.processes.forEach((process) => {
-        process.tanks
-          .filter((tank) => tank.health > 0)
-          .forEach((tank) => {
-            tank.health = Math.max(0, tank.health - 1);
+        process.bots
+          .filter((bot) => bot.health > 0)
+          .forEach((bot) => {
+            bot.health = Math.max(0, bot.health - 1);
           });
       });
     }
 
-    // Record the tick each tank died (crash, bullet, collision, or decay above),
+    // Record the tick each bot died (crash, bullet, collision, or decay above),
     // once, so the match summary can rank apps by elimination order. Read-only for
     // the physics — this never feeds back into the simulation.
     this.processes.forEach((process) =>
-      process.tanks.forEach((tank) => {
-        if (tank.health <= 0 && tank.eliminatedAt === null) {
-          tank.eliminatedAt = this.clock.time;
+      process.bots.forEach((bot) => {
+        if (bot.health <= 0 && bot.eliminatedAt === null) {
+          bot.eliminatedAt = this.clock.time;
         }
       })
     );
@@ -462,8 +462,8 @@ export default class Environment {
     // Calculate application health
     const appHealth: number[] = this.processes.map(
       (process) =>
-        process.tanks.reduce((sum, tank) => sum + tank.health, 0) /
-        (process.tanks.length * 100)
+        process.bots.reduce((sum, bot) => sum + bot.health, 0) /
+        (process.bots.length * 100)
     );
 
     this.emitter.emit('event', {
@@ -554,18 +554,18 @@ export default class Environment {
     // Restart each process
     return Promise.all(
       this.processes.map((process) => {
-        process.tanks.forEach((tank) => {
-          // Emit removed tank event
+        process.bots.forEach((bot) => {
+          // Emit removed bot event
           this.emitter.emit('event', {
-            type: 'arenaRemoveTank',
-            id: tank.id,
+            type: 'arenaRemoveBot',
+            id: bot.id,
             appId: process.getAppId(),
           });
         });
 
         process.dispose();
 
-        // Restart each tank
+        // Restart each bot
         return appService.get(process.getAppId()).then((app) => {
           if (!app) return;
 
@@ -575,31 +575,31 @@ export default class Environment {
             name: app.getName(),
           });
 
-          const tankCount = 5;
+          const botCount = 5;
           return Promise.all(
-            [...Array(tankCount)].map(() => {
-              const tank = new Tank(this, process);
-              tank.needsStarting = true;
+            [...Array(botCount)].map(() => {
+              const bot = new Bot(this, process);
+              bot.needsStarting = true;
 
-              process.tanks.push(tank);
-              compiler.init(this, process, tank);
-              return tank.execute(process).then(() => {
-                // Emit new tank event
+              process.bots.push(bot);
+              compiler.init(this, process, bot);
+              return bot.execute(process).then(() => {
+                // Emit new bot event
                 this.emitter.emit('event', {
-                  type: 'arenaPlaceTank',
-                  id: tank.id,
+                  type: 'arenaPlaceBot',
+                  id: bot.id,
                   appId: process.getAppId(),
-                  bodyOrientation: tank.orientation,
-                  bodyOrientationVelocity: tank.orientationVelocity,
-                  turretOrientation: tank.turret.orientation,
-                  turretOrientationVelocity: tank.turret.orientationVelocity,
-                  radarOrientation: tank.turret.radar.orientation,
+                  bodyOrientation: bot.orientation,
+                  bodyOrientationVelocity: bot.orientationVelocity,
+                  turretOrientation: bot.turret.orientation,
+                  turretOrientationVelocity: bot.turret.orientationVelocity,
+                  radarOrientation: bot.turret.radar.orientation,
                   radarOrientationVelocity:
-                    tank.turret.radar.orientationVelocity,
-                  speed: tank.speed,
-                  speedMax: tank.speedMax,
-                  x: tank.x,
-                  y: tank.y,
+                    bot.turret.radar.orientationVelocity,
+                  speed: bot.speed,
+                  speedMax: bot.speedMax,
+                  x: bot.x,
+                  y: bot.y,
                 });
               });
             })
@@ -611,14 +611,14 @@ export default class Environment {
     });
   }
 
-  addApp(app: TankApp) {
+  addApp(app: App) {
     const process = new Process(app.getId());
     this.processes.push(process);
 
-    // Announce the app itself before its tanks. A live client won't have a
+    // Announce the app itself before its bots. A live client won't have a
     // container for a newly enabled / added-by-reference app (disabled apps
-    // aren't in the arena it loaded), and the arenaPlaceTank reducer drops tanks
-    // whose app is unknown — so without this the tanks only appeared after a
+    // aren't in the arena it loaded), and the arenaPlaceBot reducer drops bots
+    // whose app is unknown — so without this the bots only appeared after a
     // restart re-broadcast the whole arena. The bootstrap replay and restart()
     // already emit this; addApp was the one path that skipped it.
     this.emitter.emit('event', {
@@ -628,27 +628,27 @@ export default class Environment {
     });
 
     for (let x = 0; x < 5; x++) {
-      const tank = new Tank(this, process);
-      process.tanks.push(tank);
+      const bot = new Bot(this, process);
+      process.bots.push(bot);
 
-      compiler.init(this, process, tank);
-      tank.execute(process);
+      compiler.init(this, process, bot);
+      bot.execute(process);
 
-      // Emit new tank event
+      // Emit new bot event
       this.emitter.emit('event', {
-        type: 'arenaPlaceTank',
-        id: tank.id,
+        type: 'arenaPlaceBot',
+        id: bot.id,
         appId: process.getAppId(),
-        bodyOrientation: tank.orientation,
-        bodyOrientationVelocity: tank.orientationVelocity,
-        turretOrientation: tank.turret.orientation,
-        turretOrientationVelocity: tank.turret.orientationVelocity,
-        radarOrientation: tank.turret.radar.orientation,
-        radarOrientationVelocity: tank.turret.radar.orientationVelocity,
-        speed: tank.speed,
-        speedMax: tank.speedMax,
-        x: tank.x,
-        y: tank.y,
+        bodyOrientation: bot.orientation,
+        bodyOrientationVelocity: bot.orientationVelocity,
+        turretOrientation: bot.turret.orientation,
+        turretOrientationVelocity: bot.turret.orientationVelocity,
+        radarOrientation: bot.turret.radar.orientation,
+        radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+        speed: bot.speed,
+        speedMax: bot.speedMax,
+        x: bot.x,
+        y: bot.y,
       });
     }
   }
@@ -670,11 +670,11 @@ export default class Environment {
       );
       this.processes.splice(i, 1);
 
-      process.tanks.forEach((tank) => {
-        // Emit removed tank event
+      process.bots.forEach((bot) => {
+        // Emit removed bot event
         this.emitter.emit('event', {
-          type: 'arenaRemoveTank',
-          id: tank.id,
+          type: 'arenaRemoveBot',
+          id: bot.id,
           appId: appId,
         });
       });

@@ -1,5 +1,5 @@
 // A tiny deterministic pseudo-random generator (mulberry32). A given 32-bit seed
-// always produces the same sequence, so an arena's random setup — tank placement
+// always produces the same sequence, so an arena's random setup — bot placement
 // and starting orientations — is fully reproducible when the seed is fixed. This
 // makes accelerated, headless runs (for tooling / AI) repeatable. It is fast and
 // small; it is NOT cryptographic and must not be used for anything security-

@@ -368,9 +368,9 @@ describe('mcp tools', () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
     const logs = [
-      { level: 30, appId: 'a1', tankIndex: 1, msg: 'hello info' },
-      { level: 50, appId: 'a1', tankIndex: 2, msg: 'E017: boom' },
-      { level: 40, appId: 'a2', tankIndex: 1, msg: 'warn other' },
+      { level: 30, appId: 'a1', botIndex: 1, msg: 'hello info' },
+      { level: 50, appId: 'a1', botIndex: 2, msg: 'E017: boom' },
+      { level: 40, appId: 'a2', botIndex: 1, msg: 'warn other' },
     ];
     vi.mocked(environmentService.getByArenaId).mockResolvedValue({
       getRecentLogs: () => logs,
@@ -386,7 +386,7 @@ describe('mcp tools', () => {
         )
       );
 
-    // recent_logs renames the internal tankIndex field to botIndex on output.
+    // recent_logs renames the internal botIndex field to botIndex on output.
     const mapped1 = { level: 50, appId: 'a1', botIndex: 2, msg: 'E017: boom' };
     // ERROR-and-up only.
     expect(await call({ minLevel: 'ERROR' })).toEqual([mapped1]);
@@ -406,8 +406,8 @@ describe('mcp tools', () => {
     const faults = [
       {
         appId: 'a1',
-        tankId: 't1',
-        tankIndex: 1,
+        botId: 't1',
+        botIndex: 1,
         code: 'E017',
         kind: 'load',
         message: 'x is not defined',
@@ -427,7 +427,7 @@ describe('mcp tools', () => {
     })) as { structuredContent?: unknown };
 
     expect(getRecentFaults).toHaveBeenCalledWith(10, 'a1');
-    // recent_faults renames the internal tankIndex field to botIndex on output.
+    // recent_faults renames the internal botIndex field to botIndex on output.
     expect(res.structuredContent).toEqual({
       faults: [
         {

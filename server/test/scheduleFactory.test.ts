@@ -3,14 +3,14 @@ import {
   scheduleFactory,
   timerTick,
   TimersContainer,
-  MAX_TIMERS_PER_TANK,
+  MAX_TIMERS_PER_BOT,
 } from '../src/util/scheduleFactory';
 
 // Bot setInterval/setTimeout are monkey-patched to advance with simulation
 // ticks (clock.getTime()), not wall-clock time. A bot's setTimeout(fn, 5)
 // therefore fires after 5 *ticks*. These tests lock that behavior in.
 
-function makeTank(health = 100) {
+function makeBot(health = 100) {
   return {
     health,
     logger: { trace: vi.fn(), warn: vi.fn() },
@@ -18,21 +18,21 @@ function makeTank(health = 100) {
   };
 }
 
-function makeEnv(tank: ReturnType<typeof makeTank>) {
+function makeEnv(bot: ReturnType<typeof makeBot>) {
   const state = { time: 0 };
   return {
     state,
     getTime: () => state.time,
-    getProcesses: () => [{ tanks: [tank] }],
+    getProcesses: () => [{ bots: [bot] }],
   };
 }
 
 describe('scheduleFactory + timerTick', () => {
   it('fires an interval every `interval` ticks', () => {
-    const tank = makeTank();
-    const env = makeEnv(tank);
+    const bot = makeBot();
+    const env = makeEnv(bot);
     const fn = vi.fn();
-    scheduleFactory(tank).setInterval(1, fn, 5, env as never);
+    scheduleFactory(bot).setInterval(1, fn, 5, env as never);
 
     env.state.time = 4;
     timerTick(env as never);
@@ -52,10 +52,10 @@ describe('scheduleFactory + timerTick', () => {
   });
 
   it('fires a timeout once then removes it', () => {
-    const tank = makeTank();
-    const env = makeEnv(tank);
+    const bot = makeBot();
+    const env = makeEnv(bot);
     const fn = vi.fn();
-    scheduleFactory(tank).setTimeout(1, fn, 3, env as never);
+    scheduleFactory(bot).setTimeout(1, fn, 3, env as never);
 
     env.state.time = 2;
     timerTick(env as never);
@@ -71,10 +71,10 @@ describe('scheduleFactory + timerTick', () => {
   });
 
   it('clearInterval stops a pending interval', () => {
-    const tank = makeTank();
-    const env = makeEnv(tank);
+    const bot = makeBot();
+    const env = makeEnv(bot);
     const fn = vi.fn();
-    const sched = scheduleFactory(tank);
+    const sched = scheduleFactory(bot);
     const id = sched.setInterval(7, fn, 1, env as never);
     sched.clearInterval(id);
 
@@ -84,10 +84,10 @@ describe('scheduleFactory + timerTick', () => {
   });
 
   it('clearTimeout cancels a pending timeout', () => {
-    const tank = makeTank();
-    const env = makeEnv(tank);
+    const bot = makeBot();
+    const env = makeEnv(bot);
     const fn = vi.fn();
-    const sched = scheduleFactory(tank);
+    const sched = scheduleFactory(bot);
     const id = sched.setTimeout(8, fn, 2, env as never);
     sched.clearTimeout(id);
 
@@ -96,11 +96,11 @@ describe('scheduleFactory + timerTick', () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it('does not fire timers for a destroyed tank', () => {
-    const tank = makeTank(0); // health 0
-    const env = makeEnv(tank);
+  it('does not fire timers for a destroyed bot', () => {
+    const bot = makeBot(0); // health 0
+    const env = makeEnv(bot);
     const fn = vi.fn();
-    scheduleFactory(tank).setInterval(1, fn, 1, env as never);
+    scheduleFactory(bot).setInterval(1, fn, 1, env as never);
 
     env.state.time = 5;
     timerTick(env as never);
@@ -111,33 +111,33 @@ describe('scheduleFactory + timerTick', () => {
   // of timers. Each host-side timer costs memory and per-tick CPU, so past the
   // cap registration is refused (returns the falsy sentinel 0) and E021 is
   // warned to the bot console once.
-  it('rejects timers past MAX_TIMERS_PER_TANK and warns E021 once', () => {
-    const tank = makeTank();
-    const env = makeEnv(tank);
-    const sched = scheduleFactory(tank);
+  it('rejects timers past MAX_TIMERS_PER_BOT and warns E021 once', () => {
+    const bot = makeBot();
+    const env = makeEnv(bot);
+    const sched = scheduleFactory(bot);
 
-    for (let i = 0; i < MAX_TIMERS_PER_TANK; i++) {
+    for (let i = 0; i < MAX_TIMERS_PER_BOT; i++) {
       expect(sched.setInterval(i + 1, vi.fn(), 5, env as never)).toBe(i + 1);
     }
-    expect(tank.timers.size()).toBe(MAX_TIMERS_PER_TANK);
+    expect(bot.timers.size()).toBe(MAX_TIMERS_PER_BOT);
 
     // Two more registrations (interval + timeout) are both refused, and the map
     // does not grow.
     expect(sched.setInterval(9001, vi.fn(), 5, env as never)).toBe(0);
     expect(sched.setTimeout(9002, vi.fn(), 5, env as never)).toBe(0);
-    expect(tank.timers.size()).toBe(MAX_TIMERS_PER_TANK);
+    expect(bot.timers.size()).toBe(MAX_TIMERS_PER_BOT);
 
     // Warned exactly once despite multiple rejections (no console flooding).
-    expect(tank.logger.warn).toHaveBeenCalledTimes(1);
-    expect(String(tank.logger.warn.mock.calls[0][0])).toContain('E021');
+    expect(bot.logger.warn).toHaveBeenCalledTimes(1);
+    expect(String(bot.logger.warn.mock.calls[0][0])).toContain('E021');
   });
 
   it('frees a slot after clearInterval so a new timer can register again', () => {
-    const tank = makeTank();
-    const env = makeEnv(tank);
-    const sched = scheduleFactory(tank);
+    const bot = makeBot();
+    const env = makeEnv(bot);
+    const sched = scheduleFactory(bot);
 
-    for (let i = 0; i < MAX_TIMERS_PER_TANK; i++) {
+    for (let i = 0; i < MAX_TIMERS_PER_BOT; i++) {
       sched.setInterval(i + 1, vi.fn(), 5, env as never);
     }
     expect(sched.setInterval(9001, vi.fn(), 5, env as never)).toBe(0); // full

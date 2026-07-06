@@ -2,14 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import Simulation from '../src/util/simulation';
 import { Event } from '../src/types/event';
 
-// Simulation.run only reads/writes plain tank fields and invokes
-// tank.handlers[...] functions, so we can drive the real physics with
-// lightweight mock tanks (no isolates). Angles are in degrees; 0° points
-// "down" (+y), so a tank at orientation 0 moving at speed s advances +s in y.
+// Simulation.run only reads/writes plain bot fields and invokes
+// bot.handlers[...] functions, so we can drive the real physics with
+// lightweight mock bots (no isolates). Angles are in degrees; 0° points
+// "down" (+y), so a bot at orientation 0 moving at speed s advances +s in y.
 
-function makeTank(overrides: Record<string, unknown> = {}) {
+function makeBot(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'tank',
+    id: 'bot',
     health: 100,
     appCrashed: false,
     needsStarting: false,
@@ -48,8 +48,8 @@ function makeTank(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeProcess(appId: string, tanks: unknown[]) {
-  return { getAppId: () => appId, tanks };
+function makeProcess(appId: string, bots: unknown[]) {
+  return { getAppId: () => appId, bots };
 }
 
 function makeEnv(
@@ -69,87 +69,87 @@ const run = (env: ReturnType<typeof makeEnv>) =>
   Simulation.run(env as any);
 
 describe('Simulation.run — movement', () => {
-  it('advances a tank along its orientation (0° = +y)', () => {
-    const tank = makeTank({ speed: 10, speedTarget: 10, speedMax: 10 });
-    run(makeEnv([makeProcess('a', [tank])]));
-    expect(tank.x).toBeCloseTo(375);
-    expect(tank.y).toBeCloseTo(385);
-    expect(tank.stats.distanceTraveled).toBe(10);
+  it('advances a bot along its orientation (0° = +y)', () => {
+    const bot = makeBot({ speed: 10, speedTarget: 10, speedMax: 10 });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.x).toBeCloseTo(375);
+    expect(bot.y).toBeCloseTo(385);
+    expect(bot.stats.distanceTraveled).toBe(10);
   });
 
   it('accelerates toward speedTarget using pre-acceleration speed for the step', () => {
-    const tank = makeTank({ speed: 0, speedTarget: 10, speedAcceleration: 2 });
-    run(makeEnv([makeProcess('a', [tank])]));
+    const bot = makeBot({ speed: 0, speedTarget: 10, speedAcceleration: 2 });
+    run(makeEnv([makeProcess('a', [bot])]));
     // moved with speed 0 (no displacement), then accelerated by 2
-    expect(tank.y).toBeCloseTo(375);
-    expect(tank.speed).toBe(2);
+    expect(bot.y).toBeCloseTo(375);
+    expect(bot.speed).toBe(2);
   });
 
   it('snaps to speedTarget within one acceleration step', () => {
-    const tank = makeTank({ speed: 9, speedTarget: 10, speedAcceleration: 2 });
-    run(makeEnv([makeProcess('a', [tank])]));
-    expect(tank.speed).toBe(10);
+    const bot = makeBot({ speed: 9, speedTarget: 10, speedAcceleration: 2 });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.speed).toBe(10);
   });
 
   it('clamps speed to speedMax', () => {
-    const tank = makeTank({
+    const bot = makeBot({
       speed: 9,
       speedTarget: 100,
       speedAcceleration: 5,
       speedMax: 10,
     });
-    run(makeEnv([makeProcess('a', [tank])]));
-    expect(tank.speed).toBe(10);
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.speed).toBe(10);
   });
 });
 
 describe('Simulation.run — rotation', () => {
   it('rotates the body toward its target by the rotational velocity', () => {
-    const tank = makeTank({
+    const bot = makeBot({
       orientation: 0,
       orientationTarget: 90,
       orientationVelocity: 10,
     });
-    run(makeEnv([makeProcess('a', [tank])]));
-    expect(tank.orientation).toBeCloseTo(10);
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.orientation).toBeCloseTo(10);
   });
 
   it('recharges the turret and radar each tick', () => {
-    const tank = makeTank();
-    tank.turret.loaded = 90;
-    tank.turret.radar.charged = 80;
-    run(makeEnv([makeProcess('a', [tank])]));
-    expect(tank.turret.loaded).toBe(92);
-    expect(tank.turret.radar.charged).toBe(90);
+    const bot = makeBot();
+    bot.turret.loaded = 90;
+    bot.turret.radar.charged = 80;
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.turret.loaded).toBe(92);
+    expect(bot.turret.radar.charged).toBe(90);
   });
 });
 
 describe('Simulation.run — collisions', () => {
-  it('stops the tank and applies damage at the arena boundary', () => {
+  it('stops the bot and applies damage at the arena boundary', () => {
     const collided = vi.fn();
-    const tank = makeTank({ x: 10, handlers: { [Event.COLLIDED]: collided } });
-    const env = makeEnv([makeProcess('a', [tank])]);
+    const bot = makeBot({ x: 10, handlers: { [Event.COLLIDED]: collided } });
+    const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
     expect(collided).toHaveBeenCalledWith({ angle: 0 });
-    expect(tank.health).toBe(99);
-    expect(tank.speed).toBe(0);
-    expect(tank.x).toBe(10); // movement not applied on collision
+    expect(bot.health).toBe(99);
+    expect(bot.speed).toBe(0);
+    expect(bot.x).toBe(10); // movement not applied on collision
     expect(env.emit).toHaveBeenCalledWith(
       'event',
-      expect.objectContaining({ type: 'tankStop' })
+      expect.objectContaining({ type: 'botStop' })
     );
   });
 
-  it('fires COLLIDED on two tanks that overlap, flagging friendly teams', () => {
+  it('fires COLLIDED on two bots that overlap, flagging friendly teams', () => {
     const c1 = vi.fn();
     const c2 = vi.fn();
-    const t1 = makeTank({
+    const t1 = makeBot({
       id: '1',
       x: 375,
       y: 375,
       handlers: { [Event.COLLIDED]: c1 },
     });
-    const t2 = makeTank({
+    const t2 = makeBot({
       id: '2',
       x: 385,
       y: 375,
@@ -165,9 +165,9 @@ describe('Simulation.run — collisions', () => {
 });
 
 describe('Simulation.run — bullets', () => {
-  it('damages a tank hit by an enemy bullet and explodes the bullet', () => {
+  it('damages a bot hit by an enemy bullet and explodes the bullet', () => {
     const hit = vi.fn();
-    const target = makeTank({
+    const target = makeBot({
       id: 'a',
       x: 375,
       y: 375,
@@ -183,7 +183,7 @@ describe('Simulation.run — bullets', () => {
       origin: { x: 375, y: 365 },
       callback: vi.fn(),
     };
-    const shooter = makeTank({ id: 'b', x: 375, y: 300, bullets: [bullet] });
+    const shooter = makeBot({ id: 'b', x: 375, y: 300, bullets: [bullet] });
     const env = makeEnv([
       makeProcess('a', [target]),
       makeProcess('b', [shooter]),
@@ -210,8 +210,8 @@ describe('Simulation.run — bullets', () => {
       exploded: false,
       origin: { x: 375, y: 375 },
     };
-    const tank = makeTank({ bullets: [bullet] });
-    run(makeEnv([makeProcess('a', [tank])]));
+    const bot = makeBot({ bullets: [bullet] });
+    run(makeEnv([makeProcess('a', [bot])]));
     expect(bullet.x).toBeCloseTo(375);
     expect(bullet.y).toBeCloseTo(380);
   });
@@ -227,10 +227,10 @@ describe('Simulation.run — bullets', () => {
       origin: { x: 375, y: 375 },
       callback: vi.fn(),
     };
-    const tank = makeTank({ bullets: [bullet] });
-    const env = makeEnv([makeProcess('a', [tank])]);
+    const bot = makeBot({ bullets: [bullet] });
+    const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
-    expect(tank.bullets).toHaveLength(0);
+    expect(bot.bullets).toHaveLength(0);
     expect(env.emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'bulletRemoved', id: 'b1' })
@@ -239,40 +239,40 @@ describe('Simulation.run — bullets', () => {
 });
 
 describe('Simulation.run — lifecycle', () => {
-  it('kills a tank whose bot code crashed', () => {
-    const tank = makeTank({ appCrashed: true });
-    const env = makeEnv([makeProcess('a', [tank])]);
+  it('kills a bot whose bot code crashed', () => {
+    const bot = makeBot({ appCrashed: true });
+    const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
-    expect(tank.health).toBe(0);
+    expect(bot.health).toBe(0);
     expect(env.emit).toHaveBeenCalledWith(
       'event',
-      expect.objectContaining({ type: 'tankDamaged', health: 0 })
+      expect.objectContaining({ type: 'botDamaged', health: 0 })
     );
   });
 
   it('runs the START handler exactly once', () => {
     const start = vi.fn();
-    const tank = makeTank({
+    const bot = makeBot({
       needsStarting: true,
       handlers: { [Event.START]: start },
     });
-    const env = makeEnv([makeProcess('a', [tank])]);
+    const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
     run(env);
     expect(start).toHaveBeenCalledTimes(1);
-    expect(tank.needsStarting).toBe(false);
+    expect(bot.needsStarting).toBe(false);
   });
 
-  it('runs START before the first TICK: a just-started tank skips TICK that tick', () => {
+  it('runs START before the first TICK: a just-started bot skips TICK that tick', () => {
     const calls: string[] = [];
-    const tank = makeTank({
+    const bot = makeBot({
       needsStarting: true,
       handlers: {
         [Event.START]: () => calls.push('start'),
         [Event.TICK]: () => calls.push('tick'),
       },
     });
-    const env = makeEnv([makeProcess('a', [tank])]);
+    const env = makeEnv([makeProcess('a', [bot])]);
 
     run(env);
     // START ran; TICK deferred so it can't race ahead of (async) START.
@@ -283,16 +283,16 @@ describe('Simulation.run — lifecycle', () => {
     expect(calls).toEqual(['start', 'tick']);
   });
 
-  it('does not defer TICK for a tank with no START handler', () => {
+  it('does not defer TICK for a bot with no START handler', () => {
     const tick = vi.fn();
-    const tank = makeTank({
+    const bot = makeBot({
       needsStarting: true,
       handlers: { [Event.TICK]: tick },
     });
-    const env = makeEnv([makeProcess('a', [tank])]);
+    const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
     // Nothing to start first, so TICK fires immediately on the first tick.
     expect(tick).toHaveBeenCalledTimes(1);
-    expect(tank.needsStarting).toBe(false);
+    expect(bot.needsStarting).toBe(false);
   });
 });

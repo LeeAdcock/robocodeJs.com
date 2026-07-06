@@ -1,4 +1,4 @@
-import Tank from '../types/tank';
+import Bot from '../types/bot';
 import { Event } from '../types/event';
 import { scheduleFactory } from './scheduleFactory';
 import ivm from 'isolated-vm';
@@ -13,10 +13,10 @@ import { toApiHeading, toInternalHeading } from './geometry';
 import { parseMessage } from './message';
 
 // Identifying context for a faulting bot, for the structured server log.
-const botCtx = (tank: Tank) => ({
-  appId: tank.process.appId,
-  tankId: tank.id,
-  arenaId: tank.env.getArena().getId?.(),
+const botCtx = (bot: Bot) => ({
+  appId: bot.process.appId,
+  botId: bot.id,
+  arenaId: bot.env.getArena().getId?.(),
 });
 
 // Pull a bot-code location (line/column) out of an isolated-vm error. Runtime
@@ -44,9 +44,9 @@ const cleanErrorMessage = (message: string): string =>
 // Record a fatal bot fault on the environment's fault feed (a bounded buffer plus
 // a `botFault` SSE event) so a crash is surfaced prominently — in the UI (banner /
 // in-arena indicator / jump-to-line) and to MCP (`recent_faults`). This is
-// additive: the per-site tank.logger + logBotFault calls stay as they are.
+// additive: the per-site bot.logger + logBotFault calls stay as they are.
 const emitBotFault = (
-  tank: Tank,
+  bot: Bot,
   code: ErrorCodes,
   kind: string,
   err: unknown
@@ -57,17 +57,17 @@ const emitBotFault = (
   const message = cleanErrorMessage(
     err instanceof Error ? err.message : String(err)
   );
-  tank.env.reportFault({
-    appId: tank.process.appId,
-    tankId: tank.id,
-    tankIndex: tank.process.tanks.map((t) => t.id).indexOf(tank.id) + 1,
+  bot.env.reportFault({
+    appId: bot.process.appId,
+    botId: bot.id,
+    botIndex: bot.process.bots.map((t) => t.id).indexOf(bot.id) + 1,
     code,
     kind,
     message,
     line,
     column,
     timedOut: /timed out|timeout/i.test(message),
-    time: tank.env.getTime(),
+    time: bot.env.getTime(),
   });
 };
 
@@ -91,17 +91,17 @@ const MAX_LOG_LENGTH = 2000;
 function runInIsolate(
   ref: ivm.Reference,
   args: unknown[],
-  tank: Tank,
+  bot: Bot,
   code: ErrorCodes
 ) {
   return ref
     .apply(undefined, args, { timeout: sandboxTimeoutMs() })
     .catch((e: unknown) => {
       const kind = code === ErrorCodes.E020 ? 'timer' : 'callback';
-      tank.logger.error(`${code}: ${e}`);
-      tank.appCrashed = true;
-      logBotFault(botCtx(tank), kind, e);
-      emitBotFault(tank, code, kind, e);
+      bot.logger.error(`${code}: ${e}`);
+      bot.appCrashed = true;
+      logBotFault(botCtx(bot), kind, e);
+      emitBotFault(bot, code, kind, e);
     });
 }
 
@@ -113,32 +113,32 @@ function runInIsolate(
 
 // Synchronous getter: `botPath()` copies fn()'s result out of the host.
 function exposeGetter(
-  tank: Tank,
+  bot: Bot,
   isolate: ivm.Isolate,
   botPath: string,
   name: string,
   fn: () => unknown
 ) {
-  tank.getContext().global.setSync(name, () => new ivm.ExternalCopy(fn()));
+  bot.getContext().global.setSync(name, () => new ivm.ExternalCopy(fn()));
   isolate
     .compileScriptSync(`${botPath} = () => ${name}().copy()`)
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 }
 
-// Settles a pending bot-side promise by id (see __settle). Each tank's settler
-// is registered by init; the async callbacks below look it up by tank, so the
+// Settles a pending bot-side promise by id (see __settle). Each bot's settler
+// is registered by init; the async callbacks below look it up by bot, so the
 // expose* helpers don't need to thread it through their signatures.
 type Settle = (id: number, ok: boolean, value: unknown) => void;
-const settlers = new WeakMap<Tank, Settle>();
+const settlers = new WeakMap<Bot, Settle>();
 
-// A settler is registered for every tank during init, before any bot code, timer,
+// A settler is registered for every bot during init, before any bot code, timer,
 // or command can run, so one is always present by the time a settlement fires.
 // Resolve it through this helper so that invariant is an explicit throw rather
 // than a non-null assertion.
-function getSettler(tank: Tank): Settle {
-  const settle = settlers.get(tank);
+function getSettler(bot: Bot): Settle {
+  const settle = settlers.get(bot);
   if (!settle) {
-    throw new Error('No settler registered for tank');
+    throw new Error('No settler registered for bot');
   }
   return settle;
 }
@@ -149,14 +149,14 @@ function getSettler(tank: Tank): Settle {
 // host-captured __settle reference. The bot wrapper calls the shared
 // __asyncCall bridge, so no ivm primitive is ever exposed to bot code.
 function exposeAsync1(
-  tank: Tank,
+  bot: Bot,
   isolate: ivm.Isolate,
   botPath: string,
   name: string,
   fn: (arg: number) => Promise<unknown>
 ) {
-  tank.getContext().global.setSync(name, (id: number, arg: number) => {
-    const settle = getSettler(tank);
+  bot.getContext().global.setSync(name, (id: number, arg: number) => {
+    const settle = getSettler(bot);
     fn(arg).then(
       (v) => settle(id, true, v),
       (e) => settle(id, false, e)
@@ -164,20 +164,20 @@ function exposeAsync1(
   });
   isolate
     .compileScriptSync(`${botPath} = (arg) => __asyncCall(${name}, arg)`)
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 }
 
 // Async action with no arguments that resolves with fn()'s result (e.g.
 // radar.scan's hit list). __settle copies object results across the boundary.
 function exposeAsyncResult(
-  tank: Tank,
+  bot: Bot,
   isolate: ivm.Isolate,
   botPath: string,
   name: string,
   fn: () => Promise<unknown>
 ) {
-  tank.getContext().global.setSync(name, (id: number) => {
-    const settle = getSettler(tank);
+  bot.getContext().global.setSync(name, (id: number) => {
+    const settle = getSettler(bot);
     fn().then(
       (v) => settle(id, true, v),
       (e) => settle(id, false, e)
@@ -185,49 +185,49 @@ function exposeAsyncResult(
   });
   isolate
     .compileScriptSync(`${botPath} = () => __asyncCall(${name})`)
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 }
 
 // Fire-and-forget call passing a single argument through to fn.
 function exposeVoid(
-  tank: Tank,
+  bot: Bot,
   isolate: ivm.Isolate,
   botPath: string,
   name: string,
   fn: (arg: unknown) => void
 ) {
-  tank.getContext().global.setSync(name, (arg: unknown) => {
+  bot.getContext().global.setSync(name, (arg: unknown) => {
     fn(arg);
   });
   isolate
     .compileScriptSync(`${botPath} = (arg) => ${name}(arg)`)
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 }
 
-function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
-  const radar = tank.turret.radar;
+function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
+  const radar = bot.turret.radar;
   exposeGetter(
-    tank,
+    bot,
     isolate,
     'bot.radar.getOrientation',
     '_bot_radar_getOrientation',
     () => radar.getOrientation()
   );
   exposeAsync1(
-    tank,
+    bot,
     isolate,
     'bot.radar.setOrientation',
     '_bot_radar_setOrientation',
     (arg) => radar.setOrientation(arg)
   );
   exposeGetter(
-    tank,
+    bot,
     isolate,
     'bot.radar.isTurning',
     '_bot_radar_isTurning',
     () => radar.isTurning()
   );
-  exposeAsync1(tank, isolate, 'bot.radar.turn', '_bot_radar_turn', (arg) =>
+  exposeAsync1(bot, isolate, 'bot.radar.turn', '_bot_radar_turn', (arg) =>
     radar.turn(arg)
   );
 
@@ -241,47 +241,47 @@ function exposeTankRadar(tank: Tank, isolate: ivm.Isolate) {
       }
       `
     )
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 
-  exposeAsyncResult(tank, isolate, 'bot.radar.scan', '_bot_radar_scan', () =>
+  exposeAsyncResult(bot, isolate, 'bot.radar.scan', '_bot_radar_scan', () =>
     radar.scan()
   );
   exposeAsyncResult(
-    tank,
+    bot,
     isolate,
     'bot.radar.onReady',
     '_bot_radar_onReady',
     () => radar.onReady()
   );
-  exposeGetter(tank, isolate, 'bot.radar.isReady', '_bot_radar_isReady', () =>
+  exposeGetter(bot, isolate, 'bot.radar.isReady', '_bot_radar_isReady', () =>
     radar.isReady()
   );
 }
 
-function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
-  const turret = tank.turret;
+function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
+  const turret = bot.turret;
   exposeGetter(
-    tank,
+    bot,
     isolate,
     'bot.turret.getOrientation',
     '_bot_turret_getOrientation',
     () => turret.getOrientation()
   );
   exposeAsync1(
-    tank,
+    bot,
     isolate,
     'bot.turret.setOrientation',
     '_bot_turret_setOrientation',
     (arg) => turret.setOrientation(arg)
   );
   exposeGetter(
-    tank,
+    bot,
     isolate,
     'bot.turret.isTurning',
     '_bot_turret_isTurning',
     () => turret.isTurning()
   );
-  exposeAsync1(tank, isolate, 'bot.turret.turn', '_bot_turret_turn', (arg) =>
+  exposeAsync1(bot, isolate, 'bot.turret.turn', '_bot_turret_turn', (arg) =>
     turret.turn(arg)
   );
 
@@ -295,11 +295,11 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
       }
       `
     )
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 
   // Expose fire
-  tank.getContext().global.setSync('_bot_turret_fire', (id: number) => {
-    const settle = getSettler(tank);
+  bot.getContext().global.setSync('_bot_turret_fire', (id: number) => {
+    const settle = getSettler(bot);
     turret.fire().then(
       (v) => settle(id, true, v),
       (e) => settle(id, false, e)
@@ -307,21 +307,21 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
   });
   isolate
     .compileScriptSync(`bot.turret.fire = () => __asyncCall(_bot_turret_fire)`)
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 
   exposeAsyncResult(
-    tank,
+    bot,
     isolate,
     'bot.turret.onReady',
     '_bot_turret_onReady',
     () => turret.onReady()
   );
-  exposeGetter(tank, isolate, 'bot.turret.isReady', '_bot_turret_isReady', () =>
+  exposeGetter(bot, isolate, 'bot.turret.isReady', '_bot_turret_isReady', () =>
     turret.isReady()
   );
 }
 
-function exposeTank(tank: Tank, isolate: ivm.Isolate) {
+function exposeBot(bot: Bot, isolate: ivm.Isolate) {
   // Event handlers, without exposing ivm. The bot stores its handler functions
   // in an isolate-side table (`__handlers`); the host captures a Reference to a
   // single `__dispatch` entry point and drives it when an event fires. The
@@ -341,17 +341,17 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
       }
       `
     )
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 
   // Captured once, before any bot code runs, so a bot reassigning __dispatch
   // later cannot hijack what the host invokes.
-  const dispatchRef = tank
+  const dispatchRef = bot
     .getContext()
     .evalSync('__dispatch', { reference: true });
 
   // Returns two promises for one handler invocation:
   //   done   — resolves when the handler fully finishes (may be many ticks later,
-  //            if it awaits multi-tick commands); drives tank.on's re-entry guard.
+  //            if it awaits multi-tick commands); drives bot.on's re-entry guard.
   //   parked — resolves when the apply returns, i.e. the handler has run to its
   //            first await-park this tick; the tick loop awaits this so bot code
   //            has executed before the next tick advances.
@@ -375,76 +375,76 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
         }
       )
       .catch((e: unknown) => {
-        tank.logger.error(`${ErrorCodes.E013}: ${e}`);
-        tank.appCrashed = true;
-        logBotFault(botCtx(tank), 'handler', e);
-        emitBotFault(tank, ErrorCodes.E013, 'handler', e);
+        bot.logger.error(`${ErrorCodes.E013}: ${e}`);
+        bot.appCrashed = true;
+        logBotFault(botCtx(bot), 'handler', e);
+        emitBotFault(bot, ErrorCodes.E013, 'handler', e);
         done_reject(e);
       });
     return { parked, done };
   };
 
-  tank.getContext().global.setSync(
+  bot.getContext().global.setSync(
     '_bot_register',
     new ivm.Callback(
       (event: Event) => {
-        tank.on(event, (...args: unknown[]) => dispatchEvent(event, ...args));
+        bot.on(event, (...args: unknown[]) => dispatchEvent(event, ...args));
       },
       { sync: true }
     )
   );
 
-  exposeGetter(tank, isolate, 'bot.getId', '_bot_getId', () => tank.getId());
-  exposeGetter(tank, isolate, 'bot.getSpeed', '_bot_getSpeed', () =>
-    tank.getSpeed()
+  exposeGetter(bot, isolate, 'bot.getId', '_bot_getId', () => bot.getId());
+  exposeGetter(bot, isolate, 'bot.getSpeed', '_bot_getSpeed', () =>
+    bot.getSpeed()
   );
-  exposeAsync1(tank, isolate, 'bot.setSpeed', '_bot_setSpeed', (arg) =>
-    tank.setSpeed(arg)
+  exposeAsync1(bot, isolate, 'bot.setSpeed', '_bot_setSpeed', (arg) =>
+    bot.setSpeed(arg)
   );
   // The body heading is the one absolute angle the bot sees, so translate it
   // between the internal south-zero compass and the bot-facing north-zero one.
-  exposeGetter(tank, isolate, 'bot.getOrientation', '_bot_getOrientation', () =>
-    toApiHeading(tank.getOrientation())
+  exposeGetter(bot, isolate, 'bot.getOrientation', '_bot_getOrientation', () =>
+    toApiHeading(bot.getOrientation())
   );
   exposeAsync1(
-    tank,
+    bot,
     isolate,
     'bot.setOrientation',
     '_bot_setOrientation',
-    (arg) => tank.setOrientation(toInternalHeading(arg))
+    (arg) => bot.setOrientation(toInternalHeading(arg))
   );
 
   isolate
     .compileScriptSync(
       `bot.dropMarker = () => arena.createMarker(bot.getX(), bot.getY())`
     )
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 
-  exposeVoid(tank, isolate, 'bot.setName', '_bot_setName', (arg) =>
-    tank.setName(arg as string)
+  exposeVoid(bot, isolate, 'bot.setName', '_bot_setName', (arg) =>
+    bot.setName(arg as string)
   );
-  exposeGetter(tank, isolate, 'bot.getHealth', '_bot_getHealth', () =>
-    tank.getHealth()
+  exposeGetter(bot, isolate, 'bot.getHealth', '_bot_getHealth', () =>
+    bot.getHealth()
   );
-  exposeGetter(tank, isolate, 'bot.isTurning', '_bot_isTurning', () =>
-    tank.isTurning()
+  exposeGetter(bot, isolate, 'bot.isTurning', '_bot_isTurning', () =>
+    bot.isTurning()
   );
-  exposeAsync1(tank, isolate, 'bot.turn', '_bot_turn', (arg) => tank.turn(arg));
-  exposeGetter(tank, isolate, 'bot.getX', '_bot_getX', () => tank.getX());
-  exposeGetter(tank, isolate, 'bot.getY', '_bot_getY', () => tank.getY());
+  exposeAsync1(bot, isolate, 'bot.turn', '_bot_turn', (arg) => bot.turn(arg));
+  exposeGetter(bot, isolate, 'bot.getX', '_bot_getX', () => bot.getX());
+  exposeGetter(bot, isolate, 'bot.getY', '_bot_getY', () => bot.getY());
   // bot.send accepts any JSON value — a primitive, or nested arrays/objects of
   // primitives. The value crosses the sandbox boundary as a JSON string: the
   // bot-side wrapper stringifies it and the host parses + validates it
   // (parseMessage) before broadcasting. JSON is the whitelist, so functions,
   // class instances, Dates, Maps/Sets, and host references can never be sent.
-  tank.getContext().global.setSync('_bot_send', (json: unknown) => {
-    tank.send(parseMessage(json));
+  bot.getContext().global.setSync('_bot_send', (json: unknown) => {
+    bot.send(parseMessage(json));
   });
   isolate
     .compileScriptSync(
       `bot.send = (message) => _bot_send(JSON.stringify(message))`
     )
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 
   // Convenience turnTowards
   isolate
@@ -456,7 +456,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
       }
       `
     )
-    .runSync(tank.getContext(), {});
+    .runSync(bot.getContext(), {});
 }
 
 // Bot source is (re)run in the SAME persisted isolate context on every reload:
@@ -478,23 +478,23 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
 // `})()` sits on its own trailing line, after all author code.
 const wrapSource = (source: string): string => `(() => {${source}\n})()`;
 
-// Execute the tank code
-const execute = (process: Process, tank: Tank): Promise<unknown> => {
-  tank.handlers = {};
-  tank.timers.reset();
+// Execute the bot code
+const execute = (process: Process, bot: Bot): Promise<unknown> => {
+  bot.handlers = {};
+  bot.timers.reset();
   // Reloading code re-registers handlers and resets timers, but deliberately
   // does NOT re-fire START: a running bot keeps the state it set up so an edit
   // (auto-save / save) doesn't disrupt a match. START still fires on first
-  // placement (Tank.needsStarting defaults to true), on arena restart, and when
+  // placement (Bot.needsStarting defaults to true), on arena restart, and when
   // the author explicitly reboots the bot (Environment.reboot / the editor's
   // reboot button).
   return appService.get(process.getAppId()).then((app) => {
     if (!app) return;
     const onError = (e: unknown) => {
-      tank.logger.error(`${ErrorCodes.E017}: ${e}`);
-      tank.appCrashed = true;
-      logBotFault(botCtx(tank), 'load', e);
-      emitBotFault(tank, ErrorCodes.E017, 'load', e);
+      bot.logger.error(`${ErrorCodes.E017}: ${e}`);
+      bot.appCrashed = true;
+      logBotFault(botCtx(bot), 'load', e);
+      emitBotFault(bot, ErrorCodes.E017, 'load', e);
     };
     let script: ivm.Script;
     try {
@@ -510,19 +510,19 @@ const execute = (process: Process, tank: Tank): Promise<unknown> => {
       return;
     }
     return script
-      .run(tank.getContext(), { timeout: sandboxTimeoutMs() })
+      .run(bot.getContext(), { timeout: sandboxTimeoutMs() })
       .catch(onError);
   });
 };
 
-// Initialize a tank.getContext() within the isolated sandbox
-const init = (env: Environment, process: Process, tank: Tank) => {
+// Initialize a bot.getContext() within the isolated sandbox
+const init = (env: Environment, process: Process, bot: Bot) => {
   try {
-    // Expose tank
+    // Expose bot
     process
       .getSandbox()
       .compileScriptSync(`const bot={radar: {}, turret: {}}`)
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
 
     // Async-call bridge (no ivm in the isolate). The bot's async API wrappers
     // call __asyncCall, which parks the promise's resolve/reject in __pending
@@ -549,9 +549,9 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         }
         `
       )
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
 
-    const settleRef = tank
+    const settleRef = bot
       .getContext()
       .evalSync('__settle', { reference: true });
     const settle: Settle = (id, ok, value) => {
@@ -573,18 +573,18 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           .catch(() => undefined)
       );
     };
-    settlers.set(tank, settle);
+    settlers.set(bot, settle);
 
-    exposeTank(tank, process.getSandbox());
-    exposeTankRadar(tank, process.getSandbox());
-    exposeTankTurret(tank, process.getSandbox());
+    exposeBot(bot, process.getSandbox());
+    exposeBotRadar(bot, process.getSandbox());
+    exposeBotTurret(bot, process.getSandbox());
 
     // Expose scheduler / timers, without exposing ivm. The bot keeps its timer
     // callbacks in an isolate-side table keyed by id and the host captures a
     // Reference to a single `__runTimer` entry point — the mirror of the event
     // dispatch above. Running it under the sandbox timeout keeps a looping timer
     // body from hanging the host thread.
-    const scheduler = scheduleFactory(tank);
+    const scheduler = scheduleFactory(bot);
     process
       .getSandbox()
       .compileScriptSync(
@@ -598,7 +598,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         }
         setInterval = (func, interval) => {
           const id = ++__timerSeq; __timers[id] = func
-          // A falsy return means the host refused the timer (per-tank cap, E021);
+          // A falsy return means the host refused the timer (per-bot cap, E021);
           // drop the callback we just stored so it can't leak or fire.
           if (!_setInterval(id, interval)) { delete __timers[id]; return -1 }
           return id
@@ -612,19 +612,19 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         clearTimeout = (id) => { delete __timers[id]; _clearTimeout(id) }
         `
       )
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
 
-    const runTimerRef = tank
+    const runTimerRef = bot
       .getContext()
       .evalSync('__runTimer', { reference: true });
     const fireTimer = (id: number, oneShot: boolean) =>
       // Tracked so the tick loop awaits the timer callback running to its next
       // await-park, keeping timer-driven bots deterministic under acceleration.
       env.trackBotOp(
-        runInIsolate(runTimerRef, [id, oneShot], tank, ErrorCodes.E020)
+        runInIsolate(runTimerRef, [id, oneShot], bot, ErrorCodes.E020)
       );
 
-    tank
+    bot
       .getContext()
       .global.setSync(
         '_setInterval',
@@ -639,13 +639,13 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           { sync: true }
         )
       );
-    tank.getContext().global.setSync(
+    bot.getContext().global.setSync(
       '_clearInterval',
       new ivm.Callback((id: number) => scheduler.clearInterval(id), {
         sync: true,
       })
     );
-    tank
+    bot
       .getContext()
       .global.setSync(
         '_setTimeout',
@@ -655,7 +655,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           { sync: true }
         )
       );
-    tank.getContext().global.setSync(
+    bot.getContext().global.setSync(
       '_clearTimeout',
       new ivm.Callback((id: number) => scheduler.clearTimeout(id), {
         sync: true,
@@ -663,16 +663,16 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     );
 
     // Expose clock
-    tank
+    bot
       .getContext()
       .global.setSync(
         '_clock_getTime',
         () => new ivm.ExternalCopy(env.getTime())
       );
-    // Seed this tank's Math.random from the arena PRNG so bot randomness is
+    // Seed this bot's Math.random from the arena PRNG so bot randomness is
     // reproducible when the arena seed is fixed (and still varies by default,
-    // since the default seed is nondeterministic). Each tank draws a distinct
-    // sub-seed, so tanks behave differently but repeatably. The generator is pure
+    // since the default seed is nondeterministic). Each bot draws a distinct
+    // sub-seed, so bots behave differently but repeatably. The generator is pure
     // in-isolate JS (mulberry32) — no host round-trip per call.
     const mathSeed = Math.floor(env.random() * 0x100000000);
     process
@@ -698,16 +698,16 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         }
         `
       )
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
 
     // Expose arena
-    tank
+    bot
       .getContext()
       .global.setSync(
         '_arena_getWidth',
         () => new ivm.ExternalCopy(env.getArena().getWidth())
       );
-    tank
+    bot
       .getContext()
       .global.setSync(
         '_arena_getHeight',
@@ -738,7 +738,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         }
       `
       )
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
 
     // Expose console / logger
     const streams = [
@@ -749,11 +749,11 @@ const init = (env: Environment, process: Process, tank: Tank) => {
             env.emit('log', {
               ...entry,
               // Identify the source for non-UI consumers (the MCP recent_logs
-              // tool): the bot's uuid and the tank's 1-based index within that
+              // tool): the bot's uuid and the bot's 1-based index within that
               // bot. The bunyan `name` ("<25>") is a compact UI label that's
               // opaque to API clients.
               appId: process.getAppId(),
-              tankIndex: process.tanks.map((t) => t.id).indexOf(tank.id) + 1,
+              botIndex: process.bots.map((t) => t.id).indexOf(bot.id) + 1,
               time: env.getTime(),
               id: randomUUID(),
             });
@@ -761,7 +761,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         },
       },
     ];
-    const tankId =
+    const botId =
       (env
         .getProcesses()
         .map((p) => p.getAppId())
@@ -771,12 +771,12 @@ const init = (env: Environment, process: Process, tank: Tank) => {
       ((env
         .getProcesses()
         .find((p) => p.getAppId() === process.getAppId())
-        ?.tanks.map((t) => t.id)
-        .indexOf(tank.id) || 0) +
+        ?.bots.map((t) => t.id)
+        .indexOf(bot.id) || 0) +
         1);
 
-    tank.logger = createLogger({
-      name: '<' + tankId + '>',
+    bot.logger = createLogger({
+      name: '<' + botId + '>',
       streams,
     });
 
@@ -792,7 +792,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
     // The bot-side wrappers (below) format every argument into a single string
     // before it crosses the isolate boundary, so the host only ever receives a
     // string here. Coerce defensively in case `_log` is called directly.
-    tank.getContext().global.setSync('_log', (msg: unknown) => {
+    bot.getContext().global.setSync('_log', (msg: unknown) => {
       const now = env.getTime();
       if (now !== logWindow) {
         logWindow = now;
@@ -804,14 +804,14 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         if (logCount === MAX_LOGS_PER_TICK) {
           logCount += 1;
           logger.warn(
-            { event: LogEvent.BOT_FAULT, kind: 'log-flood', ...botCtx(tank) },
+            { event: LogEvent.BOT_FAULT, kind: 'log-flood', ...botCtx(bot) },
             'bot exceeded per-tick log budget; dropping further output'
           );
         }
         return;
       }
       logCount += 1;
-      tank.logger.info(clampLog(typeof msg === 'string' ? msg : String(msg)));
+      bot.logger.info(clampLog(typeof msg === 'string' ? msg : String(msg)));
     });
     // TODO better log-level support
     //
@@ -916,7 +916,7 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         _log = undefined;
        `
       )
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
 
     // Expose Event definitions
     process
@@ -935,12 +935,12 @@ const init = (env: Environment, process: Process, tank: Tank) => {
         }
         `
       )
-      .runSync(tank.getContext(), {});
+      .runSync(bot.getContext(), {});
   } catch (e) {
-    tank.logger.error(`${ErrorCodes.E018}: ${e}`);
-    tank.appCrashed = true;
-    logBotFault(botCtx(tank), 'init', e);
-    emitBotFault(tank, ErrorCodes.E018, 'init', e);
+    bot.logger.error(`${ErrorCodes.E018}: ${e}`);
+    bot.appCrashed = true;
+    logBotFault(botCtx(bot), 'init', e);
+    emitBotFault(bot, ErrorCodes.E018, 'init', e);
   }
 };
 
@@ -960,7 +960,7 @@ export interface CheckResult {
 // does). Powers the `check_bot_source` MCP tool, the `/check` REST endpoint, and
 // the editor Check button, so authors and AI catch mistakes before deploying.
 //
-// It reuses the real Environment/Process/Tank/init path against a fresh throwaway
+// It reuses the real Environment/Process/Bot/init path against a fresh throwaway
 // Environment (which runs no tick loop and touches no database), then disposes the
 // isolate. It deliberately does NOT call logBotFault / set appCrashed — a dry-run
 // is not a real fault and must not pollute logs or fault alerting.
@@ -982,9 +982,9 @@ const check = async (source: string): Promise<CheckResult> => {
     };
   };
   try {
-    const tank = new Tank(env, process);
-    process.tanks.push(tank);
-    init(env, process, tank);
+    const bot = new Bot(env, process);
+    process.bots.push(bot);
+    init(env, process, bot);
     let script: ivm.Script;
     try {
       // Synchronous compile — throws on a syntax error. Wrap identically to
@@ -997,7 +997,7 @@ const check = async (source: string): Promise<CheckResult> => {
     try {
       // Top-level load — runs the bot's setup (registering handlers, etc.),
       // bounded by the sandbox timeout so an infinite top-level loop is caught.
-      await script.run(tank.getContext(), { timeout: sandboxTimeoutMs() });
+      await script.run(bot.getContext(), { timeout: sandboxTimeoutMs() });
     } catch (e) {
       return failure('load', e);
     }

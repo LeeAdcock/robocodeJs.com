@@ -16,7 +16,7 @@ import userService from '../services/UserService';
 import { provider, RESOURCE_URL } from './oauth';
 import User from '../types/user';
 import Arena from '../types/arena';
-import TankApp from '../types/app';
+import App from '../types/app';
 import appService from '../services/AppService';
 import compiler from '../util/compiler';
 import arenaService from '../services/ArenaService';
@@ -115,16 +115,16 @@ const fail = (message: string): ToolResult => ({
   isError: true,
 });
 
-// The MCP surface refers to an app's live instances as "bots", never "tanks", so
-// rename the internal log/fault `tankId`/`tankIndex` fields to `botId`/`botIndex`
-// on the way out. (The internal records + SSE stream + UI keep the tank* names.)
+// The MCP surface refers to an app's live instances as "bots", never "bots", so
+// rename the internal log/fault `botId`/`botIndex` fields to `botId`/`botIndex`
+// on the way out. (The internal records + SSE stream + UI keep the bot* names.)
 const botify = <T extends object>(entry: T) => {
-  if (!('tankId' in entry) && !('tankIndex' in entry)) return entry;
-  const { tankId, tankIndex, ...rest } = entry as Record<string, unknown>;
+  if (!('botId' in entry) && !('botIndex' in entry)) return entry;
+  const { botId, botIndex, ...rest } = entry as Record<string, unknown>;
   return {
     ...rest,
-    ...(tankId !== undefined ? { botId: tankId } : {}),
-    ...(tankIndex !== undefined ? { botIndex: tankIndex } : {}),
+    ...(botId !== undefined ? { botId: botId } : {}),
+    ...(botIndex !== undefined ? { botIndex: botIndex } : {}),
   };
 };
 
@@ -142,7 +142,7 @@ const WRITE = { openWorldHint: false } as const;
 
 // Resolve an app that belongs to the authenticated user, or null. Stops a tool
 // from touching another user's bot (the MCP equivalent of requireOwner).
-const ownedApp = async (user: User, appId: string): Promise<TankApp | null> => {
+const ownedApp = async (user: User, appId: string): Promise<App | null> => {
   const app = await appService.get(appId);
   return app && app.getUserId() === user.getId() ? app : null;
 };
@@ -164,7 +164,7 @@ const ownedArena = async (
 // summary. Optionally reseeds first, then runs unbounded ("as fast as the bots
 // can be driven"): it restarts the arena — re-firing every bot's START — and
 // resumes it (restart() alone silently leaves the arena PAUSED), polls until at
-// most one bot still has living tanks (`match.decided`) or the arena stops (all
+// most one bot still has living bots (`match.decided`) or the arena stops (all
 // dead) or the wall-clock timeout elapses, then pauses and restores the arena's
 // prior speed. Shared by the run_match and run_tournament tools.
 const DEFAULT_MATCH_TIMEOUT_MS = 60000;
@@ -457,7 +457,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Arena status',
       description:
         'Snapshot of an arena: size, running state, clock, and every ' +
-        "bot's tanks (position, orientation, health, bullets). Omit arenaId " +
+        "bot's bots (position, orientation, health, bullets). Omit arenaId " +
         'for your default arena.',
       inputSchema: {
         arenaId: z
@@ -485,11 +485,11 @@ export const buildServer = (user: User): McpServer => {
       description:
         'Outcome-oriented summary of an arena: a leaderboard ranked by who is ' +
         'winning/won, the resolved winner, per-bot aggregated stats (shots, ' +
-        'accuracy, damage taken, distance, collisions), survival (tanks alive, ' +
+        'accuracy, damage taken, distance, collisions), survival (bots alive, ' +
         'total health), and elimination order. Complements arena_status (which is ' +
-        'the raw per-tank snapshot); this is the "who won and how" view and is ' +
+        'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
-        'decided when at most one bot still has living tanks. Omit arenaId for ' +
+        'decided when at most one bot still has living bots. Omit arenaId for ' +
         'your default arena.',
       inputSchema: {
         arenaId: z
@@ -517,12 +517,12 @@ export const buildServer = (user: User): McpServer => {
       description:
         'Lightweight, cheap-to-poll status of an arena: whether the match is ' +
         'decided (`match.decided`), the winner once it is, and a coarse ' +
-        'standings list (each bot’s rank, tanks alive, total health) — with NONE ' +
-        'of match_summary’s per-bot stat blocks or arena_status’s per-tank ' +
+        'standings list (each bot’s rank, bots alive, total health) — with NONE ' +
+        'of match_summary’s per-bot stat blocks or arena_status’s per-bot ' +
         'positions. Use this to watch a running match ("is it decided yet / ' +
         'who’s ahead?") without pulling the large payloads; once decided, call ' +
         'match_summary for the full outcome + stats, or arena_status for exact ' +
-        'tank positions. Omit arenaId for your default arena.',
+        'bot positions. Omit arenaId for your default arena.',
       inputSchema: {
         arenaId: z
           .string()
@@ -711,7 +711,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Set arena seed',
       description:
         'Set an arena’s random seed. Fixing the seed makes the match setup — ' +
-        'tank placement and starting orientations — reproducible: restart the ' +
+        'bot placement and starting orientations — reproducible: restart the ' +
         'arena after setting it to lay out an identical match. Combined with the ' +
         'deterministic simulation, this makes accelerated headless runs fully ' +
         'repeatable. Omit arenaId for your default arena.',
@@ -742,7 +742,7 @@ export const buildServer = (user: User): McpServer => {
         'resume → poll-match_summary loop: it optionally sets `seed` for a ' +
         'reproducible match, restarts the arena (re-firing every bot’s START), ' +
         'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
-        'fast as possible until at most one bot still has living tanks ' +
+        'fast as possible until at most one bot still has living bots ' +
         '(match.decided), then pauses and returns the match_summary. Needs at ' +
         'least two active bots. Omit arenaId for your default arena.',
       inputSchema: {
@@ -755,7 +755,7 @@ export const buildServer = (user: User): McpServer => {
           .int()
           .optional()
           .describe(
-            'Optional integer seed for a reproducible match (tank placement + orientations)'
+            'Optional integer seed for a reproducible match (bot placement + orientations)'
           ),
         timeoutMs: z
           .number()
@@ -973,8 +973,7 @@ export const buildServer = (user: User): McpServer => {
         )
           return false;
         if (appId && entry.appId !== appId) return false;
-        if (botIndex !== undefined && entry.tankIndex !== botIndex)
-          return false;
+        if (botIndex !== undefined && entry.botIndex !== botIndex) return false;
         if (contains && !String(entry.msg ?? '').includes(contains))
           return false;
         return true;

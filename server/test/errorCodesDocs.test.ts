@@ -14,7 +14,7 @@ const doc = fs.readFileSync(
 );
 
 // The codes actually emitted today: by the simulation engine (see compiler.ts /
-// tank.ts / environment.ts / scheduleFactory.ts) and by the API layer
+// bot.ts / environment.ts / scheduleFactory.ts) and by the API layer
 // (E022, from the rate limiter in middleware/rateLimit.ts).
 const LIVE_CODES = [
   'E001',

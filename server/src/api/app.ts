@@ -64,9 +64,9 @@ app.post(
       res.send('App limit reached');
       return;
     }
-    const tankApp = await appService.create(user.getId());
+    const app = await appService.create(user.getId());
     res.status(201);
-    res.send({ appId: tankApp.getId() });
+    res.send({ appId: app.getId() });
   }
 );
 

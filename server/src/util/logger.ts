@@ -1,7 +1,7 @@
 import pino from 'pino';
 import { isLocalDev } from './devMode';
 
-// The server's structured application logger (distinct from the per-tank bot
+// The server's structured application logger (distinct from the per-bot bot
 // `console` output, which is streamed to the UI via browser-bunyan). Emits JSON
 // in production for ingestion by a log pipeline; pretty, human-readable lines in
 // local dev; and is silenced under test to keep the suite output clean.
@@ -45,7 +45,7 @@ export const LogEvent = {
 // timer); `timedOut` is derived from the error so a runaway or sandbox-escape
 // attempt that trips the execution timeout can be alerted on specifically.
 export function logBotFault(
-  ctx: { appId?: string; arenaId?: string; tankId?: string },
+  ctx: { appId?: string; arenaId?: string; botId?: string },
   kind: string,
   err: unknown
 ) {

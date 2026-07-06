@@ -10,8 +10,8 @@ import Arena from '../src/types/arena';
 
 const makeFault = (over: Partial<BotFault> = {}): BotFault => ({
   appId: 'a1',
-  tankId: 't1',
-  tankIndex: 1,
+  botId: 't1',
+  botIndex: 1,
   code: 'E017',
   kind: 'load',
   message: 'boom',

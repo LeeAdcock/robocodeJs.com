@@ -8,7 +8,7 @@ describe('logBotFault', () => {
   it('emits a structured bot.fault with ids and kind', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     logBotFault(
-      { appId: 'a1', tankId: 't1', arenaId: 'ar1' },
+      { appId: 'a1', botId: 't1', arenaId: 'ar1' },
       'handler',
       new Error('boom')
     );
@@ -19,7 +19,7 @@ describe('logBotFault', () => {
       kind: 'handler',
       timedOut: false,
       appId: 'a1',
-      tankId: 't1',
+      botId: 't1',
       arenaId: 'ar1',
       err: 'boom',
     });

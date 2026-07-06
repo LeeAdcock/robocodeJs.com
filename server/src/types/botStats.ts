@@ -1,4 +1,4 @@
-export class TankStats {
+export class BotStats {
   distanceTraveled = 0;
   scansCompleted = 0;
   scansDetected = 0;

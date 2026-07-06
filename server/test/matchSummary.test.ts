@@ -11,30 +11,30 @@ vi.mock('../src/services/AppService', () => ({
 
 import { buildMatchSummary, buildMatchStatus } from '../src/util/matchSummary';
 import { SUDDEN_DEATH_TIME } from '../src/types/environment';
-import { TankStats } from '../src/types/tankStats';
+import { BotStats } from '../src/types/botStats';
 import appService from '../src/services/AppService';
 
-// A mock tank exposing just the fields buildMatchSummary reads.
-const makeTank = (
+// A mock bot exposing just the fields buildMatchSummary reads.
+const makeBot = (
   id: string,
   health: number,
   eliminatedAt: number | null,
-  stats: Partial<TankStats> = {},
+  stats: Partial<BotStats> = {},
   appCrashed = false
 ) => ({
   id,
   health,
   eliminatedAt,
   appCrashed,
-  stats: { ...new TankStats(), ...stats },
+  stats: { ...new BotStats(), ...stats },
 });
 
-// A mock process (one app's five tanks). buildMatchSummary reads `.appId` and
-// `.tanks`.
-const makeProcess = (appId: string, tanks: ReturnType<typeof makeTank>[]) => ({
+// A mock process (one app's five bots). buildMatchSummary reads `.appId` and
+// `.bots`.
+const makeProcess = (appId: string, bots: ReturnType<typeof makeBot>[]) => ({
   appId,
   getAppId: () => appId,
-  tanks,
+  bots,
 });
 
 const makeMember = (appId: string, timestamp: number) => ({
@@ -74,10 +74,10 @@ beforeEach(() => {
 });
 
 describe('buildMatchSummary', () => {
-  it('reports an undecided match when two apps still have living tanks', async () => {
+  it('reports an undecided match when two apps still have living bots', async () => {
     const env = makeEnv([
-      makeProcess('a1', [makeTank('t1', 80, null), makeTank('t2', 0, 300)]),
-      makeProcess('a2', [makeTank('t3', 50, null), makeTank('t4', 40, null)]),
+      makeProcess('a1', [makeBot('t1', 80, null), makeBot('t2', 0, 300)]),
+      makeProcess('a2', [makeBot('t3', 50, null), makeBot('t4', 40, null)]),
     ]);
     const members = [makeMember('a1', 1), makeMember('a2', 2)];
 
@@ -97,8 +97,8 @@ describe('buildMatchSummary', () => {
 
   it('resolves the surviving app as the winner when the other is wiped out', async () => {
     const env = makeEnv([
-      makeProcess('a1', [makeTank('t1', 0, 420), makeTank('t2', 0, 500)]),
-      makeProcess('a2', [makeTank('t3', 25, null), makeTank('t4', 0, 480)]),
+      makeProcess('a1', [makeBot('t1', 0, 420), makeBot('t2', 0, 500)]),
+      makeProcess('a2', [makeBot('t3', 25, null), makeBot('t4', 0, 480)]),
     ]);
     const members = [makeMember('a1', 1), makeMember('a2', 2)];
 
@@ -111,7 +111,7 @@ describe('buildMatchSummary', () => {
       name: 'Wanderer',
       userId: 'u2',
     });
-    // Living app ranks first; the eliminated app carries its last-tank death tick.
+    // Living app ranks first; the eliminated app carries its last-bot death tick.
     expect(summary.leaderboard[0].id).toBe('a2');
     expect(summary.leaderboard[0].alive).toBe(true);
     expect(summary.leaderboard[0].eliminatedAt).toBeNull();
@@ -123,8 +123,8 @@ describe('buildMatchSummary', () => {
   it('picks the last app eliminated as the winner once all are dead', async () => {
     const env = makeEnv(
       [
-        makeProcess('a1', [makeTank('t1', 0, 300), makeTank('t2', 0, 450)]),
-        makeProcess('a2', [makeTank('t3', 0, 700), makeTank('t4', 0, 820)]),
+        makeProcess('a1', [makeBot('t1', 0, 300), makeBot('t2', 0, 450)]),
+        makeProcess('a2', [makeBot('t3', 0, 700), makeBot('t4', 0, 820)]),
       ],
       { running: false }
     );
@@ -135,20 +135,20 @@ describe('buildMatchSummary', () => {
     expect(summary.running).toBe(false);
     expect(summary.match.appsAlive).toBe(0);
     expect(summary.match.decided).toBe(true);
-    // a2's last tank (820) died after a1's (450) → a2 survived longest → winner.
+    // a2's last bot (820) died after a1's (450) → a2 survived longest → winner.
     expect(summary.match.winner?.id).toBe('a2');
     expect(summary.leaderboard.map((e) => e.id)).toEqual(['a2', 'a1']);
     expect(summary.leaderboard[0].eliminatedAt).toBe(820);
   });
 
-  it('aggregates stats, computes accuracy, and breaks out per-tank detail', async () => {
+  it('aggregates stats, computes accuracy, and breaks out per-bot detail', async () => {
     const env = makeEnv([
       makeProcess('a1', [
-        makeTank('t1', 100, null, { shotsFired: 6, shotsHit: 3, timesHit: 1 }),
-        makeTank('t2', 0, 200, { shotsFired: 4, shotsHit: 0 }, true),
+        makeBot('t1', 100, null, { shotsFired: 6, shotsHit: 3, timesHit: 1 }),
+        makeBot('t2', 0, 200, { shotsFired: 4, shotsHit: 0 }, true),
       ]),
       // An app that never fired → accuracy must be 0, not NaN.
-      makeProcess('a2', [makeTank('t3', 100, null, { shotsFired: 0 })]),
+      makeProcess('a2', [makeBot('t3', 100, null, { shotsFired: 0 })]),
     ]);
     const members = [makeMember('a1', 1), makeMember('a2', 2)];
 
@@ -160,11 +160,11 @@ describe('buildMatchSummary', () => {
     expect(a1.stats.timesHit).toBe(1);
     expect(a1.stats.accuracy).toBeCloseTo(0.3);
     expect(a1.crashedCount).toBe(1);
-    expect(a1.tanksTotal).toBe(2);
-    expect(a1.tanksAlive).toBe(1);
+    expect(a1.botsTotal).toBe(2);
+    expect(a1.botsAlive).toBe(1);
     expect(a1.totalHealth).toBe(100);
-    expect(a1.tanks).toHaveLength(2);
-    expect(a1.tanks[1]).toMatchObject({
+    expect(a1.bots).toHaveLength(2);
+    expect(a1.bots[1]).toMatchObject({
       id: 't2',
       health: 0,
       alive: false,
@@ -178,13 +178,13 @@ describe('buildMatchSummary', () => {
 });
 
 describe('buildMatchStatus', () => {
-  it('returns coarse standings with no stat blocks or per-tank arrays', async () => {
+  it('returns coarse standings with no stat blocks or per-bot arrays', async () => {
     const env = makeEnv([
       makeProcess('a1', [
-        makeTank('t1', 80, null, { shotsFired: 6, shotsHit: 3 }),
-        makeTank('t2', 0, 300),
+        makeBot('t1', 80, null, { shotsFired: 6, shotsHit: 3 }),
+        makeBot('t2', 0, 300),
       ]),
-      makeProcess('a2', [makeTank('t3', 50, null), makeTank('t4', 40, null)]),
+      makeProcess('a2', [makeBot('t3', 50, null), makeBot('t4', 40, null)]),
     ]);
     const members = [makeMember('a1', 1), makeMember('a2', 2)];
 
@@ -203,22 +203,22 @@ describe('buildMatchStatus', () => {
       id: 'a2',
       name: 'Wanderer',
       alive: true,
-      tanksAlive: 2,
+      botsAlive: 2,
       totalHealth: 90,
       eliminatedAt: null,
     });
-    // Lean shape: no per-bot stats, no per-tank arrays, no ranking-only fields.
+    // Lean shape: no per-bot stats, no per-bot arrays, no ranking-only fields.
     const row = status.standings[0] as Record<string, unknown>;
     expect(row.stats).toBeUndefined();
-    expect(row.tanks).toBeUndefined();
+    expect(row.bots).toBeUndefined();
     expect(row.shotsHit).toBeUndefined();
     expect(row.userId).toBeUndefined();
   });
 
   it('agrees with buildMatchSummary on order, decided, and winner', async () => {
     const processes = [
-      makeProcess('a1', [makeTank('t1', 0, 420), makeTank('t2', 0, 500)]),
-      makeProcess('a2', [makeTank('t3', 25, null), makeTank('t4', 0, 480)]),
+      makeProcess('a1', [makeBot('t1', 0, 420), makeBot('t2', 0, 500)]),
+      makeProcess('a2', [makeBot('t3', 25, null), makeBot('t4', 0, 480)]),
     ];
     const members = [makeMember('a1', 1), makeMember('a2', 2)];
 

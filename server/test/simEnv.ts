@@ -1,5 +1,5 @@
 // Shared test harness: a faithful in-memory stand-in for the parts of
-// Environment that Simulation, timers, and Tank read — including the deterministic
+// Environment that Simulation, timers, and Bot read — including the deterministic
 // per-tick command registry and bot-op tracking that the real tick loop drives.
 //
 // It mirrors Environment.waitForCondition / settlePendingCommands / trackBotOp /
@@ -38,7 +38,7 @@ export function makeSimEnv(
     width?: number;
     height?: number;
     isRunning?: () => boolean;
-    // Fixed PRNG seed for reproducible tank placement/orientation. Omit for
+    // Fixed PRNG seed for reproducible bot placement/orientation. Omit for
     // Math.random() (nondeterministic, like an unseeded Environment).
     seed?: number;
     // Run physics for one tick; injected so this helper needn't import Simulation
