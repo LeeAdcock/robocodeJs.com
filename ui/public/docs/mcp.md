@@ -50,16 +50,16 @@ Once connected, these tools are available (all scoped to your account):
 
 **Bots**
 
-- `list_bots` — list your bots
-- `get_bot_source` — read a bot's source
-- `create_bot` — create a bot (optionally with a name and initial source)
-- `set_bot_source` — replace a bot's source (live arenas pick it up)
-- `rename_bot` — rename a bot
-- `compile_bot` — re-run a bot's current source in your live arenas
-- `check_bot_source` — dry-run compile source (pass `source`, or `appId` for a
+- `list_apps` — list your bots
+- `get_app_source` — read a bot's source
+- `create_app` — create a bot (optionally with a name and initial source)
+- `set_app_source` — replace a bot's source (live arenas pick it up)
+- `rename_app` — rename a bot
+- `compile_app` — re-run a bot's current source in your live arenas
+- `check_app_source` — dry-run compile source (pass `source`, or `appId` for a
   saved bot) and report any syntax/load error with its code — without deploying it
-- `reboot_bot` — reload a bot and re-fire its `START` handler
-- `delete_bot` — remove a bot from every arena and delete it
+- `reboot_app` — reload a bot and re-fire its `START` handler
+- `delete_app` — remove a bot from every arena and delete it
 
 **Arenas**
 
@@ -72,7 +72,7 @@ Once connected, these tools are available (all scoped to your account):
   a coarse standings list (rank, tanks alive, total health) — no per-bot stat
   blocks or per-tank positions. Use it to watch a running match ("is it decided
   yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
-- `add_bot_to_arena` / `remove_bot_from_arena`
+- `add_app_to_arena` / `remove_app_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
 - `run_match` — run one match to a decision (optional `seed`) and return the
   winner + leaderboard; a blocking convenience for the restart → resume → poll
@@ -98,7 +98,7 @@ The server also exposes read-only reference material the AI can pull in:
 - `robocodejs://samples/{name}` — the sample bots
 - `robocodejs://types/robocode.d.ts` — the bot API type definitions
 - `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,
-  for interpreting `recent_logs` and `check_bot_source` output
+  for interpreting `recent_logs` and `check_app_source` output
 
 ## Troubleshooting
 
