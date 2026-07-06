@@ -1,7 +1,7 @@
 {
   "name": "@robocodejs/server",
   "version": "1.2.54",
-  "description": "",
+  "description": "RobocodeJs API server and game-simulation engine — an Express + TypeScript API with the isolated-vm bot sandbox.",
   "main": "./dist/src/index.js",
   "scripts": {
     "build": "tsc",
@@ -15,7 +15,7 @@
     "test:watch": "vitest",
     "package": "npm version patch && npm shrinkwrap && zip -r robocodejs-$(node -p \"require('./package.json').version\").zip ./ -x 'src/*' -x 'test/*' -x 'coverage/*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
-  "author": "",
+  "author": "Lee Adcock <lee@robocodejs.com>",
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

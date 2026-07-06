@@ -1,7 +1,7 @@
 {
-  "name": "robocodeJs.com",
+  "name": "@robocodejs",
   "version": "1.0.0",
-  "description": "Welcome to Battlebots, [a browser-based programming game](https://robocodeJs.com) for creating Javascript artificial intellegence that enables your bots compete for fame and glory! Brainstorm your own winning strategy, program your bot, and set it lose in the arena in teams of one or more to defeat your competition.",
+  "description": "Welcome to RobocodeJs, [a browser-based programming game](https://robocodeJs.com) for creating Javascript artificial intellegence that enables your bots compete for fame and glory! Brainstorm your own winning strategy, program your bot, and set it lose in the arena in teams of one or more to defeat your competition.",
   "main": "index.js",
   "scripts": {
     "start": "concurrently --names proxy,server,ui --prefix-colors blue,green,magenta \"node index.js\" \"npm --prefix server run dev\" \"npm --prefix ui run dev\"",
@@ -17,7 +17,7 @@
     "type": "git",
     "url": "git+https://github.com/LeeAdcock/robocodeJs.com.git"
   },
-  "author": "",
+  "author": "Lee Adcock <lee@robocodejs.com>",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/LeeAdcock/robocodeJs.com/issues"
