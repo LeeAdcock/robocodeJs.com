@@ -579,6 +579,18 @@ export default class Environment {
     const process = new Process(app.getId());
     this.processes.push(process);
 
+    // Announce the app itself before its tanks. A live client won't have a
+    // container for a newly enabled / added-by-reference app (disabled apps
+    // aren't in the arena it loaded), and the arenaPlaceTank reducer drops tanks
+    // whose app is unknown — so without this the tanks only appeared after a
+    // restart re-broadcast the whole arena. The bootstrap replay and restart()
+    // already emit this; addApp was the one path that skipped it.
+    this.emitter.emit('event', {
+      type: 'arenaPlaceApp',
+      id: app.getId(),
+      name: app.getName(),
+    });
+
     for (let x = 0; x < 5; x++) {
       const tank = new Tank(this, process);
       process.tanks.push(tank);
