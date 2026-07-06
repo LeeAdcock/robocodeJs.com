@@ -45,7 +45,8 @@ RobocodeJs is a two-package monorepo plus a tiny root dev proxy:
 A few things worth knowing about how it fits together:
 
 - **Untrusted code, safely sandboxed.** Every bot program runs in its own [`isolated-vm`](https://github.com/laverdet/isolated-vm) V8 isolate (one per app, shared by that team's five tanks). The bot-facing API (`bot`, `arena`, `clock`, `console`, timers, `Event`) is bridged into the isolate in `server/src/util/compiler.ts`. `Date` is deliberately removed so bots stay deterministic — they read time via `clock.getTime()`.
-- **Tick-based simulation.** The engine (`server/src/util/simulation.ts`) advances the world on a fixed interval: it runs bot event handlers, fires tick-driven timers, moves tanks, resolves collisions and bullet hits, and applies damage.
+- **Tick-based simulation.** The engine (`server/src/util/simulation.ts`) advances the world one tick at a time — running bot event handlers, firing tick-driven timers, moving tanks, resolving collisions and bullet hits, and applying damage. The tick rate is adjustable (and can run unbounded for headless play), and with a fixed random seed a match replays identically.
+- **AI-playable over MCP.** An in-process Model Context Protocol server (`POST /api/mcp`) lets an AI client (Claude, or any MCP client) write, run, and watch bots with the same tools a person uses — setup guide at `/mcp`.
 - **Live streaming + client interpolation.** Arena state streams to the browser over Server-Sent Events; the UI applies those events and runs its own lightweight physics between ticks (`ui/src/util/simulate.ts`) for smooth motion.
 
 ### How the pieces relate
@@ -92,7 +93,7 @@ In words: a **User** owns one or more **Arenas** and writes **Apps** (bot progra
 
 ### Prerequisites
 
-- **Node.js ≥ 22** (required by the native `isolated-vm` build; a `.devcontainer` with Node 22 is included).
+- **Node.js ≥ 24** (required by the native `isolated-vm` build; a `.devcontainer` with Node 24 is included, and CI/deploy pin Node 24).
 - That's it for local development — see below. **PostgreSQL** (`RDS_*` env vars) and **Google OAuth** are only needed for a production-like setup.
 
 ### Run it locally (zero-config)
@@ -170,10 +171,11 @@ Formatting is governed by a single root [`.prettierrc.json`](.prettierrc.json) f
 
 ## Documentation
 
-- [`server/README.md`](server/README.md) — API endpoints, the sandbox/compiler, the simulation engine, data model, environment variables.
-- [`ui/README.md`](ui/README.md) — app structure, arena rendering, the SSE event reducer, client-side interpolation, the code editor.
+- [`server/README.md`](server/README.md) — API endpoints, the sandbox/compiler, the simulation engine, the MCP server, security, data model, environment variables.
+- [`ui/README.md`](ui/README.md) — app structure, arena rendering, the SSE event reducer, client-side interpolation, the code editor, theming.
 - [`CLAUDE.md`](CLAUDE.md) — orientation for working in the codebase (commands, conventions, gotchas).
-- [`ui/public/docs/`](ui/public/docs) — the in-app bot author documentation.
+- [`SECURITY.md`](SECURITY.md) — the OWASP Top 10 audit: threat model, findings, and their remediations.
+- [`ui/public/docs/`](ui/public/docs) — the in-app bot author documentation (also served at `/dev`); MCP setup guide at [`ui/public/docs/mcp.md`](ui/public/docs/mcp.md).
 
 ## Deployment
 

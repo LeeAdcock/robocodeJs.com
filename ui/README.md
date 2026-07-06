@@ -7,7 +7,7 @@ Part of the [RobocodeJs monorepo](../README.md). Runs on port `3000` in developm
 ## Tech stack
 
 - **Vite 6** + `@vitejs/plugin-react` (build tooling / dev server)
-- **React 18** with `react-router-dom`
+- **React 19** with `react-router-dom`
 - **react-bootstrap** / Bootstrap for layout and chrome
 - **react-ace** (+ `ace-builds`, `brace`) for the code editor
 - **showdown** + `html-react-parser` for rendering the docs pages
@@ -41,6 +41,8 @@ Tests use [Vitest](https://vitest.dev) and live in `test/` (outside `src`). Two 
 - **Bootstrapping** — fetches the arena snapshot over REST (`/api/user/:id/arena`, or the public `/api/demo/arena` when signed out).
 - **Live updates** — opens an `EventSource` to the server's SSE stream and applies a large per-event-type reducer to the arena state (ticks, tank movement/turn/stop, turret/radar turns, fire/hit, place & remove app/tank, pause/resume, restart).
 - **Smooth motion** — between server ticks it runs its own lightweight physics in `src/util/simulate.ts`, a partial mirror of the server's `simulation.ts`. **If the server's movement/collision math changes, update this file to match**, or client and server will drift.
+- **Theme** — a whole-app light/dark theme lives in `src/util/theme.ts` (a tiny `useSyncExternalStore` store: header toggle, persisted to `localStorage`, defaulting to the OS preference). It sets a `body.dark` class that flips the CSS-variable palette in `src/index.css`, and its boolean also drives the Ace editor theme and the arena SVG's night-mode tint.
+- **Add-by-reference** — `/add-app/:appId` (`src/page/arena/addAppPage.tsx`) is the landing page for a bot **share link**: a signed-in visitor confirms and the referenced bot is linked into their arena (the source is never copied and stays owner-private). The Share button in the editor toolbar copies that link.
 
 ### Arena rendering (`src/components/arena/`)
 
@@ -70,7 +72,7 @@ src/
   components/      navbar + SVG arena rendering
   page/            app editor, arena logs, markdown pages
   types/           wire DTOs mirroring the server's types
-  util/            colors, ring buffer, client physics, emitter, terraformer
+  util/            colors, ring buffer, client physics, emitter, terraformer, theme, playback clock/buffer
 ```
 
 ## Notes
