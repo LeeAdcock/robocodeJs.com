@@ -99,6 +99,16 @@ your bot in a fresh sandbox), and to creating apps and arenas. Fix: slow down an
 retry after a short wait; if a script is driving the API, add a delay between
 calls. The specific budgets are listed under [Game rules](/rules).
 
+## E023
+
+**Invalid message — the broadcast was rejected.** `bot.send(...)` was called with
+something that can't be sent. A message must be a JSON value: a primitive (number,
+string, boolean, or `null`), or a nested array/object of those. Functions, class
+instances, and other non-JSON values can't be sent, and there are caps on size
+(**4096** characters once encoded) and nesting depth (**8**). The `send` call
+throws, so wrap it in a `try`/`catch` if you're sending data that might exceed a
+cap. Fix: send only plain data, and keep payloads small.
+
 ## Reserved codes
 
 `E002`, `E005`–`E012`, `E014`–`E016`, `W001`, and `W002` are reserved and not

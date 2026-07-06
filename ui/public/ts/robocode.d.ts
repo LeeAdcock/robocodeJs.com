@@ -4,6 +4,16 @@
 // These power the in-browser editor autocomplete. Reference or copy this
 // file to author bots in your own TypeScript-aware IDE with full typing.
 
+/** A value carried by bot.send and delivered to Event.RECEIVED: a JSON
+ *  primitive, or nested arrays/objects of primitives. */
+type BotMessage =
+  | number
+  | string
+  | boolean
+  | null
+  | BotMessage[]
+  | { [key: string]: BotMessage };
+
 /** One bot detected by a radar scan. */
 interface ScanResult {
   /** Unique id of the detected bot. */
@@ -18,6 +28,12 @@ interface ScanResult {
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
+}
+
+/** Details about the sender of a received message (the second RECEIVED argument). */
+interface SenderInfo {
+  /** How far away the sender was when it broadcast — a range, not a bearing. The same value is given to teammates and eavesdropping enemies. */
+  distance: number;
 }
 
 /** A virtual point in the arena with distance/bearing helpers, relative to the bot. */
@@ -108,8 +124,8 @@ interface Bot {
   on(event: 'COLLIDED', handler: (event: { angle: number; friendly: boolean }) => void | Promise<unknown>): void;
   /** Fires when your turret fires a shot. */
   on(event: 'FIRED', handler: () => void | Promise<unknown>): void;
-  /** Fires when a numeric message broadcast by a teammate (via bot.send) arrives. */
-  on(event: 'RECEIVED', handler: (event: number) => void | Promise<unknown>): void;
+  /** Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. */
+  on(event: 'RECEIVED', handler: (message: BotMessage, from: SenderInfo) => void | Promise<unknown>): void;
   /** Returns this bot’s unique id. */
   getId(): string;
   /** Returns health from 100 (full) down to 0 (dead). */
@@ -134,8 +150,8 @@ interface Bot {
   setSpeed(speed: number): Promise<void>;
   /** Sets the bot's display name. */
   setName(name: string): void;
-  /** Broadcasts a numeric message to teammates (received via Event.RECEIVED). */
-  send(message: number): void;
+  /** Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. */
+  send(message: BotMessage): void;
   /** Returns a marker at the bot's current location. */
   dropMarker(): Marker;
 }

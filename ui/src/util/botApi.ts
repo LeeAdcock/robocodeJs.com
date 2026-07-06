@@ -37,6 +37,9 @@ export interface ApiEvent {
   name: string;
   // The handler argument type, or 'void' for events that pass no payload.
   payload: string;
+  // Optional full handler parameter list; overrides `payload` for events whose
+  // handler takes more than one argument (e.g. RECEIVED's `(message, from)`).
+  params?: string;
   // Which object registers the handler: `bot.on(...)` or `clock.on(...)`.
   channel: 'bot' | 'clock';
   doc: string;
@@ -96,9 +99,10 @@ export const EVENTS: ApiEvent[] = [
   },
   {
     name: 'RECEIVED',
-    payload: 'number',
+    payload: 'BotMessage',
+    params: 'message: BotMessage, from: SenderInfo',
     channel: 'bot',
-    doc: 'Fires when a numeric message broadcast by a teammate (via bot.send) arrives.',
+    doc: 'Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was.',
   },
 ];
 
@@ -183,6 +187,18 @@ export const INTERFACES: ApiInterface[] = [
         kind: 'property',
         type: 'boolean',
         doc: 'True if it is on your team.',
+      },
+    ],
+  },
+  {
+    name: 'SenderInfo',
+    doc: 'Details about the sender of a received message (the second RECEIVED argument).',
+    members: [
+      {
+        name: 'distance',
+        kind: 'property',
+        type: 'number',
+        doc: 'How far away the sender was when it broadcast — a range, not a bearing. The same value is given to teammates and eavesdropping enemies.',
       },
     ],
   },
@@ -428,9 +444,9 @@ export const INTERFACES: ApiInterface[] = [
       {
         name: 'send',
         kind: 'method',
-        params: [{ name: 'message', type: 'number' }],
+        params: [{ name: 'message', type: 'BotMessage' }],
         type: 'void',
-        doc: 'Broadcasts a numeric message to teammates (received via Event.RECEIVED).',
+        doc: 'Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives.',
       },
       {
         name: 'dropMarker',
@@ -617,7 +633,12 @@ const renderMemberDts = (iface: ApiInterface, m: ApiMember): string[] => {
   // the generic member shape.
   if (iface.name === 'Bot' && m.name === 'on') {
     return EVENTS.filter((e) => e.channel === 'bot').flatMap((e) => {
-      const arg = e.payload === 'void' ? '' : `event: ${e.payload}`;
+      const arg =
+        e.params !== undefined
+          ? e.params
+          : e.payload === 'void'
+            ? ''
+            : `event: ${e.payload}`;
       return [
         `/** ${e.doc} */`,
         `on(event: '${e.name}', handler: (${arg}) => void | Promise<unknown>): void;`,
@@ -649,6 +670,16 @@ export function generateDts(): string {
     '// Generated from ui/src/util/botApi.ts — do not edit by hand.',
     '// These power the in-browser editor autocomplete. Reference or copy this',
     '// file to author bots in your own TypeScript-aware IDE with full typing.',
+    '',
+    '/** A value carried by bot.send and delivered to Event.RECEIVED: a JSON',
+    ' *  primitive, or nested arrays/objects of primitives. */',
+    'type BotMessage =',
+    '  | number',
+    '  | string',
+    '  | boolean',
+    '  | null',
+    '  | BotMessage[]',
+    '  | { [key: string]: BotMessage };',
     '',
   ];
 
