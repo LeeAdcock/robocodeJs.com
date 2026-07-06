@@ -16,6 +16,7 @@ import {
 import { writeRateLimit } from '../middleware/rateLimit';
 import { openSseStream } from '../util/sse';
 import { buildArenaStatus } from '../util/arenaStatus';
+import { buildMatchSummary } from '../util/matchSummary';
 
 const app = express();
 
@@ -101,6 +102,19 @@ const getStatus = async (req: Request, res: Response) => {
   res.send(await buildArenaStatus(env, members));
 };
 app.get(dual(''), loadUser, resolveArena, getStatus);
+
+// Get an outcome-oriented match summary (leaderboard, winner, aggregated stats,
+// elimination order) — most useful once a match is decided. Read-only, same open
+// access as getStatus (spectating is intentionally not owner-gated).
+const getSummary = async (req: Request, res: Response) => {
+  const arena = scopedArena(req);
+  const env = await environmentService.get(arena);
+  const members = await arenaMemberService.getForArena(arena.getId());
+
+  res.status(200);
+  res.send(await buildMatchSummary(env, members));
+};
+app.get(dual('/summary'), loadUser, resolveArena, getSummary);
 
 // Remove an app from an arena
 const removeApp = async (req: Request, res: Response) => {

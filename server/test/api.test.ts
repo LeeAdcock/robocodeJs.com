@@ -40,6 +40,9 @@ vi.mock('../src/services/EnvironmentService', () => ({
 // Mock the compiler so the /check route test doesn't spin a real isolate (the
 // dry-run behaviour itself is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
+// The summary builder is exercised directly in matchSummary.test.ts; here we only
+// assert the route wires it up, so stub it.
+vi.mock('../src/util/matchSummary', () => ({ buildMatchSummary: vi.fn() }));
 
 import userService from '../src/services/UserService';
 import appService from '../src/services/AppService';
@@ -51,6 +54,7 @@ import healthRouter from '../src/api/health';
 import userRouter from '../src/api/user';
 import appRouter from '../src/api/app';
 import arenaRouter from '../src/api/arena';
+import { buildMatchSummary } from '../src/util/matchSummary';
 
 // Build an Express app around a router, injecting an authenticated user the way
 // the real auth middleware would (the routers read req.user for ownership checks).
@@ -597,6 +601,27 @@ describe('arena endpoints', () => {
       .send({ seed: 'abc' });
     expect(res.status).toBe(400);
     expect(environmentService.get).not.toHaveBeenCalled();
+  });
+
+  it('GET /api/user/:userId/arena/summary returns the match summary', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({} as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1', name: 'Hunter' } },
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).get(
+      '/api/user/u1/arena/summary'
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      match: { decided: true, winner: { id: 'a1', name: 'Hunter' } },
+    });
+    expect(buildMatchSummary).toHaveBeenCalled();
   });
 });
 

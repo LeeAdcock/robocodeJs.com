@@ -95,10 +95,20 @@ export class Process {
   }
 }
 
+// Tick at which "sudden death" begins: health decays until a winner remains.
+// Tick-denominated (compared against clock.time, not wall time) so its real-time
+// onset scales with `speed` and outcomes stay identical across speeds. Exported
+// so the match-summary util reports the same threshold instead of duplicating it.
+export const SUDDEN_DEATH_TIME = 10000;
+
 export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
   private clock: Clock = { time: 0 };
+  // The clock tick the current match started at. `clock.time` is monotonic across
+  // restarts (restart() does not reset it), so match-relative duration is measured
+  // from here, not from 0. Set to the current time by restart().
+  private matchStartTick = 0;
   public stoppedAt: Date = new Date();
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
@@ -159,6 +169,7 @@ export default class Environment {
 
   isRunning = () => this.running;
   getTime = () => this.clock.time;
+  getMatchStartTick = () => this.matchStartTick;
   getProcesses = () => this.processes;
   getArena = () => this.arena;
 
@@ -412,16 +423,11 @@ export default class Environment {
   // handlers and command settlements so the next tick never starts until every bot
   // has run — the guarantee that makes the sim deterministic at any speed.
   private tick = async (): Promise<void> => {
-    // suddenDeathTime is tick-denominated by design (compared against clock.time,
-    // not the wall clock), so its real-time onset scales with speed automatically
-    // and outcomes stay identical across speeds. Do not make it wall-clock based.
-    const suddenDeathTime = 10000;
-
     Simulation.run(this);
     this.clock.time = this.clock.time + 1;
 
     // Health decays after sudden death time
-    if (this.clock.time > suddenDeathTime && this.clock.time % 50 === 0) {
+    if (this.clock.time > SUDDEN_DEATH_TIME && this.clock.time % 50 === 0) {
       this.processes.forEach((process) => {
         process.tanks
           .filter((tank) => tank.health > 0)
@@ -430,6 +436,17 @@ export default class Environment {
           });
       });
     }
+
+    // Record the tick each tank died (crash, bullet, collision, or decay above),
+    // once, so the match summary can rank apps by elimination order. Read-only for
+    // the physics — this never feeds back into the simulation.
+    this.processes.forEach((process) =>
+      process.tanks.forEach((tank) => {
+        if (tank.health <= 0 && tank.eliminatedAt === null) {
+          tank.eliminatedAt = this.clock.time;
+        }
+      })
+    );
 
     // Calculate application health
     const appHealth: number[] = this.processes.map(
@@ -507,6 +524,10 @@ export default class Environment {
     this.emitter.emit('event', {
       type: 'arenaRestart',
     });
+
+    // A new match begins now. clock.time is monotonic (not reset here), so record
+    // where this match starts for match-relative duration/elimination reporting.
+    this.matchStartTick = this.clock.time;
 
     // The isolates are about to be disposed and rebuilt, so drop any commands or
     // in-flight operations bound to the old ones rather than settling them into a
