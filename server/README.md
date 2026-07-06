@@ -199,7 +199,14 @@ The app emits these signals; **wiring alarms is a deploy-time/ops concern** (the
 | `event="process.fatal"` / `event="db.error"`     | Process/DB health — page on any.                                                  |
 | `event="mcp.tool"` anomalous volume per `userId` | A compromised or runaway token; the audit trail to review after an incident.      |
 
-A CloudWatch metric-filter + alarm example (one per condition) can live in `.ebextensions/`; it is deliberately not committed here because the thresholds and the SNS/notification target are environment-specific.
+**AWS wiring (this deployment).** Two `.ebextensions` files turn the above into CloudWatch alarms:
+
+- **`cloudwatch-logs.config`** (active) — streams the instance's stdout (where the pino JSON lands) to a CloudWatch Logs group, `/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log`. Required for any log-based alarm; also makes the logs queryable in Logs Insights.
+- **`cloudwatch-alarms.config.example`** (opt-in) — metric filters + alarms for `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, and `rate.limited`, publishing to the `Alerts` SNS topic by default (override via the `ALERT_SNS_TOPIC_ARN` / `ALERT_LOG_GROUP` env properties). EB only processes `*.config`, so this `.example` is inert until renamed — a deliberate, reversible activation.
+
+  **Activate (two deploys):** (1) deploy with `cloudwatch-logs.config` and confirm the log group exists; (2) `git mv cloudwatch-alarms.config.example cloudwatch-alarms.config` and deploy again (the metric filters require the log group to already exist).
+
+  The filter patterns are quoted **substring** patterns (not JSON `{ $.x = }` patterns, which wouldn't match the platform's stdout-line prefix) and are verified with `aws logs test-metric-filter` against the real pino output. Thresholds are starting points — tune per event. The alarm resources themselves aren't dry-run-validated from CI (the deploy IAM identity is scoped to EB), so treat the first activation as a staging validation.
 
 ## Tests
 
