@@ -111,14 +111,14 @@ export default function NavBar(props: NavBarProps) {
             </Navbar.Text>
             <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
             <Navbar.Text>
-              <Link to="/dev" className="nav-link" style={{ padding: '0px' }}>
-                Docs
+              <Link to="/learn" className="nav-link" style={{ padding: '0px' }}>
+                Learn
               </Link>
             </Navbar.Text>
             <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
             <Navbar.Text>
-              <Link to="/learn" className="nav-link" style={{ padding: '0px' }}>
-                Learn
+              <Link to="/dev" className="nav-link" style={{ padding: '0px' }}>
+                Docs
               </Link>
             </Navbar.Text>
             <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>

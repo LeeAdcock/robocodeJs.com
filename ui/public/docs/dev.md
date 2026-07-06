@@ -6,27 +6,13 @@ The in-browser code editor offers **autocomplete** for the whole bot API: type `
 
 See also the [game rules & physics](/rules) for exact speeds, turn rates, reload times, and damage values, and — if you've used the classic Java Robocode — [Coming from classic Robocode](/classic). Brand new to coding? Try the [Learn course](/learn).
 
-- [Type definitions](#type-definitions)
 - [Arena](#arena)
 - [Clock](#clock)
 - [Bot events](#bot-events)
 - [Bot movement](#movement)
 - [Bot turret](#turret)
 - [Bot radar](#radar)
-
-# Type definitions
-
-If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/ts/robocode.d.ts`](/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
-
-Reference them from a bot file with a triple-slash directive:
-
-```
-/// <reference path="./robocode.d.ts" />
-
-bot.on(Event.START, () => {
-  // `bot`, `arena`, `clock`, and `Event` are all typed here.
-})
-```
+- [Type definitions](#type-definitions)
 
 # Arena
 
@@ -294,3 +280,17 @@ If a registered `Event.TICK` event handler returns a promise, then although it i
 ## Date.now()
 
 Because the game runs in "simulated time" instead of real-world time, the `Date` class and related methods are not available. The `clock` instance can be used for measuring the current time within the simulation.
+
+# Type definitions
+
+If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/ts/robocode.d.ts`](/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
+
+Reference them from a bot file with a triple-slash directive:
+
+```
+/// <reference path="./robocode.d.ts" />
+
+bot.on(Event.START, () => {
+  // `bot`, `arena`, `clock`, and `Event` are all typed here.
+})
+```
