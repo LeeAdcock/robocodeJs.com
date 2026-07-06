@@ -206,7 +206,7 @@ The app emits these signals; **wiring alarms is a deploy-time/ops concern** (the
 
   **Activate (two deploys):** (1) deploy with `cloudwatch-logs.config` and confirm the log group exists; (2) `git mv cloudwatch-alarms.config.example cloudwatch-alarms.config` and deploy again (the metric filters require the log group to already exist).
 
-  The filter patterns are quoted **substring** patterns (not JSON `{ $.x = }` patterns, which wouldn't match the platform's stdout-line prefix) and are verified with `aws logs test-metric-filter` against the real pino output. Thresholds are starting points — tune per event. The alarm resources themselves aren't dry-run-validated from CI (the deploy IAM identity is scoped to EB), so treat the first activation as a staging validation.
+  The filter patterns are quoted **substring** patterns (not JSON `{ $.x = }` patterns, which wouldn't match the platform's stdout-line prefix) and are verified with `aws logs test-metric-filter` against the real pino output. The resource definitions pass `aws cloudformation validate-template`. Thresholds are starting points — tune per event. What remains deploy-only is EB's `Fn::GetOptionSetting` substitution and the metric filter binding to the EB-managed log group (the two-step rename rollout above handles the ordering), so still treat the first activation as a staging validation.
 
 ## Tests
 
