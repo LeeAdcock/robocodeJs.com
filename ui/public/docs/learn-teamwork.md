@@ -1,4 +1,4 @@
-# Lesson 14: Teamwork and graduation
+# Lesson 15: Teamwork and graduation
 
 **By the end of this lesson you'll be able to:**
 
@@ -109,4 +109,4 @@ Now go build something awesome! 🤖
 
 ---
 
-[← Maps and math](/learn/navigation) · [Index](/learn)
+[← Leading a moving target](/learn/leading) · [Index](/learn)

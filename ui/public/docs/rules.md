@@ -68,11 +68,43 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 # Combat & health
 
-| Thing      | Value           | In context                                    |
-| ---------- | --------------- | --------------------------------------------- |
-| Health     | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead |
-| Bullet hit | **−25**         | a clean hit removes a quarter of full health  |
-| Collision  | **−1 per tick** | bumping a wall/bot also stops you (speed → 0) |
+| Thing             | Value           | In context                                             |
+| ----------------- | --------------- | ------------------------------------------------------ |
+| Health            | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead          |
+| Bullet damage     | **−25**         | a clean hit removes a quarter of full health           |
+| Bullet hit radius | **32 units**    | a bullet hits any tank whose center is within 32 units |
+| Collision         | **−1 per tick** | bumping a wall/bot also stops you (speed → 0)          |
+
+**Friendly fire is on.** A bullet damages **any** tank within the 32-unit hit
+radius — **including your own teammates**. There is no team exemption, so a shot
+that skims past a teammate can hurt them. Watch your line of fire when your tanks
+cluster.
+
+**Hitting a moving target — "lead" the shot.** A bullet leaves the muzzle and
+travels **25 units/tick**; it is not instant. If you aim where an enemy _is_, by
+the time the bullet arrives the enemy has moved and you miss. To connect, aim
+where the target _will be_ — this is **leading**. A scan gives you the enemy's
+`speed` and `orientation` (its absolute heading), which is exactly what you need
+to predict its future position. Leading is the single biggest accuracy gain
+against anything that moves; the [Leading a moving target](/learn/leading) lesson
+walks through it.
+
+# Messages & your five tanks
+
+Each app fields **five tanks**, and every tank runs your program
+**independently** — each gets its own private copy. Top-level variables
+(`let target = …`) are **per-tank**, `START` runs once per tank, and one tank
+cannot see another's state. The **only** way tanks share anything is by sending
+messages.
+
+- `bot.send(number)` broadcasts a single integer that **every other living tank
+  in the arena receives** via `Event.RECEIVED` — **including enemy tanks**, not
+  just your teammates. There are no private channels.
+- Because the broadcast is global, a naïve `RECEIVED` handler can be fed an
+  **enemy's** message — even that enemy's callout about _your own_ tank. If you
+  use messages to coordinate a team, encode a value your tanks recognize and
+  another team is unlikely to send by accident (e.g. reserve some high bits as a
+  team tag), and don't blindly trust an incoming number as a friendly target.
 
 # Match length
 
