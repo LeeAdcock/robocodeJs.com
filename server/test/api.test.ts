@@ -95,7 +95,10 @@ describe('GET /health', () => {
   it('returns ok', async () => {
     const res = await request(makeApp(healthRouter)).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.body).toMatchObject({ status: 'ok' });
+    // The live server version is surfaced so a deploy can be validated.
+    expect(typeof res.body.version).toBe('string');
+    expect(res.body.version.length).toBeGreaterThan(0);
   });
 });
 
