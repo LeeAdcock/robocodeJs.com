@@ -242,18 +242,23 @@ function App() {
       );
     }
 
-    // On window open, try to authenticate
-    window.onload = function () {
-      axios
-        .get(`/api/user`)
-        .then((res) => {
-          // already authenticated
-          axios
-            .get(`/api/user/${res.data.id}`)
-            .then((res) => setUser(res.data));
-        })
-        .catch();
-    };
+    // Restore an existing session on mount. Run it directly rather than from
+    // window.onload: that event may have already fired by the time React mounts
+    // (e.g. after an HMR update, or when the bundle loads after `load`), in which
+    // case the handler never runs and the app is stuck on the sign-in button
+    // until a manual refresh — the local-dev auth bypass looked "broken" for
+    // exactly this reason. The `id` guard ignores a 200 that isn't the user JSON
+    // (e.g. an SPA index.html returned when /api isn't proxied — see the Vite
+    // dev proxy), so it can't cascade into a bogus /api/user/undefined call.
+    axios
+      .get(`/api/user`)
+      .then((res) => {
+        if (!res.data || !res.data.id) return; // not an authenticated user payload
+        return axios
+          .get(`/api/user/${res.data.id}`)
+          .then((res) => setUser(res.data));
+      })
+      .catch(() => undefined);
 
     // pause on lost focus
     const pause = () => {
