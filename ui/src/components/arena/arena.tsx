@@ -207,9 +207,10 @@ export default function ArenaSvg(props: ArenaSvgProps) {
       )}
       {(props.arena.deployTick ?? 0) - props.time > 0 && (
         // Deployment countdown: turrets are weapons-held until deployTick, so show
-        // the seconds remaining (~10 ticks/s) centered over the arena. White fill
-        // with a dark outline stays legible over terrain in both light and night
-        // mode; pointerEvents none keeps tanks clickable underneath.
+        // the seconds remaining (~10 ticks/s) centered over the arena. Amber in
+        // night mode (reads against the warm night tint), white in light mode;
+        // a dark outline keeps it legible over terrain either way. pointerEvents
+        // none keeps tanks clickable underneath.
         <text
           x={(props.arena.width || 750) / 2}
           y={(props.arena.height || 750) / 2}
@@ -217,7 +218,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           dominantBaseline="central"
           fontSize="220"
           fontWeight="bold"
-          fill="#fff"
+          fill={props.darkMode ? '#f0a500' : '#fff'}
           stroke="rgba(0,0,0,0.55)"
           strokeWidth="5"
           paintOrder="stroke"
