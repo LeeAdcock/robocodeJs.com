@@ -11,6 +11,7 @@ import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
 import { mulberry32 } from '../util/random';
+import { computeSpawns } from '../util/placement';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ArenaId = string & {};
@@ -116,6 +117,11 @@ export class Process {
 // onset scales with `speed` and outcomes stay identical across speeds. Exported
 // so the match-summary util reports the same threshold instead of duplicating it.
 export const SUDDEN_DEATH_TIME = 10000;
+
+// Ticks of damage-free "deployment" at the start of a match: bullets deal no
+// damage (bots still move, scan, aim, and fire) so teams can settle off their
+// spawn before combat — removing the last of the start-position luck. ~10s at 1x.
+export const DEPLOY_TICKS = 100;
 
 export default class Environment {
   public processes: Process[] = [];
@@ -551,9 +557,21 @@ export default class Environment {
     this.botOps.clear();
     this.recentFaults = [];
 
+    // Compute a fair, symmetric spawn layout up front (util/placement.ts) so every
+    // team gets an equivalent start — same distance to center, walls, and nearest
+    // enemy — instead of the old uniform-random per-bot placement. Driven by the
+    // seeded rng, so a fixed seed still reproduces the layout.
+    const spawns = computeSpawns(
+      this.processes.length,
+      5,
+      this.arena.getWidth(),
+      this.arena.getHeight(),
+      this.random
+    );
+
     // Restart each process
     return Promise.all(
-      this.processes.map((process) => {
+      this.processes.map((process, teamIndex) => {
         process.bots.forEach((bot) => {
           // Emit removed bot event
           this.emitter.emit('event', {
@@ -577,9 +595,20 @@ export default class Environment {
 
           const botCount = 5;
           return Promise.all(
-            [...Array(botCount)].map(() => {
+            [...Array(botCount)].map((_unused, slot) => {
               const bot = new Bot(this, process);
               bot.needsStarting = true;
+
+              // Overwrite the constructor's random placement with this bot's
+              // fair, symmetric spawn. Falls back to the random placement if no
+              // layout slot exists (defensive — e.g. an unusual team count).
+              const spawn = spawns[teamIndex]?.[slot];
+              if (spawn) {
+                bot.x = spawn.x;
+                bot.y = spawn.y;
+                bot.orientation = spawn.orientation;
+                bot.orientationTarget = spawn.orientation;
+              }
 
               process.bots.push(bot);
               compiler.init(this, process, bot);

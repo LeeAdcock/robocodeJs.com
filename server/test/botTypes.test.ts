@@ -8,7 +8,7 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import Bot, { waitUntil } from '../src/types/bot';
-import Environment from '../src/types/environment';
+import Environment, { DEPLOY_TICKS } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { normalizeAngle } from '../src/util/geometry';
 import { Event } from '../src/types/event';
@@ -23,10 +23,11 @@ function makeRealBot() {
     getAppId: () => 'app1',
     getSandbox: () => ({}),
   };
+  let clock = 0;
   const env = {
     getArena: () => ({ getWidth: () => 750, getHeight: () => 750 }),
     getProcesses: () => [proc],
-    getTime: () => 0,
+    getTime: () => clock,
     isRunning: () => false,
     random: () => 0.5,
     emit,
@@ -64,7 +65,16 @@ function makeRealBot() {
   bot.turret.radar.orientation = 0;
   bot.turret.radar.orientationTarget = 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { bot, env: env as any, proc, emit };
+  return {
+    bot,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    env: env as any,
+    proc,
+    emit,
+    setTime: (t: number) => {
+      clock = t;
+    },
+  };
 }
 
 describe('normalizeAngle (util/geometry)', () => {
@@ -208,7 +218,8 @@ describe('BotTurret', () => {
   });
 
   it('fire() spawns a bullet, resets load, and emits bulletFired', () => {
-    const { bot, emit } = makeRealBot();
+    const { bot, emit, setTime } = makeRealBot();
+    setTime(DEPLOY_TICKS); // past the deployment window so the turret is live
     bot.turret.loaded = 100;
     bot.turret.orientation = 30;
     const fired = vi.fn();
@@ -232,10 +243,24 @@ describe('BotTurret', () => {
   });
 
   it('isReady()/onReady() track the loaded state', async () => {
-    const { bot } = makeRealBot();
+    const { bot, setTime } = makeRealBot();
+    setTime(DEPLOY_TICKS); // past the deployment window
     bot.turret.loaded = 100;
     expect(bot.turret.isReady()).toBe(true);
     await expect(bot.turret.onReady()).resolves.toBeUndefined();
+  });
+
+  it('stays weapons-held during the deployment window even when loaded', async () => {
+    const { bot, setTime } = makeRealBot();
+    bot.turret.loaded = 100;
+    // Inside the deployment window (time 0 < DEPLOY_TICKS): a fully loaded turret
+    // still reads not-ready and refuses to fire — so no bullet exists in warm-up.
+    expect(bot.turret.isReady()).toBe(false);
+    await expect(bot.turret.fire()).rejects.toBe('Turret not ready');
+    expect(bot.bullets).toHaveLength(0);
+    // Once the window passes, the same loaded turret is live.
+    setTime(DEPLOY_TICKS);
+    expect(bot.turret.isReady()).toBe(true);
   });
 
   it('turn() sets the turret target and emits turretTurn', async () => {

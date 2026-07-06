@@ -26,6 +26,9 @@ export interface SimEnv {
   events: { name: string; payload: unknown }[];
   faults: Record<string, unknown>[];
   getClock: () => number;
+  // Jump the clock to a specific tick (e.g. past the damage-free deployment
+  // window) so a test can exercise live-combat behavior without ticking there.
+  setClock: (t: number) => void;
   // Advance the simulation one or more ticks: run physics, bump the clock, then
   // drain this tick's bot work to quiescence — exactly what Environment.tick does.
   tick: (n?: number) => Promise<void>;
@@ -140,6 +143,9 @@ export function makeSimEnv(
     events,
     faults,
     getClock: () => clock,
+    setClock: (t: number) => {
+      clock = t;
+    },
     tick,
     drainBotWork,
   };
