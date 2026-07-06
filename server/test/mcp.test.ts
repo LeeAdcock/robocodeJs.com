@@ -364,7 +364,7 @@ describe('mcp tools', () => {
     expect(out.ranking[1]).toMatchObject({ id: 'a2', wins: 0, points: 2 });
   });
 
-  it('recent_logs filters by level, bot, tank, and text', async () => {
+  it('recent_logs filters by level, bot, instance, and text', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
     const logs = [
@@ -386,16 +386,18 @@ describe('mcp tools', () => {
         )
       );
 
+    // recent_logs renames the internal tankIndex field to botIndex on output.
+    const mapped1 = { level: 50, appId: 'a1', botIndex: 2, msg: 'E017: boom' };
     // ERROR-and-up only.
-    expect(await call({ minLevel: 'ERROR' })).toEqual([logs[1]]);
+    expect(await call({ minLevel: 'ERROR' })).toEqual([mapped1]);
     // A single bot.
     expect(
       (await call({ appId: 'a2' })).map((l: { msg: string }) => l.msg)
     ).toEqual(['warn other']);
-    // A specific tank.
-    expect(await call({ tankIndex: 2 })).toEqual([logs[1]]);
+    // A specific bot instance.
+    expect(await call({ botIndex: 2 })).toEqual([mapped1]);
     // Substring of the message.
-    expect(await call({ contains: 'boom' })).toEqual([logs[1]]);
+    expect(await call({ contains: 'boom' })).toEqual([mapped1]);
   });
 
   it('recent_faults returns structured crash records', async () => {
@@ -425,7 +427,22 @@ describe('mcp tools', () => {
     })) as { structuredContent?: unknown };
 
     expect(getRecentFaults).toHaveBeenCalledWith(10, 'a1');
-    expect(res.structuredContent).toEqual({ faults });
+    // recent_faults renames the internal tankIndex field to botIndex on output.
+    expect(res.structuredContent).toEqual({
+      faults: [
+        {
+          appId: 'a1',
+          botId: 't1',
+          botIndex: 1,
+          code: 'E017',
+          kind: 'load',
+          message: 'x is not defined',
+          line: 3,
+          timedOut: false,
+          time: 5,
+        },
+      ],
+    });
   });
 
   it('set_arena_speed sets the speed on the resolved arena env', async () => {
