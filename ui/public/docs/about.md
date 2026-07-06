@@ -7,12 +7,12 @@
   style="border-radius: 50%; object-fit: cover; float: right; margin: 0.25rem 0 1rem 1.5rem; max-width: 40%;"
 />
 
-Hi — I'm **Lee**, and RobocodeJs is my passion project: my **web-enabled version
-of the classic [Robocode](https://robocode.sourceforge.io/)** — the game that first
-made me fall for programming as a kid.
+Hi, I'm **Lee**, and RobocodeJs is my passion project: my **web-enabled version of
+the classic [Robocode](https://robocode.sourceforge.io/)**, the game that first made
+me fall for programming as a kid.
 
 It's a love letter to that classic, where you wrote little Java tank AIs and set
-them loose to battle. I spent hours tuning radar sweeps and firing angles — and
+them loose to battle. I spent hours tuning radar sweeps and firing angles, and
 learned, without really noticing, how to think like a programmer. That spark became
 the foundation for my career in software development and technology leadership, and
 the feeling of _my code, alive in the arena_ is a big part of why I still love this
@@ -37,7 +37,7 @@ problem-solving and my own part in the creative process.
 
 None of this would exist without the original **Robocode**, created by Mathew
 Nelson and kept alive by a wonderful open-source community. RobocodeJs is a
-tribute, not a replacement — if you enjoy it, go play the original too.
+tribute, not a replacement; if you enjoy it, go play the original too.
 
 And what a life it's had. Robocode first appeared in 2000, built at IBM as a fun way
 to learn Java, and after it was open-sourced in 2005 a devoted community, led for
@@ -54,10 +54,10 @@ write bots in almost any language. RobocodeJs proudly stands on all of it.
 ## Say hi
 
 I build this in my spare time, driven by my passion for software engineering and a
-love of problem-solving, innovation, and creativity — so hearing from people who
+love of problem-solving, innovation, and creativity, so hearing from people who
 play it genuinely makes my day. Found a bug? Have an idea? Built a bot you're proud
 of? Just want to say hello?
 
 **Reach me at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com).**
 
-Thanks for playing — now go build something that strikes fear into the arena. 🤖
+Thanks for playing, and now go build something that strikes fear into the arena. 🤖
