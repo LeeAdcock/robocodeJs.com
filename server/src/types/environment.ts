@@ -80,18 +80,34 @@ export class Process {
               new Error(msg)
             );
           });
-          this.sandbox?.dispose();
+          this.disposeSandbox();
         },
       });
     }
     return this.sandbox;
   };
 
+  // Dispose the isolate at most once. isolated-vm throws "Isolate is already
+  // disposed" if `dispose()` is called on an already-disposed isolate, which
+  // previously escaped as an uncaughtException and crashed the process (the
+  // 30-minute GC could race the onCatastrophicError handler). Guard on
+  // `isDisposed` and never let cleanup throw.
+  private disposeSandbox() {
+    try {
+      if (this.sandbox && !this.sandbox.isDisposed) this.sandbox.dispose();
+    } catch (err) {
+      logger.warn(
+        { event: LogEvent.SANDBOX_CATASTROPHIC, appId: this.appId, err },
+        'isolate dispose skipped (already disposed)'
+      );
+    }
+    this.sandbox = null;
+  }
+
   dispose() {
     this.tanks.forEach((tank) => tank.getContext().release());
     this.tanks = [];
-    this.sandbox?.dispose();
-    this.sandbox = null;
+    this.disposeSandbox();
   }
 }
 

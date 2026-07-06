@@ -39,7 +39,7 @@ The full bot API is documented in [`ui/public/docs/`](ui/public/docs) (also serv
 RobocodeJs is a two-package monorepo plus a tiny root dev proxy:
 
 - **`index.js`** — a root reverse proxy (port `5000`) that routes `/api` and `/health` to the server and everything else to the UI. This is the single port you open in development.
-- **`server/`** (`@battletank/server`) — an Express + TypeScript API and the game simulation engine (port `8080`). See [`server/README.md`](server/README.md).
+- **`server/`** (`@robocodejs/server`) — an Express + TypeScript API and the game simulation engine (port `8080`). See [`server/README.md`](server/README.md).
 - **`ui/`** — a Vite + React + TypeScript front end (port `3000`) that renders the arena as SVG and hosts the bot code editor. See [`ui/README.md`](ui/README.md).
 
 A few things worth knowing about how it fits together:

@@ -1,6 +1,9 @@
 {
-  "name": "ui",
+  "name": "@robocodejs/ui",
   "version": "0.1.0",
+  "description": "RobocodeJs web front end — the React + Vite single-page app that renders the arena and the bot editor.",
+  "author": "Lee Adcock <lee@robocodejs.com>",
+  "license": "ISC",
   "private": true,
   "type": "module",
   "dependencies": {

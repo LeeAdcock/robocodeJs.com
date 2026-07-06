@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 RobocodeJs is a browser-based programming game where users write JavaScript "bots" (tank AIs) that battle in teams in a shared arena. It is a two-package monorepo plus a tiny root dev proxy:
 
 - `index.js` — root dev reverse proxy (port 5000). Routes `/api` and `/health` → `:8080` (server), everything else → `:3000` (ui). This is the port forwarded by `.devcontainer`.
-- `server/` — Express + TypeScript API and the game simulation engine (port 8080). Package `@battletank/server`.
+- `server/` — Express + TypeScript API and the game simulation engine (port 8080). Package `@robocodejs/server`.
 - `ui/` — Vite + React + TypeScript front end (port 3000). Renders the arena as SVG and the bot code editor.
 
 ## Commands
