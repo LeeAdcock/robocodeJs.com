@@ -5,8 +5,6 @@ server so an AI assistant (Claude, or any MCP-capable client) can write, run, an
 watch your bots directly — the same things you can do in the editor, driven by a
 model.
 
-This page is unlisted; it's here if you know the URL.
-
 ## 1. Connect your client (one click, no token)
 
 RobocodeJs is a full **OAuth 2.1** authorization server, so connecting is the
