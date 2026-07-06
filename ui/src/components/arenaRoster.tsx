@@ -4,7 +4,9 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Spinner from 'react-bootstrap/Spinner';
 import InputGroup from 'react-bootstrap/InputGroup';
-import { FaTimes, FaPlus } from 'react-icons/fa';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
+import { FaUnlink, FaPlus } from 'react-icons/fa';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Arena from '../types/arena';
@@ -12,17 +14,19 @@ import ArenaMember from '../types/arenaMember';
 import { colors } from '../util/colors';
 import { titleCase } from '../util/titleCase';
 
-// The arena roster: every bot linked to the owner's arena — their own and any
+// The arena roster: every app linked to the owner's arena — their own and any
 // added by reference — with an enable/disable toggle and an unlink action, plus
-// "New bot" and "Add existing (by id)". Opened as a modal from the Arena menu.
-// The roster (GET .../arena/members) is the source of truth for membership
-// INCLUDING disabled bots; live tank state flows separately over SSE.
+// "New app" and "Add existing (by id)". Opened as a modal from the Arena menu.
+// (Terminology: an "app" is the program/code; when enabled it fields "bots" —
+// the live tank instances — in the arena.) The roster (GET .../arena/members)
+// is the source of truth for membership INCLUDING disabled apps; live tank
+// state flows separately over SSE.
 interface ArenaRosterProps {
   show: boolean;
   onHide: () => void;
   userId: string;
   arena: Arena;
-  // Refresh the parent's user (so the navbar's Apps list reflects a new bot).
+  // Refresh the parent's user (so the navbar's Apps list reflects a new app).
   onChanged?: () => void;
 }
 
@@ -30,8 +34,8 @@ interface ArenaRosterProps {
 // reference. Nothing security-sensitive — the server validates the id.
 const UUID_LENGTH = 36;
 
-// Match the arena color assignment used elsewhere (navbar's AppLink): a bot's
-// color is its index among the LIVE apps. A disabled / not-yet-live bot has no
+// Match the arena color assignment used elsewhere (navbar's AppLink): an app's
+// color is its index among the LIVE apps. A disabled / not-yet-live app has no
 // live index, so it shows a muted neutral icon.
 function MemberIcon({ arena, appId }: { arena: Arena; appId: string }) {
   const index = arena?.apps.map((app) => app.id).indexOf(appId) ?? -1;
@@ -109,7 +113,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
     axios
       .get(`/api/app/${id}`)
       .then((res) => {
-        if (!cancelled) setAddPreview(res.data.name || 'Unnamed bot');
+        if (!cancelled) setAddPreview(res.data.name || 'Unnamed app');
       })
       .catch(() => {
         if (!cancelled) setAddPreview(null);
@@ -121,8 +125,8 @@ export default function ArenaRoster(props: ArenaRosterProps) {
 
   const atCapacity = members.length >= 5;
 
-  // Render in a stable, deterministic order (add-time, then appId) so toggling a
-  // bot's enabled state never reshuffles the list, regardless of the order the
+  // Render in a stable, deterministic order (add-time, then appId) so toggling
+  // an app's enabled state never reshuffles the list, regardless of the order the
   // server happens to return.
   const orderedMembers = [...members].sort(
     (a, b) =>
@@ -136,7 +140,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
         enabled: !member.enabled,
       })
       .then(() => refetch())
-      .catch(() => setError('Could not update that bot.'))
+      .catch(() => setError('Could not update that app.'))
       .finally(() => setBusyFor(member.appId, false));
   };
 
@@ -146,7 +150,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
       .delete(`/api/user/${userId}/arena/app/${member.appId}`)
       .then(() => refetch())
       .then(() => onChanged?.())
-      .catch(() => setError('Could not remove that bot.'))
+      .catch(() => setError('Could not remove that app.'))
       .finally(() => setBusyFor(member.appId, false));
   };
 
@@ -159,7 +163,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
       )
       .then(() => refetch())
       .then(() => onChanged?.())
-      .catch(() => setError('Could not create a new bot.'));
+      .catch(() => setError('Could not create a new app.'));
   };
 
   const addExisting = () => {
@@ -179,10 +183,10 @@ export default function ArenaRoster(props: ArenaRosterProps) {
         const status = err?.response?.status;
         setAddError(
           status === 404
-            ? 'No bot found with that id.'
+            ? 'No app found with that id.'
             : status === 400
-              ? 'That bot could not be added (invalid id or the arena is full).'
-              : 'Could not add that bot.'
+              ? 'That app could not be added (invalid id or the arena is full).'
+              : 'Could not add that app.'
         );
       })
       .finally(() => setAddBusy(false));
@@ -191,9 +195,17 @@ export default function ArenaRoster(props: ArenaRosterProps) {
   return (
     <Modal show={show} onHide={onHide} centered>
       <Modal.Header closeButton>
-        <Modal.Title>Arena bots</Modal.Title>
+        <Modal.Title>Arena apps</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        <div
+          style={{ fontSize: '0.85em', color: '#888', marginBottom: '12px' }}
+        >
+          Switch an app on to send its bots into the arena, or off to bench it
+          (it stays in the list). Unlinking removes an app from this arena only
+          — the app itself is never deleted.
+        </div>
+
         {error && (
           <div className="text-danger" style={{ marginBottom: '10px' }}>
             {error}
@@ -206,7 +218,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
           </div>
         ) : members.length === 0 ? (
           <div style={{ color: '#888', padding: '6px 0' }}>
-            No bots in this arena yet. Add one below.
+            No apps in this arena yet. Add one below.
           </div>
         ) : (
           <div>
@@ -244,25 +256,47 @@ export default function ArenaRoster(props: ArenaRosterProps) {
                         : member.ownerName || 'another user'}
                     </div>
                   </div>
-                  <Form.Check
-                    type="switch"
-                    id={`roster-toggle-${member.appId}`}
-                    checked={member.enabled}
-                    disabled={isBusy}
-                    onChange={() => toggleEnabled(member)}
-                    aria-label={`${member.enabled ? 'Disable' : 'Enable'} ${member.name || 'bot'}`}
-                    style={{ marginRight: '4px' }}
-                  />
-                  <Button
-                    variant="link"
-                    size="sm"
-                    disabled={isBusy}
-                    onClick={() => unlink(member)}
-                    aria-label={`Remove ${member.name || 'bot'}`}
-                    style={{ color: '#c0392b', padding: '0 6px' }}
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id={`roster-toggle-tip-${member.appId}`}>
+                        {member.enabled
+                          ? 'In the arena — switch off to bench this app'
+                          : 'Benched — switch on to send this app into the arena'}
+                      </Tooltip>
+                    }
                   >
-                    <FaTimes />
-                  </Button>
+                    <span style={{ display: 'inline-flex' }}>
+                      <Form.Check
+                        type="switch"
+                        id={`roster-toggle-${member.appId}`}
+                        checked={member.enabled}
+                        disabled={isBusy}
+                        onChange={() => toggleEnabled(member)}
+                        aria-label={`${member.enabled ? 'Disable' : 'Enable'} ${member.name || 'app'}`}
+                        style={{ marginRight: '4px' }}
+                      />
+                    </span>
+                  </OverlayTrigger>
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id={`roster-unlink-tip-${member.appId}`}>
+                        Remove from this arena (the app itself isn’t deleted)
+                      </Tooltip>
+                    }
+                  >
+                    <Button
+                      variant="link"
+                      size="sm"
+                      disabled={isBusy}
+                      onClick={() => unlink(member)}
+                      aria-label={`Unlink ${member.name || 'app'} from the arena`}
+                      style={{ color: '#6c757d', padding: '0 6px' }}
+                    >
+                      <FaUnlink />
+                    </Button>
+                  </OverlayTrigger>
                 </div>
               );
             })}
@@ -272,12 +306,12 @@ export default function ArenaRoster(props: ArenaRosterProps) {
         <hr />
 
         <div style={{ fontSize: '0.9em', color: '#888', marginBottom: '6px' }}>
-          Add an existing bot by its id (or share link)
+          Add an existing app by its id (or share link)
         </div>
         <InputGroup>
           <Form.Control
             size="sm"
-            placeholder="Bot id"
+            placeholder="App id"
             value={addId}
             disabled={atCapacity || addBusy}
             onChange={(e) => setAddId(e.target.value)}
@@ -287,7 +321,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
                 addExisting();
               }
             }}
-            aria-label="Bot id"
+            aria-label="App id"
           />
           <Button
             variant="secondary"
@@ -314,7 +348,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
         )}
         {atCapacity && (
           <div style={{ fontSize: '0.8em', color: '#888', marginTop: '4px' }}>
-            This arena is full (5 bots). Remove one to add another.
+            This arena is full (5 apps). Remove one to add another.
           </div>
         )}
       </Modal.Body>
@@ -325,7 +359,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
           disabled={atCapacity}
           onClick={createNew}
         >
-          <FaPlus /> New bot
+          <FaPlus /> New app
         </Button>
         <Button variant="secondary" size="sm" onClick={onHide}>
           Close

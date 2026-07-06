@@ -6,17 +6,18 @@ import axios from 'axios';
 import User from '../../types/user';
 import { titleCase } from '../../util/titleCase';
 
-// Landing page for a bot share link (`/add-bot/:appId`). The share reference IS
-// the bot's app id; a signed-in visitor confirms and the bot is linked into
-// their arena (add-by-reference — the underlying app is never copied and its
-// source stays owner-private). If not signed in, prompt to sign in first.
-interface AddBotPageProps {
+// Landing page for an app share link (`/add-app/:appId`). The share reference IS
+// the app's id; a signed-in visitor confirms and the app is linked into their
+// arena (add-by-reference — the app is never copied and its source stays
+// owner-private; only its live bots are visible). If not signed in, prompt to
+// sign in first.
+interface AddAppPageProps {
   user: User;
   // Refresh the parent after a successful add (so the navbar Apps/arena reflect).
   onAdded?: () => void;
 }
 
-export default function AddBotPage(props: AddBotPageProps) {
+export default function AddAppPage(props: AddAppPageProps) {
   const { appId } = useParams();
   const navigate = useNavigate();
 
@@ -27,7 +28,7 @@ export default function AddBotPage(props: AddBotPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
 
-  // Resolve the bot's metadata (name only) for the confirm prompt. Requires a
+  // Resolve the app's metadata (name only) for the confirm prompt. Requires a
   // signed-in session (the /api/app route is auth-gated); skip while signed out.
   useEffect(() => {
     if (!appId || !props.user) {
@@ -37,7 +38,7 @@ export default function AddBotPage(props: AddBotPageProps) {
     setLoading(true);
     axios
       .get(`/api/app/${appId}`)
-      .then((res) => setName(res.data.name || 'Unnamed bot'))
+      .then((res) => setName(res.data.name || 'Unnamed app'))
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [appId, props.user]);
@@ -57,8 +58,8 @@ export default function AddBotPage(props: AddBotPageProps) {
         const status = err?.response?.status;
         setError(
           status === 400
-            ? 'This bot could not be added — your arena may be full.'
-            : 'Could not add this bot. Please try again.'
+            ? 'This app could not be added — your arena may be full.'
+            : 'Could not add this app. Please try again.'
         );
       })
       .finally(() => setAdding(false));
@@ -67,8 +68,8 @@ export default function AddBotPage(props: AddBotPageProps) {
   if (!props.user) {
     return (
       <div style={{ padding: '20px' }}>
-        <h4>Add a bot to your arena</h4>
-        <p>Please sign in (top right) to add this bot to your arena.</p>
+        <h4>Add an app to your arena</h4>
+        <p>Please sign in (top right) to add this app to your arena.</p>
       </div>
     );
   }
@@ -84,8 +85,8 @@ export default function AddBotPage(props: AddBotPageProps) {
   if (notFound) {
     return (
       <div style={{ padding: '20px' }}>
-        <h4>Bot not found</h4>
-        <p>No bot matches this link. Double-check the id and try again.</p>
+        <h4>App not found</h4>
+        <p>No app matches this link. Double-check the id and try again.</p>
       </div>
     );
   }
@@ -94,17 +95,18 @@ export default function AddBotPage(props: AddBotPageProps) {
     return (
       <div style={{ padding: '20px' }}>
         <h4>Added!</h4>
-        <p>{titleCase(name || 'The bot')} is now in your arena.</p>
+        <p>{titleCase(name || 'The app')} is now in your arena.</p>
       </div>
     );
   }
 
   return (
     <div style={{ padding: '20px' }}>
-      <h4>Add {titleCase(name || 'this bot')} to your arena?</h4>
+      <h4>Add {titleCase(name || 'this app')} to your arena?</h4>
       <p style={{ color: '#888' }}>
-        This links the bot into your arena so it battles alongside your other
-        bots. You can remove it any time from the Arena → Manage bots menu.
+        This links the app into your arena so its bots battle alongside your
+        other apps. You can remove it any time from the Arena → Manage apps
+        menu.
       </p>
       {error && <div className="text-danger">{error}</div>}
       <div style={{ marginTop: '12px' }}>

@@ -121,18 +121,18 @@ describe('ArenaRoster', () => {
     renderRoster();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
 
-    fireEvent.click(screen.getByLabelText('Remove alpha'));
+    fireEvent.click(screen.getByLabelText('Unlink alpha from the arena'));
     await waitFor(() =>
       expect(axios.delete).toHaveBeenCalledWith('/api/user/u1/arena/app/a1')
     );
   });
 
-  it('adds an existing bot by pasted id', async () => {
+  it('adds an existing app by pasted id', async () => {
     renderRoster();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
 
     const id = 'b'.repeat(36);
-    fireEvent.change(screen.getByLabelText('Bot id'), {
+    fireEvent.change(screen.getByLabelText('App id'), {
       target: { value: id },
     });
     fireEvent.click(screen.getByText('Add'));
@@ -141,14 +141,14 @@ describe('ArenaRoster', () => {
     );
   });
 
-  it('creates a new bot (create + add) from the New bot button', async () => {
+  it('creates a new app (create + add) from the New app button', async () => {
     vi.mocked(axios.post).mockResolvedValueOnce({
       data: { appId: 'new1' },
     } as never);
     renderRoster();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
 
-    fireEvent.click(screen.getByText('New bot'));
+    fireEvent.click(screen.getByText('New app'));
     await waitFor(() =>
       expect(axios.post).toHaveBeenCalledWith('/api/user/u1/app')
     );

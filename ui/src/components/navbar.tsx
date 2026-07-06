@@ -155,7 +155,7 @@ export default function NavBar(props: NavBarProps) {
                 <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
                 <NavDropdown title="Arena" id="basic-nav-dropdown">
                   <NavDropdown.Item onClick={() => setShowRoster(true)}>
-                    Manage bots
+                    Manage apps
                   </NavDropdown.Item>
                   <NavDropdown.Item
                     onClick={() =>

@@ -13,7 +13,7 @@ vi.mock('axios', () => ({
   default: { get: vi.fn(), put: vi.fn() },
 }));
 import axios from 'axios';
-import AddBotPage from '../src/page/arena/addBotPage';
+import AddAppPage from '../src/page/arena/addAppPage';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const user: any = { id: 'u1', name: 'Me', apps: [] };
@@ -23,9 +23,9 @@ const renderAt = (
   props: any
 ) =>
   render(
-    <MemoryRouter initialEntries={['/add-bot/xyz']}>
+    <MemoryRouter initialEntries={['/add-app/xyz']}>
       <Routes>
-        <Route path="/add-bot/:appId" element={<AddBotPage {...props} />} />
+        <Route path="/add-app/:appId" element={<AddAppPage {...props} />} />
         <Route path="/" element={<div>home</div>} />
       </Routes>
     </MemoryRouter>
@@ -40,14 +40,14 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe('AddBotPage', () => {
+describe('AddAppPage', () => {
   it('prompts to sign in when signed out', async () => {
     renderAt({ user: null });
     expect(await screen.findByText(/sign in/i)).toBeTruthy();
     expect(axios.get).not.toHaveBeenCalled();
   });
 
-  it('previews the bot name and adds it on confirm', async () => {
+  it('previews the app name and adds it on confirm', async () => {
     renderAt({ user });
     // Metadata resolved for the confirm prompt.
     await waitFor(() => expect(axios.get).toHaveBeenCalledWith('/api/app/xyz'));

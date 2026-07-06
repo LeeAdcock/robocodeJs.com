@@ -42,7 +42,7 @@ const CADENCE_EVENTS = new Set([
 // binding is initialized before use (avoids a dev-mode temporal-dead-zone error).
 const AppPage = lazy(() => import('./page/app/appPage'));
 const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
-const AddBotPage = lazy(() => import('./page/arena/addBotPage'));
+const AddAppPage = lazy(() => import('./page/arena/addAppPage'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
@@ -459,9 +459,9 @@ function App() {
                   element={<ArenaLogPage />}
                 />
                 <Route
-                  path="/add-bot/:appId"
+                  path="/add-app/:appId"
                   element={
-                    <AddBotPage
+                    <AddAppPage
                       user={user}
                       onAdded={() =>
                         user &&
