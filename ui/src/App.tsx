@@ -43,6 +43,7 @@ const CADENCE_EVENTS = new Set([
 const AppPage = lazy(() => import('./page/app/appPage'));
 const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
 const AddAppPage = lazy(() => import('./page/arena/addAppPage'));
+const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
@@ -436,6 +437,11 @@ function App() {
                 <Route path="/learn/:slug" element={<LessonPage />} />
                 {/* Unlisted: MCP setup guide, reachable only by direct URL. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
+                {/* OAuth approval landing for MCP clients (see api/oauth.ts). */}
+                <Route
+                  path="/mcp/authorize"
+                  element={<McpAuthorizePage user={user} />}
+                />
 
                 <Route path="user/:userId" element={<>user</>} />
                 <Route path="user/:userId/arena" element={<>user arena</>} />

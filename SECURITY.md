@@ -54,6 +54,8 @@ These authenticate but don't verify the caller owns the `:userId` resource, so a
 
 `api/token.ts:31` — UUIDv4 is ~122 bits crypto-random (acceptable), but `crypto.randomBytes(32)` is the purpose-built choice. Tokens are correctly stored only as sha256 hashes (`middleware/auth.ts:16-17`). Low priority.
 
+> **Update (MCP OAuth):** the static bearer token and `api/token.ts` were **removed** when MCP auth moved to the OAuth 2.1 flow. Access/refresh tokens and auth codes are still `randomUUID()` and still stored only as sha256 hashes (now in `services/OAuthService.ts` via `util/hash.ts`), so this finding and its low-priority note carry over unchanged; the same `randomBytes(32)` upgrade would apply there.
+
 ---
 
 ## A03 — Injection
@@ -151,6 +153,8 @@ Logout just clears the cookie (`session.ts:66-70`); a stolen still-valid id toke
 `GET /api/token/new` rotates a token; SameSite=lax cookies ride top-level GET navigations, so a tricked navigation could force-rotate a victim's token (DoS on their MCP connection; cannot exfiltrate).
 
 > **Fixed** (`feat/security-hardening`). A `rejectCrossSite` guard on `GET /api/token/new` returns 403 when `Sec-Fetch-Site: cross-site` — blocking the cross-site navigation vector while still allowing `same-origin` links and address-bar (`none`) use. Tests in `test/token.test.ts`.
+>
+> **Update (MCP OAuth):** now **moot** — the state-changing token-rotation GET (`GET /api/token/new`) and all of `api/token.ts` were **removed** when MCP auth moved to the OAuth 2.1 flow. There is no longer a browser-navigable endpoint that mutates a credential: OAuth codes/tokens are minted via `POST /token` (form POST, PKCE-bound) and the session-gated `POST /api/oauth/authorize`, neither reachable by a top-level GET navigation.
 
 ---
 

@@ -7,77 +7,54 @@ model.
 
 This page is unlisted; it's here if you know the URL.
 
-## 1. Get an API token
+## 1. Connect your client (one click, no token)
 
-The MCP server authenticates with a personal API token. To mint one:
-
-1. **Sign in** to RobocodeJs in your browser (the normal Google sign-in).
-2. In the **same browser**, visit:
-
-   ```
-   https://robocodejs.com/api/token/new
-   ```
-
-   (Replace `robocodejs.com` with the host you use.) You'll get back something
-   like:
-
-   ```json
-   { "token": "81c9cbc3-e863-4b02-885e-365c6a1a52d2" }
-   ```
-
-3. **Copy the token** and keep it somewhere safe.
-
-A few things to know:
-
-- The token is only stored as a hash, so it is shown **once**. We can't recover
-  it — if you lose it, just mint a new one.
-- **Each visit to `/api/token/new` creates a fresh token and invalidates the
-  previous one.** That's also how you "revoke": mint a new token and the old one
-  stops working immediately.
-- Treat the token like a password. It grants full control of _your_ bots and
-  arenas (and nothing else — it can't touch other users).
-
-## 2. Point your client at the MCP server
-
-The server speaks MCP over **streamable HTTP** at:
+RobocodeJs is a full **OAuth 2.1** authorization server, so connecting is the
+normal "add a connector, click Connect, sign in" flow — there's **no token to
+copy**. The server speaks MCP over **streamable HTTP** at:
 
 ```
 https://robocodejs.com/api/mcp
 ```
 
-Authenticate by sending your token as a bearer header:
+(Replace `robocodejs.com` with the host you use.)
 
-```
-Authorization: Bearer <your-token>
-```
+When your client connects, it discovers the sign-in flow automatically and opens
+your browser to RobocodeJs. If you're not already signed in, you'll sign in with
+Google; then the connection is authorized and you're returned to your client.
+Because the connection only ever grants access to **your own** bots and arenas,
+there's no extra approval step beyond signing in.
+
+### claude.ai / Claude Desktop (custom connector)
+
+1. **Settings → Connectors → Add custom connector.**
+2. Set the URL to `https://robocodejs.com/api/mcp` and save.
+3. Click **Connect**. A RobocodeJs tab opens; sign in if prompted. You'll be
+   returned automatically, and the tools appear.
 
 ### Claude Code (CLI)
 
 ```bash
-claude mcp add --transport http robocodejs https://robocodejs.com/api/mcp \
-  --header "Authorization: Bearer 81c9cbc3-e863-4b02-885e-365c6a1a52d2"
+claude mcp add --transport http robocodejs https://robocodejs.com/api/mcp
 ```
 
-Then start Claude Code and ask it to, for example, "list my RobocodeJs bots" or
-"open my arena status."
+Then start Claude Code; on first use it opens your browser to authorize. After
+that, ask it to, for example, "list my RobocodeJs bots" or "open my arena
+status."
 
 ### Other MCP clients
 
-Any client that supports a **remote/streamable-HTTP MCP server with a custom
-header** will work: point it at `https://robocodejs.com/api/mcp` and add the
-`Authorization: Bearer <token>` header.
-
-> Note: clients that only support OAuth-based remote connectors (rather than a
-> custom header) aren't supported yet — bearer-token auth is the only mechanism
-> for now.
+Any client that supports a **remote / streamable-HTTP MCP server with OAuth**
+will work: point it at `https://robocodejs.com/api/mcp` and complete the sign-in
+when prompted. Clients handle token storage and refresh for you.
 
 ### Local development
 
 When running the server locally in dev mode, authentication is bypassed (every
 request acts as the built-in "Local Dev" user), so you can connect to
-`http://localhost:5000/api/mcp` **without a token**.
+`http://localhost:5000/api/mcp` **without signing in**.
 
-## 3. What the AI can do
+## 2. What the AI can do
 
 Once connected, these tools are available (all scoped to your account):
 
@@ -123,9 +100,12 @@ The server also exposes read-only reference material the AI can pull in:
 
 ## Troubleshooting
 
-- **401 from `/api/mcp`** — the token is missing, mistyped, or has been rotated
-  by a later visit to `/api/token/new`. Mint a fresh one and update your client.
-- **`/api/token/new` returns 401** — you're not signed in _in that browser_. Sign
-  in first, then revisit the URL.
+- **The browser didn't open / connection stalls** — start the connection again
+  from your client; it re-initiates the sign-in. Make sure pop-ups aren't blocked.
+- **"Please sign in" on the RobocodeJs authorize page** — you're not signed in in
+  that browser. Complete the Google sign-in (top right) and the connection
+  finishes automatically.
 - **The AI can't see a bot or arena** — tools only ever see _your_ account's
-  resources; make sure you're using the token minted under that account.
+  resources; make sure you authorized with the account that owns them.
+- **Disconnecting** — remove the connector in your client. To revoke server-side,
+  the connection's tokens expire on their own; reconnecting always re-authorizes.
