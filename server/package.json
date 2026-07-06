@@ -1,6 +1,6 @@
 {
   "name": "@robocodejs/server",
-  "version": "1.2.56",
+  "version": "1.2.57",
   "description": "RobocodeJs API server and game-simulation engine — an Express + TypeScript API with the isolated-vm bot sandbox.",
   "main": "./dist/src/index.js",
   "scripts": {
