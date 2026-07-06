@@ -86,4 +86,4 @@ custom calculations the markers don't cover.
 
 ---
 
-[← Rhythms and timers](/learn/timers) · [Index](/learn) · Next: [Teamwork and graduation →](/learn/teamwork)
+[← Rhythms and timers](/learn/timers) · [Index](/learn) · Next: [Leading a moving target →](/learn/leading)

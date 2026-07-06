@@ -18,6 +18,8 @@ interface ScanResult {
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
+  /** Its current health (0–100) — target the weakest enemy or judge a threat. */
+  health: number;
 }
 
 /** A virtual point in the arena with distance/bearing helpers, relative to the bot. */

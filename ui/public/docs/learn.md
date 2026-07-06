@@ -43,7 +43,8 @@ programmers use.
 **Part 4 — Going pro**
 
 13. [Maps and math](/learn/navigation) — navigating with markers and geometry
-14. [Teamwork and graduation](/learn/teamwork) — talking to teammates + your final challenge
+14. [Leading a moving target](/learn/leading) — hitting movers by aiming ahead of them
+15. [Teamwork and graduation](/learn/teamwork) — talking to teammates + your final challenge
 
 ---
 

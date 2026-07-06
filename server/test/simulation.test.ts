@@ -262,4 +262,37 @@ describe('Simulation.run — lifecycle', () => {
     expect(start).toHaveBeenCalledTimes(1);
     expect(tank.needsStarting).toBe(false);
   });
+
+  it('runs START before the first TICK: a just-started tank skips TICK that tick', () => {
+    const calls: string[] = [];
+    const tank = makeTank({
+      needsStarting: true,
+      handlers: {
+        [Event.START]: () => calls.push('start'),
+        [Event.TICK]: () => calls.push('tick'),
+      },
+    });
+    const env = makeEnv([makeProcess('a', [tank])]);
+
+    run(env);
+    // START ran; TICK deferred so it can't race ahead of (async) START.
+    expect(calls).toEqual(['start']);
+
+    run(env);
+    // From the next tick on, TICK fires normally.
+    expect(calls).toEqual(['start', 'tick']);
+  });
+
+  it('does not defer TICK for a tank with no START handler', () => {
+    const tick = vi.fn();
+    const tank = makeTank({
+      needsStarting: true,
+      handlers: { [Event.TICK]: tick },
+    });
+    const env = makeEnv([makeProcess('a', [tank])]);
+    run(env);
+    // Nothing to start first, so TICK fires immediately on the first tick.
+    expect(tick).toHaveBeenCalledTimes(1);
+    expect(tank.needsStarting).toBe(false);
+  });
 });

@@ -108,7 +108,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 ## Bot events
 
 - `bot.on(Event.FIRED, () => {}))` Registers a callback that is executed when the turret is fired.
-- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each tank detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean }`. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading.
+- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each tank detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading; `health` is the detected bot's current health (0–100).
 - `bot.on(Event.COLLIDED, () => {object})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to your heading (a wall ahead is 0). Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
 
 ## Environment events
@@ -199,7 +199,7 @@ The radar provides the ability to detect other nearby bots. Only nearby bots in 
 
 - `bot.radar.onReady(): Promise` Returns a promise that resolves when the radar is ready to scan. If the radar scans through another thread while this promise is pending, the promise will be rejected.
 - `bot.radar.isReady(): boolean` Returns a boolean indicating whether the radar is ready to scan.
-- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean }`
+- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`
 
 # Coding Tips
 
