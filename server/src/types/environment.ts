@@ -105,10 +105,6 @@ export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
   private clock: Clock = { time: 0 };
-  // The clock tick the current match started at. `clock.time` is monotonic across
-  // restarts (restart() does not reset it), so match-relative duration is measured
-  // from here, not from 0. Set to the current time by restart().
-  private matchStartTick = 0;
   public stoppedAt: Date = new Date();
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
@@ -169,7 +165,6 @@ export default class Environment {
 
   isRunning = () => this.running;
   getTime = () => this.clock.time;
-  getMatchStartTick = () => this.matchStartTick;
   getProcesses = () => this.processes;
   getArena = () => this.arena;
 
@@ -525,9 +520,13 @@ export default class Environment {
       type: 'arenaRestart',
     });
 
-    // A new match begins now. clock.time is monotonic (not reset here), so record
-    // where this match starts for match-relative duration/elimination reporting.
-    this.matchStartTick = this.clock.time;
+    // A new match begins now: reset the tick clock to 0. Otherwise it would run
+    // monotonically across restarts, so a second match in an arena whose first
+    // match passed the sudden-death tick (SUDDEN_DEATH_TIME) would start already
+    // in permanent health decay. It also keeps match time (and the summary's
+    // duration/elimination ticks) match-relative and bot-facing clock.getTime()
+    // starting from 0.
+    this.clock.time = 0;
 
     // The isolates are about to be disposed and rebuilt, so drop any commands or
     // in-flight operations bound to the old ones rather than settling them into a

@@ -58,3 +58,17 @@ describe('Environment fault feed', () => {
     expect(faults[faults.length - 1].time).toBe(149);
   });
 });
+
+describe('Environment restart', () => {
+  it('resets the tick clock to 0 so a new match does not inherit sudden death', async () => {
+    const env = new Environment(new Arena('ar1', 'u1'));
+    // Simulate a long first match that ran well past the sudden-death threshold.
+    (env as unknown as { clock: { time: number } }).clock.time = 12345;
+    expect(env.getTime()).toBe(12345);
+
+    // No apps are in the arena, so restart just resets state (no isolate rebuild).
+    await env.restart();
+
+    expect(env.getTime()).toBe(0);
+  });
+});

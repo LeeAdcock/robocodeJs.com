@@ -25,9 +25,9 @@ export const buildMatchSummary = async (
     members.map((member) => appService.get(member.getAppId()))
   );
 
-  const startTick = env.getMatchStartTick();
+  // clock.time resets to 0 on restart, so it is the current match's duration and
+  // elimination ticks are already match-relative.
   const time = env.getTime();
-  const durationTicks = time - startTick;
 
   // Ordered by join time (same as buildArenaStatus) so per-app aggregation is
   // stable; re-sorted into rank order below.
@@ -69,8 +69,6 @@ export const buildMatchSummary = async (
         userId: app?.getUserId(),
         alive,
         eliminatedAt,
-        eliminatedAtElapsed:
-          eliminatedAt === null ? null : eliminatedAt - startTick,
         tanksAlive,
         tanksTotal: tanks.length,
         totalHealth: tanks.reduce((sum, t) => sum + t.health, 0),
@@ -122,10 +120,9 @@ export const buildMatchSummary = async (
     running: env.isRunning(),
     clock: { time },
     match: {
-      startTick,
-      durationTicks,
+      durationTicks: time,
       suddenDeathTick: SUDDEN_DEATH_TIME,
-      suddenDeath: durationTicks > SUDDEN_DEATH_TIME,
+      suddenDeath: time > SUDDEN_DEATH_TIME,
       appCount,
       appsAlive,
       decided,

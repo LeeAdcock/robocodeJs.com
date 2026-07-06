@@ -42,17 +42,17 @@ const makeMember = (appId: string, timestamp: number) => ({
   getTimestamp: () => timestamp,
 });
 
-// A mock Environment with only the getters the util calls.
+// A mock Environment with only the getters the util calls. clock.time resets to 0
+// on restart, so `time` is the current match's duration.
 const makeEnv = (
   processes: ReturnType<typeof makeProcess>[],
-  { running = true, time = 900, startTick = 100, seed = 7 } = {}
+  { running = true, time = 900, seed = 7 } = {}
 ) =>
   ({
     getArena: () => ({ getWidth: () => 800, getHeight: () => 600 }),
     getProcesses: () => processes,
     isRunning: () => running,
     getTime: () => time,
-    getMatchStartTick: () => startTick,
     getSeed: () => seed,
   }) as never;
 
@@ -90,7 +90,7 @@ describe('buildMatchSummary', () => {
     // Both alive → ranked by total health: a2 (90) above a1 (80).
     expect(summary.leaderboard.map((e) => e.id)).toEqual(['a2', 'a1']);
     expect(summary.leaderboard[0].rank).toBe(1);
-    expect(summary.match.durationTicks).toBe(800);
+    expect(summary.match.durationTicks).toBe(900); // = clock.time (resets on restart)
     expect(summary.match.suddenDeathTick).toBe(SUDDEN_DEATH_TIME);
     expect(summary.match.suddenDeath).toBe(false);
   });
@@ -118,7 +118,6 @@ describe('buildMatchSummary', () => {
     expect(summary.leaderboard[1].id).toBe('a1');
     expect(summary.leaderboard[1].alive).toBe(false);
     expect(summary.leaderboard[1].eliminatedAt).toBe(500);
-    expect(summary.leaderboard[1].eliminatedAtElapsed).toBe(400); // 500 - startTick(100)
   });
 
   it('picks the last app eliminated as the winner once all are dead', async () => {
