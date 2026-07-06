@@ -31,9 +31,11 @@ export const LogEvent = {
   SANDBOX_CATASTROPHIC: 'sandbox.catastrophic', // isolate OOM / fatal V8 error
   AUTH_FAILED: 'auth.failed', // invalid/expired credential
   AUTH_FORBIDDEN: 'auth.forbidden', // authenticated user acting on another's resource
+  AUTH_SIGNIN: 'auth.signin', // successful Google sign-in (session established)
   AUTH_TOKEN_CREATED: 'auth.token.created', // API token minted/rotated
   AUTH_TOKEN_REVOKED: 'auth.token.revoked', // API token removed
   RATE_LIMITED: 'rate.limited', // request refused by a rate limiter (429/E022)
+  MCP_TOOL: 'mcp.tool', // an MCP tool was invoked (audit trail; token = full control)
   HTTP_ERROR: 'http.error', // unhandled error -> 5xx
   DB_ERROR: 'db.error', // database/pool error
   PROCESS_FATAL: 'process.fatal', // uncaught exception / unhandled rejection

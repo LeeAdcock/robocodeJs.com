@@ -130,11 +130,15 @@ export class RobocodeOAuthProvider implements OAuthServerProvider {
   }
 
   async revokeToken(
-    _client: OAuthClientInformationFull,
+    client: OAuthClientInformationFull,
     request: OAuthTokenRevocationRequest
   ): Promise<void> {
     // Hash-keyed delete works for either token kind, so the hint is unneeded.
     await oauthService.deleteToken(request.token);
+    logger.info(
+      { event: LogEvent.AUTH_TOKEN_REVOKED, clientId: client.client_id },
+      'OAuth token revoked'
+    );
   }
 
   private async issueTokens(

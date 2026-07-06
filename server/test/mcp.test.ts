@@ -44,7 +44,8 @@ vi.mock('../src/util/matchSummary', () => ({ buildMatchSummary: vi.fn() }));
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
 
 import request from 'supertest';
-import mcpApp, { buildServer } from '../src/api/mcp';
+import mcpApp, { buildServer, logMcpRequest } from '../src/api/mcp';
+import { logger, LogEvent } from '../src/util/logger';
 import appService from '../src/services/AppService';
 import compiler from '../src/util/compiler';
 import arenaService from '../src/services/ArenaService';
@@ -418,5 +419,42 @@ describe('POST /api/mcp auth (OAuth bearer)', () => {
     // The header points MCP clients at our protected-resource metadata so they
     // can discover the authorization server and start the OAuth flow.
     expect(res.headers['www-authenticate']).toMatch(/resource_metadata=/);
+  });
+});
+
+describe('mcp audit logging (logMcpRequest)', () => {
+  it('logs an mcp.tool event for a tools/call request', () => {
+    const spy = vi.spyOn(logger, 'info');
+    logMcpRequest('u1', {
+      method: 'tools/call',
+      params: { name: 'delete_bot' },
+    });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: LogEvent.MCP_TOOL,
+        userId: 'u1',
+        tool: 'delete_bot',
+      }),
+      expect.any(String)
+    );
+    spy.mockRestore();
+  });
+
+  it('does not log for non-tool JSON-RPC messages', () => {
+    const spy = vi.spyOn(logger, 'info');
+    logMcpRequest('u1', { method: 'tools/list', id: 1 });
+    logMcpRequest('u1', { method: 'initialize', params: {} });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('logs each call in a batched (array) request', () => {
+    const spy = vi.spyOn(logger, 'info');
+    logMcpRequest('u1', [
+      { method: 'tools/call', params: { name: 'list_bots' } },
+      { method: 'tools/call', params: { name: 'restart_arena' } },
+    ]);
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
   });
 });

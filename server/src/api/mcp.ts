@@ -30,7 +30,7 @@ import {
 } from '../util/botActions';
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary } from '../util/matchSummary';
-import { logger } from '../util/logger';
+import { logger, LogEvent } from '../util/logger';
 
 const app = express();
 
@@ -1045,8 +1045,27 @@ const mcpAuth: express.RequestHandler = (req, res, next) => {
 // access token resolves the acting user. Stateless: a fresh server + transport
 // per request (auth is per-request and the tools hold no session state), torn
 // down when the response closes.
+// Audit-log MCP tool invocations (event="mcp.tool") from the JSON-RPC request
+// body, so a log pipeline can attribute actions to a user and flag abuse — an
+// MCP bearer token grants full control of that user's bots and arenas. Only
+// `tools/call` messages are logged (one per call; a batched request is an array);
+// the token itself is never logged. Exported for direct unit testing.
+export const logMcpRequest = (userId: string, body: unknown): void => {
+  const messages = Array.isArray(body) ? body : [body];
+  for (const message of messages) {
+    const rpc = message as { method?: string; params?: { name?: string } };
+    if (rpc?.method === 'tools/call' && rpc.params?.name) {
+      logger.info(
+        { event: LogEvent.MCP_TOOL, userId, tool: rpc.params.name },
+        `mcp tool ${rpc.params.name}`
+      );
+    }
+  }
+};
+
 app.post('/api/mcp', mcpAuth, async (req, res) => {
   const user = (req as AuthenticatedRequest).user;
+  logMcpRequest(user.getId(), req.body);
   const server = buildServer(user);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
