@@ -116,12 +116,16 @@ const fail = (message: string): ToolResult => ({
 });
 
 // The MCP surface refers to an app's live instances as "bots", never "tanks", so
-// rename the internal log/fault `tankIndex` field to `botIndex` on the way out.
-// (The internal record + SSE stream + UI keep `tankIndex`.)
-const withBotIndex = <T extends object>(entry: T) => {
-  if (!('tankIndex' in entry)) return entry;
-  const { tankIndex, ...rest } = entry as Record<string, unknown>;
-  return { ...rest, botIndex: tankIndex };
+// rename the internal log/fault `tankId`/`tankIndex` fields to `botId`/`botIndex`
+// on the way out. (The internal records + SSE stream + UI keep the tank* names.)
+const botify = <T extends object>(entry: T) => {
+  if (!('tankId' in entry) && !('tankIndex' in entry)) return entry;
+  const { tankId, tankIndex, ...rest } = entry as Record<string, unknown>;
+  return {
+    ...rest,
+    ...(tankId !== undefined ? { botId: tankId } : {}),
+    ...(tankIndex !== undefined ? { botIndex: tankIndex } : {}),
+  };
 };
 
 // Behaviour hints so clients can gate/confirm actions (e.g. prompt before a
@@ -976,7 +980,7 @@ export const buildServer = (user: User): McpServer => {
         return true;
       });
       // Cap AFTER filtering so `limit` counts matching entries, not raw ones.
-      return ok((limit ? logs.slice(-limit) : logs).map(withBotIndex));
+      return ok((limit ? logs.slice(-limit) : logs).map(botify));
     }
   );
 
@@ -1007,7 +1011,7 @@ export const buildServer = (user: User): McpServer => {
         faults: z.array(
           z.object({
             appId: z.string(),
-            tankId: z.string(),
+            botId: z.string(),
             botIndex: z.number(),
             code: z.string(),
             kind: z.string(),
@@ -1026,7 +1030,7 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena, or it is not yours.');
       const env = await environmentService.getByArenaId(arena.getId());
       return ok({
-        faults: env ? env.getRecentFaults(limit, appId).map(withBotIndex) : [],
+        faults: env ? env.getRecentFaults(limit, appId).map(botify) : [],
       });
     }
   );

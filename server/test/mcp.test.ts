@@ -432,7 +432,7 @@ describe('mcp tools', () => {
       faults: [
         {
           appId: 'a1',
-          tankId: 't1',
+          botId: 't1',
           botIndex: 1,
           code: 'E017',
           kind: 'load',
