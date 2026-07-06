@@ -83,6 +83,9 @@ Once connected, these tools are available (all scoped to your account):
 - `run_match` — run one match to a decision (optional `seed`) and return the
   winner + leaderboard; a blocking convenience for the restart → resume → poll
   `match_summary` loop
+- `run_tournament` — battle-royale the arena's bots across a panel of seeds
+  (default 5) and return an aggregate **best-of-N** ranking; spawns are
+  outcome-deciding, so one match isn't a trustworthy ranking
 
 **Observation**
 
