@@ -1,6 +1,6 @@
 import { Event } from '../types/event';
 import { timerTick } from './scheduleFactory';
-import Environment, { DEPLOY_TICKS } from '../types/environment';
+import Environment from '../types/environment';
 import { normalizeAngle, toRelativeBearing } from './geometry';
 
 /*
@@ -145,28 +145,19 @@ export default {
                         });
                       }
 
-                      // The bullet is consumed and the firer's shot resolves
-                      // regardless of when it lands.
+                      tank.health -= 25;
+                      tank.stats.timesHit += 1;
+                      otherTank.stats.shotsHit += 1;
+
                       bullet.exploded = true;
                       if (bullet.callback) bullet.callback({ id: tank.id });
 
-                      // Damage-free deployment window: during the opening
-                      // DEPLOY_TICKS a shot still lands (HIT fires above) but
-                      // deals no damage, so teams can settle off their spawns
-                      // before combat is lethal — removing the last of the spawn
-                      // luck. After the window it damages as normal.
-                      if (env.getTime() >= DEPLOY_TICKS) {
-                        tank.health -= 25;
-                        tank.stats.timesHit += 1;
-                        otherTank.stats.shotsHit += 1;
-
-                        env.emit('event', {
-                          type: 'tankDamaged',
-                          id: tank.id,
-                          time: env.getTime(),
-                          health: tank.health,
-                        });
-                      }
+                      env.emit('event', {
+                        type: 'tankDamaged',
+                        id: tank.id,
+                        time: env.getTime(),
+                        health: tank.health,
+                      });
                       env.emit('event', {
                         type: 'bulletExploded',
                         time: env.getTime(),

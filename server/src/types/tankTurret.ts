@@ -5,6 +5,7 @@ import { Orientated } from './orientated';
 import Tank, { waitUntil } from './tank';
 import { normalizeAngle } from '../util/geometry';
 import { TankRadar } from './tankRadar';
+import { DEPLOY_TICKS } from './environment';
 
 export class TankTurret implements Orientated {
   public orientation: number;
@@ -85,11 +86,18 @@ export class TankTurret implements Orientated {
     );
   }
 
+  // The turret is weapons-held during the opening deployment window
+  // (DEPLOY_TICKS): reload still progresses, but the gun reads "not ready" so no
+  // shot fires until combat opens. This replaces per-bullet damage suppression —
+  // there are simply no bullets during warm-up — and reuses the reload/readiness
+  // contract bots already handle. Radar (scanning/aiming) is unaffected.
+  private deployed = () => this.tank.env.getTime() >= DEPLOY_TICKS;
+
   onReady() {
     let peakValue = this.loaded;
     return waitUntil(
       this.tank.env,
-      () => this.loaded >= 100,
+      () => this.loaded >= 100 && this.deployed(),
       () => {
         // Reject if the value decreases, or bot dies
         peakValue = Math.max(peakValue, this.loaded);
@@ -104,11 +112,12 @@ export class TankTurret implements Orientated {
   }
 
   isReady() {
-    return this.loaded >= 100;
+    return this.loaded >= 100 && this.deployed();
   }
 
   fire() {
-    if (this.loaded < 100) return Promise.reject('Turret not ready');
+    if (this.loaded < 100 || !this.deployed())
+      return Promise.reject('Turret not ready');
     this.tank.logger.trace('Turret firing');
 
     this.tank.stats.shotsFired += 1;

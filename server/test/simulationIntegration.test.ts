@@ -19,6 +19,10 @@ import { makeSimEnv } from './simEnv';
 function makeWorld() {
   const world = makeSimEnv({ run: (env) => Simulation.run(env) });
   const { env, processes, events, faults, tick, setClock } = world;
+  // These scenarios exercise live combat, so start past the damage-free
+  // deployment window — turrets are weapons-held until DEPLOY_TICKS. The warm-up
+  // gate itself is unit-tested in tankTypes.test.ts.
+  setClock(DEPLOY_TICKS);
 
   // Compile a bot's source into a fresh isolate-backed tank at a fixed pose.
   const addBot = (
@@ -168,8 +172,6 @@ describe('sandbox + simulation integration', () => {
     });
 
     const startHealth = target.health;
-    // Past the damage-free deployment window so shots are lethal.
-    world.setClock(DEPLOY_TICKS);
     await world.tick(40);
 
     expect(target.health).toBeLessThan(startHealth); // took bullet damage
@@ -239,8 +241,6 @@ describe('sandbox + simulation integration', () => {
     });
     expect(enemy.health).toBe(100);
 
-    // Past the damage-free deployment window so the shot is lethal.
-    world.setClock(DEPLOY_TICKS);
     await world.tick(15);
 
     expect(enemy.health).toBeLessThan(100); // the shot connected
@@ -306,6 +306,7 @@ describe('sandbox + simulation integration', () => {
   });
 
   it('lets a bot read the advancing clock via clock.getTime()', async () => {
+    world.setClock(0); // this test asserts on absolute clock values, not combat
     const tank = world.addBot(
       `clock.on(Event.TICK, () => { if (clock.getTime() >= 5) bot.setSpeed(2) })`,
       'clockreader'
