@@ -1,6 +1,6 @@
 # Security Overview — OWASP Top 10 Audit
 
-> **Status:** Partially remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A07-1 (rate limiting). **Still open:** A02-1 (RDS CA), A06-1 (CI scanning), and the low-severity items (A08 markdown sanitize is now partly mitigated by the A05-1 CSP). Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
+> **Status:** All medium-and-above findings remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A02-1 (RDS CA verification), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A06-1 (CI + dependency scanning), A07-1 (rate limiting). **Still open:** only the 🟡 low-severity items (A02-2, A03 mcp `sub` allowlist, A05-2, A07-2/3/4, A08 — the last now partly mitigated by the A05-1 CSP). Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
 
 ## Threat model
 
@@ -44,10 +44,11 @@ These authenticate but don't verify the caller owns the `:userId` resource, so a
 
 ## A02 — Cryptographic Failures
 
-### 🟠 A02-1 — RDS TLS does not verify the CA
+### ✅ 🟠 A02-1 — RDS TLS does not verify the CA
 
-`server/src/util/db.ts:29-32` sets `ssl: { rejectUnauthorized: false }` — the DB link is encrypted but MITM-susceptible. The code comment already documents the hardening.
-**Fix:** pin the RDS CA bundle and set `rejectUnauthorized: true`.
+`server/src/util/db.ts` previously set `ssl: { rejectUnauthorized: false }` — the DB link is encrypted but MITM-susceptible.
+
+> **Fixed** (`feat/security-hardening`). AWS's public RDS global CA bundle is vendored at `server/certs/rds-global-bundle.pem` (and shipped via `buildspec.yaml` artifacts). `sslConfig()` in `db.ts` now defaults to `{ ca: <bundle>, rejectUnauthorized: true }`, authenticating the RDS server certificate. Two escape hatches: `RDS_SSL_NO_VERIFY=true` (encrypted but unverified — the old behavior, for a non-RDS cert) and `RDS_SSL=false` (no TLS). **Operational note:** this verifies by default, so a cert/CA mismatch will block the DB connection on deploy — set `RDS_SSL_NO_VERIFY=true` if that happens. Tests in `test/db.test.ts`.
 
 ### 🟡 A02-2 — API tokens use `randomUUID()`
 
@@ -110,10 +111,11 @@ _(Positive: per-tick drain bounded by `MAX_DRAIN_ROUNDS=10000`; logs bounded by 
 
 ## A06 — Vulnerable & Outdated Components
 
-### 🟠 A06-1 — No dependency/security scanning in CI
+### ✅ 🟠 A06-1 — No dependency/security scanning in CI
 
-`buildspec.yaml` runs only `npm i` + `npm run build` — **no `npm audit`, no CodeQL/Snyk/Dependabot**, and there is **no `.github/` at all**. `buildspec.yaml:8` uses `npm i` (not `npm ci`), so lockfiles aren't strictly enforced.
-**Fix:** add `npm audit --production` (or Dependabot/CodeQL) as a CI gate; switch to `npm ci`.
+`buildspec.yaml` ran only `npm i` + `npm run build` — **no `npm audit`, no CodeQL/Snyk/Dependabot**, and there was **no `.github/` at all**. `buildspec.yaml` used `npm i` (not `npm ci`), so lockfiles weren't strictly enforced.
+
+> **Fixed** (`feat/security-hardening`). Added `.github/workflows/ci.yml` — on every PR/push it runs, per package, `npm ci` + eslint + build + tests + **`npm audit --audit-level=high`** (fails the build on high/critical advisories; the accepted moderate showdown ReDoS stays below the gate). Added `.github/dependabot.yml` for weekly npm + github-actions update PRs. Switched `buildspec.yaml` to **`npm ci`** for reproducible, lockfile-enforced deploy installs. This also stands up the project's first CI (previously none).
 
 ### 🟡 A06-2 — Known advisories (accepted / dev-only)
 
@@ -179,8 +181,8 @@ Logging hygiene is **good**: structured pino logger, no tokens/cookies logged (`
 | 4   | Add rate limiting (sign-in, token, isolate-spawning routes) → E022                            | A07-1               | 🟠 High     | ✅ Done |
 | 5   | Global arena cap + `MAX_APPS_PER_USER`                                                        | A04-2/3             | 🟠 Med      | ✅ Done |
 | 6   | Add `helmet` + CSP + `X-Frame-Options`                                                        | A05-1               | 🟠 Med      | ✅ Done |
-| 7   | Add CI dependency scanning; `npm ci`                                                          | A06-1               | 🟠 Med      | ⬜ Open |
-| 8   | Pin RDS CA, `rejectUnauthorized: true`                                                        | A02-1               | 🟠 Med      | ⬜ Open |
+| 7   | Add CI dependency scanning; `npm ci`                                                          | A06-1               | 🟠 Med      | ✅ Done |
+| 8   | Pin RDS CA, `rejectUnauthorized: true`                                                        | A02-1               | 🟠 Med      | ✅ Done |
 | 9   | Sanitize markdown pipeline / rely on CSP                                                      | A08                 | 🟡 Low      | ⬜ Open |
 | 10  | `email_verified` check; allowlist mcp `sub`; token-rotation CSRF; `crypto.randomBytes` tokens | A07-2/4, A03, A02-2 | 🟡 Low      | ⬜ Open |
 

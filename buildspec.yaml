@@ -5,8 +5,10 @@ phases:
     runtime-versions:
       nodejs: 24
     commands:
-      - (cd ui && npm i)
-      - (cd server && npm i)
+      # `npm ci` installs strictly from the lockfiles (ui/package-lock.json,
+      # server/npm-shrinkwrap.json) for reproducible, tamper-evident builds.
+      - (cd ui && npm ci)
+      - (cd server && npm ci)
   build:
     commands:
       - (cd ui && npm run build)
@@ -17,3 +19,6 @@ artifacts:
     - 'package.json'
     - 'dist/**/*'
     - '.ebextensions/**/*'
+    # Vendored AWS RDS CA bundle, read at runtime by util/db.ts to verify the
+    # TLS connection to RDS. Must be deployed alongside dist/.
+    - 'certs/**/*'
