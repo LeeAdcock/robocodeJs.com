@@ -193,6 +193,18 @@ describe('app endpoints', () => {
     expect(res.body).toMatchObject({ id: 'a1', name: 'App a1' });
   });
 
+  it('GET /api/app/:appId resolves a bot by id (add-by-reference) with metadata only', async () => {
+    // mockApp is owned by u1; a different user (u2) resolves it by id alone.
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    const res = await request(makeApp(appRouter, mockUser('u2'))).get(
+      '/api/app/a1'
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'a1', name: 'App a1', userId: 'u1' });
+    // Never leaks source through the by-id metadata route.
+    expect(res.text).not.toContain('bot code');
+  });
+
   it('GET /api/user/:userId/app/:appId/source returns the source to the owner', async () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
@@ -338,10 +350,13 @@ describe('arena endpoints', () => {
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
     } as never);
-    // already at the 5-app limit
-    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
-      1, 2, 3, 4, 5,
-    ] as never);
+    // already at the 5-app limit (distinct members, none matching a1 so the
+    // idempotency short-circuit doesn't fire before the cap check)
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue(
+      Array.from({ length: 5 }, (_, i) => ({
+        getAppId: () => `other${i}`,
+      })) as never
+    );
 
     const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
       '/api/user/u1/arena/app/a1'
@@ -366,6 +381,146 @@ describe('arena endpoints', () => {
     );
     expect(res.status).toBe(201);
     expect(addApp).toHaveBeenCalled();
+  });
+
+  it('PUT /api/user/:userId/arena/app/:appId is idempotent when already a member', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      { getAppId: () => 'a1' },
+    ] as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
+      '/api/user/u1/arena/app/a1'
+    );
+    expect(res.status).toBe(200);
+    expect(arenaMemberService.create).not.toHaveBeenCalled();
+    expect(environmentService.get).not.toHaveBeenCalled();
+  });
+
+  it("PUT /api/user/:userId/arena/app/:appId adds another user's bot (arena-owner gated)", async () => {
+    const addApp = vi.fn();
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    // A bot owned by a DIFFERENT user (u2), added by reference to u1's arena.
+    vi.mocked(appService.get).mockResolvedValue({
+      getId: () => 'aX',
+      getName: () => 'Rival',
+      getUserId: () => 'u2',
+    } as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([]);
+    vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never);
+    vi.mocked(arenaMemberService.create).mockResolvedValue(undefined as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
+      '/api/user/u1/arena/app/aX'
+    );
+    expect(res.status).toBe(201);
+    expect(addApp).toHaveBeenCalled();
+    expect(arenaMemberService.create).toHaveBeenCalledWith('ar1', 'aX');
+  });
+
+  it('POST .../arena/app/:appId/enabled=false pulls the bot from the live match, keeps membership', async () => {
+    const setEnabled = vi.fn().mockResolvedValue(undefined);
+    const removeApp = vi.fn();
+    const addApp = vi.fn();
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      { getAppId: () => 'a1', setEnabled },
+    ] as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      containsApp: () => true,
+      addApp,
+      removeApp,
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/app/a1/enabled')
+      .send({ enabled: false });
+    expect(res.status).toBe(200);
+    expect(setEnabled).toHaveBeenCalledWith(false);
+    expect(removeApp).toHaveBeenCalledWith('a1');
+    expect(addApp).not.toHaveBeenCalled();
+  });
+
+  it('POST .../arena/app/:appId/enabled=true adds the bot back into the match when absent', async () => {
+    const setEnabled = vi.fn().mockResolvedValue(undefined);
+    const addApp = vi.fn();
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      { getAppId: () => 'a1', setEnabled },
+    ] as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      containsApp: () => undefined, // not currently in the live match
+      addApp,
+      removeApp: vi.fn(),
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/app/a1/enabled')
+      .send({ enabled: true });
+    expect(res.status).toBe(200);
+    expect(setEnabled).toHaveBeenCalledWith(true);
+    expect(addApp).toHaveBeenCalled();
+  });
+
+  it('POST .../arena/app/:appId/enabled rejects a non-boolean body', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/app/a1/enabled')
+      .send({ enabled: 'yes' });
+    expect(res.status).toBe(400);
+  });
+
+  it('GET /api/user/:userId/arena/members returns the roster (incl. disabled) with owner + no source', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+    } as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      { getAppId: () => 'a1', getEnabled: () => true, getTimestamp: () => 100 },
+      {
+        getAppId: () => 'a2',
+        getEnabled: () => false,
+        getTimestamp: () => 200,
+      },
+    ] as never);
+    vi.mocked(appService.get).mockImplementation(
+      (id) => Promise.resolve(mockApp(id as string)) as never
+    );
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).get(
+      '/api/user/u1/arena/members'
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0]).toMatchObject({
+      appId: 'a1',
+      enabled: true,
+      isOwn: true,
+      ownerUserId: 'u1',
+    });
+    expect(res.body[1]).toMatchObject({ appId: 'a2', enabled: false });
+    // Roster is metadata only — never source.
+    expect(JSON.stringify(res.body)).not.toContain('bot code');
   });
 
   it('POST /api/user/:userId/arena/speed sets a numeric speed multiplier', async () => {

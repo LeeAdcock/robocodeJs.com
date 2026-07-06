@@ -68,6 +68,10 @@ app.use('/api', apiRateLimit);
 app.use('/', express.static('./dist/public'));
 
 app.use('/api/user', auth(true));
+// Bot metadata-by-id (GET /api/app/:appId) is readable by any signed-in user for
+// add-by-reference; it sits outside /api/user so gate it here. It returns
+// metadata only — never source.
+app.use('/api/app', auth(true));
 
 app.use(healthEndpoints);
 app.use(sessionEndpoints);

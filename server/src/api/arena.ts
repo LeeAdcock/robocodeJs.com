@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import arenaService from '../services/ArenaService';
+import appService from '../services/AppService';
+import userService from '../services/UserService';
 import environmentService from '../services/EnvironmentService';
 import arenaMemberService from '../services/ArenaMemberService';
 import {
@@ -129,12 +131,22 @@ app.delete(
   removeApp
 );
 
-// Add an app to an arena
+// Add an app to an arena. The app id may belong to another user (add-by-
+// reference / share link) — only the arena is owner-gated; the referenced bot's
+// source is never exposed by adding it, per the access model. Idempotent: adding
+// a bot that's already a member is a no-op.
 const addApp = async (req: Request, res: Response) => {
   const app = scopedApp(req);
   const arena = scopedArena(req);
 
   const members = await arenaMemberService.getForArena(arena.getId());
+  if (members.some((member) => member.getAppId() === app.getId())) {
+    res.status(200);
+    res.send();
+    return;
+  }
+  // Cap on total roster size (enabled + disabled). Bounds the member list and,
+  // together with the isolate caps, the arena's resource footprint.
   if (members.length > 4) {
     res.status(400);
     res.send('Arena limit reached');
@@ -148,6 +160,77 @@ const addApp = async (req: Request, res: Response) => {
     res.send();
   });
 };
+
+// Enable or disable a bot in the arena without unlinking it. Disabled = pulled
+// from the live match (tanks removed, no isolate) but the membership row stays,
+// so it remains in the roster and can be re-enabled. Owner-gated on the arena.
+const setEnabled = async (req: Request, res: Response) => {
+  const enabled = (req.body ?? {}).enabled;
+  if (typeof enabled !== 'boolean') {
+    res.status(400);
+    res.send('enabled must be a boolean');
+    return;
+  }
+
+  const app = scopedApp(req);
+  const arena = scopedArena(req);
+  const members = await arenaMemberService.getForArena(arena.getId());
+  const member = members.find((m) => m.getAppId() === app.getId());
+  if (!member) {
+    res.status(404);
+    res.send('Invalid app id');
+    return;
+  }
+
+  await member.setEnabled(enabled);
+  const env = await environmentService.get(arena);
+  if (enabled) {
+    // env.get() already materializes newly-enabled members when it first builds
+    // the environment; only add when it's an already-live env missing this bot.
+    if (!env.containsApp(app.getId())) env.addApp(app);
+  } else {
+    env.removeApp(app.getId());
+  }
+  res.status(200);
+  res.send({ enabled });
+};
+
+// The arena's full bot roster — INCLUDING disabled bots, which the live status
+// omits (they have no Process). Source of truth for the UI roster panel. Returns
+// metadata only (name + owner), never source. Owner-gated on the arena.
+const listMembers = async (req: Request, res: Response) => {
+  const arena = scopedArena(req);
+  const ownerId = scopedUser(req).getId();
+
+  const members = await arenaMemberService.getForArena(arena.getId());
+  const apps = await Promise.all(
+    members.map((member) => appService.get(member.getAppId()))
+  );
+  const ownerIds = [
+    ...new Set(
+      apps.map((app) => app?.getUserId()).filter((id): id is string => !!id)
+    ),
+  ];
+  const owners = await Promise.all(ownerIds.map((id) => userService.get(id)));
+
+  res.status(200);
+  res.json(
+    members.map((member) => {
+      const app = apps.find((a) => a?.getId() === member.getAppId());
+      const appOwnerId = app?.getUserId();
+      const owner = owners.find((o) => o?.getId() === appOwnerId);
+      return {
+        appId: member.getAppId(),
+        name: app?.getName(),
+        ownerUserId: appOwnerId,
+        ownerName: owner?.getName(),
+        enabled: member.getEnabled(),
+        addedTimestamp: member.getTimestamp(),
+        isOwn: appOwnerId === ownerId,
+      };
+    })
+  );
+};
 app.put(
   dual('/app/:appId'),
   loadUser,
@@ -156,6 +239,17 @@ app.put(
   resolveArena,
   addApp
 );
+
+app.post(
+  dual('/app/:appId/enabled'),
+  loadUser,
+  requireOwner,
+  loadApp,
+  resolveArena,
+  setEnabled
+);
+
+app.get(dual('/members'), loadUser, requireOwner, resolveArena, listMembers);
 
 const restart = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
