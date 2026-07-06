@@ -10,13 +10,15 @@ As you work to develop your application code, the bots in the arena will immedia
 
 Pick the path that fits you:
 
-- **New to coding?** Start the **[Learn to Code course](/learn)** — a guided, 14-lesson
+- **New to coding?** Start the **[Learn to Code course](/learn)** — a guided, 15-lesson
   path that takes you from "what is code?" to a fully featured battle bot, no experience
   needed.
 - **Coming from classic Robocode?** Read **[Coming from classic Robocode](/classic)** for
   a quick map of what's the same, what's different, and how to port your instincts.
 - **Want the details?** Keep the **[API reference](/dev)** and **[game rules &
   physics](/rules)** handy, and browse the **[example bots](/examples)**.
+- **Want an AI to help?** Connect Claude (or any MCP client) to write, run, and watch
+  your bots for you — see **[Connect an AI (MCP)](/mcp)**.
 
 To create your first bot, sign in with your Google account and use the menu to select
 **Apps → Create new application**; your bots are added to the arena and you're ready to
