@@ -1,7 +1,7 @@
-import Tank from './tank';
+import Bot from './bot';
 
 export default interface App {
   id: string;
   name: string;
-  tanks: Tank[];
+  bots: Bot[];
 }

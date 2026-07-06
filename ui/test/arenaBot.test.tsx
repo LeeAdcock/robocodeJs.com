@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import TankSvg from '../src/components/arena/arenaTank';
+import BotSvg from '../src/components/arena/arenaBot';
 
 const base = {
   appName: 'Bot',
   appIndex: 0,
-  tankIndex: 0,
+  botIndex: 0,
   id: 't1',
   health: 100,
   bodyOrientation: 0,
@@ -17,18 +17,18 @@ const base = {
   radarOn: false,
 };
 
-const renderTank = (props: Partial<typeof base> = {}) =>
+const renderBot = (props: Partial<typeof base> = {}) =>
   render(
     <svg>
-      <TankSvg {...base} {...props} />
+      <BotSvg {...base} {...props} />
     </svg>
   );
 
-describe('TankSvg health bar', () => {
+describe('BotSvg health bar', () => {
   afterEach(cleanup);
 
   it('sizes and colors the bar from health', () => {
-    const { container } = renderTank({ health: 50 });
+    const { container } = renderBot({ health: 50 });
     const bar = container.querySelector('rect[fill^="hsl"]') as SVGRectElement;
     expect(bar).toBeTruthy();
     expect(bar.style.width).toBe('16px'); // 32 * 0.5
@@ -36,25 +36,25 @@ describe('TankSvg health bar', () => {
   });
 
   it('is full and green at 100 health', () => {
-    const { container } = renderTank({ health: 100 });
+    const { container } = renderBot({ health: 100 });
     const bar = container.querySelector('rect[fill^="hsl"]') as SVGRectElement;
     expect(bar.style.width).toBe('32px');
     expect(bar.getAttribute('fill')).toContain('hsl(120'); // green
   });
 
-  it('hides the bar when the tank is dead', () => {
-    const { container } = renderTank({ health: 0 });
+  it('hides the bar when the bot is dead', () => {
+    const { container } = renderBot({ health: 0 });
     expect(container.querySelector('rect[fill^="hsl"]')).toBeNull();
   });
 });
 
-describe('TankSvg crash indicator', () => {
+describe('BotSvg crash indicator', () => {
   afterEach(cleanup);
 
   it('shows a warning triangle with the fault code when crashed', () => {
     const { container } = render(
       <svg>
-        <TankSvg {...base} health={0} crashed faultCode="E017" />
+        <BotSvg {...base} health={0} crashed faultCode="E017" />
       </svg>
     );
     const triangle = container.querySelector('polygon[fill="gold"]');
@@ -65,25 +65,25 @@ describe('TankSvg crash indicator', () => {
   it('shows no triangle when not crashed', () => {
     const { container } = render(
       <svg>
-        <TankSvg {...base} />
+        <BotSvg {...base} />
       </svg>
     );
     expect(container.querySelector('polygon[fill="gold"]')).toBeNull();
   });
 });
 
-describe('TankSvg open-bot interaction', () => {
+describe('BotSvg open-bot interaction', () => {
   afterEach(cleanup);
 
-  it('double-click opens source; shift+double-click opens logs (with 1-based tank index)', () => {
+  it('double-click opens source; shift+double-click opens logs (with 1-based bot index)', () => {
     const onOpen = vi.fn();
     const { container } = render(
       <svg>
-        {/* tankIndex 2 (0-based) → the log stream's tank index 3 */}
-        <TankSvg {...base} appId="a1" tankIndex={2} onOpen={onOpen} />
+        {/* botIndex 2 (0-based) → the log stream's bot index 3 */}
+        <BotSvg {...base} appId="a1" botIndex={2} onOpen={onOpen} />
       </svg>
     );
-    // The tank body image sits inside the clickable group; the dblclick bubbles.
+    // The bot body image sits inside the clickable group; the dblclick bubbles.
     const body = container.querySelector('image') as SVGElement;
 
     fireEvent.dblClick(body);
@@ -96,19 +96,19 @@ describe('TankSvg open-bot interaction', () => {
   it('is inert (no pointer, no handler) when onOpen is absent', () => {
     const { container } = render(
       <svg>
-        <TankSvg {...base} />
+        <BotSvg {...base} />
       </svg>
     );
-    // No cursor:pointer group when the tank isn't openable (e.g. the demo arena).
+    // No cursor:pointer group when the bot isn't openable (e.g. the demo arena).
     expect(container.querySelector('g[style*="cursor"]')).toBeNull();
   });
 });
 
-describe('TankSvg rotation', () => {
+describe('BotSvg rotation', () => {
   afterEach(cleanup);
 
   it('crosses the 0/360 seam the short way (continuous angle)', () => {
-    const { container, rerender } = renderTank({ bodyOrientation: 359 });
+    const { container, rerender } = renderBot({ bodyOrientation: 359 });
     const bodyTransform = () =>
       container
         .querySelector('image[href*="tankBody"]')!
@@ -118,7 +118,7 @@ describe('TankSvg rotation', () => {
 
     rerender(
       <svg>
-        <TankSvg {...base} bodyOrientation={1} />
+        <BotSvg {...base} bodyOrientation={1} />
       </svg>
     );
 

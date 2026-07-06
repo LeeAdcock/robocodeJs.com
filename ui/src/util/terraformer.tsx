@@ -425,8 +425,8 @@ const sander = (
 
 const generateTerrain = () => {
   // Build an empty 3d data structure
-  // terrain[0][x][y] are things below the tanks
-  // terrain[1][x][y] are things above the tanks
+  // terrain[0][x][y] are things below the bots
+  // terrain[1][x][y] are things above the bots
   const terrain = new Array(2);
   for (let i = 0; i < 2; i++) {
     terrain[i] = new Array(30);

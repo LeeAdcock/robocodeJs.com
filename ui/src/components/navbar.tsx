@@ -16,7 +16,7 @@ import {
 import { colors } from '../util/colors';
 import { useDarkMode, toggleDarkMode } from '../util/theme';
 import { Link } from 'react-router-dom';
-import TankApp from '../types/tankApp';
+import App from '../types/app';
 import User from '../types/user';
 import Arena from '../types/arena';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +26,7 @@ import ArenaRoster from './arenaRoster';
 
 interface AppLinkProps {
   arena: Arena;
-  app: TankApp;
+  app: App;
 }
 
 const AppLink = function (props: AppLinkProps) {
@@ -61,7 +61,7 @@ const AppLink = function (props: AppLinkProps) {
 };
 
 interface NavBarProps {
-  apps: TankApp[];
+  apps: App[];
   user: User;
   arena: Arena;
   isPaused: boolean;

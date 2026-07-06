@@ -99,14 +99,14 @@ describe('PlaybackBuffer', () => {
   it('preserves event order within a tick-group', () => {
     const b = new PlaybackBuffer();
     // First group carries actions before its terminating tick.
-    b.push(action('tankTurn'));
+    b.push(action('botTurn'));
     b.push(action('bulletFired'));
     b.push(tick());
     pushTicks(b, BUFFER_TARGET_TICKS - 1); // reach the cushion
 
     const released = drainCollect(b, NOMINAL_TICK_MS);
     expect(released.map((e) => e.type)).toEqual([
-      'tankTurn',
+      'botTurn',
       'bulletFired',
       'tick',
     ]);
@@ -115,7 +115,7 @@ describe('PlaybackBuffer', () => {
   it('only counts complete (tick-terminated) groups as depth', () => {
     const b = new PlaybackBuffer();
     pushTicks(b, 2);
-    b.push(action('tankTurn')); // trailing, not yet terminated by a tick
+    b.push(action('botTurn')); // trailing, not yet terminated by a tick
     expect(b.depth()).toBe(2);
     b.push(tick());
     expect(b.depth()).toBe(3);

@@ -27,79 +27,79 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
       );
       arena.clock.time = data.time;
     }
-  } else if (data.type === 'tankTurn') {
+  } else if (data.type === 'botTurn') {
     apps.forEach((app) =>
-      app.tanks
-        .filter((tank) => tank.id === data.id)
-        .forEach((tank) => {
-          tank.bodyOrientationTarget = data.bodyOrientationTarget;
-          tank.bodyOrientationVelocity = data.bodyOrientationVelocity;
-          tank.x = data.x;
-          tank.y = data.y;
+      app.bots
+        .filter((bot) => bot.id === data.id)
+        .forEach((bot) => {
+          bot.bodyOrientationTarget = data.bodyOrientationTarget;
+          bot.bodyOrientationVelocity = data.bodyOrientationVelocity;
+          bot.x = data.x;
+          bot.y = data.y;
         })
     );
-  } else if (data.type === 'tankAccelerate') {
+  } else if (data.type === 'botAccelerate') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.id) {
-          tank.speed = data.speed;
-          tank.speedTarget = data.speedTarget;
-          tank.speedAcceleration = data.speedAcceleration;
-          tank.speedMax = data.speedMax;
-          tank.x = data.x;
-          tank.y = data.y;
+      app.bots.forEach((bot) => {
+        if (bot.id === data.id) {
+          bot.speed = data.speed;
+          bot.speedTarget = data.speedTarget;
+          bot.speedAcceleration = data.speedAcceleration;
+          bot.speedMax = data.speedMax;
+          bot.x = data.x;
+          bot.y = data.y;
         }
       })
     );
-  } else if (data.type === 'tankStop') {
+  } else if (data.type === 'botStop') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.id) {
-          tank.speed = 0;
-          tank.speedTarget = 0;
-          tank.x = data.x;
-          tank.y = data.y;
+      app.bots.forEach((bot) => {
+        if (bot.id === data.id) {
+          bot.speed = 0;
+          bot.speedTarget = 0;
+          bot.x = data.x;
+          bot.y = data.y;
         }
       })
     );
   } else if (data.type === 'radarScan') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.id) {
-          tank.radarOn = true;
-          setTimeout(() => (tank.radarOn = false), 200);
+      app.bots.forEach((bot) => {
+        if (bot.id === data.id) {
+          bot.radarOn = true;
+          setTimeout(() => (bot.radarOn = false), 200);
         }
       })
     );
   } else if (data.type === 'radarTurn') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.id) {
-          tank.radarOrientationTarget = data.radarOrientationTarget;
-          tank.radarOrientationVelocity = data.radarOrientationVelocity;
+      app.bots.forEach((bot) => {
+        if (bot.id === data.id) {
+          bot.radarOrientationTarget = data.radarOrientationTarget;
+          bot.radarOrientationVelocity = data.radarOrientationVelocity;
         }
       })
     );
-  } else if (data.type === 'tankDamaged') {
+  } else if (data.type === 'botDamaged') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.id) {
-          tank.health = data.health;
-          if (tank.health <= 0) {
-            tank.speed = 0;
-            tank.speedTarget = 0;
+      app.bots.forEach((bot) => {
+        if (bot.id === data.id) {
+          bot.health = data.health;
+          if (bot.health <= 0) {
+            bot.speed = 0;
+            bot.speedTarget = 0;
           }
         }
       })
     );
   } else if (data.type === 'botFault') {
-    // A bot crashed — flag the tank so the arena can show a warning triangle.
-    // (Cleared naturally when the tank is re-placed on reboot/restart.)
+    // A bot crashed — flag the bot so the arena can show a warning triangle.
+    // (Cleared naturally when the bot is re-placed on reboot/restart.)
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.tankId) {
-          tank.crashed = true;
-          tank.faultCode = data.code;
+      app.bots.forEach((bot) => {
+        if (bot.id === data.botId) {
+          bot.crashed = true;
+          bot.faultCode = data.code;
         }
       })
     );
@@ -121,23 +121,23 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
     apps.push({
       id: data.id,
       name: data.name,
-      tanks: [],
+      bots: [],
     });
-  } else if (data.type === 'arenaRemoveTank') {
+  } else if (data.type === 'arenaRemoveBot') {
     apps
       .filter((app) => app.id === data.appId)
       .forEach((app) => {
-        const tankIndex = app.tanks.findIndex((tank) => tank.id === data.id);
-        if (tankIndex >= 0) {
-          app.tanks.splice(tankIndex, 1);
+        const botIndex = app.bots.findIndex((bot) => bot.id === data.id);
+        if (botIndex >= 0) {
+          app.bots.splice(botIndex, 1);
         }
       });
-  } else if (data.type === 'arenaPlaceTank') {
+  } else if (data.type === 'arenaPlaceBot') {
     apps
       .filter((app) => app.id === data.appId)
       .forEach((app) => {
-        if (!app.tanks.find((t) => t.id === data.id)) {
-          const tank = {
+        if (!app.bots.find((t) => t.id === data.id)) {
+          const bot = {
             id: data.id,
             speed: data.speed,
             speedTarget: 0,
@@ -160,30 +160,30 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
             x: data.x,
             y: data.y,
           };
-          tank.path[0] = {
+          bot.path[0] = {
             x: data.x,
             y: data.y,
             time,
           };
-          tank.pathIndex = 1;
-          app.tanks.push(tank);
+          bot.pathIndex = 1;
+          app.bots.push(bot);
         }
       });
   } else if (data.type === 'turretTurn') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (tank.id === data.id) {
-          tank.turretOrientationTarget = data.turretOrientationTarget;
-          tank.turretOrientationVelocity = data.turretOrientationVelocity;
+      app.bots.forEach((bot) => {
+        if (bot.id === data.id) {
+          bot.turretOrientationTarget = data.turretOrientationTarget;
+          bot.turretOrientationVelocity = data.turretOrientationVelocity;
         }
       })
     );
   } else if (data.type === 'bulletFired') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) => {
-        if (!tank.bullets.find((bullet) => bullet.id === data.id)) {
-          if (tank.id === data.tankId) {
-            tank.bullets.push({
+      app.bots.forEach((bot) => {
+        if (!bot.bullets.find((bullet) => bullet.id === data.id)) {
+          if (bot.id === data.botId) {
+            bot.bullets.push({
               id: data.id,
               x: data.x,
               y: data.y,
@@ -201,8 +201,8 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
     );
   } else if (data.type === 'bulletRemoved') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) =>
-        tank.bullets.forEach((bullet, bulletIndex, bullets) => {
+      app.bots.forEach((bot) =>
+        bot.bullets.forEach((bullet, bulletIndex, bullets) => {
           if (bullet.id === data.id) {
             bullets.splice(bulletIndex, 1);
           }
@@ -211,8 +211,8 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
     );
   } else if (data.type === 'bulletExploded') {
     apps.forEach((app) =>
-      app.tanks.forEach((tank) =>
-        tank.bullets.forEach((bullet) => {
+      app.bots.forEach((bot) =>
+        bot.bullets.forEach((bullet) => {
           if (bullet.id === data.id) {
             bullet.explodedAt = data.time;
           }

@@ -11,7 +11,7 @@ interface Entry {
   id: string;
   name: string;
   appId: string;
-  tankIndex: number;
+  botIndex: number;
   level: number;
   levelName: string;
   msg: string;
@@ -22,7 +22,7 @@ const entry = (over: Partial<Entry> = {}): Entry => ({
   id: `e${seq++}`,
   name: '<11>',
   appId: 'a1',
-  tankIndex: 1,
+  botIndex: 1,
   level: 30,
   levelName: 'info',
   msg: 'hi',
@@ -30,8 +30,8 @@ const entry = (over: Partial<Entry> = {}): Entry => ({
   ...over,
 });
 const bots = [
-  { id: 'a1', name: 'Bot A', tankCount: 2, index: 0 },
-  { id: 'a2', name: 'Bot B', tankCount: 2, index: 1 },
+  { id: 'a1', name: 'Bot A', botCount: 2, index: 0 },
+  { id: 'a2', name: 'Bot B', botCount: 2, index: 1 },
 ];
 
 afterEach(cleanup);
@@ -56,48 +56,48 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('from B')).toBeNull();
   });
 
-  it('selectedTank narrows to one tank instance and reflects it in the filter', () => {
+  it('selectedBot narrows to one bot instance and reflects it in the filter', () => {
     const { container } = render(
       <Logs
         bots={bots}
         selectedApp="a1"
-        selectedTank={2}
+        selectedBot={2}
         playbackTime={Number.POSITIVE_INFINITY}
         logEntries={{
           logs: [
-            entry({ appId: 'a1', tankIndex: 1, msg: 'a1 tank one' }),
-            entry({ appId: 'a1', tankIndex: 2, msg: 'a1 tank two' }),
-            entry({ appId: 'a2', tankIndex: 2, msg: 'a2 tank two' }),
+            entry({ appId: 'a1', botIndex: 1, msg: 'a1 bot one' }),
+            entry({ appId: 'a1', botIndex: 2, msg: 'a1 bot two' }),
+            entry({ appId: 'a2', botIndex: 2, msg: 'a2 bot two' }),
           ],
           index: 3,
         }}
       />
     );
-    // Only app a1's tank 2 is shown.
-    expect(screen.queryByText('a1 tank two')).toBeTruthy();
-    expect(screen.queryByText('a1 tank one')).toBeNull();
-    expect(screen.queryByText('a2 tank two')).toBeNull();
+    // Only app a1's bot 2 is shown.
+    expect(screen.queryByText('a1 bot two')).toBeTruthy();
+    expect(screen.queryByText('a1 bot one')).toBeNull();
+    expect(screen.queryByText('a2 bot two')).toBeNull();
 
-    // ...and the Bots filter reflects it: only that tank's checkbox is checked.
+    // ...and the Bots filter reflects it: only that bot's checkbox is checked.
     fireEvent.click(screen.getByText('Bots'));
     const selected = container.querySelector(
-      '[id="tank-a1:2"]'
+      '[id="bot-a1:2"]'
     ) as HTMLInputElement;
     const other = container.querySelector(
-      '[id="tank-a1:1"]'
+      '[id="bot-a1:1"]'
     ) as HTMLInputElement;
     expect(selected.checked).toBe(true);
     expect(other.checked).toBe(false);
   });
 
-  it('labels a tank from its actual log name, not the computed index', () => {
+  it('labels a bot from its actual log name, not the computed index', () => {
     // index 5 would compute (5+1)*10+1 = 61, but the log name is authoritative.
     render(
       <Logs
-        bots={[{ id: 'a1', name: 'Bot A', tankCount: 1, index: 5 }]}
+        bots={[{ id: 'a1', name: 'Bot A', botCount: 1, index: 5 }]}
         playbackTime={Number.POSITIVE_INFINITY}
         logEntries={{
-          logs: [entry({ appId: 'a1', tankIndex: 1, name: '<99>', msg: 'x' })],
+          logs: [entry({ appId: 'a1', botIndex: 1, name: '<99>', msg: 'x' })],
           index: 1,
         }}
       />
@@ -143,39 +143,39 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.getByText('Bot B')).toBeTruthy();
   });
 
-  it('can hide an individual tank (labelled by its bot id) within an application', () => {
+  it('can hide an individual bot (labelled by its bot id) within an application', () => {
     render(
       <Logs
-        bots={[{ id: 'a1', name: 'Bot A', tankCount: 2, index: 0 }]}
+        bots={[{ id: 'a1', name: 'Bot A', botCount: 2, index: 0 }]}
         playbackTime={Number.POSITIVE_INFINITY}
         logEntries={{
           logs: [
             entry({
               appId: 'a1',
-              tankIndex: 1,
+              botIndex: 1,
               name: '<11>',
-              msg: 'from tank one',
+              msg: 'from bot one',
             }),
             entry({
               appId: 'a1',
-              tankIndex: 2,
+              botIndex: 2,
               name: '<12>',
-              msg: 'from tank two',
+              msg: 'from bot two',
             }),
           ],
           index: 2,
         }}
       />
     );
-    expect(screen.queryByText('from tank one')).toBeTruthy();
-    expect(screen.queryByText('from tank two')).toBeTruthy();
+    expect(screen.queryByText('from bot one')).toBeTruthy();
+    expect(screen.queryByText('from bot two')).toBeTruthy();
 
-    // Open the Bots dropdown and hide just the first tank — labelled from its log
+    // Open the Bots dropdown and hide just the first bot — labelled from its log
     // name "<11>" → "Bot 11".
     fireEvent.click(screen.getByText('Bots'));
     fireEvent.click(screen.getByText('Bot 11'));
 
-    expect(screen.queryByText('from tank one')).toBeNull();
-    expect(screen.queryByText('from tank two')).toBeTruthy();
+    expect(screen.queryByText('from bot one')).toBeNull();
+    expect(screen.queryByText('from bot two')).toBeTruthy();
   });
 });

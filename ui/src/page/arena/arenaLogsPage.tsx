@@ -12,7 +12,7 @@ interface LogEntry {
   id: string;
   name: string;
   appId: string;
-  tankIndex: number;
+  botIndex: number;
   level: number;
   levelName: string;
   msg: string;
@@ -30,16 +30,16 @@ export default function ArenaLogsPage() {
     index: 0,
   } as LogEntries);
   const { userId } = useParams();
-  // ?app=<appId>&tank=<index> (from shift-double-clicking a tank in the arena)
-  // filters to that specific tank instance.
+  // ?app=<appId>&bot=<index> (from shift-double-clicking a bot in the arena)
+  // filters to that specific bot instance.
   const [searchParams] = useSearchParams();
   const selectedApp = searchParams.get('app') ?? '';
-  const tankParam = searchParams.get('tank');
-  const selectedTank = tankParam ? Number(tankParam) : undefined;
+  const botParam = searchParams.get('bot');
+  const selectedBot = botParam ? Number(botParam) : undefined;
   // All bots currently in the arena, so the Bots filter is populated up front —
   // not only with bots that have already logged something.
   const [bots, setBots] = useState<
-    { id: string; name: string; tankCount: number; index: number }[]
+    { id: string; name: string; botCount: number; index: number }[]
   >([]);
   const eventSource = useRef<EventSource | undefined>(undefined);
   // The tick the arena has actually played up to; hold log lines until display
@@ -84,12 +84,12 @@ export default function ArenaLogsPage() {
         setBots(
           (res.data.apps ?? []).map(
             (
-              a: { id: string; name: string; tanks?: unknown[] },
+              a: { id: string; name: string; bots?: unknown[] },
               index: number
             ) => ({
               id: a.id,
               name: a.name,
-              tankCount: a.tanks?.length ?? 5,
+              botCount: a.bots?.length ?? 5,
               index,
             })
           )
@@ -104,7 +104,7 @@ export default function ArenaLogsPage() {
         logEntries={logEntries}
         bots={bots}
         selectedApp={selectedApp}
-        selectedTank={selectedTank}
+        selectedBot={selectedBot}
         playbackTime={playbackTime}
       />
     </>
