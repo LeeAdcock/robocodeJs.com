@@ -46,12 +46,6 @@ Any client that supports a **remote / streamable-HTTP MCP server with OAuth**
 will work: point it at `https://robocodejs.com/api/mcp` and complete the sign-in
 when prompted. Clients handle token storage and refresh for you.
 
-### Local development
-
-When running the server locally in dev mode, authentication is bypassed (every
-request acts as the built-in "Local Dev" user), so you can connect to
-`http://localhost:5000/api/mcp` **without signing in**.
-
 ## 2. What the AI can do
 
 Once connected, these tools are available (all scoped to your account):
