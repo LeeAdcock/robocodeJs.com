@@ -1,4 +1,4 @@
-# @battletank/server
+# @robocodejs/server
 
 The RobocodeJs backend: an **Express + TypeScript API** and the **game simulation engine**. It compiles and runs untrusted bot code in sandboxed V8 isolates, simulates the arena, and streams live state to the browser.
 
