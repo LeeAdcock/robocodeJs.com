@@ -37,6 +37,16 @@ export class ArenaService {
       });
   };
 
+  // Total number of arenas across all users. Backs the global arena ceiling
+  // (MAX_TOTAL_ARENAS in api/arena.ts): every arena can materialize into an
+  // isolate-backed Environment, so this bounds the whole server's worst-case
+  // isolate footprint, not just any one user's.
+  count = (): Promise<number> => {
+    return pool
+      .query('SELECT COUNT(*) AS count FROM arena')
+      .then((res) => Number(res.rows[0].count));
+  };
+
   getForUser = (userId: UserId): Promise<Arena[]> => {
     return pool
       .query({

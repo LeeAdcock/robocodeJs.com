@@ -564,11 +564,17 @@ const init = (env: Environment, process: Process, tank: Tank) => {
           if (func) func()
         }
         setInterval = (func, interval) => {
-          const id = ++__timerSeq; __timers[id] = func; _setInterval(id, interval); return id
+          const id = ++__timerSeq; __timers[id] = func
+          // A falsy return means the host refused the timer (per-tank cap, E021);
+          // drop the callback we just stored so it can't leak or fire.
+          if (!_setInterval(id, interval)) { delete __timers[id]; return -1 }
+          return id
         }
         clearInterval = (id) => { delete __timers[id]; _clearInterval(id) }
         setTimeout = (func, interval) => {
-          const id = ++__timerSeq; __timers[id] = func; _setTimeout(id, interval); return id
+          const id = ++__timerSeq; __timers[id] = func
+          if (!_setTimeout(id, interval)) { delete __timers[id]; return -1 }
+          return id
         }
         clearTimeout = (id) => { delete __timers[id]; _clearTimeout(id) }
         `

@@ -33,6 +33,7 @@ export const LogEvent = {
   AUTH_FORBIDDEN: 'auth.forbidden', // authenticated user acting on another's resource
   AUTH_TOKEN_CREATED: 'auth.token.created', // API token minted/rotated
   AUTH_TOKEN_REVOKED: 'auth.token.revoked', // API token removed
+  RATE_LIMITED: 'rate.limited', // request refused by a rate limiter (429/E022)
   HTTP_ERROR: 'http.error', // unhandled error -> 5xx
   DB_ERROR: 'db.error', // database/pool error
   PROCESS_FATAL: 'process.fatal', // uncaught exception / unhandled rejection

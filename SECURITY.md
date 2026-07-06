@@ -1,6 +1,6 @@
 # Security Overview — OWASP Top 10 Audit
 
-> **Status:** Findings backlog for later resolution. This is an audit deliverable — nothing here has been fixed yet. Findings were verified by reading the source; the flagship access-control bug (`loadApp` IDOR) was hand-traced end-to-end. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
+> **Status:** Partially remediated on branch `feat/security-hardening`. **Addressed:** A01-1 (IDOR), A01-2 (log stream), A04-1 (timer cap), A04-2/A04-3 (resource caps), A05-1 (security headers + CSP), A07-1 (rate limiting). **Still open:** A02-1 (RDS CA), A06-1 (CI scanning), and the low-severity items (A08 markdown sanitize is now partly mitigated by the A05-1 CSP). Fixed findings are marked ✅ inline. Line numbers reflect the tree at audit time (branch `feat/error-surfacing`) and may drift.
 
 ## Threat model
 
@@ -12,7 +12,9 @@ RobocodeJs runs **untrusted user JavaScript** ("bots") server-side in `isolated-
 
 ## A01 — Broken Access Control _(highest severity)_
 
-### 🔴 A01-1 — IDOR: unscoped `loadApp` exposes any user's bot (read / overwrite / delete)
+### ✅ 🔴 A01-1 — IDOR: unscoped `loadApp` exposes any user's bot (read / overwrite / delete)
+
+> **Fixed** (`feat/security-hardening`). Rather than globally scoping `loadApp` (which would block the planned "add another user's app to your arena by id" feature), a new `requireAppOwner` middleware guards the confidential/destructive routes — `GET`/`PUT .../app/:appId/source`, `DELETE`, `compile`, `reboot`. `loadApp` still resolves any id, and the metadata `GET /app/:appId` (id + name only, never source) and `addApp` stay open for reference flows. See `middleware/resource.ts` + `api/app.ts`; regression tests in `test/api.test.ts`.
 
 `loadApp` (`server/src/middleware/resource.ts:71-84`) loads by `:appId` alone and **never checks the app belongs to the path user**. `requireOwner` (`resource.ts:45-68`) only asserts `authUser === :userId`. Because `:userId` and `:appId` are independent params, an attacker passes their **own** `:userId` (satisfying `requireOwner`) with a **victim's** `:appId`. Verified against `server/src/api/app.ts`:
 
@@ -24,7 +26,9 @@ RobocodeJs runs **untrusted user JavaScript** ("bots") server-side in `isolated-
 
 **Fix:** scope `loadApp` to the target user (mirror `resolveArena`'s `arena.getUserId() !== targetUser.getId()` check at `resource.ts:99`) using the existing `TankApp.getUserId()` (`types/app.ts:21`). The MCP side already does this correctly via `ownedApp` (`api/mcp.ts:114-117`) — port that check to REST.
 
-### 🟠 A01-2 — Missing `requireOwner` on read/telemetry routes (cross-user disclosure)
+### ✅ 🟠 A01-2 — Missing `requireOwner` on read/telemetry routes (cross-user disclosure)
+
+> **Partially addressed by design decision** (`feat/security-hardening`). The product intends users to _spectate_ others' arenas, so arena **status** and **events** are intentionally left open to any signed-in user. The bot **console log** stream (`GET /arena/logs`) — private developer output, not part of watching a match — is now owner-gated with `requireOwner`. Cross-user profile/app/arena _metadata_ (names + ids, never source) is likewise left readable as reference/discovery groundwork.
 
 These authenticate but don't verify the caller owns the `:userId` resource, so any logged-in user can browse another user's data by changing `:userId`:
 
@@ -66,20 +70,25 @@ These authenticate but don't verify the caller owns the `:userId` resource, so a
 
 ## A04 — Insecure Design _(resource exhaustion / DoS)_
 
-### 🔴 A04-1 — Host-side unbounded timer maps (memory + CPU amplification)
+### ✅ 🔴 A04-1 — Host-side timer maps (memory + CPU amplification)
 
-`setInterval`/`setTimeout` add entries to host-side `tank.timers.intervalMap` / `timerMap` (`util/scheduleFactory.ts:23-24,68-83`; `compiler.ts:566-576`) that are **plain host JS, not counted against the 8 MB isolate `memoryLimit`**. A bot can register a huge number of timers within its 5 s budget, growing **host process memory** unbounded; then each tick `timerTick` (`scheduleFactory.ts:32-61`) fires **every** registered interval → one `runInIsolate` apply per timer per tick — CPU amplification. `setInterval(fn, 0)` fires every tick with no throttle (`scheduleFactory.ts:42`).
-**Fix:** cap the number of timers per tank and enforce a minimum interval.
+Each `setInterval`/`setTimeout` creates **two** records: the bot's callback in the in-isolate `__timers` table (counted against the 8 MB `memoryLimit`) **and** a host-side bookkeeping record in `tank.timers.intervalMap` / `timerMap` (`util/scheduleFactory.ts`), which lives on the Node heap and is **not** counted against the isolate limit.
 
-### 🟠 A04-2 — No global cap on isolates across users
+_Correction to the original wording ("unbounded host memory"):_ because every timer also costs isolate memory, the 8 MB cap acts as an accidental throttle on how many can accumulate at once — so a single bot can't grow host memory without limit. The genuine problems are: (a) the host record is larger than the isolate entry and uncounted, so a bot's true host footprint exceeds the nominal 8 MB; and (b) **CPU amplification that recurs every tick** — `timerTick` scans the whole map and fires each due timer via a host→isolate `apply()`, a cost proportional to timer count paid for the whole life of the arena (worst case `setInterval(fn, 0)`, which fires every tick).
+
+> **Fixed** (`feat/security-hardening`). `MAX_TIMERS_PER_TANK` (default 64, combined intervals + timeouts) is enforced in `scheduleFactory.ts`; registrations past the cap are refused (the isolate-side wrapper drops its callback) and the author is warned once with **error code E021** (bot console, non-fatal). Bounds both host memory and per-tick CPU deterministically instead of relying on OOM as a proxy. A minimum-interval floor was intentionally **not** added — it would change legitimate every-tick timer behavior, and the count cap already bounds per-tick work. Tests in `test/scheduleFactory.test.ts`.
+
+### ✅ 🟠 A04-2 — No global cap on isolates across users
 
 Per-user limits exist (10 arenas `arena.ts:22`; 4 apps/arena `mcp.ts:33`; 5 tanks/app) → up to ~250 isolates × 8 MB ≈ **2 GB per user**, with **no cross-user ceiling** (`types/environment.ts:542,582`). Many users → host RAM exhaustion.
-**Fix:** add a global isolate/memory budget and shed load past it.
 
-### 🟠 A04-3 — Unbounded app creation
+> **Fixed** (`feat/security-hardening`). A global `MAX_TOTAL_ARENAS` ceiling (default 1000, env-tunable) is enforced at explicit arena creation via `arenaService.count()`, returning **503** when the server is at capacity. Bounds the persistent worst-case isolate count across all users; live isolates are further reclaimed by the existing 30-minute idle GC. (Lazy one-per-user default-arena creation is intentionally exempt so new users never fail to bootstrap.)
 
-`POST .../app/` (`app.ts:31-36`) has **no per-user cap**, unlike arenas (`MAX_ARENAS_PER_USER`, `arena.ts:22,49-54`).
-**Fix:** add `MAX_APPS_PER_USER`.
+### ✅ 🟠 A04-3 — Unbounded app creation
+
+`POST .../app/` had **no per-user cap**, unlike arenas (`MAX_ARENAS_PER_USER`, `arena.ts:22,49-54`).
+
+> **Fixed** (`feat/security-hardening`). `MAX_APPS_PER_USER` (20) enforced in `api/app.ts`.
 
 _(Positive: per-tick drain bounded by `MAX_DRAIN_ROUNDS=10000`; logs bounded by `MAX_LOGS_PER_TICK=50` / `MAX_LOG_LENGTH=2000` / `recentLogs=200`.)_
 
@@ -87,10 +96,11 @@ _(Positive: per-tick drain bounded by `MAX_DRAIN_ROUNDS=10000`; logs bounded by 
 
 ## A05 — Security Misconfiguration
 
-### 🟠 A05-1 — No security headers / no CSP (no `helmet`)
+### ✅ 🟠 A05-1 — No security headers / no CSP (no `helmet`)
 
-`server/src/index.ts` installs pino-http, body parsers, cookie-parser, static serving, routes — but **no `helmet`, no CSP, no `X-Frame-Options`, no `X-Content-Type-Options: nosniff`, no HSTS** (only cookie flags in `session.ts:39-43` exist). For a SPA that runs untrusted JS this is a notable gap (clickjacking + no XSS defense-in-depth).
-**Fix:** add `helmet` with a restrictive CSP and `frame-ancestors`.
+`server/src/index.ts` installed pino-http, body parsers, cookie-parser, static serving, routes — but **no `helmet`, no CSP, no `X-Frame-Options`, no `X-Content-Type-Options: nosniff`, no HSTS** (only cookie flags in `session.ts:39-43` existed). For a SPA that runs untrusted JS this is a notable gap (clickjacking + no XSS defense-in-depth).
+
+> **Fixed** (`feat/security-hardening`). `middleware/securityHeaders.ts` applies `helmet` (installed first in `index.ts`, so static assets + API + SPA fallback are all covered): CSP, `frame-ancestors 'self'` + `X-Frame-Options`, `nosniff`, HSTS, `object-src 'none'`, `base-uri 'self'`, and `X-Powered-By` stripped. The CSP was built from the actual built bundle (`server/dist/public/index.html`) and allows exactly the SPA's real dependencies — our own `'self'` bundle, Google Identity Services (sign-in), Google Fonts, and `*.googleusercontent.com` avatars. Two documented relaxations: `script-src 'unsafe-eval'` (ace-builds + prettier need it; does **not** permit injected inline/other-origin scripts, so the latent markdown-XSS stays blocked) and `style-src 'unsafe-inline'` (ace theme injection). `crossOriginOpenerPolicy` is set to `same-origin-allow-popups` so Google sign-in's popup flow survives. Verified the header is emitted and assets serve 200 against a running local-dev server; tests in `test/securityHeaders.test.ts`. Note: this is defense-in-depth that also covers the A08 latent markdown-XSS.
 
 ### 🟡 A05-2 — Startup robustness in lazy DDL
 
@@ -117,10 +127,11 @@ _(Positive: per-tick drain bounded by `MAX_DRAIN_ROUNDS=10000`; logs bounded by 
 
 Google id-token verification is correct: signature + expiry + **audience** checked (`middleware/auth.ts:53-58`), re-verified every request (`auth.ts:138`), dev bypass double-gated on `NODE_ENV !== 'production'` **and** absent `RDS_HOSTNAME` (`auth.ts:64`, `util/devMode.ts`).
 
-### 🟠 A07-1 — No rate limiting anywhere
+### ✅ 🟠 A07-1 — No rate limiting anywhere
 
 No `express-rate-limit` present. Unthrottled: `POST /api/session` (unauthenticated sign-in, `session.ts:13`), `GET/POST /api/token[/new]` (`token.ts:46,55`), `POST /api/mcp` (`mcp.ts:961`), and `POST .../check` / `.../compile` which each spin a fresh 8 MB isolate for ≤5 s (`app.ts:67-95`, `compiler.ts:928-967`).
-**Fix:** add per-IP / per-user throttling, tightest on sign-in, token mint, and isolate-spawning routes.
+
+> **Fixed** (`feat/security-hardening`). `middleware/rateLimit.ts` adds `express-rate-limit` limiters: **auth** (IP-keyed, 20/10min — sign-in + token), **compute** (user-keyed, 60/min — check/compile/reboot isolate spawns), **write** (user-keyed, 30/min — app/arena creation), and a broad **api** backstop (600/min). Refusals return **429** with a JSON body carrying **error code E022**; `trust proxy` is set so IP keying works behind the proxy/ELB. Limits are env-tunable and skipped under `NODE_ENV=test`. Documented in `rules.md` + `error-codes.md`; tests in `test/rateLimit.test.ts`. (`POST /api/mcp` shares the `/api` backstop; a dedicated MCP limit remains a possible follow-up.)
 
 ### 🟡 A07-2 — No `email_verified` / hosted-domain check on account creation
 
@@ -160,18 +171,18 @@ Logging hygiene is **good**: structured pino logger, no tokens/cookies logged (`
 
 ## Prioritized remediation backlog
 
-| #   | Finding                                                                                       | Category            | Severity    |
-| --- | --------------------------------------------------------------------------------------------- | ------------------- | ----------- |
-| 1   | Scope `loadApp` to the target user (IDOR)                                                     | A01-1               | 🔴 Critical |
-| 2   | Add `requireOwner` to read/telemetry routes (esp. `/logs`)                                    | A01-2               | 🟠 High     |
-| 3   | Cap per-tank timers + min interval (host DoS)                                                 | A04-1               | 🔴 High     |
-| 4   | Add rate limiting (sign-in, token, isolate-spawning routes)                                   | A07-1               | 🟠 High     |
-| 5   | Add `helmet` + CSP + `X-Frame-Options`                                                        | A05-1               | 🟠 Med      |
-| 6   | Global isolate cap + `MAX_APPS_PER_USER`                                                      | A04-2/3             | 🟠 Med      |
-| 7   | Add CI dependency scanning; `npm ci`                                                          | A06-1               | 🟠 Med      |
-| 8   | Pin RDS CA, `rejectUnauthorized: true`                                                        | A02-1               | 🟠 Med      |
-| 9   | Sanitize markdown pipeline / rely on CSP                                                      | A08                 | 🟡 Low      |
-| 10  | `email_verified` check; allowlist mcp `sub`; token-rotation CSRF; `crypto.randomBytes` tokens | A07-2/4, A03, A02-2 | 🟡 Low      |
+| #   | Finding                                                                                       | Category            | Severity    | Status  |
+| --- | --------------------------------------------------------------------------------------------- | ------------------- | ----------- | ------- |
+| 1   | `requireAppOwner` on source/delete/compile/reboot (IDOR)                                      | A01-1               | 🔴 Critical | ✅ Done |
+| 2   | Owner-gate `/arena/logs` (status/events open by design for spectating)                        | A01-2               | 🟠 High     | ✅ Done |
+| 3   | Cap per-tank timers (host DoS) → E021                                                         | A04-1               | 🔴 High     | ✅ Done |
+| 4   | Add rate limiting (sign-in, token, isolate-spawning routes) → E022                            | A07-1               | 🟠 High     | ✅ Done |
+| 5   | Global arena cap + `MAX_APPS_PER_USER`                                                        | A04-2/3             | 🟠 Med      | ✅ Done |
+| 6   | Add `helmet` + CSP + `X-Frame-Options`                                                        | A05-1               | 🟠 Med      | ✅ Done |
+| 7   | Add CI dependency scanning; `npm ci`                                                          | A06-1               | 🟠 Med      | ⬜ Open |
+| 8   | Pin RDS CA, `rejectUnauthorized: true`                                                        | A02-1               | 🟠 Med      | ⬜ Open |
+| 9   | Sanitize markdown pipeline / rely on CSP                                                      | A08                 | 🟡 Low      | ⬜ Open |
+| 10  | `email_verified` check; allowlist mcp `sub`; token-rotation CSRF; `crypto.randomBytes` tokens | A07-2/4, A03, A02-2 | 🟡 Low      | ⬜ Open |
 
 ## Verification approach (when fixes are implemented)
 

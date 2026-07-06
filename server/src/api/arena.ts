@@ -11,6 +11,7 @@ import {
   scopedApp,
   scopedArena,
 } from '../middleware/resource';
+import { writeRateLimit } from '../middleware/rateLimit';
 import { openSseStream } from '../util/sse';
 import { buildArenaStatus } from '../util/arenaStatus';
 
@@ -20,6 +21,14 @@ const app = express();
 // in-memory, isolate-backed Environment, so this bounds EnvironmentService's
 // store; idle arenas are also GC'd 30 minutes after they stop.
 const MAX_ARENAS_PER_USER = 10;
+
+// A global ceiling on the total number of arenas across ALL users. Each arena
+// can materialize into an 8 MB isolate-backed Environment, so without a
+// cross-user cap enough users (× MAX_ARENAS_PER_USER each) could exhaust host
+// memory. Live isolates are additionally reclaimed by EnvironmentService's
+// 30-minute idle GC; this bounds the persistent worst case. Tunable via env for
+// larger deployments.
+const MAX_TOTAL_ARENAS = Number(process.env.MAX_TOTAL_ARENAS) || 1000;
 
 // Arena action routes are exposed at two paths that share one handler:
 //   /api/user/:userId/arena<suffix>             -> the user's default arena (UI)
@@ -42,6 +51,7 @@ app.get('/api/user/:userId/arenas', loadUser, async (req, res) => {
 // Create a new arena for the user, up to MAX_ARENAS_PER_USER.
 app.post(
   '/api/user/:userId/arenas',
+  writeRateLimit,
   loadUser,
   requireOwner,
   async (req, res) => {
@@ -50,6 +60,11 @@ app.post(
     if (existing.length >= MAX_ARENAS_PER_USER) {
       res.status(400);
       res.send('Arena limit reached');
+      return;
+    }
+    if ((await arenaService.count()) >= MAX_TOTAL_ARENAS) {
+      res.status(503);
+      res.send('Server arena capacity reached');
       return;
     }
     const arena = await arenaService.create(user.getId());
@@ -240,7 +255,10 @@ const events = async (req: Request, res: Response) => {
 };
 app.get(dual('/events'), loadUser, resolveArena, events);
 
-// Listen to an arena's bot console logs
+// Listen to an arena's bot console logs. Unlike the arena status/events streams
+// (which are open so any signed-in user can spectate a match), console output is
+// the author's private debug channel — a bot may print strategy or diagnostic
+// data — so this stream is owner-only via requireOwner.
 const logs = async (req: Request, res: Response) => {
   openSseStream(res);
 
@@ -261,6 +279,6 @@ const logs = async (req: Request, res: Response) => {
     });
   });
 };
-app.get(dual('/logs'), loadUser, resolveArena, logs);
+app.get(dual('/logs'), loadUser, requireOwner, resolveArena, logs);
 
 export default app;

@@ -5,6 +5,9 @@ log panel next to the editor). Each code below explains what happened, whether i
 **fatal** (the bot is killed and removed from the arena) or **non-fatal** (the bot
 keeps playing), and how to fix it.
 
+A few codes (like `E022`) are **API-level** — returned by the server to the app or
+your tooling rather than written to a bot's console — and are noted as such below.
+
 You can also validate a bot before deploying it with the editor's **Check** button,
 which reports the same codes for compile/load problems.
 
@@ -72,6 +75,29 @@ expected; if you want to handle it, `.catch()` the command or wrap the `await` i
 **Timer callback failed — fatal.** A `setTimeout` / `setInterval` callback threw,
 rejected, or ran too long and hit the sandbox timeout. Fix: keep timer callbacks
 short and guard them with `try/catch`.
+
+## E021
+
+**Timer limit reached — non-fatal.** Your bot tried to hold more than the
+per-tank limit of **64** active timers (`setInterval` + `setTimeout` combined).
+The extra registration is ignored — that `setInterval`/`setTimeout` call returns
+`-1` and never fires — and the bot keeps playing. This almost always means timers
+are being created faster than they're cleared, e.g. calling `setInterval` inside a
+handler that runs every tick. Fix: create timers once (at the top level or in a
+`START` handler), keep references to them, and `clearInterval` / `clearTimeout`
+the ones you no longer need. Timers count per tank, and each app fields five
+tanks. See the timer limit under [Game rules](/rules).
+
+## E022
+
+**Rate limited — the action was refused.** You (or a tool acting for you) sent
+too many requests in a short period, so the server returned **HTTP 429** with this
+code _instead of_ performing the action. Unlike the other codes here, this is an
+API response surfaced in the app or your tooling — not a bot console message. The
+limits apply to signing in, to checking/deploying/rebooting code (each compiles
+your bot in a fresh sandbox), and to creating apps and arenas. Fix: slow down and
+retry after a short wait; if a script is driving the API, add a delay between
+calls. The specific budgets are listed under [Game rules](/rules).
 
 ## Reserved codes
 

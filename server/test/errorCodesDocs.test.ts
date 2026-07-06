@@ -13,8 +13,9 @@ const doc = fs.readFileSync(
   'utf-8'
 );
 
-// The codes actually emitted by the engine today (see compiler.ts / tank.ts /
-// environment.ts).
+// The codes actually emitted today: by the simulation engine (see compiler.ts /
+// tank.ts / environment.ts / scheduleFactory.ts) and by the API layer
+// (E022, from the rate limiter in middleware/rateLimit.ts).
 const LIVE_CODES = [
   'E001',
   'E003',
@@ -24,6 +25,8 @@ const LIVE_CODES = [
   'E018',
   'E019',
   'E020',
+  'E021',
+  'E022',
 ];
 
 describe('error-codes documentation', () => {

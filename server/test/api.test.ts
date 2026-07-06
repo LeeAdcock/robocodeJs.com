@@ -18,6 +18,7 @@ vi.mock('../src/services/ArenaService', () => ({
     get: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
+    count: vi.fn(),
   },
 }));
 vi.mock('../src/services/ArenaMemberService', () => ({
@@ -280,6 +281,54 @@ describe('app endpoints', () => {
     expect(res.status).toBe(401);
     expect(compiler.check).not.toHaveBeenCalled();
   });
+
+  // Object-level access control (A01-1). requireAppOwner must reject a caller
+  // who owns the :userId in the path (passing requireOwner) but references
+  // another user's :appId — the IDOR that would otherwise leak/overwrite/delete
+  // a victim's bot. mockApp is owned by 'u1'; the attacker authenticates as 'u2'
+  // and addresses their own userId with the victim's app id.
+  it("GET .../app/:appId/source does NOT leak another user's source", async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u2') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never); // owned by u1
+    const res = await request(makeApp(appRouter, mockUser('u2'))).get(
+      '/api/user/u2/app/a1/source'
+    );
+    expect(res.status).toBe(401);
+    expect(res.text).not.toContain('// bot code');
+  });
+
+  it("PUT .../app/:appId/source cannot overwrite another user's source", async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u2') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never); // owned by u1
+    const res = await request(makeApp(appRouter, mockUser('u2')))
+      .put('/api/user/u2/app/a1/source')
+      .set('content-type', 'application/octet-stream')
+      .send('// malicious overwrite');
+    expect(res.status).toBe(401);
+  });
+
+  it("DELETE .../app/:appId cannot delete another user's app", async () => {
+    const victimApp = mockApp('a1'); // owned by u1
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u2') as never);
+    vi.mocked(appService.get).mockResolvedValue(victimApp as never);
+    const res = await request(makeApp(appRouter, mockUser('u2'))).delete(
+      '/api/user/u2/app/a1'
+    );
+    expect(res.status).toBe(401);
+    expect(victimApp.delete).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/user/:userId/app rejects at the per-user app limit', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.getForUser).mockResolvedValue(
+      Array.from({ length: 20 }, (_, i) => mockApp(`a${i}`)) as never
+    );
+    const res = await request(makeApp(appRouter, mockUser('u1'))).post(
+      '/api/user/u1/app/'
+    );
+    expect(res.status).toBe(400);
+    expect(appService.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('arena endpoints', () => {
@@ -416,6 +465,7 @@ describe('multi-arena endpoints', () => {
 
   it('POST /api/user/:userId/arenas creates an arena under the limit', async () => {
     vi.mocked(arenaService.getForUser).mockResolvedValue([] as never);
+    vi.mocked(arenaService.count).mockResolvedValue(5);
     vi.mocked(arenaService.create).mockResolvedValue({
       getId: () => 'ar9',
     } as never);
@@ -436,6 +486,17 @@ describe('multi-arena endpoints', () => {
       '/api/user/u1/arenas'
     );
     expect(res.status).toBe(400);
+    expect(arenaService.create).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/user/:userId/arenas rejects at the global arena capacity (503)', async () => {
+    vi.mocked(arenaService.getForUser).mockResolvedValue([] as never); // under per-user cap
+    vi.mocked(arenaService.count).mockResolvedValue(1000); // at MAX_TOTAL_ARENAS
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
+      '/api/user/u1/arenas'
+    );
+    expect(res.status).toBe(503);
     expect(arenaService.create).not.toHaveBeenCalled();
   });
 
