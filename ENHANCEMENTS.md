@@ -53,9 +53,13 @@ _More to do, more ways to win, more reasons to iterate._
   reload that spawn in the arena. Cheap to add, big on dynamism.
 - **Tank classes / loadouts.** (M) Scout (fast, fragile), heavy (slow, armored),
   sniper (long range, slow reload) — tradeoffs that make team composition matter.
-- **Match scoring & stats.** (S–M) `TankStats` already tracks shots/hits/
-  collisions/messages; surface per-match scores (kills, accuracy, damage,
-  survival time) and an end-of-match summary.
+- ✅ **Match scoring & stats.** (S–M) _Shipped._ A `match_summary` MCP tool and a
+  REST `GET .../arena/summary` endpoint (shared `server/src/util/matchSummary.ts`)
+  surface an outcome-oriented view: a leaderboard ranked by who's winning/won, the
+  resolved winner, aggregated per-bot stats (shots, accuracy, damage taken,
+  distance, collisions — from `TankStats`), survival (tanks alive, total health),
+  and elimination order. The match is "decided" the moment one bot is left
+  standing (even while the engine keeps ticking the survivor).
 - **Replays.** (M–L) The arena is already an event stream — persist a match's
   events and add a replay player (scrub, slow-mo). Hugely shareable.
 
@@ -69,9 +73,12 @@ _The flywheel for popularity: ranking, sharing, and watching._
   (headless, via the multi-arena API) and rank by Elo. The competitive hook.
 - **Tournaments & weekly challenges.** (M) Scheduled brackets, a "boss bot" to
   beat, or "survive 60 seconds" puzzles. Recurring reasons to come back.
-- **Private/friend arenas.** (S–M) The multi-arena API (`/api/user/:id/arenas`)
-  already supports multiple arenas per user — expose an invite/share link so
-  friends can battle in a shared arena. Low-hanging given the API exists.
+- ✅ **Private/friend arenas.** (S–M) _Shipped._ A **Share** button copies an
+  `/add-app/:appId` link; a signed-in friend confirms and the referenced bot is
+  linked **by reference** into their arena roster — the app is never copied and
+  its source stays owner-private, only its live bots are visible — so friends can
+  battle each other's bots in a shared arena. Built on the arena bot-roster
+  (enable/disable + add/unlink by reference) over the multi-arena API.
 - **Public live spectating.** (M) A read-only "watch live" view of ongoing
   battles (the demo arena already streams publicly to signed-out users).
 - **Achievements / badges.** (S) First kill, flawless victory, 1000 shots, etc.
@@ -120,8 +127,11 @@ _Make it feel good on every screen and connection._
   proxy/tunnel) instead of relying on per-event CSS transitions.
 - **WebSocket transport (option).** (M) Lower-latency, bidirectional alternative
   to SSE; also sidesteps proxy buffering of long-lived HTTP streams.
-- **Dark mode toggle.** (S) `ArenaSvg` already accepts a `darkMode` prop with a
-  filter — wire up a UI toggle (and persist the preference).
+- ✅ **Dark mode toggle.** (S) _Shipped._ A whole-app light/dark theme with a
+  header toggle, persisted to `localStorage` and defaulting to the OS preference
+  (`ui/src/util/theme.ts`). It drives a `body.dark` CSS-variable theme across the
+  app, docs, and log console, the Ace editor theme, and the arena SVG's night-mode
+  tint.
 - **Sound effects & music.** (S–M) Fire/hit/explosion cues with a mute toggle —
   surprisingly large impact on "feel."
 - **Tank skins / themes.** (S) Cosmetic colors/sprites; a light vanity hook.
@@ -136,10 +146,11 @@ _Let an AI assistant (Claude, or any MCP client) write, run, and watch bots — 
 model as a first-class player and pair-programmer._
 
 - ✅ **In-process MCP server.** (M) _Shipped._ A Model Context Protocol server at
-  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 22
+  `POST /api/mcp` (`server/src/api/mcp.ts`, Streamable HTTP) exposing 23
   user-scoped tools (bot CRUD + compile/`check_bot_source`/reboot, arena
-  create/delete/control including `set_arena_speed`/`set_arena_seed`, status, and
-  observation — filterable `recent_logs` + structured `recent_faults`),
+  create/delete/control including `set_arena_speed`/`set_arena_seed`, status,
+  `match_summary`, and observation — filterable `recent_logs` + structured
+  `recent_faults`),
   **resources** (the bot docs, `robocode.d.ts`, sample bots, the error-code
   reference), and **prompts** (`write_bot`, `debug_bot`, `run_match`).
   Authenticated by a per-user API token; setup guide at `/mcp`.
@@ -194,10 +205,10 @@ model as a first-class player and pair-programmer._
 
 1. **Fork-this-example** buttons + **starter templates** — turn the docs into action. (S)
 2. ✅ **Editor autocomplete + bot-API type defs** — the top onboarding lever. (M) _Shipped._
-3. **Dark-mode toggle** — the plumbing already exists. (S)
-4. **Surface bot crashes in the UI** — the `bot.fault` data is already there. (S–M)
-5. **Friend/private arenas** — the multi-arena API already supports it. (S–M)
-6. **Match score summary** — `TankStats` is already collected. (S–M)
+3. ✅ **Dark-mode toggle** — the plumbing already existed; whole-app theme + header toggle. (S) _Shipped._
+4. ✅ **Surface bot crashes in the UI** — structured `botFault` + tank warning + editor banner. (S–M) _Shipped._
+5. ✅ **Friend/private arenas** — share-link add-by-reference + arena roster. (S–M) _Shipped._
+6. ✅ **Match score summary** — `match_summary` tool + `/summary` endpoint over `TankStats`. (S–M) _Shipped._
 7. **MCP token-management UI** — the `/api/token` endpoints already exist. (S)
 
 ## Bigger bets (highest popularity upside)

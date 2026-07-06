@@ -12,14 +12,16 @@ This file is the **engineering/health backlog**. For product feature ideas
 
 - ✅ **Merge `modernize-foundation` → `main`.** _Done._ The modernization work is
   on `main` (Node 24, Express 5, React 19, Vite, TS 5, etc.).
-- **CI pipeline (GitHub Actions).** (M) No CI exists (no `.github/workflows`). Add a
-  workflow that, per package, runs install → build (`tsc`) → lint → test on every
-  PR. Note the native `isolated-vm` build needs Node 24 + `gcc`/`gcc-c++` on the
-  runner. This is the last unfinished item from the original modernization plan.
-- **Cap concurrent isolates globally (sandbox review #4).** (M) Per-arena (5 apps)
-  and per-user (10 arenas) caps exist, but nothing bounds total `Environment`s/
-  isolates across all users beyond the 30-min idle GC — a memory-exhaustion DoS.
-  Add a global ceiling in `EnvironmentService` and log when it's hit.
+- ✅ **CI pipeline (GitHub Actions).** (M) _Done._ `.github/workflows/ci.yml` runs,
+  per package, `npm ci` → lint → build (`tsc`) → test + `npm audit --audit-level=high`
+  on every PR/push, and `.github/dependabot.yml` opens weekly npm + github-actions
+  update PRs (added alongside the security hardening — see `SECURITY.md` A06-1).
+  Closes the last unfinished item from the original modernization plan.
+- ✅ **Cap concurrent isolates globally (sandbox review #4).** (M) _Done._ A global
+  `MAX_TOTAL_ARENAS` ceiling (default 1000, env-tunable) is enforced at arena
+  creation via `arenaService.count()`, returning **503** at capacity
+  (`api/arena.ts`); the 30-minute idle GC still reclaims live isolates. See
+  `SECURITY.md` A04-2.
 
 ## Soon (medium priority)
 
