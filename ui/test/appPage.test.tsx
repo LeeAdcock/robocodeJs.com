@@ -101,6 +101,26 @@ describe('AppPage (bot editor)', () => {
     expect(screen.getByLabelText('Reset text size').textContent).toBe('18');
   });
 
+  it('share button copies the /add-app link and shows a copied notice', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    renderPage();
+    await screen.findByTestId('editor');
+
+    fireEvent.click(screen.getByLabelText('Copy share link'));
+
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining('/add-app/a1')
+    );
+    expect(
+      await screen.findByText('Share link copied to your clipboard.')
+    ).toBeTruthy();
+  });
+
   it('a clean recompile hides the previous error and clears editor markers', async () => {
     renderPage();
     const editor = (await screen.findByTestId('editor')) as HTMLTextAreaElement;
