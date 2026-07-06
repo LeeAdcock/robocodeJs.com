@@ -18,7 +18,7 @@ the foundation for my career in software development and technology leadership, 
 the feeling of _my code, alive in the arena_ is a big part of why I still love this
 work today.
 
-RobocodeJs is my attempt to hand that same spark to the next person. I rebuilt the
+RobocodeJs is my attempt to hand that same spark to the next generation. I rebuilt the
 idea for the browser and JavaScript so there's nothing to install and nothing
 between you and your first bot: sign in, write a few lines, and watch them fight.
 The arena, the sandbox, the Learn course, the docs — I built all of it to make that
