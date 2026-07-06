@@ -36,7 +36,7 @@ How the frames fit together:
 - **Bearings reported to you** — a scan result's `angle`, the `HIT`/`COLLIDED` `angle`,
   and `marker.getBearing()` — are **relative to your heading** (`0` = dead ahead). That's
   why aiming needs no math: `bot.turret.setOrientation(target.angle)` points the gun at a
-  scanned enemy, and `bot.turn(target.angle)` turns the whole tank toward it.
+  scanned enemy, and `bot.turn(target.angle)` turns the whole bot toward it.
 
 ## Coordinates
 
@@ -68,16 +68,16 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 # Combat & health
 
-| Thing             | Value           | In context                                             |
-| ----------------- | --------------- | ------------------------------------------------------ |
-| Health            | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead          |
-| Bullet damage     | **−25**         | a clean hit removes a quarter of full health           |
-| Bullet hit radius | **32 units**    | a bullet hits any tank whose center is within 32 units |
-| Collision         | **−1 per tick** | bumping a wall/bot also stops you (speed → 0)          |
+| Thing             | Value           | In context                                            |
+| ----------------- | --------------- | ----------------------------------------------------- |
+| Health            | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead         |
+| Bullet damage     | **−25**         | a clean hit removes a quarter of full health          |
+| Bullet hit radius | **32 units**    | a bullet hits any bot whose center is within 32 units |
+| Collision         | **−1 per tick** | bumping a wall/bot also stops you (speed → 0)         |
 
-**Friendly fire is on.** A bullet damages **any** tank within the 32-unit hit
+**Friendly fire is on.** A bullet damages **any** bot within the 32-unit hit
 radius — **including your own teammates**. There is no team exemption, so a shot
-that skims past a teammate can hurt them. Watch your line of fire when your tanks
+that skims past a teammate can hurt them. Watch your line of fire when your bots
 cluster.
 
 **Hitting a moving target — "lead" the shot.** A bullet leaves the muzzle and
@@ -89,23 +89,23 @@ to predict its future position. Leading is the single biggest accuracy gain
 against anything that moves; the [Leading a moving target](/learn/leading) lesson
 walks through it.
 
-# Messages & your five tanks
+# Messages & your five bots
 
-Each app fields **five tanks**, and every tank runs your program
+Each app fields **five bots**, and every bot runs your program
 **independently** — each gets its own private copy. Top-level variables
-(`let target = …`) are **per-tank**, `START` runs once per tank, and one tank
-cannot see another's state. The **only** way tanks share anything is by sending
+(`let target = …`) are **per-bot**, `START` runs once per bot, and one bot
+cannot see another's state. The **only** way bots share anything is by sending
 messages.
 
 - `bot.send(message)` broadcasts a **message** — a primitive (number, string,
   boolean, `null`) or a nested object/array of them — that **every other living
-  tank in the arena receives** via `Event.RECEIVED` — **including enemy tanks**,
+  bot in the arena receives** via `Event.RECEIVED` — **including enemy bots**,
   not just your teammates. There are no private channels. The receiver also gets
   a second argument, `{ distance }`: how far away the sender was (a range, not a
   bearing), so broadcasting leaks your distance to everyone in the arena.
 - Because the broadcast is global, a naïve `RECEIVED` handler can be fed an
-  **enemy's** message — even that enemy's callout about _your own_ tank. If you
-  use messages to coordinate a team, tag them with a field your tanks recognize
+  **enemy's** message — even that enemy's callout about _your own_ bot. If you
+  use messages to coordinate a team, tag them with a field your bots recognize
   and another team is unlikely to send (e.g. a shared `team` value), and validate
   an incoming message before acting on it.
 
@@ -126,11 +126,11 @@ looping.
 | Bots (apps) per account | **20**                                         |
 | Arenas per account      | **10**                                         |
 | Bots per arena          | **5**                                          |
-| Active timers per tank  | **64** (`setInterval` + `setTimeout` combined) |
+| Active timers per bot   | **64** (`setInterval` + `setTimeout` combined) |
 
 Going over the timer limit surfaces code **E021** in the bot's console and the
 extra `setInterval`/`setTimeout` is ignored — it isn't fatal. (Timers are counted
-per tank, and each app fields five tanks.)
+per bot, and each app fields five bots.)
 
 ## Rate limits
 

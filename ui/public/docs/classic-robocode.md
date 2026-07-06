@@ -11,7 +11,7 @@ the handful of differences that will trip you up if you don't know them.
 | -------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Language       | Java (`extends Robot` / `AdvancedRobot`)                          | JavaScript (no class — an "app" of event handlers)                                                                               |
 | Program shape  | a `run()` loop + `onX()` event methods                            | register handlers: `bot.on(Event.X, …)`, `clock.on(Event.TICK, …)`                                                               |
-| You control    | one robot per file                                                | a **team of 5 tanks**, all sharing your one app                                                                                  |
+| You control    | one robot per file                                                | a **team of 5 bots**, all sharing your one app                                                                                   |
 | Health         | **energy** `0–100`, spent to fire, gun heat limits fire rate      | **health** `0–100`; no firing cost, no gun heat — a **reload timer** instead                                                     |
 | Movement calls | blocking `ahead(100)` / `turnRight(45)` (or `setAhead`+`execute`) | **async** `bot.setSpeed(5)` / `bot.turn(45)` return **Promises**                                                                 |
 | Heading `0°`   | **North**, clockwise                                              | **North**, clockwise — same                                                                                                      |
@@ -28,7 +28,7 @@ relative to the body too, so aiming a scanned target needs no trig at all:
 
 ```
 bot.turret.setOrientation(target.angle); // point the gun at the enemy
-bot.turn(target.angle); // or turn the whole tank toward it
+bot.turn(target.angle); // or turn the whole bot toward it
 ```
 
 (The bot's own heading, `bot.getOrientation()` / `setOrientation()`, is the one absolute

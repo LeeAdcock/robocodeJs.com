@@ -48,29 +48,29 @@ when prompted. Clients handle token storage and refresh for you.
 
 Once connected, these tools are available (all scoped to your account):
 
-**Bots**
+**Apps**
 
-- `list_apps` — list your bots
-- `get_app_source` — read a bot's source
-- `create_app` — create a bot (optionally with a name and initial source)
-- `set_app_source` — replace a bot's source (live arenas pick it up)
-- `rename_app` — rename a bot
-- `compile_app` — re-run a bot's current source in your live arenas
+- `list_apps` — list your apps
+- `get_app_source` — read an app's source
+- `create_app` — create an app (optionally with a name and initial source)
+- `set_app_source` — replace an app's source (live arenas pick it up)
+- `rename_app` — rename an app
+- `compile_app` — re-run an app's current source in your live arenas
 - `check_app_source` — dry-run compile source (pass `source`, or `appId` for a
-  saved bot) and report any syntax/load error with its code — without deploying it
-- `reboot_app` — reload a bot and re-fire its `START` handler
-- `delete_app` — remove a bot from every arena and delete it
+  saved app) and report any syntax/load error with its code — without deploying it
+- `reboot_app` — reload an app and re-fire its `START` handler
+- `delete_app` — remove an app from every arena and delete it
 
 **Arenas**
 
 - `list_arenas` / `create_arena` / `delete_arena`
-- `arena_status` — full snapshot (size, running state, clock, and every bot's
-  tanks: position, orientation, health, bullets)
+- `arena_status` — full snapshot (size, running state, clock, and every app's
+  bots: position, orientation, health, bullets)
 - `match_summary` — outcome view: leaderboard, winner, per-bot accuracy/damage/
   survival, and elimination order (most useful once a match is decided)
 - `match_status` — the cheap-to-poll companion: just `decided`, the `winner`, and
-  a coarse standings list (rank, tanks alive, total health) — no per-bot stat
-  blocks or per-tank positions. Use it to watch a running match ("is it decided
+  a coarse standings list (rank, bots alive, total health) — no per-bot stat
+  blocks or per-bot positions. Use it to watch a running match ("is it decided
   yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
 - `add_app_to_arena` / `remove_app_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
@@ -107,7 +107,7 @@ The server also exposes read-only reference material the AI can pull in:
 - **"Please sign in" on the RobocodeJs authorize page** — you're not signed in in
   that browser. Complete the Google sign-in (top right) and the connection
   finishes automatically.
-- **The AI can't see a bot or arena** — tools only ever see _your_ account's
+- **The AI can't see an app or arena** — tools only ever see _your_ account's
   resources; make sure you authorized with the account that owns them.
 - **Disconnecting** — remove the connector in your client. To revoke server-side,
   the connection's tokens expire on their own; reconnecting always re-authorizes.
