@@ -119,7 +119,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 ## Communications events
 
-- `bot.on(Event.RECEIVED, (number) => {})` Registers a callback that is executed when an incoming numeric message is received from another bot.
+- `bot.on(Event.RECEIVED, (message, from) => {})` Registers a callback that is executed when another bot broadcasts a message (via `bot.send`). This fires for messages from **any** bot in the arena, including enemies. `message` is the payload sent — a primitive (number, string, boolean, or null) or a nested array/object of primitives. `from` is `{ distance: number }`: how far away the sender was when it broadcast (a range, not a bearing — the same value is given to teammates and eavesdropping enemies).
 
 ## Movement
 
@@ -161,7 +161,7 @@ bot.setOrientation(90).then(() => {
 
 ### Communications
 
-- `bot.send(number)` Broadcasts a numeric value that other bots can receive via an event handler.
+- `bot.send(message)` Broadcasts a message that every other bot in the arena — teammates **and** enemies — can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them.
 
 ## Turret
 

@@ -97,14 +97,17 @@ Each app fields **five tanks**, and every tank runs your program
 cannot see another's state. The **only** way tanks share anything is by sending
 messages.
 
-- `bot.send(number)` broadcasts a single integer that **every other living tank
-  in the arena receives** via `Event.RECEIVED` — **including enemy tanks**, not
-  just your teammates. There are no private channels.
+- `bot.send(message)` broadcasts a **message** — a primitive (number, string,
+  boolean, `null`) or a nested object/array of them — that **every other living
+  tank in the arena receives** via `Event.RECEIVED` — **including enemy tanks**,
+  not just your teammates. There are no private channels. The receiver also gets
+  a second argument, `{ distance }`: how far away the sender was (a range, not a
+  bearing), so broadcasting leaks your distance to everyone in the arena.
 - Because the broadcast is global, a naïve `RECEIVED` handler can be fed an
   **enemy's** message — even that enemy's callout about _your own_ tank. If you
-  use messages to coordinate a team, encode a value your tanks recognize and
-  another team is unlikely to send by accident (e.g. reserve some high bits as a
-  team tag), and don't blindly trust an incoming number as a friendly target.
+  use messages to coordinate a team, tag them with a field your tanks recognize
+  and another team is unlikely to send (e.g. a shared `team` value), and validate
+  an incoming message before acting on it.
 
 # Match length
 

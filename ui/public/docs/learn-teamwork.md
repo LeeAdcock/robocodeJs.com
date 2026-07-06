@@ -12,10 +12,16 @@
 Your team is **five tanks running the same code**. They can coordinate by sending
 **messages** to each other:
 
-- `bot.send(7)` — broadcast a **number** to your teammates. (Only numbers can be sent.)
-- The **RECEIVED** event fires on each teammate, handing them that number.
+- `bot.send(7)` — broadcast a message. It can be a **number** (or a string, or a
+  small object of them, like `{ x: 100, y: 200 }`).
+- The **RECEIVED** event fires on the other bots, handing them that message (plus
+  `from`, telling you how far away the sender was).
 
-A number is enough to share something useful — like the compass direction of an enemy.
+One catch: `bot.send` is heard by **every** bot in the arena — **enemies included**,
+not just your team. So a real team tags its messages with something only teammates
+know and checks it before trusting one (the [Magnetic](/examples) example shows how).
+For this lesson we'll keep it simple. A number is enough to share something useful —
+like the compass direction of an enemy.
 
 ## Try it
 

@@ -162,19 +162,34 @@ describe('Tank', () => {
     const other = {
       id: 'other',
       health: 100,
+      x: 100,
+      y: 200, // 100 units from the sender at (100, 100)
       stats: { messagesReceived: 0 },
       handlers: { [Event.RECEIVED]: received },
     };
     env.getProcesses = () => [{ tanks: [tank, other] }];
     tank.send(7);
-    expect(received).toHaveBeenCalledWith(7);
+    // The payload, plus the sender's distance (a range, not a bearing).
+    expect(received).toHaveBeenCalledWith(7, { distance: 100 });
     expect(other.stats.messagesReceived).toBe(1);
     expect(tank.stats.messagesSent).toBe(1);
   });
 
-  it('send() rejects a non-integer message', () => {
-    const { tank } = makeRealTank();
-    expect(() => tank.send(1.5)).toThrow();
+  it('send() also delivers a structured (object) message', () => {
+    const { tank, env } = makeRealTank();
+    const received = vi.fn();
+    const other = {
+      id: 'other',
+      health: 100,
+      x: 130,
+      y: 140, // 50 units from the sender at (100, 100)
+      stats: { messagesReceived: 0 },
+      handlers: { [Event.RECEIVED]: received },
+    };
+    env.getProcesses = () => [{ tanks: [tank, other] }];
+    const msg = { secret: 8, x: 1, y: 2 };
+    tank.send(msg);
+    expect(received).toHaveBeenCalledWith(msg, { distance: 50 });
   });
 
   it('getHealth() returns health on a 0–100 scale', () => {

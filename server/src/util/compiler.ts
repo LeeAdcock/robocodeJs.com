@@ -10,6 +10,7 @@ import appService from '../services/AppService';
 import { ErrorCodes } from '../types/ErrorCodes';
 import { logBotFault, logger, LogEvent } from './logger';
 import { toApiHeading, toInternalHeading } from './geometry';
+import { parseMessage } from './message';
 
 // Identifying context for a faulting bot, for the structured server log.
 const botCtx = (tank: Tank) => ({
@@ -354,7 +355,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   //   parked — resolves when the apply returns, i.e. the handler has run to its
   //            first await-park this tick; the tick loop awaits this so bot code
   //            has executed before the next tick advances.
-  const dispatchEvent = (event: string, x: unknown) => {
+  const dispatchEvent = (event: string, ...args: unknown[]) => {
     let done_resolve!: (value?: unknown) => void;
     let done_reject!: (reason?: unknown) => void;
     const done = new Promise((resolve, reject) => {
@@ -368,7 +369,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     const parked = dispatchRef
       .apply(
         undefined,
-        [event, JSON.stringify([x]), done_resolve, done_reject],
+        [event, JSON.stringify(args), done_resolve, done_reject],
         {
           timeout: sandboxTimeoutMs(),
         }
@@ -387,7 +388,7 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
     '_bot_register',
     new ivm.Callback(
       (event: Event) => {
-        tank.on(event, (x: unknown) => dispatchEvent(event, x));
+        tank.on(event, (...args: unknown[]) => dispatchEvent(event, ...args));
       },
       { sync: true }
     )
@@ -431,9 +432,19 @@ function exposeTank(tank: Tank, isolate: ivm.Isolate) {
   exposeAsync1(tank, isolate, 'bot.turn', '_bot_turn', (arg) => tank.turn(arg));
   exposeGetter(tank, isolate, 'bot.getX', '_bot_getX', () => tank.getX());
   exposeGetter(tank, isolate, 'bot.getY', '_bot_getY', () => tank.getY());
-  exposeVoid(tank, isolate, 'bot.send', '_bot_send', (arg) =>
-    tank.send(arg as number)
-  );
+  // bot.send accepts any JSON value — a primitive, or nested arrays/objects of
+  // primitives. The value crosses the sandbox boundary as a JSON string: the
+  // bot-side wrapper stringifies it and the host parses + validates it
+  // (parseMessage) before broadcasting. JSON is the whitelist, so functions,
+  // class instances, Dates, Maps/Sets, and host references can never be sent.
+  tank.getContext().global.setSync('_bot_send', (json: unknown) => {
+    tank.send(parseMessage(json));
+  });
+  isolate
+    .compileScriptSync(
+      `bot.send = (message) => _bot_send(JSON.stringify(message))`
+    )
+    .runSync(tank.getContext(), {});
 
   // Convenience turnTowards
   isolate

@@ -280,6 +280,27 @@ describe('sandbox + simulation integration', () => {
     expect(receiver.speed).toBe(2); // RECEIVED handler ran with the message
   });
 
+  it('delivers a structured message with the sender distance (send -> RECEIVED)', async () => {
+    world.addBot(`bot.on(Event.START, () => bot.send({ go: 3 }))`, 'sender', {
+      x: 200,
+      y: 200,
+    });
+    const receiver = world.addBot(
+      `bot.on(Event.RECEIVED, (msg, from) => {
+         if (msg && msg.go && from.distance > 0) bot.setSpeed(msg.go)
+       })`,
+      'receiver',
+      { x: 200, y: 500 } // 300 units from the sender
+    );
+
+    await world.tick(6);
+
+    // The receiver only accelerates if it decoded the object payload AND saw a
+    // positive sender distance — proving the rich message + provenance crossed
+    // the real isolate boundary in both directions.
+    expect(receiver.speed).toBe(3);
+  });
+
   it('lets a bot read the advancing clock via clock.getTime()', async () => {
     const tank = world.addBot(
       `clock.on(Event.TICK, () => { if (clock.getTime() >= 5) bot.setSpeed(2) })`,

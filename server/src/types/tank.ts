@@ -6,6 +6,7 @@ import { Event } from './event';
 import { Orientated } from './orientated';
 import { TankStats } from './tankStats';
 import { TankTurret } from './tankTurret';
+import { JsonValue } from '../util/message';
 import ivm from 'isolated-vm';
 
 import compiler from '../util/compiler';
@@ -139,7 +140,7 @@ export default class Tank implements Point, Orientated {
       Promise<unknown>
     >();
 
-    this.handlers[event] = (x?: unknown) => {
+    this.handlers[event] = (...args: unknown[]) => {
       // Backpressure: ignore a new invocation while the previous one is still in
       // flight (a handler parked mid multi-tick await). Same semantics as before,
       // now without the wall-clock setTimeout(0) indirection so the tick loop can
@@ -147,8 +148,11 @@ export default class Tank implements Point, Orientated {
       if (eventPromiseMap.get(event)) return;
 
       if (event !== Event.TICK) {
-        if (x)
-          this.logger.trace("Called event handler '" + event + "' with ", x);
+        if (args.length)
+          this.logger.trace(
+            "Called event handler '" + event + "' with ",
+            args[0]
+          );
         else this.logger.trace("Called event handler '" + event + "'");
       }
 
@@ -158,7 +162,7 @@ export default class Tank implements Point, Orientated {
       let dispatch:
         { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
       try {
-        dispatch = handler(x) as
+        dispatch = handler(...args) as
           { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
       } catch (e) {
         this.logger.error(`${ErrorCodes.E003}: ${e}`);
@@ -349,11 +353,8 @@ export default class Tank implements Point, Orientated {
     return this.y;
   }
 
-  send(x: number) {
-    if (!Number.isInteger(x)) {
-      throw new Error('Must be numeric');
-    }
-    this.logger.trace('Sending message "' + x + '"');
+  send(message: JsonValue) {
+    this.logger.trace('Sending message', message);
     this.stats.messagesSent += 1;
     this.env.getProcesses().forEach((otherProcess) => {
       otherProcess.tanks
@@ -362,7 +363,14 @@ export default class Tank implements Point, Orientated {
           if (otherTank.id !== this.id) {
             otherTank.stats.messagesReceived += 1;
             if (otherTank.handlers[Event.RECEIVED]) {
-              otherTank.handlers[Event.RECEIVED](x);
+              // The receiver also learns how far away the sender is (a range, not
+              // a bearing). Delivered to teammates AND eavesdropping enemies, so
+              // broadcasting leaks your distance to everyone in the arena.
+              const distance = Math.sqrt(
+                Math.pow(otherTank.x - this.x, 2) +
+                  Math.pow(otherTank.y - this.y, 2)
+              );
+              otherTank.handlers[Event.RECEIVED](message, { distance });
             }
           }
         });
