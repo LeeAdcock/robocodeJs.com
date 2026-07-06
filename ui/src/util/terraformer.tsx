@@ -296,8 +296,6 @@ const roadBuilderHoriz = (
           width={32}
         />
       );
-    // TODO fix this
-    // if (oldY === oldY) return roadBuilderHoriz(terrain, x, y, oldX, oldY, isSand)
   }
 
   roadBuilderHoriz(terrain, newX, newY, x, y, isSand);

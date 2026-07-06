@@ -68,7 +68,6 @@ interface NavBarProps {
   doPause: () => void;
   doResume: () => void;
   doRestart: () => void;
-  doSave: () => void;
   doCreateApp: () => void;
   // Refresh the parent's user after roster changes (so the Apps list reflects a
   // newly created bot). Optional so existing callers/tests need no change.

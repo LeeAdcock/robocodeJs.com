@@ -297,7 +297,6 @@ function exposeTankTurret(tank: Tank, isolate: ivm.Isolate) {
     .runSync(tank.getContext(), {});
 
   // Expose fire
-  // todo resulting value
   tank.getContext().global.setSync('_bot_turret_fire', (id: number) => {
     const settle = getSettler(tank);
     turret.fire().then(
