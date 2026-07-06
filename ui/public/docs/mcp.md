@@ -5,8 +5,6 @@ server so an AI assistant (Claude, or any MCP-capable client) can write, run, an
 watch your bots directly — the same things you can do in the editor, driven by a
 model.
 
-## 1. Connect your client (one click, no token)
-
 RobocodeJs is a full **OAuth 2.1** authorization server, so connecting is the
 normal "add a connector, click Connect, sign in" flow — there's **no token to
 copy**. The server speaks MCP over **streamable HTTP** at:
@@ -44,7 +42,7 @@ Any client that supports a **remote / streamable-HTTP MCP server with OAuth**
 will work: point it at `https://robocodejs.com/api/mcp` and complete the sign-in
 when prompted. Clients handle token storage and refresh for you.
 
-## 2. What the AI can do
+# What the AI can do
 
 Once connected, these tools are available (all scoped to your account):
 
@@ -100,7 +98,7 @@ The server also exposes read-only reference material the AI can pull in:
 - `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,
   for interpreting `recent_logs` and `check_bot_source` output
 
-## Troubleshooting
+# Troubleshooting
 
 - **The browser didn't open / connection stalls** — start the connection again
   from your client; it re-initiates the sign-in. Make sure pop-ups aren't blocked.
