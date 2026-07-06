@@ -115,6 +115,19 @@ const fail = (message: string): ToolResult => ({
   isError: true,
 });
 
+// The MCP surface refers to an app's live instances as "bots", never "tanks", so
+// rename the internal log/fault `tankId`/`tankIndex` fields to `botId`/`botIndex`
+// on the way out. (The internal records + SSE stream + UI keep the tank* names.)
+const botify = <T extends object>(entry: T) => {
+  if (!('tankId' in entry) && !('tankIndex' in entry)) return entry;
+  const { tankId, tankIndex, ...rest } = entry as Record<string, unknown>;
+  return {
+    ...rest,
+    ...(tankId !== undefined ? { botId: tankId } : {}),
+    ...(tankIndex !== undefined ? { botIndex: tankIndex } : {}),
+  };
+};
+
 // Behaviour hints so clients can gate/confirm actions (e.g. prompt before a
 // destructive tool, or run a read-only one freely). All tools act only on the
 // authenticated user's own resources, so none touch an "open world".
@@ -922,12 +935,14 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Only entries at this level or higher (e.g. ERROR)'),
         appId: z.string().optional().describe('Only entries from this bot'),
-        tankIndex: z
+        botIndex: z
           .number()
           .int()
           .positive()
           .optional()
-          .describe('Only entries from this tank (1-based within the bot)'),
+          .describe(
+            'Only entries from this bot instance (1-based within the app)'
+          ),
         contains: z
           .string()
           .optional()
@@ -935,7 +950,7 @@ export const buildServer = (user: User): McpServer => {
       },
       annotations: READ_ONLY,
     },
-    async ({ arenaId, limit, minLevel, appId, tankIndex, contains }) => {
+    async ({ arenaId, limit, minLevel, appId, botIndex, contains }) => {
       const arena = await ownedArena(user, arenaId);
       if (!arena) return fail('No such arena, or it is not yours.');
       const env = await environmentService.getByArenaId(arena.getId());
@@ -958,14 +973,14 @@ export const buildServer = (user: User): McpServer => {
         )
           return false;
         if (appId && entry.appId !== appId) return false;
-        if (tankIndex !== undefined && entry.tankIndex !== tankIndex)
+        if (botIndex !== undefined && entry.tankIndex !== botIndex)
           return false;
         if (contains && !String(entry.msg ?? '').includes(contains))
           return false;
         return true;
       });
       // Cap AFTER filtering so `limit` counts matching entries, not raw ones.
-      return ok(limit ? logs.slice(-limit) : logs);
+      return ok((limit ? logs.slice(-limit) : logs).map(botify));
     }
   );
 
@@ -996,8 +1011,8 @@ export const buildServer = (user: User): McpServer => {
         faults: z.array(
           z.object({
             appId: z.string(),
-            tankId: z.string(),
-            tankIndex: z.number(),
+            botId: z.string(),
+            botIndex: z.number(),
             code: z.string(),
             kind: z.string(),
             message: z.string(),
@@ -1014,7 +1029,9 @@ export const buildServer = (user: User): McpServer => {
       const arena = await ownedArena(user, arenaId);
       if (!arena) return fail('No such arena, or it is not yours.');
       const env = await environmentService.getByArenaId(arena.getId());
-      return ok({ faults: env ? env.getRecentFaults(limit, appId) : [] });
+      return ok({
+        faults: env ? env.getRecentFaults(limit, appId).map(botify) : [],
+      });
     }
   );
 

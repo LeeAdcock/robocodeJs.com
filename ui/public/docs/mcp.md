@@ -15,8 +15,6 @@ copy**. The server speaks MCP over **streamable HTTP** at:
 https://robocodejs.com/api/mcp
 ```
 
-(Replace `robocodejs.com` with the host you use.)
-
 When your client connects, it discovers the sign-in flow automatically and opens
 your browser to RobocodeJs. If you're not already signed in, you'll sign in with
 Google; then the connection is authorized and you're returned to your client.
@@ -45,12 +43,6 @@ status."
 Any client that supports a **remote / streamable-HTTP MCP server with OAuth**
 will work: point it at `https://robocodejs.com/api/mcp` and complete the sign-in
 when prompted. Clients handle token storage and refresh for you.
-
-### Local development
-
-When running the server locally in dev mode, authentication is bypassed (every
-request acts as the built-in "Local Dev" user), so you can connect to
-`http://localhost:5000/api/mcp` **without signing in**.
 
 ## 2. What the AI can do
 
@@ -92,7 +84,7 @@ Once connected, these tools are available (all scoped to your account):
 **Observation**
 
 - `recent_logs` — recent bot console output for an arena, with optional filters
-  (`minLevel`, `appId`, `tankIndex`, `contains`)
+  (`minLevel`, `appId`, `botIndex`, `contains`)
 - `recent_faults` — recent bot crashes as structured records (error code, kind,
   message, failing line) — richer than grepping the logs
 
