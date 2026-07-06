@@ -23,9 +23,10 @@ tribute, not a replacement — if you enjoy it, go play the original too.
 
 ## Say hi
 
-I build this in my spare time, for love, so hearing from people who play it
-genuinely makes my day. Found a bug? Have an idea? Built a bot you're proud of?
-Just want to say hello?
+I build this in my spare time, driven by my passion for software engineering and a
+love of problem-solving, innovation, and creativity — so hearing from people who
+play it genuinely makes my day. Found a bug? Have an idea? Built a bot you're proud
+of? Just want to say hello?
 
 **Reach me at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com).**
 
