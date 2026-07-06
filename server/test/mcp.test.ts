@@ -43,7 +43,8 @@ vi.mock('../src/util/matchSummary', () => ({ buildMatchSummary: vi.fn() }));
 // (the real dry-run behaviour is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
 
-import { buildServer } from '../src/api/mcp';
+import request from 'supertest';
+import mcpApp, { buildServer } from '../src/api/mcp';
 import appService from '../src/services/AppService';
 import compiler from '../src/util/compiler';
 import arenaService from '../src/services/ArenaService';
@@ -403,5 +404,19 @@ describe('mcp tools', () => {
     expect(text).toContain('circle and snipe');
     // It should steer the model to the API docs resource.
     expect(text).toContain('robocodejs://docs/dev');
+  });
+});
+
+describe('POST /api/mcp auth (OAuth bearer)', () => {
+  it('rejects an unauthenticated request with 401 + WWW-Authenticate', async () => {
+    const res = await request(mcpApp)
+      .post('/api/mcp')
+      .set('Content-Type', 'application/json')
+      .send({ jsonrpc: '2.0', method: 'tools/list', id: 1 });
+
+    expect(res.status).toBe(401);
+    // The header points MCP clients at our protected-resource metadata so they
+    // can discover the authorization server and start the OAuth flow.
+    expect(res.headers['www-authenticate']).toMatch(/resource_metadata=/);
   });
 });

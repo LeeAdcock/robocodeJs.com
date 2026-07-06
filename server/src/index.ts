@@ -12,7 +12,7 @@ import { logger, LogEvent } from './util/logger';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
-import tokenEndpoints from './api/token';
+import oauthEndpoints from './api/oauth';
 import mcpEndpoints from './api/mcp';
 import userEndpoints from './api/user';
 import appEndpoints from './api/app';
@@ -62,7 +62,7 @@ app.use('/api', [
 // per-route limiters (isolate spawns, resource creation) are attached inside the
 // app/arena routers. Refusals return 429 + error code E022.
 app.use('/api/session', authRateLimit);
-app.use('/api/token', authRateLimit);
+app.use('/api/oauth', authRateLimit);
 app.use('/api', apiRateLimit);
 
 app.use('/', express.static('./dist/public'));
@@ -75,7 +75,10 @@ app.use('/api/app', auth(true));
 
 app.use(healthEndpoints);
 app.use(sessionEndpoints);
-app.use(tokenEndpoints);
+// OAuth 2.1 authorization-server endpoints (/.well-known/*, /authorize, /token,
+// /register, /revoke) live at the app root — must be mounted before the SPA
+// fallback below so they aren't swallowed by index.html.
+app.use(oauthEndpoints);
 app.use(mcpEndpoints);
 app.use(demoEndpoints);
 app.use(helpEndpoints);

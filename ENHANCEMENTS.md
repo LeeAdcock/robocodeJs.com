@@ -153,19 +153,22 @@ model as a first-class player and pair-programmer._
   `recent_faults`),
   **resources** (the bot docs, `robocode.d.ts`, sample bots, the error-code
   reference), and **prompts** (`write_bot`, `debug_bot`, `run_match`).
-  Authenticated by a per-user API token; setup guide at `/mcp`.
-- **OAuth remote-connector auth.** (M–L) Today auth is a static bearer token, so
-  only clients that allow a custom header (e.g. Claude Code) can connect.
-  Implement the MCP OAuth 2.1 flow so **claude.ai / Claude Desktop custom
-  connectors** — which expect interactive OAuth — work too. The single biggest
-  lever on reach.
-- **Token-management UI.** (S) A navbar affordance to mint / show-once /
-  regenerate the API token, instead of the unlisted `GET /api/token/new` URL. The
-  endpoints already exist (`server/src/api/token.ts`); this is just UI.
-- **Multiple named tokens + per-token revocation.** (S–M) One token per user
-  today (revoke = regenerate). Support several labeled tokens with individual
-  revocation — needs an id/label column on `identity`, so pair it with the
-  `node-pg-migrate` item in `TASKS.md`.
+  Authenticated via OAuth; setup guide at `/mcp`.
+- ✅ **OAuth remote-connector auth.** (M–L) _Shipped._ RobocodeJs is its own MCP
+  **OAuth 2.1** authorization server (`server/src/api/oauth.ts`,
+  `util/oauthProvider.ts`, `services/OAuthService.ts`): discovery metadata +
+  dynamic client registration + PKCE, with the browser login delegated to the
+  existing Google sign-in on a `/mcp/authorize` UI page (auto-approve, since a
+  token only grants access to the user's own account). So **claude.ai / Claude
+  Desktop custom connectors** now connect with a one-click **Connect** (no token
+  to copy); `/api/mcp` verifies the access token with the SDK's
+  `requireBearerAuth`. All OAuth state (clients, single-use codes, access +
+  refresh tokens) lives in Postgres and is hash-keyed, so it is replica-safe. The
+  static bearer token and `/api/token` are **removed** in favor of this.
+- **Connected-clients UI.** (S) Optional: a navbar affordance listing the OAuth
+  clients the user has authorized, with a revoke button (delete their
+  `oauth_token` rows). Nice-to-have now that connecting is one click — there's no
+  longer a token to show.
 - ✅ **`check_bot_source` (dry-run compile) tool.** (M) _Shipped._ Compiles a bot's
   source in a throwaway `isolated-vm` isolate and returns the syntax/load error
   (with its `ErrorCode`) **without** adding it to an arena (`compiler.check`). Also
@@ -188,16 +191,19 @@ model as a first-class player and pair-programmer._
 - **Spectate other/demo arenas.** (S–M) Read-only `arena_status` / `recent_logs`
   for the public demo arena (and opt-in shared arenas), so the model can watch
   battles it isn't a participant in. Pairs with "public live spectating" (§3).
-- **Rate limiting + audit logging.** (M) Non-expiring tokens grant full control of
-  a user's bots/arenas; add per-token rate limits and log MCP mutations (tool,
-  user, token) via the structured logger (`LogEvent`) for security observability.
-  Pairs with the global isolate-cap item in `TASKS.md`.
+- **Rate limiting + audit logging.** (M) Access tokens grant full control of a
+  user's bots/arenas; add a dedicated per-user MCP rate limit (today `/api/mcp`
+  shares the `/api` backstop) and log MCP mutations (tool, user, client) via the
+  structured logger (`LogEvent`) for security observability. Pairs with the
+  global isolate-cap item in `TASKS.md`.
 - **`run_tournament` prompt/tool.** (S–M) Round-robin a set of bots and report a
   ranking, building on `run_match` and the multi-arena API — a natural feeder for
   the leaderboard idea (§3).
 - **End-to-end bearer auth test.** (S) The MCP tools are tested over an in-memory
-  transport and bearer resolution is unit-tested in `auth.test.ts`, but there's no
-  test that drives `/api/mcp` through a real `Authorization: Bearer` request.
+  transport; the OAuth flow (register → authorize → exchange → verify → refresh →
+  revoke) is covered in `test/oauth.test.ts` against pg-mem, and an unauthenticated
+  `POST /api/mcp` is asserted to 401 with `WWW-Authenticate`. Still missing: a test
+  that drives `/api/mcp` through a real access-token `Authorization: Bearer` header.
 
 ---
 
@@ -209,7 +215,7 @@ model as a first-class player and pair-programmer._
 4. ✅ **Surface bot crashes in the UI** — structured `botFault` + tank warning + editor banner. (S–M) _Shipped._
 5. ✅ **Friend/private arenas** — share-link add-by-reference + arena roster. (S–M) _Shipped._
 6. ✅ **Match score summary** — `match_summary` tool + `/summary` endpoint over `TankStats`. (S–M) _Shipped._
-7. **MCP token-management UI** — the `/api/token` endpoints already exist. (S)
+7. ✅ **One-click MCP connect (OAuth)** — claude.ai / Desktop connectors work with no token. (M–L) _Shipped._
 
 ## Bigger bets (highest popularity upside)
 
@@ -218,5 +224,6 @@ model as a first-class player and pair-programmer._
 - **Headless sim + ML hooks** (the tech-enthusiast magnet) — the groundwork is now
   in place (deterministic simulation, seeded RNG, and unbounded `"max"` speed
   ✅); what remains is an explicit step/read-state API and a CLI.
-- **OAuth remote-MCP auth** (lets claude.ai / Claude Desktop connect — the model
-  as a player and pair-programmer for the broadest audience).
+- ✅ **OAuth remote-MCP auth** _(shipped)_ — claude.ai / Claude Desktop connect
+  with one click (the model as a player and pair-programmer for the broadest
+  audience).

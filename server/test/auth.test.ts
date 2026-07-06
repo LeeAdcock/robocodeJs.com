@@ -17,7 +17,7 @@ vi.mock('../src/services/IdentityService', () => ({
   default: { get: vi.fn(), create: vi.fn() },
 }));
 
-import auth, { hashToken } from '../src/middleware/auth';
+import auth from '../src/middleware/auth';
 import userService from '../src/services/UserService';
 import identityService from '../src/services/IdentityService';
 
@@ -131,36 +131,16 @@ describe('auth middleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('resolves the user from a valid Bearer API token (by hash)', async () => {
-    const user = { getId: () => 'u9' };
-    vi.mocked(identityService.get).mockResolvedValue({
-      getUserId: () => 'u9',
-    } as never);
-    vi.mocked(userService.get).mockResolvedValue(user as never);
-
+  // Bearer tokens are no longer handled by this middleware — the MCP OAuth access
+  // token is verified on /api/mcp by the SDK's requireBearerAuth (see api/mcp.ts).
+  // A Bearer header here is simply ignored and the request falls through to the
+  // Google-cookie path (401 when there's no valid cookie).
+  it('ignores a Bearer header and falls through to the cookie path (401)', async () => {
+    // No valid session cookie, so Google verification rejects → 401.
+    verifyIdToken.mockRejectedValue(new Error('no credential'));
     const req = {
       cookies: {},
-      headers: { authorization: 'Bearer secret-token' },
-    } as never;
-    const res = makeRes();
-    const next = vi.fn();
-    await auth(true)(req, res, next);
-
-    // Looked up by the token's sha256 hash under the 'apikey' source, never the
-    // raw token; and Google verification is not consulted for a Bearer request.
-    const [source, sourceId] = vi.mocked(identityService.get).mock.calls[0];
-    expect(source).toBe('apikey');
-    expect(sourceId).toBe(hashToken('secret-token'));
-    expect((req as { user: unknown }).user).toBe(user);
-    expect(next).toHaveBeenCalled();
-    expect(verifyIdToken).not.toHaveBeenCalled();
-  });
-
-  it('rejects an unknown Bearer token with 401 when required', async () => {
-    vi.mocked(identityService.get).mockResolvedValue(undefined);
-    const req = {
-      cookies: {},
-      headers: { authorization: 'Bearer nope' },
+      headers: { authorization: 'Bearer whatever' },
     } as never;
     const res = makeRes();
     const next = vi.fn();
@@ -168,6 +148,5 @@ describe('auth middleware', () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
-    expect(verifyIdToken).not.toHaveBeenCalled();
   });
 });

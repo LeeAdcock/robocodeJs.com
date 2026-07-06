@@ -6,9 +6,14 @@ import {
   ResourceTemplate,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
+import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { z } from 'zod';
 
-import auth, { AuthenticatedRequest } from '../middleware/auth';
+import { AuthenticatedRequest, ensureDevUser } from '../middleware/auth';
+import { isLocalDev } from '../util/devMode';
+import userService from '../services/UserService';
+import { provider, RESOURCE_URL } from './oauth';
 import User from '../types/user';
 import Arena from '../types/arena';
 import TankApp from '../types/app';
@@ -999,11 +1004,48 @@ const registerPrompts = (server: McpServer): void => {
   );
 };
 
-// MCP over Streamable HTTP, mounted in-process and gated by auth(true) so the
-// bearer token resolves the acting user. Stateless: a fresh server + transport
+// Resolve the acting user for an MCP request. In local dev, auth is bypassed and
+// every request acts as the fixed "Local Dev" user (token-free connect). In
+// production, the SDK's requireBearerAuth verifies the OAuth access token against
+// our provider (emitting a spec-compliant 401 + WWW-Authenticate pointing at the
+// protected-resource metadata when it's missing/invalid), then we resolve the
+// user carried in the token's `extra.userId`.
+const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(RESOURCE_URL);
+const bearer = requireBearerAuth({ verifier: provider, resourceMetadataUrl });
+
+const mcpAuth: express.RequestHandler = (req, res, next) => {
+  if (isLocalDev && process.env.NODE_ENV !== 'production') {
+    ensureDevUser()
+      .then((user) => {
+        (req as AuthenticatedRequest).user = user;
+        next();
+      })
+      .catch(() => res.status(401).send('Access forbidden'));
+    return;
+  }
+  // requireBearerAuth sets req.auth (AuthInfo) on success, or answers 401 itself.
+  bearer(req, res, () => {
+    const userId = (
+      req as unknown as { auth?: { extra?: { userId?: string } } }
+    ).auth?.extra?.userId;
+    (userId ? userService.get(userId) : Promise.resolve(undefined))
+      .then((user) => {
+        if (!user) {
+          res.status(401).send('Access forbidden');
+          return;
+        }
+        (req as AuthenticatedRequest).user = user;
+        next();
+      })
+      .catch(() => res.status(500).send('Internal server error'));
+  });
+};
+
+// MCP over Streamable HTTP, mounted in-process and gated by mcpAuth so the OAuth
+// access token resolves the acting user. Stateless: a fresh server + transport
 // per request (auth is per-request and the tools hold no session state), torn
 // down when the response closes.
-app.post('/api/mcp', auth(true), async (req, res) => {
+app.post('/api/mcp', mcpAuth, async (req, res) => {
   const user = (req as AuthenticatedRequest).user;
   const server = buildServer(user);
   const transport = new StreamableHTTPServerTransport({
@@ -1040,7 +1082,7 @@ const methodNotAllowed = (_req: express.Request, res: express.Response) => {
     id: null,
   });
 };
-app.get('/api/mcp', auth(true), methodNotAllowed);
-app.delete('/api/mcp', auth(true), methodNotAllowed);
+app.get('/api/mcp', mcpAuth, methodNotAllowed);
+app.delete('/api/mcp', mcpAuth, methodNotAllowed);
 
 export default app;
