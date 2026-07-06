@@ -8,12 +8,16 @@ import oauthService from '../services/OAuthService';
 import { logger, LogEvent } from '../util/logger';
 
 // The public origin of this deployment, used as the OAuth issuer and to build the
-// browser login redirect. HTTPS is required by the spec except for localhost, so
-// the localhost default is only valid in dev; production sets MCP_ISSUER_URL to
-// the real https origin.
-export const ISSUER = new URL(
-  process.env.MCP_ISSUER_URL || 'http://localhost:5000'
-);
+// browser login redirect. It must be a fixed value at startup because the SDK
+// bakes it into the discovery metadata when the router is mounted. Defaults by
+// environment (prod → the live https origin, else the local dev proxy), mirroring
+// how GOOGLE_CLIENT_ID ships a hardcoded prod default; MCP_ISSUER_URL overrides it
+// for any other deployment. HTTPS is required by the spec except for localhost.
+const DEFAULT_ISSUER =
+  process.env.NODE_ENV === 'production'
+    ? 'https://robocodejs.com'
+    : 'http://localhost:5000';
+export const ISSUER = new URL(process.env.MCP_ISSUER_URL || DEFAULT_ISSUER);
 // The MCP endpoint is the protected resource whose metadata we advertise (its
 // path is inserted into the .well-known URL per RFC 9728).
 export const RESOURCE_URL = new URL('/api/mcp', ISSUER);
