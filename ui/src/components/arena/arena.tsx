@@ -119,7 +119,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           <g name="tanks">
             {apps.map((app) => {
               const appIndex =
-                props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0; //todo
+                props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
               return app.tanks.map((tank, tankIndex) => {
                 return tank.health <= 0 ? (
                   <TankSvg
@@ -145,7 +145,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
             })}
             {apps.map((app) => {
               const appIndex =
-                props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0; //todo
+                props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
               return app.tanks.map((tank, tankIndex) =>
                 tank.health > 0 ? (
                   <TankSvg

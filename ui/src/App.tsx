@@ -65,9 +65,6 @@ const Nav = (props: NavProps) => {
       doPause={() => axios.post(`/api/user/${props.user.id}/arena/pause`)}
       doResume={() => axios.post(`/api/user/${props.user.id}/arena/resume`)}
       doRestart={() => axios.post(`/api/user/${props.user.id}/arena/restart`)}
-      doSave={() => {
-        /* todo */
-      }}
       doRefresh={() => props.doCreateApp()}
       doCreateApp={() => {
         axios.post(`/api/user/${props.user.id}/app`).then((res) => {
@@ -325,7 +322,6 @@ function App() {
     }
     // A fresh stream replays current state; drop anything left from the old one.
     buffer.current.flush();
-    // todo externalize the server
     const source = new EventSource(
       user
         ? `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
@@ -397,7 +393,6 @@ function App() {
             arena={arena}
             isPaused={isPaused}
             doCreateApp={() => {
-              // todo
               axios
                 .get(`/api/user/${user.id}`)
                 .then((res) => setUser(res.data));
@@ -445,7 +440,6 @@ function App() {
                     <AppPage
                       arena={arena}
                       doDelete={() => {
-                        // todo
                         axios
                           .get(`/api/user/${user.id}`)
                           .then((res) => setUser(res.data));

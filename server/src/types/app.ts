@@ -42,7 +42,6 @@ export default class App {
   getName = () => this.name || 'Unnamed';
   setName = (name: string): Promise<undefined> => {
     this.name = name;
-    // todo debounce
     return pool
       .query({
         text: 'UPDATE app SET name=$2, updatedTimestamp=CURRENT_TIMESTAMP WHERE id=$1',
