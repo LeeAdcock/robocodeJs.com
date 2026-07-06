@@ -60,4 +60,4 @@ of? Just want to say hello?
 
 **Reach me at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com).**
 
-Thanks for playing, and now go build something that strikes fear into the arena. 🤖
+Thanks for playing. Now go build something that strikes fear into the arena! 🤖
