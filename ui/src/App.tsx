@@ -42,6 +42,7 @@ const CADENCE_EVENTS = new Set([
 // binding is initialized before use (avoids a dev-mode temporal-dead-zone error).
 const AppPage = lazy(() => import('./page/app/appPage'));
 const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
+const AddAppPage = lazy(() => import('./page/arena/addAppPage'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
@@ -67,6 +68,7 @@ const Nav = (props: NavProps) => {
       doSave={() => {
         /* todo */
       }}
+      doRefresh={() => props.doCreateApp()}
       doCreateApp={() => {
         axios.post(`/api/user/${props.user.id}/app`).then((res) => {
           const appId = res.data.appId;
@@ -455,6 +457,20 @@ function App() {
                 <Route
                   path="user/:userId/arena/logs"
                   element={<ArenaLogPage />}
+                />
+                <Route
+                  path="/add-app/:appId"
+                  element={
+                    <AddAppPage
+                      user={user}
+                      onAdded={() =>
+                        user &&
+                        axios
+                          .get(`/api/user/${user.id}`)
+                          .then((res) => setUser(res.data))
+                      }
+                    />
+                  }
                 />
               </Routes>
             </Suspense>

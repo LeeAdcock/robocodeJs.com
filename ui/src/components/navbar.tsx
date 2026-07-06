@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Navbar from 'react-bootstrap/Navbar';
 import Nav from 'react-bootstrap/Nav';
 import NavDropdown from 'react-bootstrap/NavDropdown';
@@ -22,6 +22,7 @@ import Arena from '../types/arena';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { titleCase } from '../util/titleCase';
+import ArenaRoster from './arenaRoster';
 
 interface AppLinkProps {
   arena: Arena;
@@ -69,11 +70,15 @@ interface NavBarProps {
   doRestart: () => void;
   doSave: () => void;
   doCreateApp: () => void;
+  // Refresh the parent's user after roster changes (so the Apps list reflects a
+  // newly created bot). Optional so existing callers/tests need no change.
+  doRefresh?: () => void;
 }
 
 export default function NavBar(props: NavBarProps) {
   const navigate = useNavigate();
   const darkMode = useDarkMode();
+  const [showRoster, setShowRoster] = useState(false);
 
   return (
     <>
@@ -149,6 +154,9 @@ export default function NavBar(props: NavBarProps) {
                 </NavDropdown>
                 <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
                 <NavDropdown title="Arena" id="basic-nav-dropdown">
+                  <NavDropdown.Item onClick={() => setShowRoster(true)}>
+                    Manage apps
+                  </NavDropdown.Item>
                   <NavDropdown.Item
                     onClick={() =>
                       navigate(`/user/${props.user.id}/arena/logs`)
@@ -248,6 +256,15 @@ export default function NavBar(props: NavBarProps) {
           </Nav>
         </Navbar.Collapse>
       </Navbar>
+      {props.user && (
+        <ArenaRoster
+          show={showRoster}
+          onHide={() => setShowRoster(false)}
+          userId={props.user.id}
+          arena={props.arena}
+          onChanged={props.doRefresh}
+        />
+      )}
     </>
   );
 }

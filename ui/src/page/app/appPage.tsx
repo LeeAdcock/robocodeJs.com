@@ -146,6 +146,41 @@ export default function AppPage(props: AppPageProps) {
       .then(() => navigate(`/user/${userId}`));
   };
 
+  // Copy a share link for this app to the clipboard. The link points at the
+  // /add-app/:appId landing page, which lets whoever follows it add this app to
+  // their own arena by reference (its source stays owner-private). Uses the
+  // async Clipboard API where available (needs a secure context), with a
+  // legacy execCommand fallback for plain-http / older browsers.
+  const doShare = () => {
+    const link = `${window.location.origin}/add-app/${appId}`;
+    const done = () => {
+      setError('');
+      setNotice('Share link copied to your clipboard.');
+      setTimeout(() => setNotice(''), 4000);
+    };
+    const fallback = () => {
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        done();
+      } catch {
+        setNotice('');
+        setError(`Could not copy the link. Copy it manually: ${link}`);
+      }
+      document.body.removeChild(textarea);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  };
+
   // Dry-run compile the current (possibly unsaved) buffer without deploying it,
   // and surface the result: a green notice when clean, or the error code + message
   // in the red banner when not. See the /error-codes docs for what each code means.
@@ -240,6 +275,7 @@ export default function AppPage(props: AppPageProps) {
               appName={app?.name ?? ''}
               code={code}
               doDelete={doDelete}
+              doShare={doShare}
               doExecute={doExecute}
               doReboot={doReboot}
               doClean={doClean}

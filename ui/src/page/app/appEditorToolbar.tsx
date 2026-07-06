@@ -14,6 +14,7 @@ import {
   FaSearchMinus,
   FaSearchPlus,
   FaPowerOff,
+  FaShareAlt,
 } from 'react-icons/fa';
 
 import { EDITOR_FONT_MIN, EDITOR_FONT_MAX } from './appEditor';
@@ -22,6 +23,7 @@ interface EditorToolbarProps {
   code: string;
   appName: string;
   doDelete: () => void;
+  doShare: () => void;
   doClean: () => void;
   doCheck: () => void;
   doExecute: () => void;
@@ -158,6 +160,25 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           <OverlayTrigger
             placement={'bottom'}
             overlay={
+              <Tooltip id={`share-app`}>
+                Copy a share link — anyone who follows it can add this app to
+                their own arena (your source stays private).
+              </Tooltip>
+            }
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Copy share link"
+              onClick={() => props.doShare()}
+            >
+              <FaShareAlt />
+            </Button>
+          </OverlayTrigger>
+
+          <OverlayTrigger
+            placement={'bottom'}
+            overlay={
               <Tooltip id={`delete-app`}>
                 Destroy this application and its bots. Be careful!
               </Tooltip>
@@ -166,6 +187,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             <Button
               variant="secondary"
               size="sm"
+              aria-label="Delete app"
               onClick={() => props.doDelete()}
             >
               <FaTrash />

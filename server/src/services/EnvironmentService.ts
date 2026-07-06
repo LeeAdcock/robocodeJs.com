@@ -38,9 +38,14 @@ export class EnvironmentService {
       .getForArena(arena.getId())
       .then((members) =>
         Promise.all(
-          members.map((member) => {
-            env.processes.push(new Process(member.getAppId()));
-          })
+          // Disabled members keep their link but don't participate in the match,
+          // so they're never given a Process (isolate). Re-enabling adds one live
+          // via Environment.addApp (see api/arena.ts setEnabled).
+          members
+            .filter((member) => member.getEnabled())
+            .map((member) => {
+              env.processes.push(new Process(member.getAppId()));
+            })
         ).then(() => env)
       )
       .then(() => env.restart().then(() => env));

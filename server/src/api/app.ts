@@ -21,6 +21,20 @@ import { computeRateLimit, writeRateLimit } from '../middleware/rateLimit';
 
 const app = express();
 
+// Resolve a bot's public metadata (id + name + owner) by its id alone — for the
+// "add existing bot by UUID" / share-link flow, where the caller has only the
+// bot's id and not its owner's userId. Gated to any signed-in user by the
+// `app.use('/api/app', auth(true))` line in index.ts. Returns NO source — source
+// stays behind the owner-gated /user/:userId/app/:appId/source route.
+app.get('/api/app/:appId', loadApp, (req, res) => {
+  const target = scopedApp(req);
+  res.json({
+    id: target.getId(),
+    name: target.getName(),
+    userId: target.getUserId(),
+  });
+});
+
 // Caps the number of apps (bots) a single user can own. Each app compiles into
 // an 8 MB isolate per arena it runs in, so this bounds a user's isolate/memory
 // footprint alongside MAX_ARENAS_PER_USER (see api/arena.ts).

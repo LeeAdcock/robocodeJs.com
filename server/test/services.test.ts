@@ -112,7 +112,7 @@ describe('ArenaMemberService', () => {
   it('create() inserts the row and returns a member with the correct ids', async () => {
     const member = await arenaMemberService.create('arena1', 'app1');
     expect(query).toHaveBeenCalledWith(
-      expect.objectContaining({ values: ['arena1', 'app1'] })
+      expect.objectContaining({ values: ['arena1', 'app1', true] })
     );
     expect(member.getAppId()).toBe('app1');
     expect(member.getArenaId()).toBe('arena1');
