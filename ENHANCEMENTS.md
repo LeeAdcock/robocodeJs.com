@@ -204,6 +204,26 @@ model as a first-class player and pair-programmer._
   revoke) is covered in `test/oauth.test.ts` against pg-mem, and an unauthenticated
   `POST /api/mcp` is asserted to 401 with `WWW-Authenticate`. Still missing: a test
   that drives `/api/mcp` through a real access-token `Authorization: Bearer` header.
+- **Partial / config source updates.** (S–M) `set_bot_source` replaces the whole
+  program, so tuning one constant means resending the entire bot each iteration. Add
+  a patch path or a `set_bot_config(appId, {...})` that merges a small config object,
+  to shrink iterative-tuning payloads (a model may resend a bot 10–15× while tuning).
+- **Settable arena config on create.** (S–M) Expose arena size and sudden-death /
+  max-tick timing on `create_arena` so a model can shorten matches (faster
+  tournaments) or vary the battlefield. Pairs with `set_arena_speed`.
+- **Batch bot setup.** (S) A `create_bot(…, addToArena)` option (or a bulk add) —
+  standing up a 5-bot tournament arena is otherwise ~10 separate calls.
+- **Editor live-reload on external edits.** (S–M) When a bot's source changes
+  out-of-band — e.g. an MCP client calls `set_bot_source` — the open editor has no
+  idea. If that bot is the one on screen, detect the change (an SSE/resource
+  notification, or an app version/etag) and reload it live, or surface a
+  non-destructive "updated elsewhere — reload?" prompt to protect unsaved edits.
+  Keeps the human and the AI pair-programmer on the same source.
+- **Reliability observations (from AI-driving; verify still reproduce).** (S) Two
+  glitches seen while a model drove the MCP end-to-end: (a) `get_bot_source` returned
+  empty for a starter bot that has source; (b) after `rename_bot` _plus_ a code
+  `setName(...)`, `arena_status` kept reporting the bot's old name across
+  restart/reboot (a cached name rather than the live app/process name).
 
 ---
 

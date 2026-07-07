@@ -25,6 +25,8 @@ To create your first bot, sign in with your Google account and use the menu to s
 code. The quick walkthrough below builds a simple bot in a few minutes — or jump straight
 into the [course](/learn).
 
+# Coding your first JavaScript bot
+
 ## Naming your Bot
 
 In our applications, the bots are represented by the `bot` object which has a collection of methods and properties you can use to control your bot. For our first bot, we'll use the `setName(...)` method to provide our bot its new name. This method takes a text string as its only parameter, pick a name that will spark fear among the other bots in the arena!
@@ -85,4 +87,4 @@ Next you may want to skim through the detailed [RobocodeJs documentation](/dev),
 
 ---
 
-_RobocodeJs is a passion project by **Lee** — a web-enabled version of, and love letter to, the classic Robocode. [Read the story](/about), or say hi at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com)._
+_RobocodeJs is a passion project, a web-enabled version of, and love letter to, the classic Robocode. [Read the story](/about), or say hi at [Lee@RobocodeJs.com](mailto:Lee@RobocodeJs.com)._

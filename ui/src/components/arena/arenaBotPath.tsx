@@ -87,6 +87,12 @@ const BotPathSvg = (props: BotPathProps) => {
               'rotate(180)',
               'rotate(' + angle + ')',
             ].join(' ')}
+            // A segment's opacity steps down each time a new vertex is recorded
+            // (the trail grows, so trailSegmentOpacity recomputes lower). Animate
+            // just the opacity so those steps fade smoothly; geometry is left to
+            // snap instantly (transitioning it would morph segments as the trail
+            // rebuilds/wraps). Matches the 200ms playback cadence used elsewhere.
+            style={{ transition: 'opacity 200ms linear' }}
           />
         );
       })}
