@@ -50,6 +50,7 @@ describe('AppPage (bot editor)', () => {
     render(
       <MemoryRouter initialEntries={['/user/u1/app/a1']}>
         <Routes>
+          <Route path="/" element={<div data-testid="home">home</div>} />
           <Route
             path="/user/:userId/app/:appId"
             element={
@@ -99,6 +100,20 @@ describe('AppPage (bot editor)', () => {
     renderPage();
     await screen.findByTestId('editor');
     expect(screen.getByLabelText('Reset text size').textContent).toBe('18');
+  });
+
+  it('deleting the app (after confirming) redirects to the homepage, not a stub route', async () => {
+    vi.mocked(axios.delete).mockResolvedValue({ data: {} } as never);
+    renderPage();
+    await screen.findByTestId('editor');
+
+    // First click only opens the confirmation; delete fires on confirm.
+    fireEvent.click(screen.getByLabelText('Delete app'));
+    fireEvent.click(screen.getByLabelText('Confirm delete app'));
+
+    expect(axios.delete).toHaveBeenCalledWith('/api/user/u1/app/a1');
+    // Lands on the homepage ('/'), not the old '/user/:userId' placeholder.
+    expect(await screen.findByTestId('home')).toBeTruthy();
   });
 
   it('share button copies the /add-app link and shows a copied notice', async () => {

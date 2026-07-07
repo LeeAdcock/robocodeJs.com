@@ -143,7 +143,10 @@ export default function AppPage(props: AppPageProps) {
     axios
       .delete(`/api/user/${userId}/app/${appId}`)
       .then(props.doDelete)
-      .then(() => navigate(`/user/${userId}`));
+      // The just-deleted app's editor route no longer points at anything, so
+      // return to the homepage (the arena stays in the right pane; the navbar's
+      // app list is refreshed by props.doDelete).
+      .then(() => navigate(`/`));
   };
 
   // Copy a share link for this app to the clipboard. The link points at the
