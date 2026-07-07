@@ -116,7 +116,7 @@ export class Process {
 // Tick-denominated (compared against clock.time, not wall time) so its real-time
 // onset scales with `speed` and outcomes stay identical across speeds. Exported
 // so the match-summary util reports the same threshold instead of duplicating it.
-export const SUDDEN_DEATH_TIME = 10000;
+export const SUDDEN_DEATH_TIME = 7500;
 
 // Ticks of damage-free "deployment" at the start of a match: bullets deal no
 // damage (bots still move, scan, aim, and fire) so teams can settle off their
