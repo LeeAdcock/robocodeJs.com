@@ -9,6 +9,9 @@ import securityHeaders from './middleware/securityHeaders';
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit';
 import { isLocalDev } from './util/devMode';
 import { logger, LogEvent } from './util/logger';
+import { collectMetrics } from './util/metrics';
+import pool from './util/db';
+import environmentService from './services/EnvironmentService';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
@@ -120,7 +123,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const port = 8080;
-app.listen(port, () => {
+const server = app.listen(port, () => {
   logger.info({ port }, `server started at http://localhost:${port}`);
   if (isLocalDev) {
     logger.info(
@@ -130,3 +133,71 @@ app.listen(port, () => {
     );
   }
 });
+
+// Periodic operational-metrics heartbeat: emit the same cheap gauges /health
+// serves as a structured `event=metrics` log line, so they become a time series
+// for dashboards/alerting (e.g. a CloudWatch metric filter on the event field)
+// without anyone having to poll /health. Interval is env-tunable (0 disables);
+// unref'd so it never keeps the process alive during shutdown. Skipped under test.
+const metricsIntervalMs = parseInt(
+  process.env.METRICS_LOG_INTERVAL_MS || '60000'
+);
+if (process.env.NODE_ENV !== 'test' && metricsIntervalMs > 0) {
+  const metricsTimer = setInterval(() => {
+    logger.info(
+      {
+        event: LogEvent.METRICS,
+        ...collectMetrics(),
+        uptimeSec: Math.round(process.uptime()),
+      },
+      'operational metrics'
+    );
+  }, metricsIntervalMs);
+  metricsTimer.unref();
+}
+
+// Graceful shutdown: on a deploy/restart signal, stop accepting new connections,
+// dispose every live isolate (releasing native isolated-vm memory) and close the
+// pg pool, so a redeploy doesn't leak native resources. This matters on the small
+// prod instance where leaked isolates across in-place deploys contribute to OOM.
+// Guarded so a repeated signal is a no-op, with a failsafe timeout in case the
+// orderly close hangs (a stuck connection or pool client).
+let shuttingDown = false;
+const shutdown = (signal: NodeJS.Signals) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(
+    { event: LogEvent.SHUTDOWN, signal },
+    `received ${signal}, shutting down gracefully`
+  );
+
+  const failsafe = setTimeout(() => {
+    logger.error(
+      { event: LogEvent.SHUTDOWN, signal },
+      'graceful shutdown timed out; forcing exit'
+    );
+    process.exit(1);
+  }, 10000);
+  failsafe.unref();
+
+  server.close(async () => {
+    try {
+      const isolatesDisposed = environmentService.disposeAll();
+      await pool.end();
+      logger.info(
+        { event: LogEvent.SHUTDOWN, signal, isolatesDisposed },
+        'graceful shutdown complete'
+      );
+    } catch (err) {
+      logger.error(
+        { event: LogEvent.SHUTDOWN, signal, err },
+        'error during graceful shutdown'
+      );
+    } finally {
+      clearTimeout(failsafe);
+      process.exit(0);
+    }
+  });
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

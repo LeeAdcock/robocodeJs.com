@@ -27,8 +27,13 @@ This file is the **engineering/health backlog**. For product feature ideas
 
 - ✅ **Upgrade TypeScript 4.9 → 5.x** (both packages). _Done._ Both packages are on
   TypeScript 5.9, with `pino` v10 and `@typescript-eslint` v8.
-- **Graceful shutdown.** (S) On `SIGTERM`/`SIGINT`, dispose isolates and close the
-  pg pool so deploys/restarts don't leak native resources.
+- ✅ **Graceful shutdown.** (S) _Done._ On `SIGTERM`/`SIGINT` the server stops
+  accepting new connections (`server.close`), disposes every live isolate
+  (`EnvironmentService.disposeAll`) and closes the pg pool (`pool.end`), then
+  exits — so deploys/restarts don't leak native `isolated-vm` resources (a real
+  factor in the small-instance OOM history). Guarded against repeated signals with
+  a 10s failsafe; lifecycle logged via the `process.shutdown` `LogEvent`
+  (`index.ts`).
 - **DB schema migrations.** (M) Schema is created ad-hoc via
   `CREATE TABLE IF NOT EXISTS` at import; columns can't evolve safely. Introduce a
   lightweight migration tool (e.g. `node-pg-migrate`).
@@ -54,10 +59,17 @@ This file is the **engineering/health backlog**. For product feature ideas
 - **Burn down remaining `~18` TODOs** in `server/src` / `ui/src` (e.g. debounce
   `app.setSource` persistence, "only if actual change" guards, validate uploaded
   source). Mostly small.
-- **Operational metrics.** (M) Structured logging is done (pino + request logs +
-  named fault/security events — see the server README "Logging & monitoring").
-  Still missing: metrics/gauges (e.g. live isolate count, tick duration) and
-  alert wiring on the `event=*` log fields.
+- **Operational metrics.** (M) _Partly done._ Structured logging (pino + request
+  logs + named fault/security events — see the server README "Logging &
+  monitoring") and now point-in-time **gauges on `/health`**: live arena count,
+  running arenas, total isolates, the busiest arena's EMA tick duration
+  (`Environment` maintains it in `runLoop`), and process memory (rss/heap) +
+  uptime. Kept O(arenas) with no async so it's safe on every ALB health check
+  (`util`/`services/EnvironmentService.metrics`, `util/metrics.ts`,
+  `api/health.ts`), plus a periodic `event=metrics` **log heartbeat** for
+  time-series/alerting (`index.ts`, `METRICS_LOG_INTERVAL_MS`-tunable, off under
+  test). Still missing: a `/metrics` scrape endpoint (Prometheus) and alert wiring
+  on the `event=*` log fields (e.g. CloudWatch metric filters).
 
 ## Known & accepted (not action items)
 
