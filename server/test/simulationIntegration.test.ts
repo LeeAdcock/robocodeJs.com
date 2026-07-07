@@ -46,6 +46,8 @@ function makeWorld() {
       .getSandbox()
       .compileScriptSync(source)
       .runSync(bot.getContext(), { timeout: 5000 });
+    // Loaded synchronously here, so Simulation may start/tick it immediately.
+    bot.codeLoaded = true;
     return bot;
   };
 

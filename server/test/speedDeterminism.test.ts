@@ -65,6 +65,8 @@ const runBattle = async (ticks: number, pace?: () => Promise<void>) => {
       .getSandbox()
       .compileScriptSync(source)
       .runSync(bot.getContext(), { timeout: 5000 });
+    // Loaded synchronously here, so Simulation may start/tick it immediately.
+    bot.codeLoaded = true;
     return bot;
   };
 

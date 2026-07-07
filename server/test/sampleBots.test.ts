@@ -55,6 +55,8 @@ describe('sample bots run without crashing', () => {
       .getSandbox()
       .compileScriptSync(source)
       .runSync(bot.getContext(), { timeout: 5000 });
+    // Loaded synchronously here, so Simulation may start/tick it immediately.
+    bot.codeLoaded = true;
 
     // START + TICK run via the simulation; then fire the inbound events a bot
     // might subscribe to (no-ops if it doesn't), and drive long enough for the
