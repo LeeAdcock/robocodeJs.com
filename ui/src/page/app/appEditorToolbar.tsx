@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
+import Modal from 'react-bootstrap/Modal';
 
 import {
   FaCode,
@@ -35,6 +36,9 @@ interface EditorToolbarProps {
 }
 
 export default function EditorToolbar(props: EditorToolbarProps) {
+  // Deleting an app is destructive and irreversible, so gate the trash button
+  // behind a confirmation dialog rather than firing on a single click.
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   return (
     <>
       <ButtonToolbar style={{ justifyContent: 'flex-end' }}>
@@ -188,7 +192,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               variant="secondary"
               size="sm"
               aria-label="Delete app"
-              onClick={() => props.doDelete()}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               <FaTrash />
             </Button>
@@ -220,6 +224,39 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           </OverlayTrigger>
         </ButtonGroup>
       </ButtonToolbar>
+
+      <Modal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Delete this app?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Deleting <strong>{props.appName || 'this app'}</strong> permanently
+          destroys the application and its bots, and removes it from every
+          arena. This can&apos;t be undone.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            aria-label="Confirm delete app"
+            onClick={() => {
+              setShowDeleteConfirm(false);
+              props.doDelete();
+            }}
+          >
+            <FaTrash /> Delete app
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 }
