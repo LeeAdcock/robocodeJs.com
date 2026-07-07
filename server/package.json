@@ -38,7 +38,7 @@
     "@types/node": "^24.13.2",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^6.0.2",
-    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.62.0",
     "eslint": "^8.57.1",
     "nodemon": "^3.1.14",
@@ -48,7 +48,7 @@
     "prettier": "^3.9.4",
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "npm": ">=10.0.0",
