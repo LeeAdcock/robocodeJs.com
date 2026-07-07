@@ -255,15 +255,6 @@ function App() {
           .then((res) => setUser(res.data));
       })
       .catch(() => undefined);
-
-    // pause on lost focus
-    const pause = () => {
-      if (user) axios.post(`/api/user/${user.id}/arena/pause`);
-    };
-    window.addEventListener('blur', pause);
-    return () => {
-      window.removeEventListener('blur', pause);
-    };
   }, []);
 
   // (Re)render the Google sign-in button whenever the theme changes so it
@@ -330,6 +321,21 @@ function App() {
     );
     eventSource.current = source;
 
+    // On a *re*connect (network blip, laptop sleep/wake), the browser silently
+    // reopens the stream and the server replays current placement — but any
+    // structural events missed during the gap (removes, bullet lifecycle) are
+    // lost, leaving ghosts or a stale arena. Reconcile from the authoritative
+    // snapshot on every open after the first; the initial state is already
+    // loaded by the doReloadArena effect, so skip that one.
+    let hasOpened = false;
+    source.onopen = () => {
+      if (hasOpened) {
+        buffer.current.flush();
+        doReloadArena();
+      }
+      hasOpened = true;
+    };
+
     source.onmessage = (message) => {
       const data = JSON.parse(message.data);
       emitter.emit(data.type, data);
@@ -369,7 +375,20 @@ function App() {
       setArena((arena) => applyArenaEvent(arena, data, timeRef.current));
     };
 
+    // Returning to a backgrounded tab: the rAF playback loop was suspended while
+    // hidden, so the jitter buffer holds a stale backlog that would fast-forward
+    // ("rapid update") when the loop resumes. Drop it and resync from the current
+    // snapshot instead of replaying the backlog.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        buffer.current.flush();
+        doReloadArena();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
       source.close();
       eventSource.current = undefined;
     };

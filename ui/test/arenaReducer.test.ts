@@ -52,11 +52,48 @@ describe('applyArenaEvent — apps', () => {
     expect(arena.apps.map((a: any) => a.id)).toEqual(['a1', 'a3']);
   });
 
-  it('arenaPlaceApp replaces an existing app of the same id', () => {
-    const arena = makeArena([makeApp('a1'), makeApp('a2')]);
+  it('arenaPlaceApp on an existing app updates its name in place without wiping bots', () => {
+    // Regression: the SSE replay's arenaPlaceApp used to splice+recreate the app
+    // with an empty bots array, wiping bots already loaded from the REST snapshot
+    // (the "bots missing until restart" bug). It must now preserve bots and order.
+    const arena = makeArena([
+      makeApp('a1', [makeBot('t1'), makeBot('t2')]),
+      makeApp('a2'),
+    ]);
     apply(arena, { type: 'arenaPlaceApp', id: 'a1', name: 'New' });
-    expect(arena.apps.map((a: any) => a.id)).toEqual(['a2', 'a1']);
-    expect(arena.apps.find((a: any) => a.id === 'a1').name).toBe('New');
+    expect(arena.apps.map((a: any) => a.id)).toEqual(['a1', 'a2']); // order kept
+    const a1 = arena.apps.find((a: any) => a.id === 'a1');
+    expect(a1.name).toBe('New');
+    expect(a1.bots.map((t: any) => t.id)).toEqual(['t1', 't2']); // bots kept
+  });
+
+  it('arenaPlaceBot before its arenaPlaceApp still attaches the bot (order-independent)', () => {
+    // On a fresh/reconnected stream the server replays app-then-bots, but to be
+    // resilient the reducer must not drop a bot whose app is not present yet: it
+    // lazily creates a placeholder app that the later arenaPlaceApp fills in.
+    const arena = makeArena([]);
+    apply(arena, {
+      type: 'arenaPlaceBot',
+      appId: 'a1',
+      id: 't1',
+      x: 50,
+      y: 60,
+      speed: 0,
+      speedMax: 5,
+      bodyOrientation: 0,
+      bodyOrientationVelocity: 0,
+      turretOrientation: 0,
+      turretOrientationVelocity: 0,
+      radarOrientation: 0,
+      radarOrientationVelocity: 0,
+    });
+    // Bot attached to a lazily-created app...
+    expect(arena.apps.map((a: any) => a.id)).toEqual(['a1']);
+    expect(arena.apps[0].bots.map((t: any) => t.id)).toEqual(['t1']);
+    // ...and the app's real name arrives afterward without dropping the bot.
+    apply(arena, { type: 'arenaPlaceApp', id: 'a1', name: 'Late' });
+    expect(arena.apps[0].name).toBe('Late');
+    expect(arena.apps[0].bots.map((t: any) => t.id)).toEqual(['t1']);
   });
 
   it('appRenamed updates the matching app name', () => {

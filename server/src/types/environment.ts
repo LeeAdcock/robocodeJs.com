@@ -199,30 +199,33 @@ export default class Environment {
     if (eventName === 'event') {
       this.processes.forEach((process) => {
         appService.get(process.getAppId()).then((app) => {
-          if (app) {
-            listener({
-              type: 'arenaPlaceApp',
-              id: process.getAppId(),
-              name: app.getName(),
-            });
-          }
-        });
-        process.bots.forEach((bot) => {
-          // Emit new bot event
+          if (!app) return;
+          // Emit the app placement BEFORE its bots. The client reducer attaches
+          // each arenaPlaceBot to an already-placed app, so a bot arriving first
+          // would be dropped — the bootstrap/reconnect race that left bots
+          // missing until a restart. Emitting bots inside this `.then` (after the
+          // app) guarantees the order, matching restart()'s app-then-bots path.
           listener({
-            type: 'arenaPlaceBot',
-            id: bot.id,
-            appId: process.getAppId(),
-            bodyOrientation: bot.orientation,
-            bodyOrientationVelocity: bot.orientationVelocity,
-            turretOrientation: bot.turret.orientation,
-            turretOrientationVelocity: bot.turret.orientationVelocity,
-            radarOrientation: bot.turret.radar.orientation,
-            radarOrientationVelocity: bot.turret.radar.orientationVelocity,
-            speed: bot.speed,
-            speedMax: bot.speedMax,
-            x: bot.x,
-            y: bot.y,
+            type: 'arenaPlaceApp',
+            id: process.getAppId(),
+            name: app.getName(),
+          });
+          process.bots.forEach((bot) => {
+            listener({
+              type: 'arenaPlaceBot',
+              id: bot.id,
+              appId: process.getAppId(),
+              bodyOrientation: bot.orientation,
+              bodyOrientationVelocity: bot.orientationVelocity,
+              turretOrientation: bot.turret.orientation,
+              turretOrientationVelocity: bot.turret.orientationVelocity,
+              radarOrientation: bot.turret.radar.orientation,
+              radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+              speed: bot.speed,
+              speedMax: bot.speedMax,
+              x: bot.x,
+              y: bot.y,
+            });
           });
         });
       });
