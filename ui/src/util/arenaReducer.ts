@@ -114,15 +114,20 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
       apps.splice(index, 1);
     }
   } else if (data.type === 'arenaPlaceApp') {
-    const index = apps.findIndex((app) => app && app.id === data.id);
-    if (index >= 0) {
-      apps.splice(index, 1);
+    // Non-destructive: if the app is already present (from the REST snapshot or a
+    // prior/lazy placement), just refresh its name — do NOT recreate it with an
+    // empty bots array, which used to wipe bots when the SSE replay landed after
+    // the snapshot. A first-time app is created empty for its bots to attach to.
+    const existing = apps.find((app) => app && app.id === data.id);
+    if (existing) {
+      existing.name = data.name;
+    } else {
+      apps.push({
+        id: data.id,
+        name: data.name,
+        bots: [],
+      });
     }
-    apps.push({
-      id: data.id,
-      name: data.name,
-      bots: [],
-    });
   } else if (data.type === 'arenaRemoveBot') {
     apps
       .filter((app) => app.id === data.appId)
@@ -133,42 +138,46 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
         }
       });
   } else if (data.type === 'arenaPlaceBot') {
-    apps
-      .filter((app) => app.id === data.appId)
-      .forEach((app) => {
-        if (!app.bots.find((t) => t.id === data.id)) {
-          const bot = {
-            id: data.id,
-            speed: data.speed,
-            speedTarget: 0,
-            speedAcceleration: 0,
-            speedMax: data.speedMax,
-            bodyOrientation: data.bodyOrientation,
-            bodyOrientationTarget: data.bodyOrientation,
-            bodyOrientationVelocity: data.bodyOrientationVelocity,
-            turretOrientation: data.turretOrientation,
-            turretOrientationTarget: data.turretOrientation,
-            turretOrientationVelocity: data.turretOrientationVelocity,
-            radarOrientation: data.radarOrientation,
-            radarOrientationTarget: data.radarOrientation,
-            radarOrientationVelocity: data.radarOrientationVelocity,
-            radarOn: false,
-            bullets: [],
-            health: 100,
-            path: Array<PointInTime>(20),
-            pathIndex: 0,
-            x: data.x,
-            y: data.y,
-          };
-          bot.path[0] = {
-            x: data.x,
-            y: data.y,
-            time,
-          };
-          bot.pathIndex = 1;
-          app.bots.push(bot);
-        }
-      });
+    // Order-independent: if the bot's app hasn't been placed yet (e.g. its
+    // arenaPlaceApp is still in flight), create a placeholder app now so the bot
+    // isn't dropped. A later arenaPlaceApp fills in the real name (see above).
+    let app = apps.find((a) => a.id === data.appId);
+    if (!app) {
+      app = { id: data.appId, name: '', bots: [] };
+      apps.push(app);
+    }
+    if (!app.bots.find((t) => t.id === data.id)) {
+      const bot = {
+        id: data.id,
+        speed: data.speed,
+        speedTarget: 0,
+        speedAcceleration: 0,
+        speedMax: data.speedMax,
+        bodyOrientation: data.bodyOrientation,
+        bodyOrientationTarget: data.bodyOrientation,
+        bodyOrientationVelocity: data.bodyOrientationVelocity,
+        turretOrientation: data.turretOrientation,
+        turretOrientationTarget: data.turretOrientation,
+        turretOrientationVelocity: data.turretOrientationVelocity,
+        radarOrientation: data.radarOrientation,
+        radarOrientationTarget: data.radarOrientation,
+        radarOrientationVelocity: data.radarOrientationVelocity,
+        radarOn: false,
+        bullets: [],
+        health: 100,
+        path: Array<PointInTime>(20),
+        pathIndex: 0,
+        x: data.x,
+        y: data.y,
+      };
+      bot.path[0] = {
+        x: data.x,
+        y: data.y,
+        time,
+      };
+      bot.pathIndex = 1;
+      app.bots.push(bot);
+    }
   } else if (data.type === 'turretTurn') {
     apps.forEach((app) =>
       app.bots.forEach((bot) => {
