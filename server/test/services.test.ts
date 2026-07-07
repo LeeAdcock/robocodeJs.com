@@ -49,6 +49,15 @@ describe('AppService', () => {
     expect(apps.map((a) => a.getName())).toEqual(['N1', 'N2']);
   });
 
+  it('get() coerces a NULL source (legacy rows) to an empty string', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'Cool Bot', source: null }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+    expect(app?.getSource()).toBe('');
+  });
+
   it('create() inserts and returns an app owned by the user', async () => {
     const app = await appService.create('u1');
     expect(app.getUserId()).toBe('u1');
@@ -58,6 +67,18 @@ describe('AppService', () => {
         text: expect.stringContaining('INSERT INTO app'),
       })
     );
+  });
+
+  it('create() inserts a non-NULL empty-string source, not NULL', async () => {
+    await appService.create('u1');
+    const insert = query.mock.calls.find(([arg]) =>
+      (arg as { text?: string }).text?.includes('INSERT INTO app')
+    );
+    expect(insert).toBeDefined();
+    const { text, values } = insert![0] as { text: string; values: unknown[] };
+    // source is now an explicit column in the insert, and its value is '' (never NULL)
+    expect(text).toContain('source');
+    expect(values).toContain('');
   });
 });
 

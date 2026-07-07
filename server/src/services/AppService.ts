@@ -7,7 +7,7 @@ pool.query(`
   CREATE TABLE IF NOT EXISTS app (
     id UUID,
     userId UUID,
-    source text,
+    source text default '',
     name text,
     deleted boolean default false,
     createdTimestamp timestamp default CURRENT_TIMESTAMP,
@@ -22,8 +22,12 @@ export class AppService {
     const app = new App(appId, userId);
     return pool
       .query({
-        text: 'INSERT INTO app(id, userId, name) VALUES($1, $2, $3)',
-        values: [app.getId(), app.getUserId(), app.getName()],
+        // Insert an empty-string source rather than leaving it NULL: a NULL
+        // source reads back as an empty bot before setSource lands and is a
+        // foot-gun for any consumer that assumes a string (get_app_source, the
+        // compiler, the editor). See App.hydrate for the read-side guard.
+        text: 'INSERT INTO app(id, userId, name, source) VALUES($1, $2, $3, $4)',
+        values: [app.getId(), app.getUserId(), app.getName(), app.getSource()],
       })
       .then(() => Promise.resolve(app));
   };

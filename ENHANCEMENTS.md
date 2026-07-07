@@ -219,11 +219,20 @@ model as a first-class player and pair-programmer._
   notification, or an app version/etag) and reload it live, or surface a
   non-destructive "updated elsewhere — reload?" prompt to protect unsaved edits.
   Keeps the human and the AI pair-programmer on the same source.
-- **Reliability observations (from AI-driving; verify still reproduce).** (S) Two
-  glitches seen while a model drove the MCP end-to-end: (a) `get_bot_source` returned
-  empty for a starter bot that has source; (b) after `rename_bot` _plus_ a code
-  `setName(...)`, `arena_status` kept reporting the bot's old name across
-  restart/reboot (a cached name rather than the live app/process name).
+- **Reliability observations (from AI-driving).** (S) Two glitches seen while a
+  model drove the MCP end-to-end, both since investigated:
+  - ✅ (a) `get_bot_source` returned empty for a bot that has source. _Fixed._ A
+    newly created app inserted only `id`/`userId`/`name`, leaving `source` **NULL**
+    until `setSource` landed; in that window a read saw an empty/absent source.
+    `source` now defaults to `''` (schema default + explicit insert value) and
+    `App.hydrate` coerces legacy `NULL` rows to `''`, so a read is always a string
+    (`AppService`, `types/app.ts`).
+  - (b) after `rename_app` _plus_ a code `setName(...)`, `arena_status` kept
+    reporting the bot's old name across restart/reboot. _Working as intended, not
+    a cache._ `arena_status` reads the name fresh from the DB; the starter bots'
+    source contains a literal `bot.setName(...)` that re-runs on every load/reboot
+    and deterministically re-asserts that name over an external rename. Left as-is
+    by design (bot code owns its name).
 
 ---
 
