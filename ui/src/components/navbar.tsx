@@ -88,7 +88,7 @@ export default function NavBar(props: NavBarProps) {
         style={{ padding: '10px' }}
         className="topNavBar"
       >
-        <Navbar.Brand className="nav-item">
+        <Navbar.Brand as={Link} to="/" className="nav-item">
           <span
             style={{
               fontWeight: '700',
