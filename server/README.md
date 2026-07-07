@@ -135,9 +135,9 @@ Ownership is enforced by two middlewares (`src/middleware/resource.ts`): **`requ
 
 `src/api/mcp.ts` is an in-process [Model Context Protocol](https://modelcontextprotocol.io) server at **`POST /api/mcp`** (Streamable HTTP, stateless — a fresh server + transport per request), so an AI client (Claude, or any MCP client) can write, run, and watch bots. It's gated by `auth(true)`, resolving the acting user from a **bearer API token** (minted via `src/api/token.ts`); every tool acts only on that user's own resources — `ownedApp`/`ownedArena` mirror the REST ownership checks, so there's no cross-user addressing.
 
-`buildServer(user)` registers ~23 user-scoped **tools**:
+`buildServer(user)` registers ~22 user-scoped **tools**:
 
-- **Bots:** `list_bots`, `get_bot_source`, `create_bot`, `set_bot_source`, `rename_bot`, `compile_bot`, `check_bot_source` (dry-run compile), `reboot_bot`, `delete_bot`.
+- **Bots:** `list_bots`, `get_bot_source`, `create_bot`, `set_bot_source`, `compile_bot`, `check_bot_source` (dry-run compile), `reboot_bot`, `delete_bot`. (A bot's name is owned by its code via `bot.setName` — there is no out-of-band rename tool, since it would be overwritten on the next reboot.)
 - **Arenas:** `list_arenas`, `create_arena`, `delete_arena`, `arena_status`, **`match_summary`** (leaderboard / winner / elimination order), `add_bot_to_arena`, `remove_bot_from_arena`, `pause_arena`, `resume_arena`, `restart_arena`, `set_arena_speed`, `set_arena_seed`.
 - **Observation:** `recent_logs` (filterable), `recent_faults` (structured crash records).
 

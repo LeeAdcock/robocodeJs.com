@@ -76,7 +76,7 @@ User bot code is untrusted JavaScript run in `isolated-vm` isolates — this is 
 
 ### AI integration (MCP)
 
-`server/src/api/mcp.ts` is an in-process **Model Context Protocol** server at `POST /api/mcp` (Streamable HTTP, stateless, bearer-token auth) exposing ~23 user-scoped tools (bot CRUD + `check_bot_source`/compile/reboot; arena create/delete/control incl. `set_arena_speed`/`set_arena_seed`; `arena_status`, `match_summary`; `recent_logs`/`recent_faults`), **resources** (bot docs, `robocode.d.ts`, samples, error codes), and **prompts** (`write_bot`, `debug_bot`, `run_match`). Every tool acts only on the token owner's own resources (`ownedApp`/`ownedArena` mirror the REST ownership checks) — keep the MCP caps in sync with the REST caps by hand. User-facing setup guide at `/mcp` (`ui/public/docs/mcp.md`).
+`server/src/api/mcp.ts` is an in-process **Model Context Protocol** server at `POST /api/mcp` (Streamable HTTP, stateless, bearer-token auth) exposing ~22 user-scoped tools (bot CRUD + `check_bot_source`/compile/reboot; arena create/delete/control incl. `set_arena_speed`/`set_arena_seed`; `arena_status`, `match_summary`; `recent_logs`/`recent_faults`), **resources** (bot docs, `robocode.d.ts`, samples, error codes), and **prompts** (`write_bot`, `debug_bot`, `run_match`). Every tool acts only on the token owner's own resources (`ownedApp`/`ownedArena` mirror the REST ownership checks) — keep the MCP caps in sync with the REST caps by hand. User-facing setup guide at `/mcp` (`ui/public/docs/mcp.md`).
 
 ### Bot roster & membership
 
