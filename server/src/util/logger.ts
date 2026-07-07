@@ -40,6 +40,7 @@ export const LogEvent = {
   DB_ERROR: 'db.error', // database/pool error
   PROCESS_FATAL: 'process.fatal', // uncaught exception / unhandled rejection
   SHUTDOWN: 'process.shutdown', // graceful shutdown (SIGTERM/SIGINT) lifecycle
+  METRICS: 'metrics', // periodic operational gauges heartbeat (time-series/alerting)
 } as const;
 
 // Log a bot fault uniformly. `kind` says where it happened (compile/run/handler/

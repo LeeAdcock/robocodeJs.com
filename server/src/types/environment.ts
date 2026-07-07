@@ -141,6 +141,12 @@ export default class Environment {
   // second concurrent loop.
   private looping = false;
 
+  // Exponential moving average of per-tick wall-clock duration (ms), maintained
+  // in runLoop from the elapsed time it already measures for pacing. A cheap O(1)
+  // health gauge (read by /health via EnvironmentService.metrics) — a rising value
+  // flags an overloaded arena. 0 until the first tick completes.
+  private avgTickMs = 0;
+
   // Commands the bots are awaiting, settled deterministically each tick.
   private pendingCommands: PendingCommand[] = [];
   // In-flight isolate operations (event-handler dispatches, command settlements,
@@ -188,6 +194,7 @@ export default class Environment {
   isRunning = () => this.running;
   getTime = () => this.clock.time;
   getProcesses = () => this.processes;
+  getAvgTickMs = () => this.avgTickMs;
   getArena = () => this.arena;
 
   addListener = (
@@ -504,10 +511,13 @@ export default class Environment {
       while (this.running) {
         const started = Date.now();
         await this.tick();
+        const elapsed = Date.now() - started;
+        // EMA (alpha 0.2) so a single slow tick doesn't dominate the gauge.
+        this.avgTickMs =
+          this.avgTickMs === 0 ? elapsed : this.avgTickMs * 0.8 + elapsed * 0.2;
         if (!this.running) break;
         const target = this.tickMs();
-        const delay =
-          target > 0 ? Math.max(0, target - (Date.now() - started)) : 0;
+        const delay = target > 0 ? Math.max(0, target - elapsed) : 0;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     } finally {

@@ -33,3 +33,44 @@ describe('EnvironmentService.disposeAll', () => {
     expect(environmentService.disposeAll()).toBe(0);
   });
 });
+
+describe('EnvironmentService.metrics', () => {
+  const store = () =>
+    environmentService.store as unknown as Record<string, unknown>;
+  // Clear the store directly (these fakes have no pause/dispose, so disposeAll
+  // can't be used to reset).
+  const clear = () => Object.keys(store()).forEach((k) => delete store()[k]);
+
+  it('aggregates arena/isolate counts and the busiest tick time', () => {
+    clear();
+    store()['a'] = {
+      isRunning: () => true,
+      getProcesses: () => [{}, {}], // 2 isolates
+      getAvgTickMs: () => 3.2,
+    };
+    store()['b'] = {
+      isRunning: () => false, // paused arena still counts as a live env
+      getProcesses: () => [{}], // 1 isolate
+      getAvgTickMs: () => 7.891,
+    };
+
+    const m = environmentService.metrics();
+    expect(m.arenas).toBe(2);
+    expect(m.runningArenas).toBe(1);
+    expect(m.isolates).toBe(3);
+    // Busiest arena's EMA, rounded to 2 decimals.
+    expect(m.maxAvgTickMs).toBe(7.89);
+
+    clear();
+  });
+
+  it('reports zeroes when no environments are live', () => {
+    clear();
+    expect(environmentService.metrics()).toEqual({
+      arenas: 0,
+      runningArenas: 0,
+      isolates: 0,
+      maxAvgTickMs: 0,
+    });
+  });
+});

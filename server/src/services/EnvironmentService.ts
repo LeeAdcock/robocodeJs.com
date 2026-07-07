@@ -77,6 +77,38 @@ export class EnvironmentService {
     return entries.length;
   };
 
+  // Cheap point-in-time gauges for the /health endpoint. A single O(arenas) pass
+  // over the store reading already-maintained fields — no isolate calls, no async,
+  // no allocation beyond the returned object — so it's safe to compute on every
+  // (frequent) load-balancer health check.
+  //   arenas        live environments held in memory (each owns isolates)
+  //   runningArenas environments whose tick loop is active
+  //   isolates      total Processes across all environments (one isolate each)
+  //   maxAvgTickMs  the busiest arena's EMA tick duration (see Environment)
+  metrics = (): {
+    arenas: number;
+    runningArenas: number;
+    isolates: number;
+    maxAvgTickMs: number;
+  } => {
+    const envs = Object.values(this.store);
+    let runningArenas = 0;
+    let isolates = 0;
+    let maxAvgTickMs = 0;
+    for (const env of envs) {
+      if (env.isRunning()) runningArenas++;
+      isolates += env.getProcesses().length;
+      const t = env.getAvgTickMs();
+      if (t > maxAvgTickMs) maxAvgTickMs = t;
+    }
+    return {
+      arenas: envs.length,
+      runningArenas,
+      isolates,
+      maxAvgTickMs: Math.round(maxAvgTickMs * 100) / 100,
+    };
+  };
+
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {
     return Promise.resolve(this.store[arenaId]);
   };
