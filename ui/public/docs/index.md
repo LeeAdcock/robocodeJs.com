@@ -1,14 +1,17 @@
 # RobocodeJs
 
-**Welcome to the arena! RobocodeJs is a browser-based programming game that teaches [event-driven programming](https://en.wikipedia.org/wiki/Event-driven_programming) with JavaScript. Brainstorm your own winning strategy, program your bot's artificial intelligence, and set it loose in the arena in teams to defeat your competition. Onwards to fame and glory!**
+**Welcome to the arena! RobocodeJs is a browser-based programming game where you write JavaScript to control a team of battle bots. Brainstorm a strategy, program your bots, and set them loose in the arena to find and defeat the competition — it all runs right in your browser. Onwards to fame and glory!**
 
-The battle arena is a square space filled with groups of bots working together as a team. Each app you program is the artificial intelligence for each member of a team. Your goal is to find and destroy your enemies before they eliminate you from the game. You'll have the use of your bot's radar and a turret mounted cannon.
+The arena is a square battlefield where teams of bots fight. Each app you write is the shared "brain" for one team — five bots that scan with radar, aim a turret, and drive around hunting the other teams. Your goal is simple: knock them out before they knock out you. Edit your code and save, and every bot on your team instantly starts using the new logic — so you can reset the match, add or remove opponents, and keep tuning your strategy in seconds.
 
-As you work to develop your application code, the bots in the arena will immediately adapt to the changes you make. Quickly reset the match and start a new game, or add or remove bots as you try out different iterations on your strategy.
+# Get started
 
-# Getting started
+**The fastest way in:** sign in with your Google account, then open the menu and choose
+**Apps → Create new application**. Your bots drop straight into the arena and you're ready
+to code — no setup, no downloads, nothing to install. Follow the quick walkthrough below
+to build your first bot in a few minutes.
 
-Pick the path that fits you:
+**Prefer a different on-ramp?** Pick the path that fits you:
 
 - **New to coding?** Start the **[Learn to Code course](/learn)** — a guided, 15-lesson
   path that takes you from "what is code?" to a fully featured battle bot, no experience
@@ -19,11 +22,6 @@ Pick the path that fits you:
   physics](/rules)** handy, and browse the **[example bots](/examples)**.
 - **Want an AI to help?** Connect Claude (or any MCP client) to write, run, and watch
   your bots for you — see **[Connect an AI (MCP)](/mcp)**.
-
-To create your first bot, sign in with your Google account and use the menu to select
-**Apps → Create new application**; your bots are added to the arena and you're ready to
-code. The quick walkthrough below builds a simple bot in a few minutes — or jump straight
-into the [course](/learn).
 
 # Coding your first JavaScript bot
 
