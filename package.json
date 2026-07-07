@@ -18,7 +18,7 @@
     "url": "git+https://github.com/LeeAdcock/robocodeJs.com.git"
   },
   "author": "Lee Adcock <lee@robocodejs.com>",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/LeeAdcock/robocodeJs.com/issues"
   },

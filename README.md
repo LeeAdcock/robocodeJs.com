@@ -187,4 +187,4 @@ The production runtime needs the same configuration as local dev — the `RDS_*`
 
 ## License
 
-ISC
+Released under the [MIT License](LICENSE) — © 2022–2026 Lee Adcock.
