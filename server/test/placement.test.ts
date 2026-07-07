@@ -12,12 +12,12 @@ const dist = (
   b: { x: number; y: number }
 ): number => Math.hypot(a.x - b.x, a.y - b.y);
 
-const centroid = (tanks: { x: number; y: number }[]) => ({
-  x: tanks.reduce((s, t) => s + t.x, 0) / tanks.length,
-  y: tanks.reduce((s, t) => s + t.y, 0) / tanks.length,
+const centroid = (bots: { x: number; y: number }[]) => ({
+  x: bots.reduce((s, t) => s + t.x, 0) / bots.length,
+  y: bots.reduce((s, t) => s + t.y, 0) / bots.length,
 });
 
-// Min distance from any of team i's tanks to any tank of a different team.
+// Min distance from any of team i's bots to any bot of a different team.
 const nearestEnemy = (
   teams: { x: number; y: number }[][],
   i: number
@@ -50,7 +50,7 @@ describe('computeSpawns', () => {
         expect(s.orientation).toBeLessThan(360);
       });
 
-      // No clumping: a team's own tanks are spread apart.
+      // No clumping: a team's own bots are spread apart.
       spawns.forEach((team) => {
         for (let a = 0; a < team.length; a++) {
           for (let b = a + 1; b < team.length; b++) {
@@ -70,7 +70,7 @@ describe('computeSpawns', () => {
       // ...and no team starts inside point-blank range of another.
       expect(Math.min(...nearest)).toBeGreaterThan(40);
 
-      // Tanks face inward (moving forward reduces distance to center).
+      // Bots face inward (moving forward reduces distance to center).
       spawns.flat().forEach((s) => {
         const rad = (s.orientation * Math.PI) / 180;
         const fx = Math.sin(rad); // forward vector in the game's compass frame

@@ -18,7 +18,7 @@ import { colors } from '../../util/colors';
 import { useNavigate } from 'react-router-dom';
 import { titleCase } from '../../util/titleCase';
 import Arena from '../../types/arena';
-import App from '../../types/tankApp';
+import App from '../../types/app';
 import { Emitter } from '../../util/emitter';
 
 interface AppPageProps {

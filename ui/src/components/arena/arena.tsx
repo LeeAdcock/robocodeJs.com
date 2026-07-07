@@ -5,8 +5,8 @@ import Arena from '../../types/arena';
 import CraterSvg from './arenaCrater';
 import TerrainSvg from './arenaTerrain';
 import BulletSvg from './arenaBullet';
-import TankSvg from './arenaTank';
-import TankPathSvg from './arenaTankPath';
+import BotSvg from './arenaBot';
+import BotPathSvg from './arenaBotPath';
 
 const ArenaStyle = React.memo((props: { width: number; height: number }) => (
   <defs>
@@ -62,7 +62,7 @@ interface ArenaSvgProps {
   darkMode: boolean;
   time: number;
   // Open a bot from the arena: double-click → source, shift+double-click → logs.
-  onOpenBot?: (appId: string, tankIndex: number, shiftKey: boolean) => void;
+  onOpenBot?: (appId: string, botIndex: number, shiftKey: boolean) => void;
 }
 
 export default function ArenaSvg(props: ArenaSvgProps) {
@@ -87,8 +87,8 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         <TerrainSvg>
           <g name="craters">
             {apps.map((app) =>
-              app.tanks.map((tank) =>
-                tank.bullets
+              app.bots.map((bot) =>
+                bot.bullets
                   .filter((bullet) => bullet.explodedAt)
                   .map((bullet) => (
                     <CraterSvg
@@ -104,40 +104,40 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           </g>
           <g name="paths">
             {apps.map((app) =>
-              app.tanks.map((tank) => (
-                <TankPathSvg
-                  id={tank.id}
-                  key={tank.id}
-                  path={tank.path}
-                  pathIndex={tank.pathIndex}
-                  x={tank.x}
-                  y={tank.y}
+              app.bots.map((bot) => (
+                <BotPathSvg
+                  id={bot.id}
+                  key={bot.id}
+                  path={bot.path}
+                  pathIndex={bot.pathIndex}
+                  x={bot.x}
+                  y={bot.y}
                 />
               ))
             )}
           </g>
-          <g name="tanks">
+          <g name="bots">
             {apps.map((app) => {
               const appIndex =
                 props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
-              return app.tanks.map((tank, tankIndex) => {
-                return tank.health <= 0 ? (
-                  <TankSvg
-                    key={tank.id}
-                    tankIndex={tankIndex}
+              return app.bots.map((bot, botIndex) => {
+                return bot.health <= 0 ? (
+                  <BotSvg
+                    key={bot.id}
+                    botIndex={botIndex}
                     appIndex={appIndex}
                     appName={app.name}
-                    id={tank.id}
+                    id={bot.id}
                     appId={app.id}
                     onOpen={props.onOpenBot}
-                    health={tank.health}
-                    crashed={tank.crashed}
-                    faultCode={tank.faultCode}
-                    bodyOrientation={tank.bodyOrientation}
-                    turretOrientation={tank.turretOrientation}
-                    radarOrientation={tank.radarOrientation}
-                    x={tank.x}
-                    y={tank.y}
+                    health={bot.health}
+                    crashed={bot.crashed}
+                    faultCode={bot.faultCode}
+                    bodyOrientation={bot.bodyOrientation}
+                    turretOrientation={bot.turretOrientation}
+                    radarOrientation={bot.radarOrientation}
+                    x={bot.x}
+                    y={bot.y}
                     radarOn={false}
                   />
                 ) : null;
@@ -146,25 +146,25 @@ export default function ArenaSvg(props: ArenaSvgProps) {
             {apps.map((app) => {
               const appIndex =
                 props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
-              return app.tanks.map((tank, tankIndex) =>
-                tank.health > 0 ? (
-                  <TankSvg
-                    key={tank.id}
-                    tankIndex={tankIndex}
+              return app.bots.map((bot, botIndex) =>
+                bot.health > 0 ? (
+                  <BotSvg
+                    key={bot.id}
+                    botIndex={botIndex}
                     appIndex={appIndex}
                     appName={app.name}
-                    id={tank.id}
+                    id={bot.id}
                     appId={app.id}
                     onOpen={props.onOpenBot}
-                    health={tank.health}
-                    crashed={tank.crashed}
-                    faultCode={tank.faultCode}
-                    bodyOrientation={tank.bodyOrientation}
-                    turretOrientation={tank.turretOrientation}
-                    radarOrientation={tank.radarOrientation}
-                    x={tank.x}
-                    y={tank.y}
-                    radarOn={tank.radarOn}
+                    health={bot.health}
+                    crashed={bot.crashed}
+                    faultCode={bot.faultCode}
+                    bodyOrientation={bot.bodyOrientation}
+                    turretOrientation={bot.turretOrientation}
+                    radarOrientation={bot.radarOrientation}
+                    x={bot.x}
+                    y={bot.y}
+                    radarOn={bot.radarOn}
                   />
                 ) : null
               );
@@ -172,9 +172,9 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           </g>
           <g name="bullets">
             {apps.map((app, appIndex) =>
-              app.tanks.map((tank) => (
-                <g key={tank.id}>
-                  {tank.bullets
+              app.bots.map((bot) => (
+                <g key={bot.id}>
+                  {bot.bullets
                     .filter((bullet) => !bullet.explodedAt)
                     .map((bullet) => (
                       <BulletSvg
@@ -193,9 +193,9 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         </TerrainSvg>
       </g>
       {props.darkMode && (
-        // Night mode: multiply the whole arena (terrain, padding, and tanks) by a
+        // Night mode: multiply the whole arena (terrain, padding, and bots) by a
         // dark red, so it reads as a darker, warmer scene rather than a washed-out
-        // grey. pointerEvents none keeps the tanks double-clickable underneath.
+        // grey. pointerEvents none keeps the bots double-clickable underneath.
         <rect
           x="-200%"
           y="-200%"
@@ -211,7 +211,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         // mode use the theme's link accent (--link, the same warm tone as dark-mode
         // anchor links) so it reads against the warm night tint; white in light
         // mode. A dark outline keeps it legible over terrain either way, and
-        // pointerEvents none keeps tanks clickable underneath.
+        // pointerEvents none keeps bots clickable underneath.
         <text
           x={(props.arena.width || 750) / 2}
           y={(props.arena.height || 750) / 2}

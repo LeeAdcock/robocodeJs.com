@@ -9,7 +9,7 @@
 
 ## The idea
 
-Your team is **five tanks running the same code**. They can coordinate by sending
+Your team is **five bots running the same code**. They can coordinate by sending
 **messages** to each other:
 
 - `bot.send(7)` — broadcast a message. It can be a **number** (or a string, or a
@@ -25,7 +25,7 @@ like the compass direction of an enemy.
 
 ## Try it
 
-When any tank spots an enemy, it tells the team which way to point:
+When any bot spots an enemy, it tells the team which way to point:
 
 ```
 bot.setName('Rusty');

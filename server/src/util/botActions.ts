@@ -1,4 +1,4 @@
-import TankApp, { AppId } from '../types/app';
+import App, { AppId } from '../types/app';
 import { UserId } from '../types/user';
 import arenaService from '../services/ArenaService';
 import environmentService from '../services/EnvironmentService';
@@ -12,7 +12,7 @@ import arenaMemberService from '../services/ArenaMemberService';
 // a running bot picks up the change. Saving deliberately does NOT re-fire START
 // (see Environment.execute) — use reboot for that.
 export const propagateSource = async (
-  app: TankApp,
+  app: App,
   source: string
 ): Promise<void> => {
   await app.setSource(source);
@@ -59,7 +59,7 @@ export const rebootInUserArenas = async (
 
 // Remove a bot from every arena it's in (tearing it out of any live environment),
 // then soft-delete the app.
-export const deleteAppEverywhere = async (app: TankApp): Promise<void> => {
+export const deleteAppEverywhere = async (app: App): Promise<void> => {
   const memberships = await arenaMemberService.getForApp(app.getId());
   await Promise.all(
     memberships.map(async (membership) => {

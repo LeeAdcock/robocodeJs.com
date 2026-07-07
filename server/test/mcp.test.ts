@@ -42,7 +42,7 @@ vi.mock('../src/util/matchSummary', () => ({
   buildMatchSummary: vi.fn(),
   buildMatchStatus: vi.fn(),
 }));
-// Mock the compiler so check_bot_source doesn't spin a real isolate in this suite
+// Mock the compiler so check_app_source doesn't spin a real isolate in this suite
 // (the real dry-run behaviour is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
 
@@ -76,27 +76,27 @@ const textOf = (res: { content: unknown[] }) =>
 beforeEach(() => vi.clearAllMocks());
 
 describe('mcp tools', () => {
-  it('list_bots returns the user apps', async () => {
+  it('list_apps returns the user apps', async () => {
     vi.mocked(appService.getForUser).mockResolvedValue([
       { getId: () => 'a1', getName: () => 'Bot' },
     ] as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'list_bots',
+      name: 'list_apps',
       arguments: {},
     })) as never;
 
     expect(JSON.parse(textOf(res))).toEqual([{ id: 'a1', name: 'Bot' }]);
   });
 
-  it('get_bot_source returns source for an owned bot', async () => {
+  it('get_app_source returns source for an owned bot', async () => {
     vi.mocked(appService.get).mockResolvedValue({
       getUserId: () => 'u1',
       getSource: () => 'CODE',
     } as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'get_bot_source',
+      name: 'get_app_source',
       arguments: { appId: 'a1' },
     })) as { content: unknown[]; isError?: boolean };
 
@@ -111,7 +111,7 @@ describe('mcp tools', () => {
     } as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'get_bot_source',
+      name: 'get_app_source',
       arguments: { appId: 'a1' },
     })) as { content: unknown[]; isError?: boolean };
 
@@ -119,23 +119,23 @@ describe('mcp tools', () => {
     expect(textOf(res)).not.toContain('SECRET');
   });
 
-  it('set_bot_source persists + propagates via the shared helper', async () => {
+  it('set_app_source persists + propagates via the shared helper', async () => {
     const app = { getId: () => 'a1', getUserId: () => 'u1' };
     vi.mocked(appService.get).mockResolvedValue(app as never);
     const client = await connect();
     await client.callTool({
-      name: 'set_bot_source',
+      name: 'set_app_source',
       arguments: { appId: 'a1', source: 'NEW' },
     });
 
     expect(propagateSource).toHaveBeenCalledWith(app, 'NEW');
   });
 
-  it('check_bot_source dry-run compiles raw source', async () => {
+  it('check_app_source dry-run compiles raw source', async () => {
     vi.mocked(compiler.check).mockResolvedValue({ valid: true } as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'check_bot_source',
+      name: 'check_app_source',
       arguments: { source: 'clock.on(Event.TICK, () => {})' },
     })) as never;
 
@@ -145,7 +145,7 @@ describe('mcp tools', () => {
     expect(JSON.parse(textOf(res))).toEqual({ valid: true });
   });
 
-  it('check_bot_source reports an invalid bot (still a successful call)', async () => {
+  it('check_app_source reports an invalid bot (still a successful call)', async () => {
     vi.mocked(compiler.check).mockResolvedValue({
       valid: false,
       stage: 'compile',
@@ -155,7 +155,7 @@ describe('mcp tools', () => {
     } as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'check_bot_source',
+      name: 'check_app_source',
       arguments: { source: 'function ( {' },
     })) as { content: unknown[]; isError?: boolean };
 
@@ -163,7 +163,7 @@ describe('mcp tools', () => {
     expect(JSON.parse(textOf(res)).errorCode).toBe('E017');
   });
 
-  it('check_bot_source resolves a saved bot by appId and enforces ownership', async () => {
+  it('check_app_source resolves a saved bot by appId and enforces ownership', async () => {
     vi.mocked(compiler.check).mockResolvedValue({ valid: true } as never);
     vi.mocked(appService.get).mockResolvedValue({
       getUserId: () => 'u1',
@@ -171,7 +171,7 @@ describe('mcp tools', () => {
     } as never);
     const client = await connect();
     await client.callTool({
-      name: 'check_bot_source',
+      name: 'check_app_source',
       arguments: { appId: 'a1' },
     });
     expect(compiler.check).toHaveBeenCalledWith('SAVED');
@@ -183,17 +183,17 @@ describe('mcp tools', () => {
       getSource: () => 'SECRET',
     } as never);
     const res = (await client.callTool({
-      name: 'check_bot_source',
+      name: 'check_app_source',
       arguments: { appId: 'a1' },
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
     expect(compiler.check).not.toHaveBeenCalled();
   });
 
-  it('check_bot_source requires source or appId', async () => {
+  it('check_app_source requires source or appId', async () => {
     const client = await connect();
     const res = (await client.callTool({
-      name: 'check_bot_source',
+      name: 'check_app_source',
       arguments: {},
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
@@ -368,9 +368,9 @@ describe('mcp tools', () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
     const logs = [
-      { level: 30, appId: 'a1', tankIndex: 1, msg: 'hello info' },
-      { level: 50, appId: 'a1', tankIndex: 2, msg: 'E017: boom' },
-      { level: 40, appId: 'a2', tankIndex: 1, msg: 'warn other' },
+      { level: 30, appId: 'a1', botIndex: 1, msg: 'hello info' },
+      { level: 50, appId: 'a1', botIndex: 2, msg: 'E017: boom' },
+      { level: 40, appId: 'a2', botIndex: 1, msg: 'warn other' },
     ];
     vi.mocked(environmentService.getByArenaId).mockResolvedValue({
       getRecentLogs: () => logs,
@@ -386,7 +386,7 @@ describe('mcp tools', () => {
         )
       );
 
-    // recent_logs renames the internal tankIndex field to botIndex on output.
+    // recent_logs renames the internal botIndex field to botIndex on output.
     const mapped1 = { level: 50, appId: 'a1', botIndex: 2, msg: 'E017: boom' };
     // ERROR-and-up only.
     expect(await call({ minLevel: 'ERROR' })).toEqual([mapped1]);
@@ -406,8 +406,8 @@ describe('mcp tools', () => {
     const faults = [
       {
         appId: 'a1',
-        tankId: 't1',
-        tankIndex: 1,
+        botId: 't1',
+        botIndex: 1,
         code: 'E017',
         kind: 'load',
         message: 'x is not defined',
@@ -427,7 +427,7 @@ describe('mcp tools', () => {
     })) as { structuredContent?: unknown };
 
     expect(getRecentFaults).toHaveBeenCalledWith(10, 'a1');
-    // recent_faults renames the internal tankIndex field to botIndex on output.
+    // recent_faults renames the internal botIndex field to botIndex on output.
     expect(res.structuredContent).toEqual({
       faults: [
         {
@@ -517,15 +517,15 @@ describe('mcp tools', () => {
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
 
     // Read-only tools are hinted so a client can run them freely.
-    expect(byName['list_bots'].annotations?.readOnlyHint).toBe(true);
+    expect(byName['list_apps'].annotations?.readOnlyHint).toBe(true);
     expect(byName['arena_status'].annotations?.readOnlyHint).toBe(true);
-    expect(byName['check_bot_source'].annotations?.readOnlyHint).toBe(true);
+    expect(byName['check_app_source'].annotations?.readOnlyHint).toBe(true);
     // Destructive tools are hinted so a client can confirm first.
-    expect(byName['delete_bot'].annotations?.destructiveHint).toBe(true);
+    expect(byName['delete_app'].annotations?.destructiveHint).toBe(true);
     expect(byName['delete_arena'].annotations?.destructiveHint).toBe(true);
     // Typed tools advertise an output schema.
-    expect(byName['check_bot_source'].outputSchema).toBeTruthy();
-    expect(byName['set_bot_source'].outputSchema).toBeTruthy();
+    expect(byName['check_app_source'].outputSchema).toBeTruthy();
+    expect(byName['set_app_source'].outputSchema).toBeTruthy();
   });
 
   it('returns typed structuredContent for object results', async () => {
@@ -533,7 +533,7 @@ describe('mcp tools', () => {
     vi.mocked(appService.get).mockResolvedValue(app as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'set_bot_source',
+      name: 'set_app_source',
       arguments: { appId: 'a1', source: 'NEW' },
     })) as { structuredContent?: unknown };
 
@@ -545,11 +545,11 @@ describe('mcp tools', () => {
 
     const prompts = await client.listPrompts();
     expect(prompts.prompts.map((p) => p.name)).toEqual(
-      expect.arrayContaining(['write_bot', 'debug_bot', 'run_match'])
+      expect.arrayContaining(['write_app', 'debug_app', 'run_match'])
     );
 
     const filled = await client.getPrompt({
-      name: 'write_bot',
+      name: 'write_app',
       arguments: { goal: 'circle and snipe' },
     });
     const text = (filled.messages[0].content as { text: string }).text;
@@ -578,13 +578,13 @@ describe('mcp audit logging (logMcpRequest)', () => {
     const spy = vi.spyOn(logger, 'info');
     logMcpRequest('u1', {
       method: 'tools/call',
-      params: { name: 'delete_bot' },
+      params: { name: 'delete_app' },
     });
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
         event: LogEvent.MCP_TOOL,
         userId: 'u1',
-        tool: 'delete_bot',
+        tool: 'delete_app',
       }),
       expect.any(String)
     );
@@ -602,7 +602,7 @@ describe('mcp audit logging (logMcpRequest)', () => {
   it('logs each call in a batched (array) request', () => {
     const spy = vi.spyOn(logger, 'info');
     logMcpRequest('u1', [
-      { method: 'tools/call', params: { name: 'list_bots' } },
+      { method: 'tools/call', params: { name: 'list_apps' } },
       { method: 'tools/call', params: { name: 'restart_arena' } },
     ]);
     expect(spy).toHaveBeenCalledTimes(2);

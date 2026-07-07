@@ -18,8 +18,8 @@ import { titleCase } from '../util/titleCase';
 // added by reference — with an enable/disable toggle and an unlink action, plus
 // "New app" and "Add existing (by id)". Opened as a modal from the Arena menu.
 // (Terminology: an "app" is the program/code; when enabled it fields "bots" —
-// the live tank instances — in the arena.) The roster (GET .../arena/members)
-// is the source of truth for membership INCLUDING disabled apps; live tank
+// the live bot instances — in the arena.) The roster (GET .../arena/members)
+// is the source of truth for membership INCLUDING disabled apps; live bot
 // state flows separately over SSE.
 interface ArenaRosterProps {
   show: boolean;

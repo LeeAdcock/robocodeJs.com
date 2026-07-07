@@ -4,8 +4,8 @@ import { TimersContainer } from '../util/scheduleFactory';
 import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
-import { TankStats } from './tankStats';
-import { TankTurret } from './tankTurret';
+import { BotStats } from './botStats';
+import { BotTurret } from './botTurret';
 import { JsonValue } from '../util/message';
 import ivm from 'isolated-vm';
 
@@ -15,7 +15,7 @@ import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
 
-// Minimal structural type for the per-tank bot logger (a browser-bunyan
+// Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
 // methods are all we need — and all that scheduleFactory's Timer shares.
 export interface Logger {
@@ -40,9 +40,9 @@ export const waitUntil = (
   msg: string | null = null
 ) => env.waitForCondition(successCondition, failureCondition, msg);
 
-export default class Tank implements Point, Orientated {
+export default class Bot implements Point, Orientated {
   private context: ivm.Context | null = null;
-  public turret: TankTurret;
+  public turret: BotTurret;
 
   public orientation = 0;
   public orientationTarget = 0;
@@ -63,12 +63,12 @@ export default class Tank implements Point, Orientated {
   public handlers: any = {};
   public bullets: Bullet[] = [];
   public health = 100;
-  // The clock tick at which this tank first reached 0 health (crashed, shot,
+  // The clock tick at which this bot first reached 0 health (crashed, shot,
   // collided, or decayed), or null while still alive. Written once by
   // Environment.tick; never read by the physics, so it can't affect determinism.
-  // A restart builds fresh Tank instances, so it resets to null automatically.
+  // A restart builds fresh Bot instances, so it resets to null automatically.
   public eliminatedAt: number | null = null;
-  public stats: TankStats = new TankStats();
+  public stats: BotStats = new BotStats();
   public timers: TimersContainer = new TimersContainer();
   public logger!: Logger;
   public process: Process;
@@ -81,44 +81,37 @@ export default class Tank implements Point, Orientated {
     this.env = env;
     this.process = process;
 
-    let overallClosestTank: number | null = null;
+    let overallClosestBot: number | null = null;
     do {
       this.x = 16 + (env.getArena().getWidth() - 32) * env.random();
       this.y = 16 + (env.getArena().getHeight() - 32) * env.random();
 
-      // Keep iterating if we placed this tank too close to another
-      overallClosestTank = env
+      // Keep iterating if we placed this bot too close to another
+      overallClosestBot = env
         .getProcesses()
-        .reduce(
-          (closestDistanceForTankApp: number | null, curProcess: Process) => {
-            const closestTankForThisTankApp = curProcess.tanks.reduce(
-              (closestDistanceForTank: number | null, curTank: Tank) => {
-                if (curTank.id === this.id) return closestDistanceForTank;
+        .reduce((closestDistanceForApp: number | null, curProcess: Process) => {
+          const closestBotForThisApp = curProcess.bots.reduce(
+            (closestDistanceForBot: number | null, curBot: Bot) => {
+              if (curBot.id === this.id) return closestDistanceForBot;
 
-                const curTankDistance: number | null = Math.sqrt(
-                  Math.pow(curTank.x - this.x, 2) +
-                    Math.pow(curTank.y - this.y, 2)
-                );
-                return !closestDistanceForTank
-                  ? curTankDistance
-                  : Math.min(closestDistanceForTank, curTankDistance);
-              },
-              null
-            );
-            if (!closestDistanceForTankApp) return closestTankForThisTankApp;
-            if (!closestTankForThisTankApp) return closestDistanceForTankApp;
-            return Math.min(
-              closestDistanceForTankApp,
-              closestTankForThisTankApp
-            );
-          },
-          null
-        );
-    } while (overallClosestTank !== null && overallClosestTank < 50);
+              const curBotDistance: number | null = Math.sqrt(
+                Math.pow(curBot.x - this.x, 2) + Math.pow(curBot.y - this.y, 2)
+              );
+              return !closestDistanceForBot
+                ? curBotDistance
+                : Math.min(closestDistanceForBot, curBotDistance);
+            },
+            null
+          );
+          if (!closestDistanceForApp) return closestBotForThisApp;
+          if (!closestBotForThisApp) return closestDistanceForApp;
+          return Math.min(closestDistanceForApp, closestBotForThisApp);
+        }, null);
+    } while (overallClosestBot !== null && overallClosestBot < 50);
 
     this.orientation = env.random() * 360;
     this.orientationTarget = this.orientation;
-    this.turret = new TankTurret(this);
+    this.turret = new BotTurret(this);
   }
 
   getContext = (): ivm.Context => {
@@ -248,7 +241,7 @@ export default class Tank implements Point, Orientated {
 
     this.orientationTarget = target;
     this.env.emit('event', {
-      type: 'tankTurn',
+      type: 'botTurn',
       time: this.env.getTime(),
       id: this.id,
       x: this.x,
@@ -286,7 +279,7 @@ export default class Tank implements Point, Orientated {
     }
     this.orientationTarget = target;
     this.env.emit('event', {
-      type: 'tankTurn',
+      type: 'botTurn',
       time: this.env.getTime(),
       id: this.id,
       x: this.x,
@@ -320,7 +313,7 @@ export default class Tank implements Point, Orientated {
     );
     this.speedTarget = target;
     this.env.emit('event', {
-      type: 'tankAccelerate',
+      type: 'botAccelerate',
       time: this.env.getTime(),
       id: this.id,
       x: this.x,
@@ -357,20 +350,20 @@ export default class Tank implements Point, Orientated {
     this.logger.trace('Sending message', message);
     this.stats.messagesSent += 1;
     this.env.getProcesses().forEach((otherProcess) => {
-      otherProcess.tanks
-        .filter((otherTank) => otherTank.health > 0)
-        .forEach((otherTank) => {
-          if (otherTank.id !== this.id) {
-            otherTank.stats.messagesReceived += 1;
-            if (otherTank.handlers[Event.RECEIVED]) {
+      otherProcess.bots
+        .filter((otherBot) => otherBot.health > 0)
+        .forEach((otherBot) => {
+          if (otherBot.id !== this.id) {
+            otherBot.stats.messagesReceived += 1;
+            if (otherBot.handlers[Event.RECEIVED]) {
               // The receiver also learns how far away the sender is (a range, not
               // a bearing). Delivered to teammates AND eavesdropping enemies, so
               // broadcasting leaks your distance to everyone in the arena.
               const distance = Math.sqrt(
-                Math.pow(otherTank.x - this.x, 2) +
-                  Math.pow(otherTank.y - this.y, 2)
+                Math.pow(otherBot.x - this.x, 2) +
+                  Math.pow(otherBot.y - this.y, 2)
               );
-              otherTank.handlers[Event.RECEIVED](message, { distance });
+              otherBot.handlers[Event.RECEIVED](message, { distance });
             }
           }
         });

@@ -26,16 +26,16 @@ function useContinuousAngle(target: number): number {
   return ref.current;
 }
 
-interface TankProps {
+interface BotProps {
   appName: string;
   appIndex: number;
-  tankIndex: number;
+  botIndex: number;
 
   id: string;
   appId?: string;
-  // Open this bot: double-click → source editor, shift+double-click → this tank's
-  // logs. tankIndex is 1-based to match the log stream's tank index.
-  onOpen?: (appId: string, tankIndex: number, shiftKey: boolean) => void;
+  // Open this bot: double-click → source editor, shift+double-click → this bot's
+  // logs. botIndex is 1-based to match the log stream's bot index.
+  onOpen?: (appId: string, botIndex: number, shiftKey: boolean) => void;
   health: number;
   crashed?: boolean;
   faultCode?: string;
@@ -47,7 +47,7 @@ interface TankProps {
   radarOn: boolean;
 }
 
-interface TankTurretProps {
+interface BotTurretProps {
   appIndex: number;
   turretOrientation: number;
   bodyOrientation: number;
@@ -55,7 +55,7 @@ interface TankTurretProps {
   y: number;
 }
 
-interface TankRadarProps {
+interface BotRadarProps {
   appIndex: number;
   turretOrientation: number;
   bodyOrientation: number;
@@ -66,10 +66,10 @@ interface TankRadarProps {
 }
 
 // Convenience method to create a readable id
-const getTankId = (appIndex: number, tankIndex: number) =>
-  (appIndex + 1) * 10 + (tankIndex + 1);
+const getBotId = (appIndex: number, botIndex: number) =>
+  (appIndex + 1) * 10 + (botIndex + 1);
 
-const TankTurretSvg = (props: TankTurretProps) => {
+const BotTurretSvg = (props: BotTurretProps) => {
   const angle = useContinuousAngle(
     props.bodyOrientation + props.turretOrientation
   );
@@ -96,7 +96,7 @@ const TankTurretSvg = (props: TankTurretProps) => {
   );
 };
 
-const TankRadarSvg = (props: TankRadarProps) => {
+const BotRadarSvg = (props: BotRadarProps) => {
   const angle = useContinuousAngle(
     props.bodyOrientation + props.turretOrientation + props.radarOrientation
   );
@@ -123,7 +123,7 @@ const TankRadarSvg = (props: TankRadarProps) => {
   );
 };
 
-const TankSvg = React.memo((props: TankProps) => {
+const BotSvg = React.memo((props: BotProps) => {
   const body = useContinuousAngle(props.bodyOrientation);
   return (
     <>
@@ -132,7 +132,7 @@ const TankSvg = React.memo((props: TankProps) => {
         overlay={
           <Tooltip id={props.id}>
             {props.appName} [{props.appIndex + 1}
-            {props.tankIndex + 1}]
+            {props.botIndex + 1}]
           </Tooltip>
         }
       >
@@ -143,8 +143,8 @@ const TankSvg = React.memo((props: TankProps) => {
           style={props.onOpen ? { cursor: 'pointer' } : undefined}
           onDoubleClick={(e) => {
             if (props.onOpen && props.appId)
-              // props.tankIndex is 0-based; the log stream is 1-based.
-              props.onOpen(props.appId, props.tankIndex + 1, e.shiftKey);
+              // props.botIndex is 0-based; the log stream is 1-based.
+              props.onOpen(props.appId, props.botIndex + 1, e.shiftKey);
           }}
         >
           <image
@@ -176,9 +176,9 @@ const TankSvg = React.memo((props: TankProps) => {
               fontWeight: 'bold',
             }}
           >
-            {getTankId(props.appIndex, props.tankIndex)}
+            {getBotId(props.appIndex, props.botIndex)}
           </text>
-          <TankTurretSvg
+          <BotTurretSvg
             appIndex={props.appIndex}
             turretOrientation={props.turretOrientation}
             bodyOrientation={props.bodyOrientation}
@@ -186,7 +186,7 @@ const TankSvg = React.memo((props: TankProps) => {
             y={props.y}
           />
 
-          <TankRadarSvg
+          <BotRadarSvg
             appIndex={props.appIndex}
             turretOrientation={props.turretOrientation}
             bodyOrientation={props.bodyOrientation}
@@ -231,7 +231,7 @@ const TankSvg = React.memo((props: TankProps) => {
           )}
 
           {props.crashed && (
-            // A crisp warning triangle above the tank (outside the dead-tank blur)
+            // A crisp warning triangle above the bot (outside the dead-bot blur)
             // marking a bot that crashed rather than died in combat.
             <g transform={translate(props.x, props.y - 26)}>
               <title>{`Crashed${props.faultCode ? ` (${props.faultCode})` : ''}`}</title>
@@ -260,4 +260,4 @@ const TankSvg = React.memo((props: TankProps) => {
   );
 });
 
-export default TankSvg;
+export default BotSvg;

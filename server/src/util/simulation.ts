@@ -5,42 +5,42 @@ import { normalizeAngle, toRelativeBearing } from './geometry';
 
 /*
   These functions calculate the changes and interaction between active
-  elements in the arena, specifically tanks and their bullets.
+  elements in the arena, specifically bots and their bullets.
 */
 
 export default {
   // Handles all object movement
   run: (env: Environment) => {
-    // Process any tanks whose software crashed
+    // Process any bots whose software crashed
     env.getProcesses().forEach((process) => {
-      process.tanks
-        .filter((tank) => tank.health > 0 && tank.appCrashed)
-        .forEach((tank) => {
-          tank.health = 0;
+      process.bots
+        .filter((bot) => bot.health > 0 && bot.appCrashed)
+        .forEach((bot) => {
+          bot.health = 0;
           env.emit('event', {
-            type: 'tankDamaged',
-            id: tank.id,
+            type: 'botDamaged',
+            id: bot.id,
             time: env.getTime(),
-            health: tank.health,
+            health: bot.health,
           });
         });
     });
 
-    // Ensure the tank has started. A tank whose START handler runs THIS tick is
+    // Ensure the bot has started. A bot whose START handler runs THIS tick is
     // recorded so the TICK loop below skips it: its first TICK arrives next tick,
     // after this tick's drainBotWork has fully run the (async) START. That makes
     // startup order deterministic — START always runs (and settles) before a
-    // tank's first TICK — instead of racing START and TICK within one tick.
+    // bot's first TICK — instead of racing START and TICK within one tick.
     const startedThisTick = new Set<unknown>();
     env.getProcesses().forEach((process) => {
-      process.tanks.forEach((tank) => {
-        if (tank.health > 0) {
-          if (tank.needsStarting === true) {
-            if (tank.handlers[Event.START]) {
-              tank.handlers[Event.START]();
-              startedThisTick.add(tank);
+      process.bots.forEach((bot) => {
+        if (bot.health > 0) {
+          if (bot.needsStarting === true) {
+            if (bot.handlers[Event.START]) {
+              bot.handlers[Event.START]();
+              startedThisTick.add(bot);
             }
-            tank.needsStarting = false;
+            bot.needsStarting = false;
           }
         }
       });
@@ -49,62 +49,62 @@ export default {
     // Then execute all timers
     timerTick(env);
 
-    // Then execute the tank's tick handlers (skipping any tank just started this
-    // tick, so START runs before that tank ever sees a TICK).
+    // Then execute the bot's tick handlers (skipping any bot just started this
+    // tick, so START runs before that bot ever sees a TICK).
     env.getProcesses().forEach((process) => {
-      process.tanks
-        .filter((tank) => tank.health > 0)
-        .forEach((tank) => {
-          if (!startedThisTick.has(tank) && tank.handlers[Event.TICK]) {
-            tank.handlers[Event.TICK]();
+      process.bots
+        .filter((bot) => bot.health > 0)
+        .forEach((bot) => {
+          if (!startedThisTick.has(bot) && bot.handlers[Event.TICK]) {
+            bot.handlers[Event.TICK]();
           }
 
-          if (tank.turret.loaded < 100) tank.turret.loaded += 2;
-          if (tank.turret.radar.charged < 100) tank.turret.radar.charged += 10;
+          if (bot.turret.loaded < 100) bot.turret.loaded += 2;
+          if (bot.turret.radar.charged < 100) bot.turret.radar.charged += 10;
         });
     });
 
     // Then handle movement and interactions
     env.getProcesses().forEach((process) => {
-      process.tanks.forEach((tank) => {
-        if (tank.health > 0) {
+      process.bots.forEach((bot) => {
+        if (bot.health > 0) {
           const newX =
-            tank.x + tank.speed * Math.sin(-tank.orientation * (Math.PI / 180));
+            bot.x + bot.speed * Math.sin(-bot.orientation * (Math.PI / 180));
           const newY =
-            tank.y + tank.speed * Math.cos(-tank.orientation * (Math.PI / 180));
+            bot.y + bot.speed * Math.cos(-bot.orientation * (Math.PI / 180));
           let collided = false;
 
-          // Detect if we have collided with another tank
+          // Detect if we have collided with another bot
           env.getProcesses().forEach((otherProcess) =>
-            otherProcess.tanks.forEach((otherTank) => {
-              if (otherTank.health > 0 && otherTank.id !== tank.id) {
+            otherProcess.bots.forEach((otherBot) => {
+              if (otherBot.health > 0 && otherBot.id !== bot.id) {
                 const distance = Math.sqrt(
-                  Math.pow(otherTank.x - newX, 2) +
-                    Math.pow(otherTank.y - newY, 2)
+                  Math.pow(otherBot.x - newX, 2) +
+                    Math.pow(otherBot.y - newY, 2)
                 );
                 const angle: number = normalizeAngle(
-                  Math.atan2(otherTank.y - tank.y, otherTank.x - tank.x) *
+                  Math.atan2(otherBot.y - bot.y, otherBot.x - bot.x) *
                     (180 / Math.PI) -
                     90
                 );
 
                 if (distance < 32) {
                   collided = true;
-                  tank.stats.timesCollided += 1;
-                  otherTank.stats.timesCollided += 1;
-                  tank.logger.trace('Collided with tank');
-                  otherTank.logger.trace('Collided with tank');
-                  if (tank.handlers[Event.COLLIDED]) {
-                    tank.handlers[Event.COLLIDED]({
-                      angle: toRelativeBearing(angle, tank.orientation),
+                  bot.stats.timesCollided += 1;
+                  otherBot.stats.timesCollided += 1;
+                  bot.logger.trace('Collided with bot');
+                  otherBot.logger.trace('Collided with bot');
+                  if (bot.handlers[Event.COLLIDED]) {
+                    bot.handlers[Event.COLLIDED]({
+                      angle: toRelativeBearing(angle, bot.orientation),
                       friendly: otherProcess.getAppId() === process.getAppId(),
                     });
                   }
-                  if (otherTank.handlers[Event.COLLIDED]) {
-                    otherTank.handlers[Event.COLLIDED]({
+                  if (otherBot.handlers[Event.COLLIDED]) {
+                    otherBot.handlers[Event.COLLIDED]({
                       angle: toRelativeBearing(
                         normalizeAngle(180 + angle),
-                        otherTank.orientation
+                        otherBot.orientation
                       ),
                       friendly: otherProcess.getAppId() === process.getAppId(),
                     });
@@ -114,21 +114,21 @@ export default {
             })
           );
 
-          // Detect if we have been hit by another tank's bullets
+          // Detect if we have been hit by another bot's bullets
           env.getProcesses().forEach((otherProcess) =>
-            otherProcess.tanks.forEach((otherTank) => {
-              if (otherTank.id !== tank.id) {
-                otherTank.bullets
+            otherProcess.bots.forEach((otherBot) => {
+              if (otherBot.id !== bot.id) {
+                otherBot.bullets
                   .filter((bullet) => !bullet.exploded)
                   .forEach((bullet) => {
                     const distance = Math.sqrt(
-                      Math.pow(bullet.x - tank.x, 2) +
-                        Math.pow(bullet.y - tank.y, 2)
+                      Math.pow(bullet.x - bot.x, 2) +
+                        Math.pow(bullet.y - bot.y, 2)
                     );
                     const angle: number = normalizeAngle(
                       Math.atan2(
-                        tank.y - bullet.origin.y,
-                        tank.x - bullet.origin.x
+                        bot.y - bullet.origin.y,
+                        bot.x - bullet.origin.x
                       ) *
                         (180 / Math.PI) -
                         90
@@ -136,33 +136,33 @@ export default {
 
                     if (distance < 32) {
                       // We have a hit
-                      if (tank.handlers[Event.HIT]) {
-                        tank.handlers[Event.HIT]({
+                      if (bot.handlers[Event.HIT]) {
+                        bot.handlers[Event.HIT]({
                           angle: toRelativeBearing(
                             normalizeAngle(angle + 180),
-                            tank.orientation
+                            bot.orientation
                           ),
                         });
                       }
 
-                      tank.health -= 25;
-                      tank.stats.timesHit += 1;
-                      otherTank.stats.shotsHit += 1;
+                      bot.health -= 25;
+                      bot.stats.timesHit += 1;
+                      otherBot.stats.shotsHit += 1;
 
                       bullet.exploded = true;
-                      if (bullet.callback) bullet.callback({ id: tank.id });
+                      if (bullet.callback) bullet.callback({ id: bot.id });
 
                       env.emit('event', {
-                        type: 'tankDamaged',
-                        id: tank.id,
+                        type: 'botDamaged',
+                        id: bot.id,
                         time: env.getTime(),
-                        health: tank.health,
+                        health: bot.health,
                       });
                       env.emit('event', {
                         type: 'bulletExploded',
                         time: env.getTime(),
                         id: bullet.id,
-                        tankId: tank.id,
+                        botId: bot.id,
                         x: bullet.x,
                         y: bullet.y,
                       });
@@ -180,10 +180,10 @@ export default {
             newY > env.getArena().getHeight() - 16
           ) {
             collided = true;
-            tank.stats.timesCollided += 1;
-            tank.logger.trace('Collided with arena boundary');
-            if (tank.handlers[Event.COLLIDED]) {
-              tank.handlers[Event.COLLIDED]({
+            bot.stats.timesCollided += 1;
+            bot.logger.trace('Collided with arena boundary');
+            if (bot.handlers[Event.COLLIDED]) {
+              bot.handlers[Event.COLLIDED]({
                 // A wall is in the direction you drove into it — dead ahead (0)
                 // once expressed relative to your heading.
                 angle: 0,
@@ -194,41 +194,37 @@ export default {
           // If there wasn't a collision, continue the movement
           if (!collided) {
             // Update the location
-            tank.x = newX;
-            tank.y = newY;
+            bot.x = newX;
+            bot.y = newY;
 
-            tank.stats.distanceTraveled += tank.speed;
+            bot.stats.distanceTraveled += bot.speed;
 
             // Manage acceleration / deceleration
-            if (tank.speed > tank.speedTarget)
-              tank.speed -= tank.speedAcceleration;
-            if (tank.speed < tank.speedTarget)
-              tank.speed += tank.speedAcceleration;
-            if (
-              Math.abs(tank.speed - tank.speedTarget) < tank.speedAcceleration
-            )
-              tank.speed = tank.speedTarget;
-            tank.speed = Math.max(
-              -tank.speedMax,
-              Math.min(tank.speedMax, tank.speed)
+            if (bot.speed > bot.speedTarget) bot.speed -= bot.speedAcceleration;
+            if (bot.speed < bot.speedTarget) bot.speed += bot.speedAcceleration;
+            if (Math.abs(bot.speed - bot.speedTarget) < bot.speedAcceleration)
+              bot.speed = bot.speedTarget;
+            bot.speed = Math.max(
+              -bot.speedMax,
+              Math.min(bot.speedMax, bot.speed)
             );
           } else {
-            tank.speedTarget = 0;
-            tank.speed = 0;
-            tank.health -= 1;
+            bot.speedTarget = 0;
+            bot.speed = 0;
+            bot.health -= 1;
             // Handle a collision
             env.emit('event', {
-              type: 'tankStop',
+              type: 'botStop',
               time: env.getTime(),
-              id: tank.id,
-              x: tank.x,
-              y: tank.y,
+              id: bot.id,
+              x: bot.x,
+              y: bot.y,
             });
             env.emit('event', {
-              type: 'tankDamaged',
+              type: 'botDamaged',
               time: env.getTime(),
-              id: tank.id,
-              health: tank.health,
+              id: bot.id,
+              health: bot.health,
             });
           }
 
@@ -246,29 +242,29 @@ export default {
           };
 
           // Rotate the body
-          tank.orientation = rotate(
-            tank.orientation,
-            tank.orientationTarget,
-            tank.orientationVelocity
+          bot.orientation = rotate(
+            bot.orientation,
+            bot.orientationTarget,
+            bot.orientationVelocity
           );
 
           // Rotate the turret
-          tank.turret.orientation = rotate(
-            tank.turret.orientation,
-            tank.turret.orientationTarget,
-            tank.turret.orientationVelocity
+          bot.turret.orientation = rotate(
+            bot.turret.orientation,
+            bot.turret.orientationTarget,
+            bot.turret.orientationVelocity
           );
 
           // Rotate the radar
-          tank.turret.radar.orientation = rotate(
-            tank.turret.radar.orientation,
-            tank.turret.radar.orientationTarget,
-            tank.turret.radar.orientationVelocity
+          bot.turret.radar.orientation = rotate(
+            bot.turret.radar.orientation,
+            bot.turret.radar.orientationTarget,
+            bot.turret.radar.orientationVelocity
           );
         }
 
         // Move our bullets
-        tank.bullets.forEach((bullet, bulletIndex, bullets) => {
+        bot.bullets.forEach((bullet, bulletIndex, bullets) => {
           if (!bullet.exploded) {
             const newX =
               bullet.x +
@@ -290,7 +286,7 @@ export default {
                 type: 'bulletRemoved',
                 time: env.getTime(),
                 id: bullet.id,
-                tankId: tank.id,
+                botId: bot.id,
               });
               if (bullet.callback) bullet.callback({});
               bullets.splice(bulletIndex, 1);

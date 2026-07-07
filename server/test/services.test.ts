@@ -22,7 +22,7 @@ describe('AppService', () => {
     expect(await appService.get('missing')).toBeUndefined();
   });
 
-  it('get() maps a row to a TankApp', async () => {
+  it('get() maps a row to a App', async () => {
     query.mockResolvedValue({
       rows: [{ userId: 'u1', name: 'Cool Bot', source: '// code' }],
       rowCount: 1,
@@ -36,7 +36,7 @@ describe('AppService', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it('getForUser() maps each row to a TankApp', async () => {
+  it('getForUser() maps each row to a App', async () => {
     query.mockResolvedValue({
       rows: [
         { appId: 'a1', name: 'N1', source: 's1' },

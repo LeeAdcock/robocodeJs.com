@@ -1,23 +1,23 @@
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Tank, { waitUntil } from './tank';
+import Bot, { waitUntil } from './bot';
 import {
   normalizeAngle,
   toApiHeading,
   toRelativeBearing,
 } from '../util/geometry';
 
-export class TankRadar implements Orientated {
+export class BotRadar implements Orientated {
   public orientation: number;
   public orientationTarget: number;
   public orientationVelocity: number;
 
   public charged: number;
-  private tank: Tank;
+  private bot: Bot;
 
-  constructor(tank: Tank) {
-    this.tank = tank;
-    this.orientation = tank.env.random() * 360;
+  constructor(bot: Bot) {
+    this.bot = bot;
+    this.orientation = bot.env.random() * 360;
     this.orientationTarget = this.orientation;
     this.orientationVelocity = 2;
     this.charged = 0;
@@ -29,21 +29,21 @@ export class TankRadar implements Orientated {
       return Promise.resolve();
     }
     this.orientationTarget = target;
-    this.tank.env.emit('event', {
+    this.bot.env.emit('event', {
       type: 'radarTurn',
-      time: this.tank.env.getTime(),
-      id: this.tank.id,
+      time: this.bot.env.getTime(),
+      id: this.bot.id,
       radarOrientationTarget: this.orientationTarget,
       radarOrientation: this.orientation,
       radarOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning radar to ' + this.orientationTarget + '°');
+    this.bot.logger.trace('Turning radar to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
-      this.tank.env,
+      this.bot.env,
       () => this.orientation === target % 360,
       () =>
-        !this.tank.env.isRunning() || this.orientationTarget !== target % 360,
+        !this.bot.env.isRunning() || this.orientationTarget !== target % 360,
       'Radar orientation change cancelled'
     );
   }
@@ -62,23 +62,23 @@ export class TankRadar implements Orientated {
       return Promise.resolve();
     }
     this.orientationTarget = target;
-    this.tank.env.emit('event', {
+    this.bot.env.emit('event', {
       type: 'radarTurn',
-      time: this.tank.env.getTime(),
-      id: this.tank.id,
+      time: this.bot.env.getTime(),
+      id: this.bot.id,
       radarOrientationTarget: this.orientationTarget,
       radarOrientation: this.orientation,
       radarOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning radar to ' + this.orientationTarget + '°');
+    this.bot.logger.trace('Turning radar to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
-      this.tank.env,
+      this.bot.env,
       () => this.orientation === target,
       () =>
-        !this.tank.env.isRunning() ||
+        !this.bot.env.isRunning() ||
         this.orientationTarget !== target ||
-        this.tank.health <= 0,
+        this.bot.health <= 0,
       'Radar turn chancelled'
     );
   }
@@ -86,14 +86,14 @@ export class TankRadar implements Orientated {
   onReady() {
     let peakValue = this.charged;
     return waitUntil(
-      this.tank.env,
+      this.bot.env,
       () => this.charged >= 100,
       () => {
         // Reject if the value decreases, or bot dies
         peakValue = Math.max(peakValue, this.charged);
         return (
-          !this.tank.env.isRunning() ||
-          this.tank.health <= 0 ||
+          !this.bot.env.isRunning() ||
+          this.bot.health <= 0 ||
           this.charged < peakValue
         );
       },
@@ -107,15 +107,15 @@ export class TankRadar implements Orientated {
 
   scan() {
     if (this.charged < 100) return Promise.reject('Radar not ready');
-    this.tank.logger.trace('Scanning');
+    this.bot.logger.trace('Scanning');
     this.charged = 0;
-    this.tank.env.emit('event', {
+    this.bot.env.emit('event', {
       type: 'radarScan',
-      time: this.tank.env.getTime(),
-      id: this.tank.id,
+      time: this.bot.env.getTime(),
+      id: this.bot.id,
     });
 
-    this.tank.stats.scansCompleted += 1;
+    this.bot.stats.scansCompleted += 1;
 
     const found: Array<{
       id: string;
@@ -126,21 +126,21 @@ export class TankRadar implements Orientated {
       friendly: boolean;
       health: number;
     }> = [];
-    this.tank.env.getProcesses().forEach((otherProcess) => {
-      otherProcess.tanks.forEach((otherTank) => {
-        if (otherTank.health > 0 && otherTank.id !== this.tank.id) {
+    this.bot.env.getProcesses().forEach((otherProcess) => {
+      otherProcess.bots.forEach((otherBot) => {
+        if (otherBot.health > 0 && otherBot.id !== this.bot.id) {
           const distance = Math.sqrt(
-            Math.pow(otherTank.x - this.tank.x, 2) +
-              Math.pow(otherTank.y - this.tank.y, 2)
+            Math.pow(otherBot.x - this.bot.x, 2) +
+              Math.pow(otherBot.y - this.bot.y, 2)
           );
           const angle: number = normalizeAngle(
-            Math.atan2(otherTank.y - this.tank.y, otherTank.x - this.tank.x) *
+            Math.atan2(otherBot.y - this.bot.y, otherBot.x - this.bot.x) *
               (180 / Math.PI) -
               90
           );
           const radarAngle: number = normalizeAngle(
-            this.tank.getOrientation() +
-              this.tank.turret.getOrientation() +
+            this.bot.getOrientation() +
+              this.bot.turret.getOrientation() +
               this.getOrientation()
           );
           if (
@@ -148,34 +148,33 @@ export class TankRadar implements Orientated {
             Math.abs(normalizeAngle(angle - radarAngle + 180) - 180) <
               (500 - distance) * (0.5 / 10)
           ) {
-            if (otherTank.handlers[Event.DETECTED]) {
-              otherTank.handlers[Event.DETECTED]();
+            if (otherBot.handlers[Event.DETECTED]) {
+              otherBot.handlers[Event.DETECTED]();
             }
-            otherTank.stats.timesDetected += 1;
+            otherBot.stats.timesDetected += 1;
             found.push({
-              id: otherTank.id,
-              speed: otherTank.speed,
+              id: otherBot.id,
+              speed: otherBot.speed,
               // The enemy's own heading is absolute (north-zero); the bearing to
               // it is relative to our body (so turret.setOrientation(angle) aims).
-              orientation: toApiHeading(otherTank.getOrientation()),
+              orientation: toApiHeading(otherBot.getOrientation()),
               distance,
-              angle: toRelativeBearing(angle, this.tank.getOrientation()),
-              friendly:
-                otherProcess.getAppId() === this.tank.process.getAppId(),
-              // The detected tank's current health (0–100), so bots can prioritize
+              angle: toRelativeBearing(angle, this.bot.getOrientation()),
+              friendly: otherProcess.getAppId() === this.bot.process.getAppId(),
+              // The detected bot's current health (0–100), so bots can prioritize
               // the weakest enemy or judge a threat. Symmetric — every bot sees it.
-              health: otherTank.health,
+              health: otherBot.health,
             });
           }
         }
       });
     });
-    if (this.tank.handlers[Event.SCANNED]) {
-      this.tank.handlers[Event.SCANNED](found);
+    if (this.bot.handlers[Event.SCANNED]) {
+      this.bot.handlers[Event.SCANNED](found);
     }
 
-    this.tank.logger.trace(`Scan detected ${found.length} bots`);
-    this.tank.stats.scansDetected += found.length;
+    this.bot.logger.trace(`Scan detected ${found.length} bots`);
+    this.bot.stats.scansDetected += found.length;
 
     return Promise.resolve(found);
   }

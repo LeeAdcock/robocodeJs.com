@@ -1,4 +1,4 @@
-import TankApp from '../types/tankApp';
+import App from '../types/app';
 import { normalizeAngle } from './geometry';
 
 // A partial mirror of the server's movement engine (server/src/util/
@@ -6,41 +6,36 @@ import { normalizeAngle } from './geometry';
 // Keep the movement/rotation math here consistent with the server's.
 export default (
   time: number,
-  apps: TankApp[],
+  apps: App[],
   arenaWidth: number,
   arenaHeight: number
 ) => {
   // Then handle movement and interactions
   apps.forEach((app) => {
-    app.tanks.forEach((tank) => {
-      if (tank.health > 0) {
+    app.bots.forEach((bot) => {
+      if (bot.health > 0) {
         // Update the location
-        const newTankX =
-          tank.x +
-          tank.speed * Math.sin(-tank.bodyOrientation * (Math.PI / 180));
-        const newTankY =
-          tank.y +
-          tank.speed * Math.cos(-tank.bodyOrientation * (Math.PI / 180));
+        const newBotX =
+          bot.x + bot.speed * Math.sin(-bot.bodyOrientation * (Math.PI / 180));
+        const newBotY =
+          bot.y + bot.speed * Math.cos(-bot.bodyOrientation * (Math.PI / 180));
 
         if (
-          newTankX > 16 &&
-          newTankY > 16 &&
-          newTankX < arenaWidth - 16 &&
-          newTankY < arenaHeight - 16
+          newBotX > 16 &&
+          newBotY > 16 &&
+          newBotX < arenaWidth - 16 &&
+          newBotY < arenaHeight - 16
         ) {
-          tank.x = newTankX;
-          tank.y = newTankY;
+          bot.x = newBotX;
+          bot.y = newBotY;
         }
 
         // Manage acceleration / deceleration
-        if (tank.speed > tank.speedTarget) tank.speed -= tank.speedAcceleration;
-        if (tank.speed < tank.speedTarget) tank.speed += tank.speedAcceleration;
-        if (Math.abs(tank.speed - tank.speedTarget) < tank.speedAcceleration)
-          tank.speed = tank.speedTarget;
-        tank.speed = Math.max(
-          -tank.speedMax,
-          Math.min(tank.speedMax, tank.speed)
-        );
+        if (bot.speed > bot.speedTarget) bot.speed -= bot.speedAcceleration;
+        if (bot.speed < bot.speedTarget) bot.speed += bot.speedAcceleration;
+        if (Math.abs(bot.speed - bot.speedTarget) < bot.speedAcceleration)
+          bot.speed = bot.speedTarget;
+        bot.speed = Math.max(-bot.speedMax, Math.min(bot.speedMax, bot.speed));
 
         // Convenience method for manging rotating towards a target orientation
         // with a maximum rotational velocity.
@@ -55,60 +50,60 @@ export default (
           );
         };
 
-        // Record the tank's path only while it is turning (orientation not yet
+        // Record the bot's path only while it is turning (orientation not yet
         // at its target). By design the trail is the series of vertices where
-        // the tank changed heading — the renderer (arenaTankPath) connects them
+        // the bot changed heading — the renderer (arenaBotPath) connects them
         // into a polyline — so a straight run needs no breadcrumbs between its
         // endpoints. Points go into a fixed-size ring buffer, deduped by
         // position.
         if (
-          normalizeAngle(tank.bodyOrientation - tank.bodyOrientationTarget) > 1
+          normalizeAngle(bot.bodyOrientation - bot.bodyOrientationTarget) > 1
         ) {
-          if (!tank.path) {
-            tank.path = new Array(20);
-            tank.pathIndex = 0;
+          if (!bot.path) {
+            bot.path = new Array(20);
+            bot.pathIndex = 0;
           }
-          const len = tank.path.length;
+          const len = bot.path.length;
           // (pathIndex - 1) with a positive modulo, so the dedup check reads the
           // last written slot after the ring buffer wraps, instead of
-          // tank.path[-1] / an out-of-bounds index. The old
+          // bot.path[-1] / an out-of-bounds index. The old
           // `pathIndex - (1 % len)` collapsed to `pathIndex - 1` (1 % len === 1)
           // and broke once pathIndex passed the buffer length.
-          const lastPoint = tank.path[(tank.pathIndex - 1 + len) % len];
-          if (!lastPoint || lastPoint.x !== tank.x || lastPoint.y !== tank.y) {
-            tank.path[tank.pathIndex % len] = {
-              x: tank.x,
-              y: tank.y,
+          const lastPoint = bot.path[(bot.pathIndex - 1 + len) % len];
+          if (!lastPoint || lastPoint.x !== bot.x || lastPoint.y !== bot.y) {
+            bot.path[bot.pathIndex % len] = {
+              x: bot.x,
+              y: bot.y,
               time,
             };
-            tank.pathIndex = tank.pathIndex + 1;
+            bot.pathIndex = bot.pathIndex + 1;
           }
         }
 
         // Rotate the body
-        tank.bodyOrientation = rotate(
-          tank.bodyOrientation,
-          tank.bodyOrientationTarget,
-          tank.bodyOrientationVelocity
+        bot.bodyOrientation = rotate(
+          bot.bodyOrientation,
+          bot.bodyOrientationTarget,
+          bot.bodyOrientationVelocity
         );
 
         // Rotate the turret
-        tank.turretOrientation = rotate(
-          tank.turretOrientation,
-          tank.turretOrientationTarget,
-          tank.turretOrientationVelocity
+        bot.turretOrientation = rotate(
+          bot.turretOrientation,
+          bot.turretOrientationTarget,
+          bot.turretOrientationVelocity
         );
 
         // Rotate the radar
-        tank.radarOrientation = rotate(
-          tank.radarOrientation,
-          tank.radarOrientationTarget,
-          tank.radarOrientationVelocity
+        bot.radarOrientation = rotate(
+          bot.radarOrientation,
+          bot.radarOrientationTarget,
+          bot.radarOrientationVelocity
         );
       }
 
       // Move our bullets
-      tank.bullets.forEach((bullet) => {
+      bot.bullets.forEach((bullet) => {
         if (!bullet.explodedAt) {
           bullet.x =
             bullet.x +

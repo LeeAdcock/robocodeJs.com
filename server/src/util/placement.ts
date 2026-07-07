@@ -1,6 +1,6 @@
 // Fair, low-variance match starts.
 //
-// The original placement (Tank constructor) dropped every tank at a uniform-random
+// The original placement (Bot constructor) dropped every bot at a uniform-random
 // point over the whole arena, so one team could spawn clumped in a corner while
 // another got the open center — and that positional luck, not skill, decided most
 // matches. computeSpawns replaces it with a ROTATIONALLY SYMMETRIC layout: every
@@ -18,7 +18,7 @@ export interface Spawn {
   orientation: number; // absolute compass heading, 0 = north, clockwise
 }
 
-// Keep tanks off the walls, matching the 16u inset the old placement used.
+// Keep bots off the walls, matching the 16u inset the old placement used.
 const MARGIN = 16;
 
 const normalizeDeg = (deg: number): number => ((deg % 360) + 360) % 360;
@@ -30,30 +30,30 @@ const headingToward = (x: number, y: number, tx: number, ty: number): number =>
   normalizeDeg((Math.atan2(tx - x, y - ty) * 180) / Math.PI);
 
 // Returns spawns[team][slot]. Teams are evenly spaced on a circle around the arena
-// center; each team's tanks sit on a small ring around the team's point (so a team
-// is spread out, never clumped), and every tank faces the center for immediate,
+// center; each team's bots sit on a small ring around the team's point (so a team
+// is spread out, never clumped), and every bot faces the center for immediate,
 // symmetric engagement geometry.
 export function computeSpawns(
   teamCount: number,
-  tanksPerTeam: number,
+  botsPerTeam: number,
   width: number,
   height: number,
   rng: () => number
 ): Spawn[][] {
   const teams: Spawn[][] = [];
-  if (teamCount <= 0 || tanksPerTeam <= 0) return teams;
+  if (teamCount <= 0 || botsPerTeam <= 0) return teams;
 
   const cx = width / 2;
   const cy = height / 2;
-  // Max distance from center a tank may occupy while staying off the walls.
+  // Max distance from center a bot may occupy while staying off the walls.
   const usable = Math.min(width, height) / 2 - MARGIN;
 
-  // A team's tanks spread on a ring of this radius around the team point; kept
+  // A team's bots spread on a ring of this radius around the team point; kept
   // small enough that the whole formation stays inside `usable`.
   const formR = Math.min(teamCount > 1 ? 70 : 90, usable * 0.35);
   // Distance of each team point from center. 0 for a lone team (centered); for
   // ≥2 teams, pushed out toward the walls but leaving room for the formation, so
-  // no tank is ever clamped and symmetry is exact.
+  // no bot is ever clamped and symmetry is exact.
   const teamR = teamCount <= 1 ? 0 : Math.min(usable - formR, usable * 0.62);
 
   // Single global rotation — the only randomness, and it advantages no team.
@@ -64,26 +64,25 @@ export function computeSpawns(
     const bx = cx + teamR * Math.sin(rad(teamAngle));
     const by = cy - teamR * Math.cos(rad(teamAngle));
 
-    const tanks: Spawn[] = [];
-    for (let j = 0; j < tanksPerTeam; j++) {
-      // Offset by half a step so a team's tanks don't all line up on the same
+    const bots: Spawn[] = [];
+    for (let j = 0; j < botsPerTeam; j++) {
+      // Offset by half a step so a team's bots don't all line up on the same
       // spoke as the team direction.
-      const slotAngle =
-        teamAngle + (j * 360) / tanksPerTeam + 180 / tanksPerTeam;
+      const slotAngle = teamAngle + (j * 360) / botsPerTeam + 180 / botsPerTeam;
       const x = bx + formR * Math.sin(rad(slotAngle));
       const y = by - formR * Math.cos(rad(slotAngle));
       // Safety clamp (a no-op for the square arena, where the radii above keep
-      // every tank in bounds); guards odd width/height without breaking symmetry
+      // every bot in bounds); guards odd width/height without breaking symmetry
       // in the common case.
       const cxp = Math.max(MARGIN, Math.min(width - MARGIN, x));
       const cyp = Math.max(MARGIN, Math.min(height - MARGIN, y));
-      tanks.push({
+      bots.push({
         x: cxp,
         y: cyp,
         orientation: headingToward(cxp, cyp, cx, cy),
       });
     }
-    teams.push(tanks);
+    teams.push(bots);
   }
   return teams;
 }

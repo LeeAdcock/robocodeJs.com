@@ -1,11 +1,11 @@
 import Environment, { SUDDEN_DEATH_TIME } from '../types/environment';
 import ArenaMember from '../types/arenaMember';
-import { TankStats } from '../types/tankStats';
+import { BotStats } from '../types/botStats';
 import appService from '../services/AppService';
 
-// The numeric per-tank counters we aggregate. Derived from a fresh TankStats so
+// The numeric per-bot counters we aggregate. Derived from a fresh BotStats so
 // the summary automatically picks up any field added to that class.
-const STAT_KEYS = Object.keys(new TankStats()) as (keyof TankStats)[];
+const STAT_KEYS = Object.keys(new BotStats()) as (keyof BotStats)[];
 
 // ── Shared ranking / outcome contract ──────────────────────────────────────
 // buildMatchSummary (the full "who won and how" view) and buildMatchStatus (the
@@ -25,19 +25,19 @@ const byJoinTime =
 type Ranked = {
   alive: boolean;
   totalHealth: number;
-  tanksAlive: number;
+  botsAlive: number;
   eliminatedAt: number | null;
   shotsHit: number;
 };
 
-// Rank by outcome: living apps first (more total health, then more tanks still
+// Rank by outcome: living apps first (more total health, then more bots still
 // up, then more hits landed); among the eliminated, whoever died LATER ranks
 // higher (survived longest), then more hits.
 const compareForRank = (a: Ranked, b: Ranked): number => {
   if (a.alive !== b.alive) return a.alive ? -1 : 1;
   if (a.alive) {
     if (b.totalHealth !== a.totalHealth) return b.totalHealth - a.totalHealth;
-    if (b.tanksAlive !== a.tanksAlive) return b.tanksAlive - a.tanksAlive;
+    if (b.botsAlive !== a.botsAlive) return b.botsAlive - a.botsAlive;
     return b.shotsHit - a.shotsHit;
   }
   if ((b.eliminatedAt ?? 0) !== (a.eliminatedAt ?? 0)) {
@@ -60,7 +60,7 @@ const deriveMatch = (
 ) => {
   const appCount = ranked.length;
   const appsAlive = ranked.filter((e) => e.alive).length;
-  // Settled once at most one app still has living tanks (and there was a real
+  // Settled once at most one app still has living bots (and there was a real
   // contest of ≥2 apps): the survivor has won, or — if all are dead — the last
   // one eliminated (rank 1) has.
   const decided = appCount >= 2 && appsAlive <= 1;
@@ -81,7 +81,7 @@ const deriveMatch = (
 // Builds the match-summary returned by the REST `/summary` endpoint and the MCP
 // `match_summary` tool: an outcome-oriented view (leaderboard, winner, aggregated
 // stats, elimination order) over an arena's live state. Companion to
-// buildArenaStatus (arenaStatus.ts), the per-tank physics snapshot, and to
+// buildArenaStatus (arenaStatus.ts), the per-bot physics snapshot, and to
 // buildMatchStatus below, the lightweight decision/standings view; this is the
 // "who won and how" view and is most useful once a match is decided.
 //
@@ -107,26 +107,26 @@ export const buildMatchSummary = async (
     .sort(byJoinTime(members))
     .map((process) => {
       const app = apps.find((a) => a?.getId() === process.appId);
-      const tanks = process.tanks;
+      const bots = process.bots;
 
-      // Aggregate every TankStats counter across the app's five tanks. Typed by
-      // TankStats key (not a string index) so named fields like shotsHit/shotsFired
+      // Aggregate every BotStats counter across the app's five bots. Typed by
+      // BotStats key (not a string index) so named fields like shotsHit/shotsFired
       // stay accessible for the accuracy calc and the ranking below.
-      const stats = {} as Record<keyof TankStats, number>;
+      const stats = {} as Record<keyof BotStats, number>;
       for (const key of STAT_KEYS) {
-        stats[key] = tanks.reduce((sum, t) => sum + (t.stats[key] || 0), 0);
+        stats[key] = bots.reduce((sum, t) => sum + (t.stats[key] || 0), 0);
       }
       // Fraction of fired shots that connected (0 when the app never fired).
       const accuracy =
         stats.shotsFired > 0 ? stats.shotsHit / stats.shotsFired : 0;
 
-      const tanksAlive = tanks.filter((t) => t.health > 0).length;
-      const alive = tanksAlive > 0;
-      // An app is eliminated once all its tanks are dead; its elimination time is
-      // when its LAST tank fell (null while any tank still lives).
+      const botsAlive = bots.filter((t) => t.health > 0).length;
+      const alive = botsAlive > 0;
+      // An app is eliminated once all its bots are dead; its elimination time is
+      // when its LAST bot fell (null while any bot still lives).
       const eliminatedAt = alive
         ? null
-        : tanks.reduce((max, t) => Math.max(max, t.eliminatedAt ?? 0), 0) ||
+        : bots.reduce((max, t) => Math.max(max, t.eliminatedAt ?? 0), 0) ||
           null;
 
       return {
@@ -135,12 +135,12 @@ export const buildMatchSummary = async (
         userId: app?.getUserId(),
         alive,
         eliminatedAt,
-        tanksAlive,
-        tanksTotal: tanks.length,
-        totalHealth: tanks.reduce((sum, t) => sum + t.health, 0),
-        crashedCount: tanks.filter((t) => t.appCrashed).length,
+        botsAlive,
+        botsTotal: bots.length,
+        totalHealth: bots.reduce((sum, t) => sum + t.health, 0),
+        crashedCount: bots.filter((t) => t.appCrashed).length,
         stats: { ...stats, accuracy },
-        tanks: tanks.map((t) => ({
+        bots: bots.map((t) => ({
           id: t.id,
           health: t.health,
           alive: t.health > 0,
@@ -154,7 +154,7 @@ export const buildMatchSummary = async (
   const ranked = rankSort(entries, (e) => ({
     alive: e.alive,
     totalHealth: e.totalHealth,
-    tanksAlive: e.tanksAlive,
+    botsAlive: e.botsAlive,
     eliminatedAt: e.eliminatedAt,
     shotsHit: e.stats.shotsHit,
   }));
@@ -174,7 +174,7 @@ export const buildMatchSummary = async (
 
 // Builds the lightweight match status returned by the REST `/match-status`
 // endpoint and the MCP `match_status` tool: the decision fields plus a coarse
-// standings list, with NONE of the per-bot stat blocks or per-tank arrays. It
+// standings list, with NONE of the per-bot stat blocks or per-bot arrays. It
 // answers a different question than its companions — "is the match over, and
 // who's ahead?" — so it is cheap to poll repeatedly while a match runs, where
 // arena_status (spatial) and match_summary (full stats) are both large. The rank
@@ -195,12 +195,12 @@ export const buildMatchStatus = async (
     .sort(byJoinTime(members))
     .map((process) => {
       const app = apps.find((a) => a?.getId() === process.appId);
-      const tanks = process.tanks;
-      const tanksAlive = tanks.filter((t) => t.health > 0).length;
-      const alive = tanksAlive > 0;
+      const bots = process.bots;
+      const botsAlive = bots.filter((t) => t.health > 0).length;
+      const alive = botsAlive > 0;
       const eliminatedAt = alive
         ? null
-        : tanks.reduce((max, t) => Math.max(max, t.eliminatedAt ?? 0), 0) ||
+        : bots.reduce((max, t) => Math.max(max, t.eliminatedAt ?? 0), 0) ||
           null;
       return {
         id: process.appId,
@@ -208,10 +208,10 @@ export const buildMatchStatus = async (
         userId: app?.getUserId(),
         alive,
         eliminatedAt,
-        tanksAlive,
-        totalHealth: tanks.reduce((sum, t) => sum + t.health, 0),
+        botsAlive,
+        totalHealth: bots.reduce((sum, t) => sum + t.health, 0),
         // Ranking tiebreak only — not emitted in the standings.
-        shotsHit: tanks.reduce((sum, t) => sum + (t.stats.shotsHit || 0), 0),
+        shotsHit: bots.reduce((sum, t) => sum + (t.stats.shotsHit || 0), 0),
       };
     });
 
@@ -222,7 +222,7 @@ export const buildMatchStatus = async (
     id: e.id,
     name: e.name,
     alive: e.alive,
-    tanksAlive: e.tanksAlive,
+    botsAlive: e.botsAlive,
     totalHealth: e.totalHealth,
     eliminatedAt: e.eliminatedAt,
   }));

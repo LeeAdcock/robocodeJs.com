@@ -1,5 +1,5 @@
 import { UserId } from '../types/user';
-import TankApp, { AppId } from '../types/app';
+import App, { AppId } from '../types/app';
 import pool from '../util/db';
 import { randomUUID } from 'node:crypto';
 
@@ -17,9 +17,9 @@ pool.query(`
 `);
 
 export class AppService {
-  create = (userId: UserId): Promise<TankApp> => {
+  create = (userId: UserId): Promise<App> => {
     const appId = randomUUID();
-    const app = new TankApp(appId, userId);
+    const app = new App(appId, userId);
     return pool
       .query({
         text: 'INSERT INTO app(id, userId, name) VALUES($1, $2, $3)',
@@ -28,7 +28,7 @@ export class AppService {
       .then(() => Promise.resolve(app));
   };
 
-  get = (appId: AppId): Promise<TankApp | undefined> => {
+  get = (appId: AppId): Promise<App | undefined> => {
     return pool
       .query({
         text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source" FROM app WHERE id=$1 AND NOT deleted',
@@ -36,14 +36,14 @@ export class AppService {
       })
       .then((res) => {
         if (res.rowCount === 0) return undefined;
-        return new TankApp(appId, res.rows[0].userId).hydrate(
+        return new App(appId, res.rows[0].userId).hydrate(
           res.rows[0].name,
           res.rows[0].source
         );
       });
   };
 
-  getForUser = (userId: UserId): Promise<TankApp[]> => {
+  getForUser = (userId: UserId): Promise<App[]> => {
     return pool
       .query({
         text: 'SELECT app.id as "appId", app.name as "name", app.source as "source" FROM app WHERE userId=$1 AND NOT deleted ORDER BY app.id',
@@ -51,7 +51,7 @@ export class AppService {
       })
       .then((res) =>
         res.rows.map((row) =>
-          new TankApp(row.appId, userId).hydrate(row.name, row.source)
+          new App(row.appId, userId).hydrate(row.name, row.source)
         )
       );
   };

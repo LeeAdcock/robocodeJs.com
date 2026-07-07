@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 // work to quiescence before advancing, inter-tick wall-clock time cannot affect
 // the outcome. This test drives the same scenario two ways — ticks back-to-back
 // ("as fast as possible") and ticks spaced out with real setTimeout delays
-// ("slow") — and asserts the resulting tank state matches exactly. A regression
+// ("slow") — and asserts the resulting bot state matches exactly. A regression
 // that reintroduced any wall-clock coupling (e.g. a real-time command timer) would
 // make the two runs diverge.
 vi.mock('../src/util/db', () => ({
@@ -14,14 +14,14 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import compiler from '../src/util/compiler';
-import Tank from '../src/types/tank';
+import Bot from '../src/types/bot';
 import { Process } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
 import { makeSimEnv } from './simEnv';
 
 // A snapshot of the state that physics + bot decisions determine, for comparison.
-const snapshot = (tanks: Tank[]) =>
-  tanks.map((t) => ({
+const snapshot = (bots: Bot[]) =>
+  bots.map((t) => ({
     x: t.x,
     y: t.y,
     health: t.health,
@@ -43,29 +43,29 @@ const runBattle = async (ticks: number, pace?: () => Promise<void>) => {
     source: string,
     appId: string,
     pose: { x: number; y: number; orientation: number }
-  ): Tank => {
+  ): Bot => {
     const proc = new Process(appId);
     processes.push(proc);
-    const tank = new Tank(env, proc);
-    proc.tanks.push(tank);
-    tank.x = pose.x;
-    tank.y = pose.y;
-    tank.orientation = pose.orientation;
-    tank.orientationTarget = pose.orientation;
+    const bot = new Bot(env, proc);
+    proc.bots.push(bot);
+    bot.x = pose.x;
+    bot.y = pose.y;
+    bot.orientation = pose.orientation;
+    bot.orientationTarget = pose.orientation;
     // Pin the otherwise-random turret/radar orientations so the two runs start
     // from an identical state and any divergence is attributable to pacing.
-    tank.turret.orientation = pose.orientation;
-    tank.turret.orientationTarget = pose.orientation;
-    tank.turret.radar.orientation = pose.orientation;
-    tank.turret.radar.orientationTarget = pose.orientation;
-    tank.turret.loaded = 100;
-    tank.turret.radar.charged = 100;
-    compiler.init(env, proc, tank);
+    bot.turret.orientation = pose.orientation;
+    bot.turret.orientationTarget = pose.orientation;
+    bot.turret.radar.orientation = pose.orientation;
+    bot.turret.radar.orientationTarget = pose.orientation;
+    bot.turret.loaded = 100;
+    bot.turret.radar.charged = 100;
+    compiler.init(env, proc, bot);
     proc
       .getSandbox()
       .compileScriptSync(source)
-      .runSync(tank.getContext(), { timeout: 5000 });
-    return tank;
+      .runSync(bot.getContext(), { timeout: 5000 });
+    return bot;
   };
 
   // A mover that accelerates and turns, and a gunner that repeatedly aims and
@@ -89,9 +89,9 @@ const runBattle = async (ticks: number, pace?: () => Promise<void>) => {
     if (pace) await pace();
   }
 
-  const tanks = processes.flatMap((p) => p.tanks);
-  const state = snapshot(tanks);
-  processes.forEach((p) => p.tanks.forEach((t) => t.getContext().release()));
+  const bots = processes.flatMap((p) => p.bots);
+  const state = snapshot(bots);
+  processes.forEach((p) => p.bots.forEach((t) => t.getContext().release()));
   return state;
 };
 

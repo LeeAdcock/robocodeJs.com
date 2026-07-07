@@ -16,7 +16,7 @@ import userService from '../services/UserService';
 import { provider, RESOURCE_URL } from './oauth';
 import User from '../types/user';
 import Arena from '../types/arena';
-import TankApp from '../types/app';
+import App from '../types/app';
 import appService from '../services/AppService';
 import compiler from '../util/compiler';
 import arenaService from '../services/ArenaService';
@@ -115,16 +115,16 @@ const fail = (message: string): ToolResult => ({
   isError: true,
 });
 
-// The MCP surface refers to an app's live instances as "bots", never "tanks", so
-// rename the internal log/fault `tankId`/`tankIndex` fields to `botId`/`botIndex`
-// on the way out. (The internal records + SSE stream + UI keep the tank* names.)
+// The MCP surface refers to an app's live instances as "bots", never "bots", so
+// rename the internal log/fault `botId`/`botIndex` fields to `botId`/`botIndex`
+// on the way out. (The internal records + SSE stream + UI keep the bot* names.)
 const botify = <T extends object>(entry: T) => {
-  if (!('tankId' in entry) && !('tankIndex' in entry)) return entry;
-  const { tankId, tankIndex, ...rest } = entry as Record<string, unknown>;
+  if (!('botId' in entry) && !('botIndex' in entry)) return entry;
+  const { botId, botIndex, ...rest } = entry as Record<string, unknown>;
   return {
     ...rest,
-    ...(tankId !== undefined ? { botId: tankId } : {}),
-    ...(tankIndex !== undefined ? { botIndex: tankIndex } : {}),
+    ...(botId !== undefined ? { botId: botId } : {}),
+    ...(botIndex !== undefined ? { botIndex: botIndex } : {}),
   };
 };
 
@@ -142,7 +142,7 @@ const WRITE = { openWorldHint: false } as const;
 
 // Resolve an app that belongs to the authenticated user, or null. Stops a tool
 // from touching another user's bot (the MCP equivalent of requireOwner).
-const ownedApp = async (user: User, appId: string): Promise<TankApp | null> => {
+const ownedApp = async (user: User, appId: string): Promise<App | null> => {
   const app = await appService.get(appId);
   return app && app.getUserId() === user.getId() ? app : null;
 };
@@ -164,7 +164,7 @@ const ownedArena = async (
 // summary. Optionally reseeds first, then runs unbounded ("as fast as the bots
 // can be driven"): it restarts the arena — re-firing every bot's START — and
 // resumes it (restart() alone silently leaves the arena PAUSED), polls until at
-// most one bot still has living tanks (`match.decided`) or the arena stops (all
+// most one bot still has living bots (`match.decided`) or the arena stops (all
 // dead) or the wall-clock timeout elapses, then pauses and restores the arena's
 // prior speed. Shared by the run_match and run_tournament tools.
 const DEFAULT_MATCH_TIMEOUT_MS = 60000;
@@ -204,10 +204,10 @@ export const buildServer = (user: User): McpServer => {
   // ---- Bots (apps) ----
 
   server.registerTool(
-    'list_bots',
+    'list_apps',
     {
-      title: 'List bots',
-      description: "List the authenticated user's bots (id and name).",
+      title: 'List apps',
+      description: "List the authenticated user's apps (id and name).",
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -218,10 +218,10 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'get_bot_source',
+    'get_app_source',
     {
-      title: 'Get bot source',
-      description: "Return a bot's JavaScript source code.",
+      title: 'Get app source',
+      description: "Return an app's JavaScript source code.",
       inputSchema: { appId: z.string().describe('The bot (app) id') },
       annotations: READ_ONLY,
     },
@@ -234,7 +234,7 @@ export const buildServer = (user: User): McpServer => {
       if (!source.trim()) {
         return ok(
           `This bot ("${app.getName()}", ${appId}) has no source yet — it ` +
-            'is empty. Add code with set_bot_source.'
+            'is empty. Add code with set_app_source.'
         );
       }
       return ok(source);
@@ -242,13 +242,13 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'create_bot',
+    'create_app',
     {
-      title: 'Create bot',
+      title: 'Create app',
       description:
-        'Create a new bot, optionally setting its name and initial source.',
+        'Create a new app, optionally setting its name and initial source.',
       inputSchema: {
-        name: z.string().optional().describe('Optional bot name'),
+        name: z.string().optional().describe('Optional app name'),
         source: z
           .string()
           .optional()
@@ -266,12 +266,12 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'set_bot_source',
+    'set_app_source',
     {
-      title: 'Set bot source',
+      title: 'Set app source',
       description:
-        "Replace a bot's source. Live arenas it's in pick up the change " +
-        '(without re-firing START — use reboot_bot for that).',
+        "Replace an app's source. Live arenas it's in pick up the change " +
+        '(without re-firing START — use reboot_app for that).',
       inputSchema: {
         appId: z.string().describe('The bot (app) id'),
         source: z.string().describe('New JavaScript source'),
@@ -288,10 +288,10 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'rename_bot',
+    'rename_app',
     {
-      title: 'Rename bot',
-      description: 'Change a bot’s display name.',
+      title: 'Rename app',
+      description: 'Change an app’s display name.',
       inputSchema: {
         appId: z.string().describe('The bot (app) id'),
         name: z.string().describe('New name'),
@@ -308,10 +308,11 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'compile_bot',
+    'compile_app',
     {
-      title: 'Compile bot',
-      description: "Re-run a bot's current source in each of your live arenas.",
+      title: 'Compile app',
+      description:
+        "Re-run an app's current source in each of your live arenas.",
       inputSchema: { appId: z.string().describe('The bot (app) id') },
       outputSchema: { appId: z.string(), compiled: z.boolean() },
       annotations: WRITE,
@@ -325,21 +326,21 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'check_bot_source',
+    'check_app_source',
     {
-      title: 'Check bot source',
+      title: 'Check app source',
       description:
         'Dry-run compile a bot WITHOUT deploying it: loads the source in a ' +
         'throwaway sandbox and reports any syntax or load error (with its error ' +
         'code — see the robocodejs://reference/error-codes resource). Pass ' +
-        '`source` to check arbitrary code before creating a bot, or `appId` to ' +
-        'check a saved bot. A clean result is `{ valid: true }`.',
+        '`source` to check arbitrary code before creating an app, or `appId` to ' +
+        'check a saved app. A clean result is `{ valid: true }`.',
       inputSchema: {
         source: z.string().optional().describe('Bot source to check'),
         appId: z
           .string()
           .optional()
-          .describe("A saved bot to check (used when 'source' is omitted)"),
+          .describe("A saved app to check (used when 'source' is omitted)"),
       },
       outputSchema: {
         valid: z.boolean(),
@@ -363,11 +364,11 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'reboot_bot',
+    'reboot_app',
     {
-      title: 'Reboot bot',
+      title: 'Reboot app',
       description:
-        'Reload a bot and re-fire its START handler in each of your live arenas.',
+        'Reload an app and re-fire its START handler in each of your live arenas.',
       inputSchema: { appId: z.string().describe('The bot (app) id') },
       outputSchema: { appId: z.string(), rebooted: z.boolean() },
       annotations: WRITE,
@@ -381,10 +382,10 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'delete_bot',
+    'delete_app',
     {
-      title: 'Delete bot',
-      description: 'Remove a bot from every arena and delete it.',
+      title: 'Delete app',
+      description: 'Remove an app from every arena and delete it.',
       inputSchema: { appId: z.string().describe('The bot (app) id') },
       outputSchema: { appId: z.string(), deleted: z.boolean() },
       annotations: DESTRUCTIVE,
@@ -457,7 +458,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Arena status',
       description:
         'Snapshot of an arena: size, running state, clock, and every ' +
-        "bot's tanks (position, orientation, health, bullets). Omit arenaId " +
+        "app's bots (position, orientation, health, bullets). Omit arenaId " +
         'for your default arena.',
       inputSchema: {
         arenaId: z
@@ -485,11 +486,11 @@ export const buildServer = (user: User): McpServer => {
       description:
         'Outcome-oriented summary of an arena: a leaderboard ranked by who is ' +
         'winning/won, the resolved winner, per-bot aggregated stats (shots, ' +
-        'accuracy, damage taken, distance, collisions), survival (tanks alive, ' +
+        'accuracy, damage taken, distance, collisions), survival (bots alive, ' +
         'total health), and elimination order. Complements arena_status (which is ' +
-        'the raw per-tank snapshot); this is the "who won and how" view and is ' +
+        'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
-        'decided when at most one bot still has living tanks. Omit arenaId for ' +
+        'decided when at most one bot still has living bots. Omit arenaId for ' +
         'your default arena.',
       inputSchema: {
         arenaId: z
@@ -517,12 +518,12 @@ export const buildServer = (user: User): McpServer => {
       description:
         'Lightweight, cheap-to-poll status of an arena: whether the match is ' +
         'decided (`match.decided`), the winner once it is, and a coarse ' +
-        'standings list (each bot’s rank, tanks alive, total health) — with NONE ' +
-        'of match_summary’s per-bot stat blocks or arena_status’s per-tank ' +
+        'standings list (each bot’s rank, bots alive, total health) — with NONE ' +
+        'of match_summary’s per-bot stat blocks or arena_status’s per-bot ' +
         'positions. Use this to watch a running match ("is it decided yet / ' +
         'who’s ahead?") without pulling the large payloads; once decided, call ' +
         'match_summary for the full outcome + stats, or arena_status for exact ' +
-        'tank positions. Omit arenaId for your default arena.',
+        'bot positions. Omit arenaId for your default arena.',
       inputSchema: {
         arenaId: z
           .string()
@@ -541,10 +542,10 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'add_bot_to_arena',
+    'add_app_to_arena',
     {
-      title: 'Add bot to arena',
-      description: `Add one of your bots to an arena (max ${MAX_APPS_PER_ARENA + 1} bots). Omit arenaId for your default arena.`,
+      title: 'Add app to arena',
+      description: `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps). Omit arenaId for your default arena.`,
       inputSchema: {
         appId: z.string().describe('The bot (app) id'),
         arenaId: z
@@ -580,11 +581,11 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'remove_bot_from_arena',
+    'remove_app_from_arena',
     {
-      title: 'Remove bot from arena',
+      title: 'Remove app from arena',
       description:
-        'Remove a bot from an arena. Omit arenaId for your default arena.',
+        'Remove an app from an arena. Omit arenaId for your default arena.',
       inputSchema: {
         appId: z.string().describe('The bot (app) id'),
         arenaId: z
@@ -711,7 +712,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Set arena seed',
       description:
         'Set an arena’s random seed. Fixing the seed makes the match setup — ' +
-        'tank placement and starting orientations — reproducible: restart the ' +
+        'bot placement and starting orientations — reproducible: restart the ' +
         'arena after setting it to lay out an identical match. Combined with the ' +
         'deterministic simulation, this makes accelerated headless runs fully ' +
         'repeatable. Omit arenaId for your default arena.',
@@ -742,7 +743,7 @@ export const buildServer = (user: User): McpServer => {
         'resume → poll-match_summary loop: it optionally sets `seed` for a ' +
         'reproducible match, restarts the arena (re-firing every bot’s START), ' +
         'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
-        'fast as possible until at most one bot still has living tanks ' +
+        'fast as possible until at most one bot still has living bots ' +
         '(match.decided), then pauses and returns the match_summary. Needs at ' +
         'least two active bots. Omit arenaId for your default arena.',
       inputSchema: {
@@ -755,7 +756,7 @@ export const buildServer = (user: User): McpServer => {
           .int()
           .optional()
           .describe(
-            'Optional integer seed for a reproducible match (tank placement + orientations)'
+            'Optional integer seed for a reproducible match (bot placement + orientations)'
           ),
         timeoutMs: z
           .number()
@@ -973,8 +974,7 @@ export const buildServer = (user: User): McpServer => {
         )
           return false;
         if (appId && entry.appId !== appId) return false;
-        if (botIndex !== undefined && entry.tankIndex !== botIndex)
-          return false;
+        if (botIndex !== undefined && entry.botIndex !== botIndex) return false;
         if (contains && !String(entry.msg ?? '').includes(contains))
           return false;
         return true;
@@ -1126,7 +1126,7 @@ const registerResources = (server: McpServer): void => {
   );
 
   // The E0xx/W0xx error-code reference — lets the model interpret the codes that
-  // show up in recent_logs and check_bot_source results.
+  // show up in recent_logs and check_app_source results.
   server.registerResource(
     'error-codes',
     'robocodejs://reference/error-codes',
@@ -1135,7 +1135,7 @@ const registerResources = (server: McpServer): void => {
       description:
         'The E0xx/W0xx codes that appear in a bot’s console logs and dry-run ' +
         'results, with human descriptions — use it to interpret recent_logs and ' +
-        'check_bot_source output.',
+        'check_app_source output.',
       mimeType: 'text/markdown',
     },
     async (uri) => {
@@ -1154,9 +1154,9 @@ const registerResources = (server: McpServer): void => {
 // task, so a user doesn't have to spell out the steps.
 const registerPrompts = (server: McpServer): void => {
   server.registerPrompt(
-    'write_bot',
+    'write_app',
     {
-      title: 'Write a bot',
+      title: 'Write an app',
       description:
         'Design and create a new bot for a goal, grounded in the real API.',
       argsSchema: {
@@ -1180,11 +1180,11 @@ const registerPrompts = (server: McpServer): void => {
               `First read the resource robocodejs://docs/dev (the API reference) ` +
               `and robocodejs://types/robocode.d.ts (the exact signatures), and ` +
               `skim a relevant sample under robocodejs://samples/. Then:\n` +
-              `1. create_bot (give it a descriptive name and the initial source).\n` +
-              `2. add_bot_to_arena${arenaId ? ` (arenaId ${arenaId})` : ''} and ` +
+              `1. create_app (give it a descriptive name and the initial source).\n` +
+              `2. add_app_to_arena${arenaId ? ` (arenaId ${arenaId})` : ''} and ` +
               `restart_arena.\n` +
-              `3. Check arena_status and recent_logs; iterate with set_bot_source ` +
-              `+ reboot_bot until it behaves. Keep the code idiomatic to the docs.`,
+              `3. Check arena_status and recent_logs; iterate with set_app_source ` +
+              `+ reboot_app until it behaves. Keep the code idiomatic to the docs.`,
           },
         },
       ],
@@ -1192,9 +1192,9 @@ const registerPrompts = (server: McpServer): void => {
   );
 
   server.registerPrompt(
-    'debug_bot',
+    'debug_app',
     {
-      title: 'Debug a bot',
+      title: 'Debug an app',
       description:
         'Diagnose why a bot misbehaves or crashes and propose a fix.',
       argsSchema: {
@@ -1213,7 +1213,7 @@ const registerPrompts = (server: McpServer): void => {
             type: 'text',
             text:
               `Debug RobocodeJs bot ${appId}.\n\n` +
-              `Read its current source (get_bot_source), then recent_faults` +
+              `Read its current source (get_app_source), then recent_faults` +
               `${arenaId ? ` (arenaId ${arenaId})` : ''} for structured crash ` +
               `records (code, kind, message, line) — if it crashed, this is the ` +
               `fastest signal. Also read recent_logs and arena_status to see ` +
@@ -1221,8 +1221,8 @@ const registerPrompts = (server: McpServer): void => {
               `robocodejs://reference/error-codes). Cross-reference the API at ` +
               `robocodejs://docs/dev and the signatures at ` +
               `robocodejs://types/robocode.d.ts. Explain the root cause, then fix ` +
-              `it with set_bot_source and reboot_bot, and confirm via recent_logs. ` +
-              `Validate fixes with check_bot_source before deploying.`,
+              `it with set_app_source and reboot_app, and confirm via recent_logs. ` +
+              `Validate fixes with check_app_source before deploying.`,
           },
         },
       ],
@@ -1250,8 +1250,8 @@ const registerPrompts = (server: McpServer): void => {
             text:
               `Run a RobocodeJs match` +
               `${arenaId ? ` in arena ${arenaId}` : ''}.\n\n` +
-              `Use list_bots and arena_status to see what's available; make sure ` +
-              `at least two bots are in the arena (add_bot_to_arena as needed). ` +
+              `Use list_apps and arena_status to see what's available; make sure ` +
+              `at least two bots are in the arena (add_app_to_arena as needed). ` +
               `restart_arena to begin, then poll arena_status to follow the ` +
               `battle, and report the result (who survived / had the most health) ` +
               `along with anything notable from recent_logs.`,

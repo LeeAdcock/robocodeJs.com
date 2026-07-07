@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// compiler.ts -> tank.ts -> appService -> util/db runs CREATE TABLE at import.
+// compiler.ts -> bot.ts -> appService -> util/db runs CREATE TABLE at import.
 // Mock the db pool so importing the real modules doesn't reach Postgres.
 vi.mock('../src/util/db', () => ({
   default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
 }));
 
 import compiler from '../src/util/compiler';
-import Tank from '../src/types/tank';
+import Bot from '../src/types/bot';
 import { Process } from '../src/types/environment';
 import { Event } from '../src/types/event';
 import { timerTick } from '../src/util/scheduleFactory';
@@ -18,7 +18,7 @@ import appService from '../src/services/AppService';
 // sandbox and read values back out. This locks the bot-facing contract before
 // any refactor of compiler.ts.
 
-function makeCompiledTank() {
+function makeCompiledBot() {
   const emit = vi.fn();
   const proc = new Process('app1');
   const env = {
@@ -45,36 +45,36 @@ function makeCompiledTank() {
     },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tank = new Tank(env as any, proc as any);
-  tank.x = 100;
-  tank.y = 200;
-  tank.orientation = 0;
-  tank.orientationTarget = 0;
-  tank.speed = 0;
-  tank.speedTarget = 0;
-  proc.tanks.push(tank);
+  const bot = new Bot(env as any, proc as any);
+  bot.x = 100;
+  bot.y = 200;
+  bot.orientation = 0;
+  bot.orientationTarget = 0;
+  bot.speed = 0;
+  bot.speedTarget = 0;
+  proc.bots.push(bot);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  compiler.init(env as any, proc, tank);
+  compiler.init(env as any, proc, bot);
 
   // Run bot code in the sandbox.
   const run = (code: string) =>
-    proc.getSandbox().compileScriptSync(code).runSync(tank.getContext());
+    proc.getSandbox().compileScriptSync(code).runSync(bot.getContext());
   // Evaluate an expression inside the isolate and copy the result out.
   const read = (expr: string) =>
     proc
       .getSandbox()
       .compileScriptSync(`(${expr})`)
-      .runSync(tank.getContext(), { copy: true });
+      .runSync(bot.getContext(), { copy: true });
 
-  return { tank, proc, env, emit, run, read };
+  return { bot, proc, env, emit, run, read };
 }
 
 describe('compiler — bot API in a real isolate', () => {
-  let ctx: ReturnType<typeof makeCompiledTank>;
+  let ctx: ReturnType<typeof makeCompiledBot>;
 
   beforeEach(() => {
-    ctx = makeCompiledTank();
+    ctx = makeCompiledBot();
   });
   afterEach(() => {
     ctx.proc.dispose();
@@ -97,7 +97,7 @@ describe('compiler — bot API in a real isolate', () => {
   it('exposes synchronous getters that copy real values across the boundary', () => {
     expect(ctx.read('bot.getX()')).toBe(100);
     expect(ctx.read('bot.getY()')).toBe(200);
-    expect(ctx.read('bot.getId()')).toBe(ctx.tank.id);
+    expect(ctx.read('bot.getId()')).toBe(ctx.bot.id);
     expect(ctx.read('arena.getWidth()')).toBe(750);
     expect(ctx.read('arena.getHeight()')).toBe(600);
     expect(ctx.read('clock.getTime()')).toBe(42);
@@ -112,11 +112,11 @@ describe('compiler — bot API in a real isolate', () => {
   });
 
   it('seeds Math.random from the arena RNG so bot randomness is reproducible', () => {
-    // The mock env.random() is constant, so both tanks draw the same sub-seed and
+    // The mock env.random() is constant, so both bots draw the same sub-seed and
     // therefore replay the identical Math.random stream — the reproducibility a
     // fixed arena seed provides.
-    const a = makeCompiledTank();
-    const b = makeCompiledTank();
+    const a = makeCompiledBot();
+    const b = makeCompiledBot();
     const seqA = a.read(
       '[Math.random(), Math.random(), Math.random()]'
     ) as number[];
@@ -134,23 +134,23 @@ describe('compiler — bot API in a real isolate', () => {
     b.proc.dispose();
   });
 
-  it('applies mutating commands to the underlying tank', () => {
+  it('applies mutating commands to the underlying bot', () => {
     ctx.run('bot.setSpeed(3).catch(() => {})');
-    expect(ctx.tank.speedTarget).toBe(3);
+    expect(ctx.bot.speedTarget).toBe(3);
 
     ctx.run('bot.turn(90).catch(() => {})');
-    expect(ctx.tank.orientationTarget).toBe(90);
+    expect(ctx.bot.orientationTarget).toBe(90);
 
     ctx.run('bot.turret.setOrientation(45).catch(() => {})');
-    expect(ctx.tank.turret.orientationTarget).toBe(45);
+    expect(ctx.bot.turret.orientationTarget).toBe(45);
 
     ctx.run('bot.radar.setOrientation(10).catch(() => {})');
-    expect(ctx.tank.turret.radar.orientationTarget).toBe(10);
+    expect(ctx.bot.turret.radar.orientationTarget).toBe(10);
   });
 
-  it('clamps setSpeed to the tank speedMax', () => {
+  it('clamps setSpeed to the bot speedMax', () => {
     ctx.run('bot.setSpeed(1000).catch(() => {})');
-    expect(ctx.tank.speedTarget).toBe(ctx.tank.speedMax);
+    expect(ctx.bot.speedTarget).toBe(ctx.bot.speedMax);
   });
 
   it('registers event handlers and runs them through the Reference bridge', async () => {
@@ -158,22 +158,22 @@ describe('compiler — bot API in a real isolate', () => {
             globalThis._started = false
             bot.on(Event.START, () => { globalThis._started = true })
         `);
-    expect(typeof ctx.tank.handlers[Event.START]).toBe('function');
+    expect(typeof ctx.bot.handlers[Event.START]).toBe('function');
 
     // Invoking the handler schedules a setTimeout(0) that calls into the isolate.
-    ctx.tank.handlers[Event.START]();
+    ctx.bot.handlers[Event.START]();
     expect(await waitUntilRead('globalThis._started', (v) => v === true)).toBe(
       true
     );
   });
 
-  it('wires clock.on(TICK) through to a tank TICK handler', async () => {
+  it('wires clock.on(TICK) through to a bot TICK handler', async () => {
     ctx.run(`
             globalThis._ticks = 0
             clock.on(Event.TICK, () => { globalThis._ticks++ })
         `);
-    expect(typeof ctx.tank.handlers[Event.TICK]).toBe('function');
-    ctx.tank.handlers[Event.TICK]();
+    expect(typeof ctx.bot.handlers[Event.TICK]).toBe('function');
+    ctx.bot.handlers[Event.TICK]();
     expect(await waitUntilRead('globalThis._ticks', (v) => v === 1)).toBe(1);
   });
 
@@ -185,9 +185,9 @@ describe('compiler — bot API in a real isolate', () => {
     );
   });
 
-  it('registers tick-driven setInterval timers on the tank', () => {
+  it('registers tick-driven setInterval timers on the bot', () => {
     ctx.run(`setInterval(() => {}, 5)`);
-    expect(Object.keys(ctx.tank.timers.intervalMap)).toHaveLength(1);
+    expect(Object.keys(ctx.bot.timers.intervalMap)).toHaveLength(1);
   });
 
   it('terminates a runaway timer body under the sandbox timeout (DoS guard)', async () => {
@@ -202,10 +202,10 @@ describe('compiler — bot API in a real isolate', () => {
       // The crash is recorded asynchronously once the timeout fires; poll for it
       // rather than racing a fixed delay (off-thread timing varies under load).
       const deadline = Date.now() + 3000;
-      while (!ctx.tank.appCrashed && Date.now() < deadline) {
+      while (!ctx.bot.appCrashed && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 25));
       }
-      expect(ctx.tank.appCrashed).toBe(true);
+      expect(ctx.bot.appCrashed).toBe(true);
     } finally {
       delete process.env.SANDBOX_TIMEOUT_MS;
     }
@@ -247,7 +247,7 @@ describe('compiler — bot API in a real isolate', () => {
       o.self = o;
       console.log('obj', o);
     `);
-    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(ctx.bot.appCrashed).toBeFalsy();
     expect(lastLogMsg()).toBe('obj {"a":1,"self":"[Circular]"}');
   });
 
@@ -255,29 +255,29 @@ describe('compiler — bot API in a real isolate', () => {
     // Functions can't be cloned across the isolate boundary; formatting them to
     // a placeholder before crossing keeps a debugging log from killing the bot.
     ctx.run(`console.log('fn', function greet() {}, { cb: () => {} })`);
-    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(ctx.bot.appCrashed).toBeFalsy();
     expect(lastLogMsg()).toBe('fn [Function: greet] {"cb":"[Function: cb]"}');
   });
 
   it('renders an Error with its stack', () => {
     ctx.run(`console.error(new Error('boom'))`);
-    expect(ctx.tank.appCrashed).toBeFalsy();
+    expect(ctx.bot.appCrashed).toBeFalsy();
     expect(lastLogMsg()).toContain('boom');
   });
 
   it('reloading code does not re-fire START (saves keep running state)', async () => {
-    // A tank that has already started, then has new source loaded onto it (a
+    // A bot that has already started, then has new source loaded onto it (a
     // save/recompile). START must NOT re-arm — re-initialization is explicit
     // (the reboot button / Environment.reboot), so an edit doesn't disrupt a
     // running bot.
-    ctx.tank.needsStarting = false;
+    ctx.bot.needsStarting = false;
     vi.spyOn(appService, 'get').mockResolvedValue({
       getSource: () => 'bot.on(Event.START, () => {})',
     } as never);
 
-    await ctx.tank.execute(ctx.proc);
+    await ctx.bot.execute(ctx.proc);
 
-    expect(ctx.tank.needsStarting).toBe(false);
+    expect(ctx.bot.needsStarting).toBe(false);
   });
 
   it('exposes console.info / warn / error / debug and logger levels', () => {
@@ -307,7 +307,7 @@ describe('compiler — bot API in a real isolate', () => {
       setName: vi.fn().mockResolvedValue(undefined),
     };
     vi.spyOn(appService, 'get').mockResolvedValue(app as never);
-    ctx.tank.setName('  \u0000Super\u0007Bot' + 'z'.repeat(100));
+    ctx.bot.setName('  \u0000Super\u0007Bot' + 'z'.repeat(100));
     await new Promise((r) => setTimeout(r, 0));
     const call = ctx.emit.mock.calls.find(
       (c) => c[0] === 'event' && c[1]?.type === 'appRenamed'
@@ -326,7 +326,7 @@ describe('compiler — bot API in a real isolate', () => {
     };
     vi.spyOn(appService, 'get').mockResolvedValue(app as never);
     ctx.emit.mockClear();
-    ctx.tank.setName(' ');
+    ctx.bot.setName(' ');
     await new Promise((r) => setTimeout(r, 0));
     expect(
       ctx.emit.mock.calls.find((c) => c[1]?.type === 'appRenamed')
@@ -353,7 +353,7 @@ describe('compiler — bot API in a real isolate', () => {
   });
 
   it('copies an async object result (scan hit list) back across the boundary', async () => {
-    ctx.tank.turret.radar.charged = 100; // allow the scan to run
+    ctx.bot.turret.radar.charged = 100; // allow the scan to run
     ctx.run(
       `globalThis.__hits = 'pending'; bot.radar.scan().then((v) => { __hits = Array.isArray(v) ? v.length : 'notarray' })`
     );
@@ -366,24 +366,24 @@ describe('compiler — bot API in a real isolate', () => {
   });
 
   it('copies bot.getHealth() across the boundary on a 0–100 scale', () => {
-    // tank health 100
+    // bot health 100
     expect(ctx.read('bot.getHealth()')).toBe(100);
   });
 
   it('exposes the body heading on a north-zero compass (API boundary)', () => {
     // Internally orientation is south-zero; the bot API is north-zero (+180).
-    ctx.tank.orientation = 0; // internal south
+    ctx.bot.orientation = 0; // internal south
     expect(ctx.read('bot.getOrientation()')).toBe(180); // north-zero: south = 180
-    ctx.tank.orientation = 90; // internal west
+    ctx.bot.orientation = 90; // internal west
     expect(ctx.read('bot.getOrientation()')).toBe(270);
   });
 
   it('setOrientation maps a north-zero heading to the internal compass', () => {
     // Bot asks to face north (0); internally that is south-zero 180.
     ctx.run('bot.setOrientation(0).catch(() => {})');
-    expect(ctx.tank.orientationTarget).toBe(180);
+    expect(ctx.bot.orientationTarget).toBe(180);
     ctx.run('bot.setOrientation(90).catch(() => {})'); // east
-    expect(ctx.tank.orientationTarget).toBe(270);
+    expect(ctx.bot.orientationTarget).toBe(270);
   });
 });
 
@@ -435,10 +435,10 @@ describe('compiler.check — dry-run compile (throwaway isolate)', () => {
 });
 
 describe('compiler — reload scoping (top-level const/let, E017 regression)', () => {
-  let ctx: ReturnType<typeof makeCompiledTank>;
+  let ctx: ReturnType<typeof makeCompiledBot>;
 
   beforeEach(() => {
-    ctx = makeCompiledTank();
+    ctx = makeCompiledBot();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -467,15 +467,15 @@ describe('compiler — reload scoping (top-level const/let, E017 regression)', (
     } as unknown as Awaited<ReturnType<typeof appService.get>>);
 
     // First load.
-    await compiler.execute(ctx.proc, ctx.tank);
-    expect(ctx.tank.appCrashed).toBeFalsy();
+    await compiler.execute(ctx.proc, ctx.bot);
+    expect(ctx.bot.appCrashed).toBeFalsy();
     expect(ctx.read('this.loads')).toBe(1);
     expect(ctx.read('this.flee')).toBe(40);
 
     // Reload in the SAME context — this is what threw "Identifier 'FLEE' has
     // already been declared" (E017) before wrapSource.
-    await compiler.execute(ctx.proc, ctx.tank);
-    expect(ctx.tank.appCrashed).toBeFalsy();
+    await compiler.execute(ctx.proc, ctx.bot);
+    expect(ctx.bot.appCrashed).toBeFalsy();
     // Top-level const gets a fresh per-load scope (no redeclare error)...
     expect(ctx.read('this.flee')).toBe(40);
     // ...while this-state (globalThis) persists across the reload, as documented.

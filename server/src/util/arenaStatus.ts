@@ -51,27 +51,27 @@ export const buildArenaStatus = async (
         addedTimestamp: members
           .find((member) => member?.getAppId() === process.appId)
           ?.getTimestamp(),
-        tanks: process.tanks.map((tank) => ({
-          id: tank.id,
-          x: tank.x,
-          y: tank.y,
-          speed: tank.speed,
-          speedTarget: tank.speedTarget,
-          speedAcceleration: tank.speedAcceleration,
-          speedMax: tank.speedMax,
-          bodyOrientation: tank.orientation,
-          bodyOrientationTarget: tank.orientationTarget,
-          bodyOrientationVelocity: tank.orientationVelocity,
-          turretOrientation: tank.turret.orientation,
-          turretOrientationTarget: tank.turret.orientationTarget,
-          turretOrientationVelocity: tank.turret.radar.orientationVelocity,
-          radarOrientation: tank.turret.radar.orientation,
-          radarOrientationTarget: tank.turret.radar.orientationTarget,
-          radarOrientationVelocity: tank.turret.radar.orientationVelocity,
-          health: tank.health,
+        bots: process.bots.map((bot) => ({
+          id: bot.id,
+          x: bot.x,
+          y: bot.y,
+          speed: bot.speed,
+          speedTarget: bot.speedTarget,
+          speedAcceleration: bot.speedAcceleration,
+          speedMax: bot.speedMax,
+          bodyOrientation: bot.orientation,
+          bodyOrientationTarget: bot.orientationTarget,
+          bodyOrientationVelocity: bot.orientationVelocity,
+          turretOrientation: bot.turret.orientation,
+          turretOrientationTarget: bot.turret.orientationTarget,
+          turretOrientationVelocity: bot.turret.radar.orientationVelocity,
+          radarOrientation: bot.turret.radar.orientation,
+          radarOrientationTarget: bot.turret.radar.orientationTarget,
+          radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+          health: bot.health,
           // Whether the bot crashed (vs. died in combat) — lets a client / AI tell
           // a fault-death from a bullet-death. Detail is in the fault feed.
-          crashed: tank.appCrashed,
+          crashed: bot.appCrashed,
           // Only live bullets, and include orientation/speed so a client that
           // bootstraps from this snapshot (a reload, or a freshly connected SSE
           // client) can both render the bullet (it rotates by orientation) and
@@ -79,7 +79,7 @@ export const buildArenaStatus = async (
           // undefined orientation — an invalid SVG transform that the browser
           // drops, stranding the sprite at (0,0). Spent (exploded) bullets are
           // excluded so they don't re-seed as immovable orphans.
-          bullets: tank.bullets
+          bullets: bot.bullets
             .filter((bullet) => !bullet.exploded)
             .map((bullet) => ({
               id: bullet.id,

@@ -1,7 +1,7 @@
 import './App.css';
 import ArenaSvg from './components/arena/arena';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import TankApp from './types/tankApp';
+import type App from './types/app';
 import Arena from './types/arena';
 import NavBar from './components/navbar';
 import MarkdownPage from './page/markdownPage';
@@ -20,18 +20,18 @@ import { useDarkMode } from './util/theme';
 import { Emitter } from './util/emitter';
 
 // High-frequency simulation events are played back through the jitter buffer on
-// a steady local clock. Everything else (structural/control events: app & tank
+// a steady local clock. Everything else (structural/control events: app & bot
 // placement/removal, pause/resume/restart, renames, crashes) is applied the
 // instant it arrives, so bootstrap and the toolbar controls stay responsive.
 const CADENCE_EVENTS = new Set([
   'tick',
-  'tankTurn',
-  'tankAccelerate',
-  'tankStop',
+  'botTurn',
+  'botAccelerate',
+  'botStop',
   'turretTurn',
   'radarTurn',
   'radarScan',
-  'tankDamaged',
+  'botDamaged',
   'bulletFired',
   'bulletRemoved',
   'bulletExploded',
@@ -104,7 +104,7 @@ function App() {
   const [user, setUser] = useState(null as unknown as User);
   const [arena, setArena] = useState({
     clock: { time: 0 },
-    apps: [] as TankApp[],
+    apps: [] as App[],
   } as Arena);
   const [time, setTime] = useState(0);
   const [isPaused, setPaused] = useState(true);
@@ -113,14 +113,14 @@ function App() {
   // renders outside it — can open a bot's source/logs on double-click.
   const navigateRef = useRef<((to: string) => void) | null>(null);
 
-  // Double-click a tank in the arena → open its bot's source; shift+double-click →
-  // open the arena logs filtered to just that tank instance. Only for the
+  // Double-click a bot in the arena → open its bot's source; shift+double-click →
+  // open the arena logs filtered to just that bot instance. Only for the
   // signed-in user's own arena (not the demo).
-  const openBot = (appId: string, tankIndex: number, shiftKey: boolean) => {
+  const openBot = (appId: string, botIndex: number, shiftKey: boolean) => {
     if (!user) return;
     navigateRef.current?.(
       shiftKey
-        ? `/user/${user.id}/arena/logs?app=${appId}&tank=${tankIndex}`
+        ? `/user/${user.id}/arena/logs?app=${appId}&bot=${botIndex}`
         : `/user/${user.id}/app/${appId}`
     );
   };
@@ -150,7 +150,7 @@ function App() {
           setUser(null as unknown as User);
           /*setArena({
                         clock: { time: 0 },
-                        apps: [] as TankApp[],
+                        apps: [] as App[],
                     } as Arena)
                     setPaused(true)*/
         })
@@ -177,15 +177,15 @@ function App() {
           if (typeof res.data.tickMs === 'number') {
             buffer.current.setTickMs(res.data.tickMs);
           }
-          res.data.apps.forEach((app: TankApp) =>
-            app.tanks.forEach((tank) => {
-              tank.path = Array<PointInTime>(20);
-              tank.path[0] = {
-                x: tank.x,
-                y: tank.y,
+          res.data.apps.forEach((app: App) =>
+            app.bots.forEach((bot) => {
+              bot.path = Array<PointInTime>(20);
+              bot.path[0] = {
+                x: bot.x,
+                y: bot.y,
                 time,
               };
-              tank.pathIndex = 1;
+              bot.pathIndex = 1;
             })
           );
           setArena(res.data);

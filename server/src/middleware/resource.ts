@@ -4,7 +4,7 @@ import appService from '../services/AppService';
 import { logger, LogEvent } from '../util/logger';
 import arenaService from '../services/ArenaService';
 import User from '../types/user';
-import TankApp from '../types/app';
+import App from '../types/app';
 import Arena from '../types/arena';
 
 // Express middleware that removes the user-lookup / ownership / app-lookup
@@ -13,13 +13,13 @@ import Arena from '../types/arena';
 // `user` is attached by the auth() middleware; targetUser/targetApp by the
 // loaders below.
 export type UserScopedRequest = Request & { user?: User; targetUser: User };
-export type AppScopedRequest = UserScopedRequest & { targetApp: TankApp };
+export type AppScopedRequest = UserScopedRequest & { targetApp: App };
 export type ArenaScopedRequest = UserScopedRequest & { targetArena: Arena };
 
 // Typed accessors for the resources attached by the loaders above.
 export const scopedUser = (req: Request): User =>
   (req as UserScopedRequest).targetUser;
-export const scopedApp = (req: Request): TankApp =>
+export const scopedApp = (req: Request): App =>
   (req as AppScopedRequest).targetApp;
 export const scopedArena = (req: Request): Arena =>
   (req as ArenaScopedRequest).targetArena;

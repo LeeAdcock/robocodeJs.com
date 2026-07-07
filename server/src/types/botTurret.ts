@@ -2,25 +2,25 @@ import Bullet from './bullet';
 import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Tank, { waitUntil } from './tank';
+import Bot, { waitUntil } from './bot';
 import { normalizeAngle } from '../util/geometry';
-import { TankRadar } from './tankRadar';
+import { BotRadar } from './botRadar';
 import { DEPLOY_TICKS } from './environment';
 
-export class TankTurret implements Orientated {
+export class BotTurret implements Orientated {
   public orientation: number;
   public orientationTarget: number;
   public orientationVelocity: number;
-  public radar: TankRadar;
+  public radar: BotRadar;
   public loaded: number;
-  private tank: Tank;
+  private bot: Bot;
 
-  constructor(tank: Tank) {
-    this.tank = tank;
-    this.orientation = tank.env.random() * 360;
+  constructor(bot: Bot) {
+    this.bot = bot;
+    this.orientation = bot.env.random() * 360;
     this.orientationTarget = this.orientation;
     this.orientationVelocity = 2;
-    this.radar = new TankRadar(tank);
+    this.radar = new BotRadar(bot);
     this.loaded = 0;
   }
 
@@ -30,23 +30,23 @@ export class TankTurret implements Orientated {
       return Promise.resolve();
     }
     this.orientationTarget = target;
-    this.tank.env.emit('event', {
+    this.bot.env.emit('event', {
       type: 'turretTurn',
-      time: this.tank.env.getTime(),
-      id: this.tank.id,
+      time: this.bot.env.getTime(),
+      id: this.bot.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
       turretOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
+    this.bot.logger.trace('Turning turret to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
-      this.tank.env,
+      this.bot.env,
       () => this.orientation === target % 360,
       () =>
-        !this.tank.env.isRunning() ||
+        !this.bot.env.isRunning() ||
         this.orientationTarget !== target % 360 ||
-        this.tank.health <= 0,
+        this.bot.health <= 0,
       'Turret orientation change cancelled'
     );
   }
@@ -65,23 +65,23 @@ export class TankTurret implements Orientated {
       return Promise.resolve();
     }
     this.orientationTarget = target;
-    this.tank.env.emit('event', {
+    this.bot.env.emit('event', {
       type: 'turretTurn',
-      time: this.tank.env.getTime(),
-      id: this.tank.id,
+      time: this.bot.env.getTime(),
+      id: this.bot.id,
       turretOrientationTarget: this.orientationTarget,
       turretOrientation: this.orientation,
       turretOrientationVelocity: this.orientationVelocity,
     });
-    this.tank.logger.trace('Turning turret to ' + this.orientationTarget + '°');
+    this.bot.logger.trace('Turning turret to ' + this.orientationTarget + '°');
     if (this.orientationTarget === this.orientation) return Promise.resolve();
     return waitUntil(
-      this.tank.env,
+      this.bot.env,
       () => this.orientation === target,
       () =>
-        !this.tank.env.isRunning() ||
+        !this.bot.env.isRunning() ||
         this.orientationTarget !== target ||
-        this.tank.health <= 0,
+        this.bot.health <= 0,
       'Turret turn cancelled'
     );
   }
@@ -91,19 +91,19 @@ export class TankTurret implements Orientated {
   // shot fires until combat opens. This replaces per-bullet damage suppression —
   // there are simply no bullets during warm-up — and reuses the reload/readiness
   // contract bots already handle. Radar (scanning/aiming) is unaffected.
-  private deployed = () => this.tank.env.getTime() >= DEPLOY_TICKS;
+  private deployed = () => this.bot.env.getTime() >= DEPLOY_TICKS;
 
   onReady() {
     let peakValue = this.loaded;
     return waitUntil(
-      this.tank.env,
+      this.bot.env,
       () => this.loaded >= 100 && this.deployed(),
       () => {
         // Reject if the value decreases, or bot dies
         peakValue = Math.max(peakValue, this.loaded);
         return (
-          !this.tank.env.isRunning() ||
-          this.tank.health <= 0 ||
+          !this.bot.env.isRunning() ||
+          this.bot.health <= 0 ||
           this.loaded < peakValue
         );
       },
@@ -118,34 +118,34 @@ export class TankTurret implements Orientated {
   fire() {
     if (this.loaded < 100 || !this.deployed())
       return Promise.reject('Turret not ready');
-    this.tank.logger.trace('Turret firing');
+    this.bot.logger.trace('Turret firing');
 
-    this.tank.stats.shotsFired += 1;
+    this.bot.stats.shotsFired += 1;
 
-    if (this.tank.handlers[Event.FIRED]) {
-      this.tank.handlers[Event.FIRED]();
+    if (this.bot.handlers[Event.FIRED]) {
+      this.bot.handlers[Event.FIRED]();
     }
 
     const bullet: Bullet = {
       id: randomUUID(),
       exploded: false,
-      x: this.tank.x,
-      y: this.tank.y,
+      x: this.bot.x,
+      y: this.bot.y,
       origin: {
-        x: this.tank.x,
-        y: this.tank.y,
+        x: this.bot.x,
+        y: this.bot.y,
       },
-      orientation: this.tank.getOrientation() + this.orientation,
+      orientation: this.bot.getOrientation() + this.orientation,
       speed: 25,
     };
-    this.tank.bullets.push(bullet);
+    this.bot.bullets.push(bullet);
     this.loaded = 0;
 
-    this.tank.env.emit('event', {
+    this.bot.env.emit('event', {
       type: 'bulletFired',
-      time: this.tank.env.getTime(),
+      time: this.bot.env.getTime(),
       id: bullet.id,
-      tankId: this.tank.id,
+      botId: this.bot.id,
       x: bullet.origin.x,
       y: bullet.origin.y,
       speed: bullet.speed,

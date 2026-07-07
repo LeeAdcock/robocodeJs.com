@@ -18,7 +18,7 @@ straight to its entry here.
 
 **Sandbox catastrophic error — fatal.** The bot's sandbox hit a fatal limit,
 almost always the **8 MB memory cap** from runaway allocation (e.g. an
-ever-growing array). All of the app's tanks are killed. Fix: bound the memory your
+ever-growing array). All of the app's bots are killed. Fix: bound the memory your
 bot keeps — don't accumulate unbounded history or large data structures.
 
 ## E003
@@ -79,14 +79,14 @@ short and guard them with `try/catch`.
 ## E021
 
 **Timer limit reached — non-fatal.** Your bot tried to hold more than the
-per-tank limit of **64** active timers (`setInterval` + `setTimeout` combined).
+per-bot limit of **64** active timers (`setInterval` + `setTimeout` combined).
 The extra registration is ignored — that `setInterval`/`setTimeout` call returns
 `-1` and never fires — and the bot keeps playing. This almost always means timers
 are being created faster than they're cleared, e.g. calling `setInterval` inside a
 handler that runs every tick. Fix: create timers once (at the top level or in a
 `START` handler), keep references to them, and `clearInterval` / `clearTimeout`
-the ones you no longer need. Timers count per tank, and each app fields five
-tanks. See the timer limit under [Game rules](/rules).
+the ones you no longer need. Timers count per bot, and each app fields five
+bots. See the timer limit under [Game rules](/rules).
 
 ## E022
 

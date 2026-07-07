@@ -23,7 +23,7 @@ describe('GET /api/ask', () => {
   it('still classifies a natural-language question (not an error code)', async () => {
     const res = await request(helpRouter).get(
       '/api/ask?question=' +
-        encodeURIComponent('how do I move the tank around the arena')
+        encodeURIComponent('how do I move the bot around the arena')
     );
     expect(typeof res.body.answer).toBe('string');
     expect(res.body.answer).not.toContain('/error-codes');

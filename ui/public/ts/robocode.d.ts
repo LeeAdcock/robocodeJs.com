@@ -108,7 +108,7 @@ interface Clock {
   on(event: 'TICK', handler: () => void | Promise<unknown>): void;
 }
 
-/** Your tank: movement, radar, turret, communications, and event registration. */
+/** Your bot: movement, radar, turret, communications, and event registration. */
 interface Bot {
   /** The radar, for detecting other bots. */
   radar: Radar;

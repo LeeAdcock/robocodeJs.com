@@ -1,7 +1,7 @@
 import React from 'react';
 import PointInTime from '../../types/pointInTime';
 
-interface TankPathProps {
+interface BotPathProps {
   id: string;
   path: PointInTime[];
   pathIndex: number;
@@ -11,7 +11,7 @@ interface TankPathProps {
 
 type Point = { x: number; y: number };
 
-// Fade the trail from the tank backwards: the newest segment (nearest the live
+// Fade the trail from the bot backwards: the newest segment (nearest the live
 // position) is fully opaque and older ones fade out. `count` is the number of
 // points; there are `count - 1` segments, indexed 0 (oldest) .. count-2 (newest).
 // Keyed off the newest end (not absolute index) so a brand-new trail with a
@@ -23,7 +23,7 @@ export const trailSegmentOpacity = (
 ): number => 0.45 * ((pointIndex + 1) / Math.max(1, count - 1));
 
 // Reconstruct the trail as an ordered list of points: the recorded vertices in
-// ring-buffer insertion order (oldest → newest), followed by the tank's live
+// ring-buffer insertion order (oldest → newest), followed by the bot's live
 // position. Ordering by pathIndex — not by the points' `time` field — is what
 // keeps the trail a single polyline. The seed point (path[0]) and the recorded
 // vertices are stamped from two different clocks (the displayed playback time
@@ -49,7 +49,7 @@ export const buildTrailPoints = (
   return points;
 };
 
-const TankPathSvg = (props: TankPathProps) => {
+const BotPathSvg = (props: BotPathProps) => {
   if (!props.path) return null;
 
   const points = buildTrailPoints(
@@ -100,4 +100,4 @@ const TankPathSvg = (props: TankPathProps) => {
   );
 };
 
-export default TankPathSvg;
+export default BotPathSvg;

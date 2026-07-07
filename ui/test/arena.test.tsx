@@ -18,7 +18,7 @@ describe('ArenaSvg night mode', () => {
     rerender(<ArenaSvg arena={arena} darkMode={true} time={0} />);
     const overlay = container.querySelector('[style*="multiply"]');
     expect(overlay).toBeTruthy();
-    // The overlay must not intercept clicks meant for the tanks underneath.
+    // The overlay must not intercept clicks meant for the bots underneath.
     expect((overlay as SVGElement).getAttribute('style')).toContain(
       'pointer-events: none'
     );

@@ -340,7 +340,7 @@ export const INTERFACES: ApiInterface[] = [
   },
   {
     name: 'Bot',
-    doc: 'Your tank: movement, radar, turret, communications, and event registration.',
+    doc: 'Your bot: movement, radar, turret, communications, and event registration.',
     members: [
       {
         name: 'radar',
@@ -470,7 +470,7 @@ export const GLOBALS: ApiGlobal[] = [
   {
     name: 'bot',
     signature: 'bot: Bot',
-    doc: 'Your tank: movement, radar, turret, comms, and event registration.',
+    doc: 'Your bot: movement, radar, turret, comms, and event registration.',
   },
   {
     name: 'arena',

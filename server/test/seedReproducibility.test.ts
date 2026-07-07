@@ -1,28 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// A fixed random seed makes an arena's setup — tank placement and starting
+// A fixed random seed makes an arena's setup — bot placement and starting
 // orientations — reproduce exactly, so accelerated headless runs are repeatable.
 vi.mock('../src/util/db', () => ({
   default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
 }));
 
-import Tank from '../src/types/tank';
+import Bot from '../src/types/bot';
 import Environment from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { makeSimEnv } from './simEnv';
 
-// Build `n` tanks in a world and capture the randomized placement/orientation the
+// Build `n` bots in a world and capture the randomized placement/orientation the
 // seeded PRNG produced for each.
 const layout = (seed: number, n = 5) => {
   const world = makeSimEnv({ seed, run: () => undefined });
-  const proc = { tanks: [] as Tank[], getAppId: () => 'app1' };
+  const proc = { bots: [] as Bot[], getAppId: () => 'app1' };
   world.processes.push(proc as never);
-  const tanks = Array.from({ length: n }, () => {
-    const t = new Tank(world.env, proc as never);
-    proc.tanks.push(t);
+  const bots = Array.from({ length: n }, () => {
+    const t = new Bot(world.env, proc as never);
+    proc.bots.push(t);
     return t;
   });
-  return tanks.map((t) => ({
+  return bots.map((t) => ({
     x: t.x,
     y: t.y,
     orientation: t.orientation,

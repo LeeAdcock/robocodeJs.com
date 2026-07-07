@@ -118,7 +118,7 @@ app.get(dual('/summary'), loadUser, resolveArena, getSummary);
 
 // Get the lightweight match status (decided flag, winner, coarse standings) —
 // the cheap-to-poll companion to getSummary, without the per-bot stat blocks or
-// per-tank arrays. Same open, un-owner-gated access (spectating is intentional).
+// per-bot arrays. Same open, un-owner-gated access (spectating is intentional).
 const getMatchStatus = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
   const env = await environmentService.get(arena);
@@ -189,7 +189,7 @@ const addApp = async (req: Request, res: Response) => {
 };
 
 // Enable or disable a bot in the arena without unlinking it. Disabled = pulled
-// from the live match (tanks removed, no isolate) but the membership row stays,
+// from the live match (bots removed, no isolate) but the membership row stays,
 // so it remains in the roster and can be re-enabled. Owner-gated on the arena.
 const setEnabled = async (req: Request, res: Response) => {
   const enabled = (req.body ?? {}).enabled;
@@ -338,9 +338,9 @@ const setSpeed = async (req: Request, res: Response) => {
 };
 app.post(dual('/speed'), loadUser, requireOwner, resolveArena, setSpeed);
 
-// Set the arena's random seed. Fixing the seed makes the match setup (tank
+// Set the arena's random seed. Fixing the seed makes the match setup (bot
 // placement + starting orientations) reproducible; the change takes effect on the
-// next restart, which rebuilds the tanks from the reseeded stream. A tooling/MCP
+// next restart, which rebuilds the bots from the reseeded stream. A tooling/MCP
 // control.
 const setSeed = async (req: Request, res: Response) => {
   const raw = (req.body ?? {}).seed;

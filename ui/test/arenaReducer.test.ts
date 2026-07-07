@@ -6,7 +6,7 @@ import applyArenaEvent from '../src/util/arenaReducer';
 const apply = (arena: any, data: any, time = 0) =>
   applyArenaEvent(arena, data, time);
 
-function makeTank(id: string, over: Record<string, unknown> = {}) {
+function makeBot(id: string, over: Record<string, unknown> = {}) {
   return {
     id,
     x: 100,
@@ -32,10 +32,10 @@ function makeTank(id: string, over: Record<string, unknown> = {}) {
     ...over,
   };
 }
-const makeApp = (id: string, tanks: unknown[] = []) => ({
+const makeApp = (id: string, bots: unknown[] = []) => ({
   id,
   name: `App ${id}`,
-  tanks,
+  bots,
 });
 const makeArena = (apps: unknown[], time = 0) => ({ clock: { time }, apps });
 
@@ -66,11 +66,11 @@ describe('applyArenaEvent — apps', () => {
   });
 });
 
-describe('applyArenaEvent — tanks', () => {
-  it('arenaPlaceTank adds a tank to its app', () => {
+describe('applyArenaEvent — bots', () => {
+  it('arenaPlaceBot adds a bot to its app', () => {
     const arena = makeArena([makeApp('a1')]);
     apply(arena, {
-      type: 'arenaPlaceTank',
+      type: 'arenaPlaceBot',
       appId: 'a1',
       id: 't1',
       x: 50,
@@ -84,37 +84,37 @@ describe('applyArenaEvent — tanks', () => {
       radarOrientation: 0,
       radarOrientationVelocity: 0,
     });
-    expect(arena.apps[0].tanks.map((t: any) => t.id)).toEqual(['t1']);
+    expect(arena.apps[0].bots.map((t: any) => t.id)).toEqual(['t1']);
   });
 
-  it('arenaRemoveTank removes only the targeted tank (regression: slice bug)', () => {
+  it('arenaRemoveBot removes only the targeted bot (regression: slice bug)', () => {
     const arena = makeArena([
-      makeApp('a1', [makeTank('t1'), makeTank('t2'), makeTank('t3')]),
+      makeApp('a1', [makeBot('t1'), makeBot('t2'), makeBot('t3')]),
     ]);
-    apply(arena, { type: 'arenaRemoveTank', appId: 'a1', id: 't2' });
-    expect(arena.apps[0].tanks.map((t: any) => t.id)).toEqual(['t1', 't3']);
+    apply(arena, { type: 'arenaRemoveBot', appId: 'a1', id: 't2' });
+    expect(arena.apps[0].bots.map((t: any) => t.id)).toEqual(['t1', 't3']);
   });
 
-  it('tankTurn sets the body target/velocity and position', () => {
-    const arena = makeArena([makeApp('a1', [makeTank('t1')])]);
+  it('botTurn sets the body target/velocity and position', () => {
+    const arena = makeArena([makeApp('a1', [makeBot('t1')])]);
     apply(arena, {
-      type: 'tankTurn',
+      type: 'botTurn',
       id: 't1',
       bodyOrientationTarget: 90,
       bodyOrientationVelocity: 10,
       x: 200,
       y: 210,
     });
-    const t = arena.apps[0].tanks[0];
+    const t = arena.apps[0].bots[0];
     expect(t.bodyOrientationTarget).toBe(90);
     expect(t.bodyOrientationVelocity).toBe(10);
     expect([t.x, t.y]).toEqual([200, 210]);
   });
 
-  it('tankAccelerate / tankStop update speed fields', () => {
-    const arena = makeArena([makeApp('a1', [makeTank('t1')])]);
+  it('botAccelerate / botStop update speed fields', () => {
+    const arena = makeArena([makeApp('a1', [makeBot('t1')])]);
     apply(arena, {
-      type: 'tankAccelerate',
+      type: 'botAccelerate',
       id: 't1',
       speed: 3,
       speedTarget: 5,
@@ -123,33 +123,33 @@ describe('applyArenaEvent — tanks', () => {
       x: 1,
       y: 2,
     });
-    expect(arena.apps[0].tanks[0].speedTarget).toBe(5);
-    apply(arena, { type: 'tankStop', id: 't1', x: 1, y: 2 });
-    expect(arena.apps[0].tanks[0].speed).toBe(0);
-    expect(arena.apps[0].tanks[0].speedTarget).toBe(0);
+    expect(arena.apps[0].bots[0].speedTarget).toBe(5);
+    apply(arena, { type: 'botStop', id: 't1', x: 1, y: 2 });
+    expect(arena.apps[0].bots[0].speed).toBe(0);
+    expect(arena.apps[0].bots[0].speedTarget).toBe(0);
   });
 
-  it('tankDamaged sets health and stops the tank when destroyed', () => {
+  it('botDamaged sets health and stops the bot when destroyed', () => {
     const arena = makeArena([
-      makeApp('a1', [makeTank('t1', { speed: 4, speedTarget: 4 })]),
+      makeApp('a1', [makeBot('t1', { speed: 4, speedTarget: 4 })]),
     ]);
-    apply(arena, { type: 'tankDamaged', id: 't1', health: 0 });
-    const t = arena.apps[0].tanks[0];
+    apply(arena, { type: 'botDamaged', id: 't1', health: 0 });
+    const t = arena.apps[0].bots[0];
     expect(t.health).toBe(0);
     expect([t.speed, t.speedTarget]).toEqual([0, 0]);
   });
 
-  it('botFault flags the matching tank as crashed with its code', () => {
-    const arena = makeArena([makeApp('a1', [makeTank('t1'), makeTank('t2')])]);
-    apply(arena, { type: 'botFault', tankId: 't2', code: 'E017' });
-    const [t1, t2] = arena.apps[0].tanks;
+  it('botFault flags the matching bot as crashed with its code', () => {
+    const arena = makeArena([makeApp('a1', [makeBot('t1'), makeBot('t2')])]);
+    apply(arena, { type: 'botFault', botId: 't2', code: 'E017' });
+    const [t1, t2] = arena.apps[0].bots;
     expect(t1.crashed).toBeFalsy();
     expect(t2.crashed).toBe(true);
     expect(t2.faultCode).toBe('E017');
   });
 
   it('turret/radar turn set their targets', () => {
-    const arena = makeArena([makeApp('a1', [makeTank('t1')])]);
+    const arena = makeArena([makeApp('a1', [makeBot('t1')])]);
     apply(arena, {
       type: 'turretTurn',
       id: 't1',
@@ -162,31 +162,31 @@ describe('applyArenaEvent — tanks', () => {
       radarOrientationTarget: 30,
       radarOrientationVelocity: 3,
     });
-    const t = arena.apps[0].tanks[0];
+    const t = arena.apps[0].bots[0];
     expect(t.turretOrientationTarget).toBe(45);
     expect(t.radarOrientationTarget).toBe(30);
   });
 });
 
 describe('applyArenaEvent — bullets & clock', () => {
-  it('bulletFired / bulletExploded / bulletRemoved manage a tank bullet', () => {
-    const arena = makeArena([makeApp('a1', [makeTank('t1')])]);
+  it('bulletFired / bulletExploded / bulletRemoved manage a bot bullet', () => {
+    const arena = makeArena([makeApp('a1', [makeBot('t1')])]);
     apply(arena, {
       type: 'bulletFired',
-      tankId: 't1',
+      botId: 't1',
       id: 'b1',
       x: 10,
       y: 20,
       orientation: 0,
       speed: 25,
     });
-    expect(arena.apps[0].tanks[0].bullets).toHaveLength(1);
+    expect(arena.apps[0].bots[0].bullets).toHaveLength(1);
 
     apply(arena, { type: 'bulletExploded', id: 'b1', time: 7 });
-    expect(arena.apps[0].tanks[0].bullets[0].explodedAt).toBe(7);
+    expect(arena.apps[0].bots[0].bullets[0].explodedAt).toBe(7);
 
     apply(arena, { type: 'bulletRemoved', id: 'b1' });
-    expect(arena.apps[0].tanks[0].bullets).toHaveLength(0);
+    expect(arena.apps[0].bots[0].bullets).toHaveLength(0);
   });
 
   it('tick advances the clock and is a no-op when the time is unchanged', () => {

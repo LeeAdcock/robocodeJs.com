@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildTrailPoints,
   trailSegmentOpacity,
-} from '../src/components/arena/arenaTankPath';
+} from '../src/components/arena/arenaBotPath';
 import PointInTime from '../src/types/pointInTime';
 
 // buildTrailPoints reconstructs the trail polyline: recorded vertices in
