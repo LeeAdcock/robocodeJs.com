@@ -1,39 +1,14 @@
 # RobocodeJs — future work
 
-A living backlog for future sessions, written after the 2024 modernization effort
-(Node 24, CRA→Vite, Prettier/ESLint unification, security hardening, sandbox
-rewrite, multi-arena API, zero-config local dev). Roughly priority-ordered within
-each tier. Effort tags: **S** ≈ <½ day, **M** ≈ 1–2 days, **L** ≈ multi-day.
+A living backlog of engineering/health work still to be done. Roughly
+priority-ordered within each tier. Effort tags: **S** ≈ <½ day, **M** ≈ 1–2 days,
+**L** ≈ multi-day.
 
-This file is the **engineering/health backlog**. For product feature ideas
-(game modes, leaderboards, onboarding, etc.) see [`ENHANCEMENTS.md`](ENHANCEMENTS.md).
-
-## Now (high priority)
-
-- ✅ **Merge `modernize-foundation` → `main`.** _Done._ The modernization work is
-  on `main` (Node 24, Express 5, React 19, Vite, TS 5, etc.).
-- ✅ **CI pipeline (GitHub Actions).** (M) _Done._ `.github/workflows/ci.yml` runs,
-  per package, `npm ci` → lint → build (`tsc`) → test + `npm audit --audit-level=high`
-  on every PR/push, and `.github/dependabot.yml` opens weekly npm + github-actions
-  update PRs (added alongside the security hardening — see `SECURITY.md` A06-1).
-  Closes the last unfinished item from the original modernization plan.
-- ✅ **Cap concurrent isolates globally (sandbox review #4).** (M) _Done._ A global
-  `MAX_TOTAL_ARENAS` ceiling (default 1000, env-tunable) is enforced at arena
-  creation via `arenaService.count()`, returning **503** at capacity
-  (`api/arena.ts`); the 30-minute idle GC still reclaims live isolates. See
-  `SECURITY.md` A04-2.
+For product feature ideas (game modes, leaderboards, onboarding, etc.) see
+[`ENHANCEMENTS.md`](ENHANCEMENTS.md).
 
 ## Soon (medium priority)
 
-- ✅ **Upgrade TypeScript 4.9 → 5.x** (both packages). _Done._ Both packages are on
-  TypeScript 5.9, with `pino` v10 and `@typescript-eslint` v8.
-- ✅ **Graceful shutdown.** (S) _Done._ On `SIGTERM`/`SIGINT` the server stops
-  accepting new connections (`server.close`), disposes every live isolate
-  (`EnvironmentService.disposeAll`) and closes the pg pool (`pool.end`), then
-  exits — so deploys/restarts don't leak native `isolated-vm` resources (a real
-  factor in the small-instance OOM history). Guarded against repeated signals with
-  a 10s failsafe; lifecycle logged via the `process.shutdown` `LogEvent`
-  (`index.ts`).
 - **DB schema migrations.** (M) Schema is created ad-hoc via
   `CREATE TABLE IF NOT EXISTS` at import; columns can't evolve safely. Introduce a
   lightweight migration tool (e.g. `node-pg-migrate`).
@@ -46,30 +21,20 @@ This file is the **engineering/health backlog**. For product feature ideas
 - **Multi-arena tooling client.** (M) The `/arenas` API exists but has no
   consumer; build a small CLI/script that drives multiple arenas (the original
   motivation for that API).
-- ✅ **React 18 → 19 and Express 4 → 5.** _Done._ The UI is on React 19 and the
-  server on Express 5.
 - **Trim the editor bundle.** (S–M) The lazy `appPage` chunk (ace + prettier) is
   ~1.3 MB / ~380 kB gzip. Already off the initial load; could be slimmed with a
   lighter editor or formatter.
-- ✅ **Document `ErrorCodes` (E0xx) for bot authors.** _Done._ Each code is
-  described in `ui/public/docs/error-codes.md` (the `/error-codes` page), also
-  exposed as the `robocodejs://reference/error-codes` MCP resource.
 - **Tidy `DemoService`.** (S) Move its inline hardcoded bot source into
   `ui/public/samples` and reuse it.
 - **Burn down remaining `~18` TODOs** in `server/src` / `ui/src` (e.g. debounce
   `app.setSource` persistence, "only if actual change" guards, validate uploaded
   source). Mostly small.
-- **Operational metrics.** (M) _Partly done._ Structured logging (pino + request
-  logs + named fault/security events — see the server README "Logging &
-  monitoring") and now point-in-time **gauges on `/health`**: live arena count,
-  running arenas, total isolates, the busiest arena's EMA tick duration
-  (`Environment` maintains it in `runLoop`), and process memory (rss/heap) +
-  uptime. Kept O(arenas) with no async so it's safe on every ALB health check
-  (`util`/`services/EnvironmentService.metrics`, `util/metrics.ts`,
-  `api/health.ts`), plus a periodic `event=metrics` **log heartbeat** for
-  time-series/alerting (`index.ts`, `METRICS_LOG_INTERVAL_MS`-tunable, off under
-  test). Still missing: a `/metrics` scrape endpoint (Prometheus) and alert wiring
-  on the `event=*` log fields (e.g. CloudWatch metric filters).
+- **Operational metrics — remaining.** (S–M) Gauges are already live on `/health`
+  and emitted as a periodic `event=metrics` log heartbeat (`util/metrics.ts`,
+  `services/EnvironmentService.metrics`, `api/health.ts`, `index.ts`). Still
+  missing: a `/metrics` scrape endpoint (Prometheus) and alert wiring on the
+  `event=*` log fields (e.g. CloudWatch metric filters, thresholds seeded from
+  observed baselines).
 
 ## Known & accepted (not action items)
 

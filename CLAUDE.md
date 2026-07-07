@@ -72,7 +72,7 @@ User bot code is untrusted JavaScript run in `isolated-vm` isolates — this is 
 
 ### Auth & access control
 
-`server/src/middleware/auth.ts` verifies a Google OAuth id token (checking its **audience** against `GOOGLE_CLIENT_ID`, which must match the client id the UI signs in with) stored in the `auth` cookie. The cookie is set **server-side and HttpOnly** by `POST /api/session` (the UI posts the Google credential there; `DELETE /api/session` logs out) — see `server/src/api/session.ts`. A user record is auto-created on first login (rejected if `email_verified` is false). Both `/api/user` and `POST /api/mcp` are hard-gated by `auth(true)` — the latter resolves the acting user from a **bearer API token** (`api/token.ts`, stored only as a sha256 hash). Ownership is enforced by two middlewares (`middleware/resource.ts`): `requireOwner` (the actor owns the `:userId`/arena) and `requireAppOwner` (the confidential/destructive app routes — source read/write, delete, compile, reboot — the A01 IDOR fix). Metadata reads and add-by-reference stay open by design (spectating / share-links). Full model + rationale in `SECURITY.md`.
+`server/src/middleware/auth.ts` verifies a Google OAuth id token (checking its **audience** against `GOOGLE_CLIENT_ID`, which must match the client id the UI signs in with) stored in the `auth` cookie. The cookie is set **server-side and HttpOnly** by `POST /api/session` (the UI posts the Google credential there; `DELETE /api/session` logs out) — see `server/src/api/session.ts`. A user record is auto-created on first login (rejected if `email_verified` is false). Both `/api/user` and `POST /api/mcp` are hard-gated by `auth(true)` — the latter resolves the acting user from a **bearer API token** (`api/token.ts`, stored only as a sha256 hash). Ownership is enforced by two middlewares (`middleware/resource.ts`): `requireOwner` (the actor owns the `:userId`/arena) and `requireAppOwner` (the confidential/destructive app routes — source read/write, delete, compile, reboot — the A01 IDOR fix). Metadata reads and add-by-reference stay open by design (spectating / share-links).
 
 ### AI integration (MCP)
 
@@ -84,7 +84,17 @@ An arena's **roster** is its `ArenaMember` rows. A member can be **enabled or di
 
 ### Security & resource limits
 
-Untrusted code + shared multi-user arenas make **access control, sandbox integrity, and resource exhaustion** the primary concerns. Hardening in place: `helmet` + CSP (`middleware/securityHeaders.ts`), rate limiting (`middleware/rateLimit.ts` — auth/compute/write/api limiters, `429` + error `E022`), RDS TLS **CA verification** (`db.ts` `sslConfig`), and resource caps — per-tank timers (`MAX_TIMERS_PER_TANK`, `E021`), per-user apps (`MAX_APPS_PER_USER`) and arenas (`MAX_ARENAS_PER_USER`) plus a global `MAX_TOTAL_ARENAS` ceiling, and the 8 MB isolate limit. `SECURITY.md` is the full OWASP audit (findings, fixes, and accepted risks); `TASKS.md`/`ENHANCEMENTS.md` are the engineering + product backlogs.
+Untrusted code + shared multi-user arenas make **access control, sandbox integrity, and resource exhaustion** the primary concerns. Hardening in place: `helmet` + CSP (`middleware/securityHeaders.ts`), rate limiting (`middleware/rateLimit.ts` — auth/compute/write/api limiters, `429` + error `E022`), RDS TLS **CA verification** (`db.ts` `sslConfig`), and resource caps — per-tank timers (`MAX_TIMERS_PER_TANK`, `E021`), per-user apps (`MAX_APPS_PER_USER`) and arenas (`MAX_ARENAS_PER_USER`) plus a global `MAX_TOTAL_ARENAS` ceiling, and the 8 MB isolate limit. A full OWASP Top 10 audit was completed and **all medium-and-above findings are remediated**; `TASKS.md`/`ENHANCEMENTS.md` are the engineering + product backlogs.
+
+**Accepted / deferred security risks** (all low severity, decided deliberately — don't "fix" without cause):
+
+- **No server-side session revocation.** Logout just clears the cookie; a stolen still-valid Google id token works until its ~1 h expiry. Accepted — a revocation denylist is disproportionate for the short TTL.
+- **Markdown rendering relies on CSP, not a sanitizer.** `showdown` → `html-react-parser` (`ui/src/.../markdownPage.tsx`) is unsanitized, but input is only our own static `/docs/*.md`, `html-react-parser` makes injected scripts inert, and the CSP is a backstop. Escalation path if untrusted markdown is ever rendered: add `DOMPurify.sanitize` before `parse()` (noted at the render site).
+- **`showdown` ReDoS** (GHSA-rmmh-p597-ppvv, no fix available): accepted for the same reason — trusted static input only.
+- **Token entropy uses `randomUUID()`.** OAuth codes/access/refresh tokens are ~122-bit UUIDv4, stored only as sha256 hashes (`services/OAuthService.ts` via `util/hash.ts`). Adequate; `crypto.randomBytes(32)` would be the purist upgrade.
+- **Lazy DDL startup robustness.** `CREATE TABLE IF NOT EXISTS` promises fire at import time without `await`/`.catch` (e.g. `AppService.ts`) — a startup race, not a vuln. Would be tidied by the DB-migrations task (`TASKS.md`).
+- **`eslint` 8 is EOL** — dev-only chore; migrate to 9 eventually.
+- **`isolated-vm` ⇄ Node major coupling** (6.x needs Node ≥22; 7.x needs ≥26): move both majors together on any runtime bump.
 
 ### Services & types
 

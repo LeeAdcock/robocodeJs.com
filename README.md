@@ -173,8 +173,7 @@ Formatting is governed by a single root [`.prettierrc.json`](.prettierrc.json) f
 
 - [`server/README.md`](server/README.md) — API endpoints, the sandbox/compiler, the simulation engine, the MCP server, security, data model, environment variables.
 - [`ui/README.md`](ui/README.md) — app structure, arena rendering, the SSE event reducer, client-side interpolation, the code editor, theming.
-- [`CLAUDE.md`](CLAUDE.md) — orientation for working in the codebase (commands, conventions, gotchas).
-- [`SECURITY.md`](SECURITY.md) — the OWASP Top 10 audit: threat model, findings, and their remediations.
+- [`CLAUDE.md`](CLAUDE.md) — orientation for working in the codebase (commands, conventions, gotchas); includes the security posture and accepted risks (a full OWASP Top 10 audit was completed and all medium-and-above findings remediated).
 - [`ui/public/docs/`](ui/public/docs) — the in-app bot author documentation (also served at `/dev`); MCP setup guide at [`ui/public/docs/mcp.md`](ui/public/docs/mcp.md).
 
 ## Deployment
