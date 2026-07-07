@@ -9,7 +9,7 @@ The arena is a square battlefield where teams of bots fight. Each app you write 
 **The fastest way in:** sign in with your Google account, then open the menu and choose
 **Apps → Create new application**. Your bots drop straight into the arena and you're ready
 to code — no setup, no downloads, nothing to install. Follow the quick walkthrough below
-to build your first bot in a few minutes.
+to see how a bot comes together, step by step.
 
 **Prefer a different on-ramp?** Pick the path that fits you:
 
@@ -25,9 +25,10 @@ to build your first bot in a few minutes.
 
 # Coding your first JavaScript bot
 
-This quick walkthrough builds a simple bot in a few minutes. Prefer to start by reading
-instead? Take the guided **[Learn to Code course](/learn)** or dive into the full
-**[documentation](/dev)**.
+This quick walkthrough shows the key steps to building a bot — naming it, firing its
+turret, and getting it moving — so you can see how the pieces fit together. Prefer to
+start by reading instead? Take the guided **[Learn to Code course](/learn)** or dive into
+the full **[documentation](/dev)**.
 
 ## Naming your Bot
 
