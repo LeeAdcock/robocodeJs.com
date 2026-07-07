@@ -288,26 +288,6 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'rename_app',
-    {
-      title: 'Rename app',
-      description: 'Change an app’s display name.',
-      inputSchema: {
-        appId: z.string().describe('The bot (app) id'),
-        name: z.string().describe('New name'),
-      },
-      outputSchema: { appId: z.string(), name: z.string() },
-      annotations: IDEMPOTENT,
-    },
-    async ({ appId, name }) => {
-      const app = await ownedApp(user, appId);
-      if (!app) return fail('No such bot, or it is not yours.');
-      await app.setName(name);
-      return ok({ appId, name });
-    }
-  );
-
-  server.registerTool(
     'compile_app',
     {
       title: 'Compile app',

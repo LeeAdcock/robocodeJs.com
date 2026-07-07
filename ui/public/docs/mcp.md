@@ -52,7 +52,6 @@ Once connected, these tools are available (all scoped to your account):
 - `get_app_source` — read an app's source
 - `create_app` — create an app (optionally with a name and initial source)
 - `set_app_source` — replace an app's source (live arenas pick it up)
-- `rename_app` — rename an app
 - `compile_app` — re-run an app's current source in your live arenas
 - `check_app_source` — dry-run compile source (pass `source`, or `appId` for a
   saved app) and report any syntax/load error with its code — without deploying it
