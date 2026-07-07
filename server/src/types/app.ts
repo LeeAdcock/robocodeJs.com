@@ -24,7 +24,9 @@ export default class App {
   // (setName/setSource persist; this is for hydrating a loaded record).
   hydrate = (name: string, source: string): App => {
     this.name = name;
-    this.source = source;
+    // Coerce a NULL/undefined source (legacy rows created before the column
+    // defaulted to '') to an empty string so getSource always returns a string.
+    this.source = source ?? '';
     return this;
   };
 
