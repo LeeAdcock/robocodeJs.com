@@ -20,6 +20,7 @@ function makeBot(overrides: Record<string, unknown> = {}) {
     health: 100,
     appCrashed: false,
     needsStarting: false,
+    codeLoaded: true,
     handlers: {} as Record<string, (arg?: unknown) => void>,
     x: 375,
     y: 375,
@@ -301,5 +302,36 @@ describe('Simulation.run — lifecycle', () => {
     // Nothing to start first, so TICK fires immediately on the first tick.
     expect(tick).toHaveBeenCalledTimes(1);
     expect(bot.needsStarting).toBe(false);
+  });
+
+  it('does not start or tick a bot whose code has not loaded yet', () => {
+    // Reproduces the addApp race: a bot placed in an already-running arena is
+    // ticked before execute() has registered its handlers. needsStarting must
+    // NOT be consumed, or START is skipped forever and TICK runs first.
+    const calls: string[] = [];
+    const bot = makeBot({
+      needsStarting: true,
+      codeLoaded: false,
+      handlers: {
+        [Event.START]: () => calls.push('start'),
+        [Event.TICK]: () => calls.push('tick'),
+      },
+    });
+    const env = makeEnv([makeProcess('a', [bot])]);
+
+    run(env);
+    // Code not loaded: neither handler ran, and the start is still pending.
+    expect(calls).toEqual([]);
+    expect(bot.needsStarting).toBe(true);
+
+    // Code finishes loading (execute() resolves).
+    bot.codeLoaded = true;
+    run(env);
+    // START now runs first, and TICK is deferred to the following tick.
+    expect(calls).toEqual(['start']);
+    expect(bot.needsStarting).toBe(false);
+
+    run(env);
+    expect(calls).toEqual(['start', 'tick']);
   });
 });

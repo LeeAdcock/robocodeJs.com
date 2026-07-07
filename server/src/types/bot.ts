@@ -76,6 +76,12 @@ export default class Bot implements Point, Orientated {
 
   public needsStarting = true;
   public appCrashed = false;
+  // False until the bot's code has run and registered its handlers. Simulation
+  // gates START/TICK on this so a bot added to an already-running arena (addApp
+  // fires execute() without awaiting) can't be ticked in the window before its
+  // START handler exists — which would clear needsStarting and let TICK run
+  // first. See execute() below and Simulation.run.
+  public codeLoaded = false;
 
   constructor(env: Environment, process: Process) {
     this.env = env;
@@ -222,10 +228,19 @@ export default class Bot implements Point, Orientated {
   execute(process: Process): Promise<unknown> {
     this.logger.trace('Executing code');
     try {
-      return compiler.execute(process, this);
+      // Mark the bot loaded once its code has run (compiler.execute resolves
+      // after the script runs and registers handlers, and also on a handled
+      // load error). Simulation won't run START/TICK until this flips true.
+      return compiler.execute(process, this).then((result) => {
+        this.codeLoaded = true;
+        return result;
+      });
     } catch (e) {
       this.logger.error(`${ErrorCodes.E004}: ${e}`);
       this.appCrashed = true;
+      // The load attempt is over (it threw synchronously); let Simulation see
+      // the bot so its appCrashed path can kill it.
+      this.codeLoaded = true;
       // Surface the crash on the unified fault feed (replaces the old bespoke
       // `appError` event) — buffered for MCP and broadcast as `botFault` for the UI.
       compiler.emitBotFault(this, ErrorCodes.E004, 'execute', e);

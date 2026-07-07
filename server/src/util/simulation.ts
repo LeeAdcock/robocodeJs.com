@@ -34,7 +34,11 @@ export default {
     const startedThisTick = new Set<unknown>();
     env.getProcesses().forEach((process) => {
       process.bots.forEach((bot) => {
-        if (bot.health > 0) {
+        // Skip until the bot's code has loaded (handlers registered). Clearing
+        // needsStarting before the START handler exists would permanently skip
+        // START and let the first TICK run against uninitialized state — the
+        // race that hit bots added to an already-running arena. See bot.codeLoaded.
+        if (bot.health > 0 && bot.codeLoaded) {
           if (bot.needsStarting === true) {
             if (bot.handlers[Event.START]) {
               bot.handlers[Event.START]();
@@ -55,7 +59,11 @@ export default {
       process.bots
         .filter((bot) => bot.health > 0)
         .forEach((bot) => {
-          if (!startedThisTick.has(bot) && bot.handlers[Event.TICK]) {
+          if (
+            bot.codeLoaded &&
+            !startedThisTick.has(bot) &&
+            bot.handlers[Event.TICK]
+          ) {
             bot.handlers[Event.TICK]();
           }
 
