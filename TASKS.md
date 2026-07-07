@@ -27,8 +27,13 @@ This file is the **engineering/health backlog**. For product feature ideas
 
 - ✅ **Upgrade TypeScript 4.9 → 5.x** (both packages). _Done._ Both packages are on
   TypeScript 5.9, with `pino` v10 and `@typescript-eslint` v8.
-- **Graceful shutdown.** (S) On `SIGTERM`/`SIGINT`, dispose isolates and close the
-  pg pool so deploys/restarts don't leak native resources.
+- ✅ **Graceful shutdown.** (S) _Done._ On `SIGTERM`/`SIGINT` the server stops
+  accepting new connections (`server.close`), disposes every live isolate
+  (`EnvironmentService.disposeAll`) and closes the pg pool (`pool.end`), then
+  exits — so deploys/restarts don't leak native `isolated-vm` resources (a real
+  factor in the small-instance OOM history). Guarded against repeated signals with
+  a 10s failsafe; lifecycle logged via the `process.shutdown` `LogEvent`
+  (`index.ts`).
 - **DB schema migrations.** (M) Schema is created ad-hoc via
   `CREATE TABLE IF NOT EXISTS` at import; columns can't evolve safely. Introduce a
   lightweight migration tool (e.g. `node-pg-migrate`).
