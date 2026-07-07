@@ -63,6 +63,20 @@ export class EnvironmentService {
     return Promise.resolve();
   };
 
+  // Tears down every live environment (pausing its tick loop first, then
+  // releasing its isolate) and clears the store. Used on graceful shutdown so a
+  // deploy/restart releases native isolated-vm memory instead of leaking it.
+  // Returns the number of environments disposed.
+  disposeAll = (): number => {
+    const entries = Object.entries(this.store) as [ArenaId, Environment][];
+    entries.forEach(([arenaId, env]) => {
+      env.pause();
+      env.dispose();
+      delete this.store[arenaId];
+    });
+    return entries.length;
+  };
+
   getByArenaId = (arenaId: ArenaId): Promise<Environment | undefined> => {
     return Promise.resolve(this.store[arenaId]);
   };
