@@ -25,6 +25,10 @@ to build your first bot in a few minutes.
 
 # Coding your first JavaScript bot
 
+This quick walkthrough builds a simple bot in a few minutes. Prefer to start by reading
+instead? Take the guided **[Learn to Code course](/learn)** or dive into the full
+**[documentation](/dev)**.
+
 ## Naming your Bot
 
 In our applications, the bots are represented by the `bot` object which has a collection of methods and properties you can use to control your bot. For our first bot, we'll use the `setName(...)` method to provide our bot its new name. This method takes a text string as its only parameter, pick a name that will spark fear among the other bots in the arena!
