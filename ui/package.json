@@ -19,7 +19,7 @@
     "react-icons": "^5.7.0",
     "react-router-dom": "^7.18.1",
     "showdown": "^2.1.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "scripts": {
     "dev": "fuser -k 3000/tcp & vite",
