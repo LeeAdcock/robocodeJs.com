@@ -439,8 +439,6 @@ function App() {
                   element={<McpAuthorizePage user={user} />}
                 />
 
-                <Route path="user/:userId" element={<>user</>} />
-                <Route path="user/:userId/arena" element={<>user arena</>} />
                 <Route
                   path="user/:userId/app/:appId"
                   element={
