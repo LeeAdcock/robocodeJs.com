@@ -4,6 +4,8 @@
 
 The arena is a square battlefield where teams of bots fight. Each app you write is the shared "brain" for one team — five bots that scan with radar, aim a turret, and drive around hunting the other teams. Your goal is simple: knock them out before they knock out you. Edit your code and save, and every bot on your team instantly starts using the new logic — so you can reset the match, add or remove opponents, and keep tuning your strategy in seconds.
 
+See that arena? It's a live demo — real bots battling right now. In a few minutes, yours can be in there too.
+
 # Get started
 
 **The fastest way in:** sign in with your Google account, then open the menu and choose
@@ -30,63 +32,43 @@ turret, and getting it moving — so you can see how the pieces fit together. Pr
 start by reading instead? Take the guided **[Learn to Code course](/learn)** or dive into
 the full **[documentation](/dev)**.
 
-## Naming your Bot
+Everything you control hangs off the `bot` object. **Name your bot:**
 
-In our applications, the bots are represented by the `bot` object which has a collection of methods and properties you can use to control your bot. For our first bot, we'll use the `setName(...)` method to provide our bot its new name. This method takes a text string as its only parameter, pick a name that will spark fear among the other bots in the arena!
-
-```
-bot.setName('My first bot')
+```js
+bot.setName('My first bot');
 ```
 
-Clicking the "Save" button in the editor will send your new application to all of your bots, and they will immediately execute it and start using their new logic.
+**Fire when the turret is loaded** — it needs time to reload, so check first, and run that check every clock tick:
 
-## Firing the Turret
-
-Next, let's write a JavaScript function that will fire the bot's turret, if it's loaded. The turret takes time to reload, so you'll usually want to check its status before you try to use it. All of the turret controls are on the `bot.turret` object.
-
-```
+```js
 function fireIfReady() {
-  if(bot.turret.isReady()) {
-    bot.turret.fire()
+  if (bot.turret.isReady()) {
+    bot.turret.fire();
   }
 }
+
+clock.on(Event.TICK, fireIfReady);
 ```
 
-To call this function and run your new turret behavior, let's attach it to an event. In this case we want to keep checking if the turret is ready to fire, so let's attach this behavior to the `clock`'s `Event.TICK` event. The clock tick is the smallest increment of time in the arena, and ensures we'll execute this code as soon as the turret is ready. We pass the `clock.on` method the type of event and the function we created to execute when this event happens. You can only have one event handler defined for each event type, so if you call this again it will overwrite any other event handler you've already set.
+**Get it moving** — drive when the match starts, and turn a little each time you fire:
 
-```
-clock.on(Event.TICK, fireIfReady)
-```
-
-## Movement
-
-Right now our bot just sits in place. Let's get it moving and have it turn each time it fires. Driving is controlled with `bot.setSpeed(...)`, while `bot.turn(...)` rotates the bot by a relative number of degrees. Angles in the arena are measured in degrees on a compass, with 0° pointing straight up (north) and angles increasing clockwise.
-
-Let's start the bot driving when the match begins by handling the `Event.START` event — a good place to set up your bot's initial behavior, since it runs whenever your code is loaded:
-
-```
+```js
 bot.on(Event.START, () => {
-  bot.setSpeed(2)
-})
+  bot.setSpeed(2);
+});
+
+bot.on(Event.FIRED, () => {
+  bot.turn(10);
+});
 ```
 
-And let's turn a little each time the turret fires, by attaching a function to the `Event.FIRED` event on our bot:
-
-```
-function turnRight() {
-  bot.turn(10)
-}
-
-bot.on(Event.FIRED, turnRight)
-```
-
-There are several other ways to define and pass functions in JavaScript, and you'll see those other ways in some of our examples. The result is the same, but different approaches may be better in different situations for helping increase your code's readability.
+Save in the editor and every bot on your team picks up the new logic instantly. That's the shape of a bot — react to events, and control the `bot` with each one.
 
 # Next steps!
 
-You've created your first bot! This simple logic is probably not likely to dominate the arena, but it's a great first step as you begin to learn RobocodeJs.
+That's the gist — a bot that drives, fires, and turns. It won't dominate the arena yet, but you've seen how the pieces fit together.
 
-Next you may want to skim through the detailed [RobocodeJs documentation](/dev), study a few [more examples](/examples), or [deepen your knowledge](https://learnjavascript.online/) on the JavaScript programming language.
+Ready to build your own? Take the guided **[Learn to Code course](/learn)** for the full step-by-step path, skim the detailed **[RobocodeJs documentation](/dev)**, study a few **[example bots](/examples)**, or [deepen your knowledge](https://learnjavascript.online/) of JavaScript itself.
 
 ---
 
