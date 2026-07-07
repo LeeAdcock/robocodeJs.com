@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(npm -v)",
+      "Bash(npm --version)",
+      "Bash(npm view *)",
+      "Bash(npm ls *)",
+      "Bash(npm audit *)",
+      "Bash(npx vitest *)",
+      "Bash(npx eslint *)",
+      "Bash(npx tsc *)",
+      "Bash(npx prettier *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git fetch *)",
+      "Bash(git remote *)",
+      "Bash(git rev-list *)",
+      "Bash(git check-ignore *)",
+      "Bash(gh pr *)",
+      "mcp__robocodejs__list_arenas",
+      "mcp__robocodejs__list_bots",
+      "mcp__robocodejs__arena_status",
+      "mcp__robocodejs__get_bot_source",
+      "mcp__robocodejs__recent_logs",
+      "mcp__robocodejs__recent_faults",
+      "mcp__robocodejs__match_summary",
+      "mcp__robocodejs__check_bot_source"
+    ]
+  }
+}
