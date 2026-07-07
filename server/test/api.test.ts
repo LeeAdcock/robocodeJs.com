@@ -35,6 +35,12 @@ vi.mock('../src/services/EnvironmentService', () => ({
     has: vi.fn(),
     get: vi.fn(),
     dispose: vi.fn(),
+    metrics: vi.fn(() => ({
+      arenas: 0,
+      runningArenas: 0,
+      isolates: 0,
+      maxAvgTickMs: 0,
+    })),
   },
 }));
 // Mock the compiler so the /check route test doesn't spin a real isolate (the
@@ -99,6 +105,24 @@ describe('GET /health', () => {
     // The live server version is surfaced so a deploy can be validated.
     expect(typeof res.body.version).toBe('string');
     expect(res.body.version.length).toBeGreaterThan(0);
+  });
+
+  it('carries lightweight operational metrics', async () => {
+    const res = await request(makeApp(healthRouter)).get('/health');
+    expect(res.status).toBe(200);
+    // Env gauges (from the mocked service) plus process-level gauges.
+    expect(res.body.metrics).toMatchObject({
+      arenas: 0,
+      runningArenas: 0,
+      isolates: 0,
+      maxAvgTickMs: 0,
+    });
+    expect(typeof res.body.metrics.rssMB).toBe('number');
+    expect(typeof res.body.metrics.heapUsedMB).toBe('number');
+    expect(typeof res.body.uptimeSec).toBe('number');
+    // The gauges must be cheap enough for a frequent health check: a single
+    // metrics() read, no per-request heavy work.
+    expect(environmentService.metrics).toHaveBeenCalledTimes(1);
   });
 });
 

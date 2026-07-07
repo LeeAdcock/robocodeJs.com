@@ -9,6 +9,7 @@ import securityHeaders from './middleware/securityHeaders';
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit';
 import { isLocalDev } from './util/devMode';
 import { logger, LogEvent } from './util/logger';
+import { collectMetrics } from './util/metrics';
 import pool from './util/db';
 import environmentService from './services/EnvironmentService';
 
@@ -132,6 +133,28 @@ const server = app.listen(port, () => {
     );
   }
 });
+
+// Periodic operational-metrics heartbeat: emit the same cheap gauges /health
+// serves as a structured `event=metrics` log line, so they become a time series
+// for dashboards/alerting (e.g. a CloudWatch metric filter on the event field)
+// without anyone having to poll /health. Interval is env-tunable (0 disables);
+// unref'd so it never keeps the process alive during shutdown. Skipped under test.
+const metricsIntervalMs = parseInt(
+  process.env.METRICS_LOG_INTERVAL_MS || '60000'
+);
+if (process.env.NODE_ENV !== 'test' && metricsIntervalMs > 0) {
+  const metricsTimer = setInterval(() => {
+    logger.info(
+      {
+        event: LogEvent.METRICS,
+        ...collectMetrics(),
+        uptimeSec: Math.round(process.uptime()),
+      },
+      'operational metrics'
+    );
+  }, metricsIntervalMs);
+  metricsTimer.unref();
+}
 
 // Graceful shutdown: on a deploy/restart signal, stop accepting new connections,
 // dispose every live isolate (releasing native isolated-vm memory) and close the
