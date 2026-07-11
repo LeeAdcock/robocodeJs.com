@@ -4,6 +4,11 @@
    it sees. This simple logic is a good introduction
    for getting started on your own bot development.
 
+   Teaches: the scan -> aim -> fire loop, Promises via onReady, and
+   reacting to collisions.
+   Difficulty: beginner. Pairs with the "Take aim" (/learn/aim) and
+   "Fire!" (/learn/fire) lessons.
+
    Add additional clones of this bot to the arena by
    clicking the [+] button above to the right.
 */
@@ -34,7 +39,12 @@ clock.on(Event.TICK, async () => {
   // is met before our logic executes.
   let targets = await bot.radar.onReady().then(bot.radar.scan);
 
-  if (targets.length > 0 && !targets[0].friendly) {
+  // Only bother with an enemy that's close enough to actually hit — firing at a
+  // far-off target just wastes the shot (and, with the missed-shot rule, health).
+  if (targets.length > 0 && !targets[0].friendly && targets[0].distance < 250) {
+    // Point the turret at the enemy first (the scan's angle is relative to our
+    // body, and so is the turret), then fire once it has reloaded.
+    bot.turret.setOrientation(targets[0].angle).catch(() => {});
     return bot.turret
       .onReady()
       .then(bot.turret.fire)

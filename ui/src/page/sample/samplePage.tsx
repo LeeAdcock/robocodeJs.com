@@ -39,9 +39,11 @@ const SAMPLE_TITLES: Record<string, string> = {
   magnetic: 'Magnetic',
   pathfinder: 'Pathfinder',
   spirograph: 'Spirograph',
-  stately: 'Stately',
   chronometer: 'Chronometer',
   returnfire: 'ReturnFire',
+  marksman: 'Marksman',
+  survivor: 'Survivor',
+  squad: 'Squad',
   firstbot: 'FirstBot',
   secondbot: 'SecondBot',
 };

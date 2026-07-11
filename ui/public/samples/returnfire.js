@@ -1,6 +1,11 @@
 /*
   This bot is stationary, but quickly turns to face any
   enemy bots who collide or hit it, then returns fire.
+
+  Teaches: purely event-driven combat (no tick loop) reacting to HIT and
+  COLLIDED, and factoring shared behavior into a reusable function.
+  Difficulty: beginner. Pairs with the "Events" (/learn/events) and
+  "Survival" (/learn/survival) lessons.
 */
 bot.setName('ReturnFire');
 

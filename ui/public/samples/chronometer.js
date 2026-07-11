@@ -1,6 +1,9 @@
 /*
   This bot demonstrates the use of one-shot timers
   and scheduled interval timers.
+
+  Teaches: setInterval / setTimeout scheduled by clock ticks (not real time).
+  Difficulty: beginner. Pairs with the "Timers" (/learn/timers) lesson.
 */
 bot.setName('Chronometer');
 

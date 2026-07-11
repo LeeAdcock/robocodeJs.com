@@ -4,6 +4,10 @@
    it sees. A state machine enables it to switch between
    behaviors.
 
+   Teaches: a SEARCH / RETALIATE / AVOID state machine on 'this', miss detection
+   from the fire() result, and async/await with try/catch/finally.
+   Difficulty: advanced. Pairs with the "Remembering things" (/learn/state) lesson.
+
    Add additional clones of this bot to the arena by
    clicking the [+] button above to the right.
 */

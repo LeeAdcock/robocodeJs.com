@@ -8,6 +8,11 @@
   `secret` acts as a team tag: messages without it are ignored. Never trust a
   broadcast you didn't send. (A received message also comes with the sender's
   distance, but not its direction, so we still share x/y to steer toward it.)
+
+  Teaches: broadcasting structured messages with bot.send and validating them
+  on Event.RECEIVED with a shared team secret.
+  Difficulty: intermediate. Pairs with the "Teamwork" (/learn/teamwork) lesson.
+  (For using messages to focus-fire an enemy, see the Squad example.)
 */
 bot.setName('Magnetic');
 

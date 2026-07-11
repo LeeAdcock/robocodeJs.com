@@ -1,6 +1,10 @@
 /*
   This bot is stationary, turning as it scans for
   others, then adjusts its turret before firing.
+
+  Teaches: a stationary scan-and-fire loop using synchronous isReady()
+  gating (instead of onReady() Promises).
+  Difficulty: beginner. Pairs with the "Take aim" (/learn/aim) lesson.
 */
 bot.setName('Lighthouse');
 
