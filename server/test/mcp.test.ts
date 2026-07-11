@@ -9,7 +9,12 @@ vi.mock('../src/util/db', () => ({ default: { query: vi.fn() } }));
 // Mock the data/runtime layer so the tools can be driven in isolation; the MCP
 // glue (ownership checks, arena resolution, result shaping) is what's under test.
 vi.mock('../src/services/AppService', () => ({
-  default: { getForUser: vi.fn(), get: vi.fn(), create: vi.fn() },
+  default: {
+    getForUser: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    getLeaderboard: vi.fn(),
+  },
 }));
 vi.mock('../src/services/ArenaService', () => ({
   default: {
@@ -78,7 +83,12 @@ beforeEach(() => vi.clearAllMocks());
 describe('mcp tools', () => {
   it('list_apps returns the user apps', async () => {
     vi.mocked(appService.getForUser).mockResolvedValue([
-      { getId: () => 'a1', getName: () => 'Bot' },
+      {
+        getId: () => 'a1',
+        getName: () => 'Bot',
+        getRating: () => 1500,
+        getRatingGames: () => 0,
+      },
     ] as never);
     const client = await connect();
     const res = (await client.callTool({
@@ -86,7 +96,37 @@ describe('mcp tools', () => {
       arguments: {},
     })) as never;
 
-    expect(JSON.parse(textOf(res))).toEqual([{ id: 'a1', name: 'Bot' }]);
+    expect(JSON.parse(textOf(res))).toEqual([
+      { id: 'a1', name: 'Bot', rating: 1500, ratingGames: 0 },
+    ]);
+  });
+
+  it('leaderboard returns the global top-rated bots', async () => {
+    vi.mocked(appService.getLeaderboard).mockResolvedValue([
+      {
+        rank: 1,
+        appId: 'a1',
+        name: 'Overlord',
+        ownerName: 'Lee',
+        rating: 1712,
+        games: 40,
+        wins: 30,
+        winRate: 0.75,
+      },
+    ] as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'leaderboard',
+      arguments: {},
+    })) as never;
+
+    expect(appService.getLeaderboard).toHaveBeenCalled();
+    expect(JSON.parse(textOf(res))[0]).toMatchObject({
+      rank: 1,
+      name: 'Overlord',
+      ownerName: 'Lee',
+      rating: 1712,
+    });
   });
 
   it('get_app_source returns source for an owned bot', async () => {

@@ -2,6 +2,30 @@ import { UserId } from '../types/user';
 import App, { AppId } from '../types/app';
 import pool from '../util/db';
 import { randomUUID } from 'node:crypto';
+import { DEFAULT_RATING } from '../util/elo';
+
+// A single app eligible for global-ladder matchmaking, with just the fields the
+// selector needs (see AppService.getLadderCandidates).
+export interface LadderCandidate {
+  appId: AppId;
+  userId: UserId;
+  rating: number;
+  ratingGames: number;
+  source: string;
+}
+
+// One row of the public global-ladder leaderboard (see getLeaderboard). Wire
+// shape mirrored by the UI (ui/src/types/leaderboardEntry.ts). No source.
+export interface LeaderboardEntry {
+  rank: number;
+  appId: AppId;
+  name: string;
+  ownerName: string;
+  rating: number;
+  games: number;
+  wins: number;
+  winRate: number;
+}
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS app (
@@ -10,11 +34,29 @@ pool.query(`
     source text default '',
     name text,
     deleted boolean default false,
+    rating real default 1500,
+    ratingGames integer default 0,
+    ratingWins integer default 0,
+    lastRankedAt timestamp,
+    broken boolean default false,
     createdTimestamp timestamp default CURRENT_TIMESTAMP,
     updatedTimestamp timestamp default CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
   )
 `);
+// Backfill the global-ladder columns (GitHub #151) on databases whose `app`
+// table predates them. No-ops where the CREATE above already added them (fresh
+// pg-mem in dev/test). Wrapped like ArenaMemberService so a mocked pool.query is
+// safe and an engine lacking `ADD COLUMN IF NOT EXISTS` can't crash boot.
+Promise.resolve(
+  pool.query(`
+    ALTER TABLE app ADD COLUMN IF NOT EXISTS rating real default 1500;
+    ALTER TABLE app ADD COLUMN IF NOT EXISTS ratingGames integer default 0;
+    ALTER TABLE app ADD COLUMN IF NOT EXISTS ratingWins integer default 0;
+    ALTER TABLE app ADD COLUMN IF NOT EXISTS lastRankedAt timestamp;
+    ALTER TABLE app ADD COLUMN IF NOT EXISTS broken boolean default false;
+  `)
+).catch(() => undefined);
 
 export class AppService {
   create = (userId: UserId): Promise<App> => {
@@ -35,27 +77,102 @@ export class AppService {
   get = (appId: AppId): Promise<App | undefined> => {
     return pool
       .query({
-        text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source" FROM app WHERE id=$1 AND NOT deleted',
+        text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source", app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.broken as "broken" FROM app WHERE id=$1 AND NOT deleted',
         values: [appId],
       })
       .then((res) => {
         if (res.rowCount === 0) return undefined;
-        return new App(appId, res.rows[0].userId).hydrate(
-          res.rows[0].name,
-          res.rows[0].source
-        );
+        const row = res.rows[0];
+        return new App(appId, row.userId).hydrate(row.name, row.source, {
+          rating: row.rating,
+          ratingGames: row.ratingGames,
+          ratingWins: row.ratingWins,
+          broken: row.broken,
+        });
       });
+  };
+
+  // Global-ladder leaderboard rows (GitHub #151): the top `limit` rated apps by
+  // Elo, joined to their owner's display name. Only apps that have actually
+  // played a ranked game appear (ratingGames > 0), so never-played 1500 defaults
+  // and untouched starters don't clutter the board; broken/deleted apps are
+  // excluded. Public — exposes only name/owner/rating/record, never source.
+  getLeaderboard = (limit = 20): Promise<LeaderboardEntry[]> => {
+    return pool
+      .query({
+        text: `SELECT app.id as "appId", app.name as "name", account.name as "ownerName",
+                      app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
+               FROM app JOIN account ON account.id = app.userId
+               WHERE NOT app.deleted
+                 AND NOT COALESCE(app.broken, false)
+                 AND COALESCE(app.ratingGames, 0) > 0
+               ORDER BY app.rating DESC, app.ratingGames DESC
+               LIMIT $1`,
+        values: [limit],
+      })
+      .then((res) =>
+        res.rows.map((row, i) => {
+          const games = (row.ratingGames as number | null) ?? 0;
+          const wins = (row.ratingWins as number | null) ?? 0;
+          return {
+            rank: i + 1,
+            appId: row.appId as AppId,
+            name: (row.name as string | null) ?? 'Unnamed',
+            ownerName: (row.ownerName as string | null) ?? 'Anonymous',
+            rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
+            games,
+            wins,
+            winRate: games > 0 ? wins / games : 0,
+          };
+        })
+      );
+  };
+
+  // Lightweight rows for global-ladder matchmaking (GitHub #151): every app
+  // eligible to be picked for a ranked match. Eligibility (all must hold):
+  //   - not deleted, not flagged broken (a prior compile/crash failure)
+  //   - non-empty source
+  //   - edited within the last 3 months (updatedTimestamp)
+  //   - owner active within the last 3 months (account.lastActiveAt, falling
+  //     back to createdTimestamp so pre-tracking accounts get a grace period)
+  // Untouched starter bots are filtered out by the caller (source comparison),
+  // which SQL can't do cleanly. Returns `source` so that filter can run.
+  getLadderCandidates = (): Promise<LadderCandidate[]> => {
+    return pool
+      .query({
+        text: `SELECT app.id as "appId", app.userId as "userId", app.rating as "rating", app.ratingGames as "ratingGames", app.source as "source"
+               FROM app JOIN account ON account.id = app.userId
+               WHERE NOT app.deleted
+                 AND NOT COALESCE(app.broken, false)
+                 AND COALESCE(app.source, '') <> ''
+                 AND app.updatedTimestamp >= CURRENT_TIMESTAMP - interval '3 months'
+                 AND COALESCE(account.lastActiveAt, account.createdTimestamp) >= CURRENT_TIMESTAMP - interval '3 months'`,
+      })
+      .then((res) =>
+        res.rows.map((row) => ({
+          appId: row.appId as AppId,
+          userId: row.userId as UserId,
+          rating: (row.rating as number | null) ?? DEFAULT_RATING,
+          ratingGames: (row.ratingGames as number | null) ?? 0,
+          source: (row.source as string | null) ?? '',
+        }))
+      );
   };
 
   getForUser = (userId: UserId): Promise<App[]> => {
     return pool
       .query({
-        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source" FROM app WHERE userId=$1 AND NOT deleted ORDER BY app.id',
+        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source", app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.broken as "broken" FROM app WHERE userId=$1 AND NOT deleted ORDER BY app.id',
         values: [userId],
       })
       .then((res) =>
         res.rows.map((row) =>
-          new App(row.appId, userId).hydrate(row.name, row.source)
+          new App(row.appId, userId).hydrate(row.name, row.source, {
+            rating: row.rating,
+            ratingGames: row.ratingGames,
+            ratingWins: row.ratingWins,
+            broken: row.broken,
+          })
         )
       );
   };

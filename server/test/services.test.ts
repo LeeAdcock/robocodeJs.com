@@ -80,6 +80,113 @@ describe('AppService', () => {
     expect(text).toContain('source');
     expect(values).toContain('');
   });
+
+  it('get() hydrates the ladder rating fields', async () => {
+    query.mockResolvedValue({
+      rows: [
+        {
+          userId: 'u1',
+          name: 'Ranked Bot',
+          source: '// code',
+          rating: 1642,
+          ratingGames: 12,
+          broken: false,
+        },
+      ],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+    expect(app?.getRating()).toBe(1642);
+    expect(app?.getRatingGames()).toBe(12);
+    expect(app?.isBroken()).toBe(false);
+  });
+
+  it('get() defaults rating fields for legacy rows predating the ladder columns', async () => {
+    query.mockResolvedValue({
+      rows: [
+        {
+          userId: 'u1',
+          name: 'Old Bot',
+          source: '// code',
+          rating: null,
+          ratingGames: null,
+          broken: null,
+        },
+      ],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+    expect(app?.getRating()).toBe(1500); // DEFAULT_RATING
+    expect(app?.getRatingGames()).toBe(0);
+    expect(app?.isBroken()).toBe(false);
+  });
+
+  it('setRating() persists rating, games, and a lastRankedAt stamp', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'N', source: 's' }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+    query.mockClear();
+    await app!.setRating(1580, 5, true);
+    expect(app!.getRating()).toBe(1580);
+    expect(app!.getRatingGames()).toBe(5);
+    expect(app!.getRatingWins()).toBe(1); // won -> wins incremented
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('rating=$2');
+    expect(text).toContain('ratingWins=ratingWins + $4');
+    expect(text).toContain('lastRankedAt=CURRENT_TIMESTAMP');
+    expect(values).toEqual(['a1', 1580, 5, 1]);
+  });
+
+  it('getLeaderboard() maps rows, rounds rating, and computes rank + win rate', async () => {
+    query.mockResolvedValue({
+      rows: [
+        {
+          appId: 'a1',
+          name: 'Bot1',
+          ownerName: 'Lee',
+          rating: 1712.4,
+          ratingGames: 40,
+          ratingWins: 30,
+        },
+        {
+          appId: 'a2',
+          name: 'Bot2',
+          ownerName: 'Dana',
+          rating: 1655,
+          ratingGames: 10,
+          ratingWins: 5,
+        },
+      ],
+      rowCount: 2,
+    } as never);
+    const board = await appService.getLeaderboard(20);
+    expect(board[0]).toMatchObject({
+      rank: 1,
+      appId: 'a1',
+      ownerName: 'Lee',
+      rating: 1712,
+      winRate: 0.75,
+    });
+    expect(board[1]).toMatchObject({ rank: 2, winRate: 0.5 });
+  });
+
+  it('setSource() clears the broken flag', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'N', source: 's', broken: true }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+    expect(app!.isBroken()).toBe(true);
+    query.mockClear();
+    await app!.setSource('// edited');
+    expect(app!.isBroken()).toBe(false);
+    const [{ text }] = query.mock.calls[0] as [{ text: string }];
+    expect(text).toContain('broken=false');
+  });
 });
 
 describe('ArenaService', () => {

@@ -11,7 +11,12 @@ vi.mock('google-auth-library', () => ({
   }),
 }));
 vi.mock('../src/services/UserService', () => ({
-  default: { get: vi.fn(), create: vi.fn() },
+  default: {
+    get: vi.fn(),
+    create: vi.fn(),
+    // Fire-and-forget activity bump the middleware makes after resolving a user.
+    touchActivity: vi.fn().mockResolvedValue(false),
+  },
 }));
 vi.mock('../src/services/IdentityService', () => ({
   default: { get: vi.fn(), create: vi.fn() },

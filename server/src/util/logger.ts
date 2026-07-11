@@ -41,6 +41,7 @@ export const LogEvent = {
   PROCESS_FATAL: 'process.fatal', // uncaught exception / unhandled rejection
   SHUTDOWN: 'process.shutdown', // graceful shutdown (SIGTERM/SIGINT) lifecycle
   METRICS: 'metrics', // periodic operational gauges heartbeat (time-series/alerting)
+  LADDER_MATCH: 'ladder.match', // a global-ladder ranked match completed (GitHub #151)
 } as const;
 
 // Log a bot fault uniformly. `kind` says where it happened (compile/run/handler/

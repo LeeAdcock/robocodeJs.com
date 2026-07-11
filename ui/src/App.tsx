@@ -44,6 +44,9 @@ const AppPage = lazy(() => import('./page/app/appPage'));
 const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
 const AddAppPage = lazy(() => import('./page/arena/addAppPage'));
 const SamplePage = lazy(() => import('./page/sample/samplePage'));
+const LeaderboardPage = lazy(
+  () => import('./page/leaderboard/leaderboardPage')
+);
 const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -480,6 +483,8 @@ function App() {
                 />
                 <Route path="/learn" element={<MarkdownPage path="learn" />} />
                 <Route path="/learn/:slug" element={<LessonPage />} />
+                {/* Global bot ladder — public, linked from the main nav. */}
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/about" element={<MarkdownPage path="about" />} />
                 {/* MCP setup guide, linked from the homepage getting-started list. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />

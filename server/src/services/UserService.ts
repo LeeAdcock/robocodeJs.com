@@ -6,6 +6,7 @@ import appService from './AppService';
 import arenaMemberService from './ArenaMemberService';
 import environmentService from './EnvironmentService';
 import { logger } from '../util/logger';
+import { STARTER_BOTS } from '../util/starterBots';
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS account (
@@ -13,10 +14,21 @@ pool.query(`
     name text,
     picture text,
     email text,
+    lastActiveAt timestamp,
     createdTimestamp timestamp default CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
   )
 `);
+// Backfill lastActiveAt (GitHub #151 — ladder eligibility reads it as "owner
+// active recently") on databases whose `account` table predates the column.
+// No-op where the CREATE above already added it. Same guarded idiom as
+// ArenaMemberService so a mocked pool.query is safe and an engine lacking `ADD
+// COLUMN IF NOT EXISTS` can't crash boot.
+Promise.resolve(
+  pool.query(
+    'ALTER TABLE account ADD COLUMN IF NOT EXISTS lastActiveAt timestamp'
+  )
+).catch(() => undefined);
 
 class UserService {
   static demoUserId: UserId = 'c8c62d4b-37bc-45af-a86a-0e9d654aef13';
@@ -42,51 +54,21 @@ class UserService {
       })
       .then(() =>
         arenaService.create(user.getId()).then((arena) =>
-          Promise.all([
-            appService.create(user.getId()).then((app) => {
-              app.setName('My First Bot');
-              return app
-                .setSource(
-                  `
-// Set the bot's name
-bot.setName('My First Bot')
-
-// Begin accelerating
-bot.setSpeed(2)
-
-// Fire when turret is ready
-function fireIfReady() {
-  if(bot.turret.isReady()) {
-    bot.turret.fire()
-  }
-}
-clock.on(Event.TICK, fireIfReady)
-
-// After firing, turn to the right
-function turnRight() {
-  bot.turn(10)  
-}
-bot.on(Event.FIRED, turnRight)
-              `
-                )
-                .then(() =>
-                  arenaMemberService.create(arena.getId(), app.getId())
-                );
-            }),
-            appService.create(user.getId()).then((app) => {
-              app.setName('Target Practice');
-              return app
-                .setSource(
-                  `
-// Set the bot's name
-bot.setName('Target Practice')
-`
-                )
-                .then(() =>
-                  arenaMemberService.create(arena.getId(), app.getId())
-                );
-            }),
-          ])
+          Promise.all(
+            // Seed each new account's starter bots from the shared templates
+            // (util/starterBots.ts), which the ladder also references to keep
+            // untouched starters out of the rankings.
+            STARTER_BOTS.map((starter) =>
+              appService.create(user.getId()).then((app) => {
+                app.setName(starter.name);
+                return app
+                  .setSource(starter.source)
+                  .then(() =>
+                    arenaMemberService.create(arena.getId(), app.getId())
+                  );
+              })
+            )
+          )
             .then(() =>
               environmentService.get(arena).then((env) => env.resume())
             )
@@ -120,6 +102,20 @@ bot.setName('Target Practice')
               res.rows[0].email
             );
       });
+  };
+
+  // Record that a user was active now (GitHub #151 — ladder eligibility skips
+  // apps whose owner has gone quiet). Called fire-and-forget from the auth
+  // middleware on every authenticated request, so the update is throttled in SQL
+  // to at most once per hour per user to avoid write amplification. Resolves to
+  // whether a row was actually written (false when throttled or user missing).
+  touchActivity = (userId: UserId): Promise<boolean> => {
+    return pool
+      .query({
+        text: "UPDATE account SET lastActiveAt=CURRENT_TIMESTAMP WHERE id=$1 AND (lastActiveAt IS NULL OR lastActiveAt < CURRENT_TIMESTAMP - interval '1 hour')",
+        values: [userId],
+      })
+      .then((res) => (res.rowCount ?? 0) > 0);
   };
 }
 
