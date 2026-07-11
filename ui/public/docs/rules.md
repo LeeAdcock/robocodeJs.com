@@ -68,17 +68,24 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 # Combat & health
 
-| Thing             | Value           | In context                                            |
-| ----------------- | --------------- | ----------------------------------------------------- |
-| Health            | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead         |
-| Bullet damage     | **−25**         | a clean hit removes a quarter of full health          |
-| Bullet hit radius | **32 units**    | a bullet hits any bot whose center is within 32 units |
-| Collision         | **−1 per tick** | bumping a wall/bot also stops you (speed → 0)         |
+| Thing             | Value           | In context                                                                       |
+| ----------------- | --------------- | -------------------------------------------------------------------------------- |
+| Health            | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead                                    |
+| Bullet damage     | **−25**         | a clean hit removes a quarter of full health                                     |
+| Bullet hit radius | **32 units**    | a bullet hits any bot whose center is within 32 units                            |
+| Collision         | **−1 per tick** | bumping a wall/bot also stops you (speed → 0)                                    |
+| Missed shot       | **−3**          | a bullet that leaves the field without hitting anyone costs the shooter 3 health |
 
 **Friendly fire is on.** A bullet damages **any** bot within the 32-unit hit
 radius — **including your own teammates**. There is no team exemption, so a shot
 that skims past a teammate can hurt them. Watch your line of fire when your bots
 cluster.
+
+**Missing costs you.** A bullet that flies clear off the field without hitting
+any bot deducts **3 health** from the bot that fired it. There is no cost to
+_fire_ — only to _miss_ — so don't spray blindly: fire when you have a target
+and expect to connect. (A shot that grazes a wall's hit radius still counts as a
+miss once it leaves the arena.)
 
 **Hitting a moving target — "lead" the shot.** A bullet leaves the muzzle and
 travels **25 units/tick**; it is not instant. If you aim where an enemy _is_, by

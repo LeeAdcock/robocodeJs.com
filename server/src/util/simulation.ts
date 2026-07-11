@@ -289,12 +289,22 @@ export default {
               bullet.x = newX;
               bullet.y = newY;
             } else {
-              // Went outside the arena, get rid of it
+              // Went outside the arena without hitting anyone — the shooter is
+              // penalized 3 health for the missed shot, then the bullet is
+              // removed. (Elimination at health <= 0 is handled in
+              // Environment.tick, so a miss can be a self-inflicted killing blow.)
+              bot.health -= 3;
               env.emit('event', {
                 type: 'bulletRemoved',
                 time: env.getTime(),
                 id: bullet.id,
                 botId: bot.id,
+              });
+              env.emit('event', {
+                type: 'botDamaged',
+                id: bot.id,
+                time: env.getTime(),
+                health: bot.health,
               });
               if (bullet.callback) bullet.callback({});
               bullets.splice(bulletIndex, 1);

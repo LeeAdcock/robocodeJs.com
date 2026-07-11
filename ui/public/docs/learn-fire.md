@@ -64,7 +64,8 @@ Because of reload time. `isReady()` is `false` while reloading, so the `if` skip
 until it's loaded again.
 
 **Does firing hurt me or my teammates?**
-Firing itself doesn't hurt you. Your shots _can_ hit teammates, though — soon we'll learn
+Firing itself is free — but a shot that _misses_ and flies off the field costs you **3 health**,
+so don't fire blindly into empty space. Your shots _can_ also hit teammates — soon we'll learn
 to scan and only fire at enemies.
 
 ## You learned

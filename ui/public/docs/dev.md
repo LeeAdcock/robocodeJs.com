@@ -167,7 +167,7 @@ As the bot turns, the turret will also turn. The position of the turret is relat
 
 - `bot.turret.onReady(): Promise` Returns a promise that resolves when the turret is ready to fire. If the turret fires through another thread while this promise is pending, the promise will be rejected.
 - `bot.turret.isReady(): boolean` Returns a boolean indicating whether the turret is ready to fire.
-- `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:number}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena. If the turret is not ready to fire, the Promise is rejected.
+- `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:number}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena — and the shooter loses **3 health** for the missed shot. If the turret is not ready to fire, the Promise is rejected.
 
 ## Radar
 
