@@ -712,3 +712,95 @@ describe('mcp audit logging (logMcpRequest)', () => {
     spy.mockRestore();
   });
 });
+
+describe('mcp completion logging (mcp.tool.result)', () => {
+  it('logs ok=true with a duration when a tool succeeds', async () => {
+    vi.mocked(appService.getForUser).mockResolvedValue([] as never);
+    const spy = vi.spyOn(logger, 'info');
+
+    const client = await connect();
+    await client.callTool({ name: 'list_apps', arguments: {} });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: LogEvent.MCP_TOOL_RESULT,
+        userId: 'u1',
+        tool: 'list_apps',
+        ok: true,
+        durationMs: expect.any(Number),
+      }),
+      expect.any(String)
+    );
+    spy.mockRestore();
+  });
+
+  it('logs ok=false with the reason when a tool returns an error result', async () => {
+    // run_match with a single active bot returns an isError result (fail()).
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([{}] as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      getProcesses: () => [{}],
+    } as never);
+    const spy = vi.spyOn(logger, 'info');
+
+    const client = await connect();
+    await client.callTool({ name: 'run_match', arguments: {} });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: LogEvent.MCP_TOOL_RESULT,
+        tool: 'run_match',
+        ok: false,
+        error: expect.stringContaining('at least two active bots'),
+      }),
+      expect.any(String)
+    );
+    spy.mockRestore();
+  });
+});
+
+describe('mcp per-match logging (mcp.match)', () => {
+  it('logs a decided match for run_match with the winner and seed', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      {},
+      {},
+    ] as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      getProcesses: () => [{}, {}],
+      setSeed: vi.fn(),
+      getSpeed: () => 1,
+      setSpeed: vi.fn(),
+      restart: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
+      pause: vi.fn(),
+      isRunning: () => true,
+    } as never);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1', name: 'Winner' } },
+      leaderboard: [{ rank: 1, id: 'a1' }],
+    } as never);
+    const spy = vi.spyOn(logger, 'info');
+
+    const client = await connect();
+    await client.callTool({ name: 'run_match', arguments: { seed: 42 } });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: LogEvent.MCP_MATCH,
+        context: 'run_match',
+        arenaId: 'ar1',
+        seed: 42,
+        decided: true,
+        timedOut: false,
+        winnerId: 'a1',
+        winnerName: 'Winner',
+        durationMs: expect.any(Number),
+      }),
+      expect.any(String)
+    );
+    spy.mockRestore();
+  });
+});

@@ -93,6 +93,11 @@ type ToolResult = {
   isError?: boolean;
 };
 
+// A registered tool's handler. The MCP SDK passes (args, extra); we only need to
+// time it and inspect its ToolResult, so the argument list is left open.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToolHandler = (...args: any[]) => Promise<ToolResult> | ToolResult;
+
 // Wrap a tool's result. In addition to the human-readable text part, a plain
 // object is also returned as `structuredContent` so clients can consume a typed
 // result (and it satisfies the validated `outputSchema` on tools that declare
@@ -167,6 +172,33 @@ const ownedArena = async (
 // runMatchToDecision helper (util/runMatch.ts), which the global ladder uses too
 // so both decide a match identically.
 
+// Log one decided (or timed-out) match from run_match / run_tournament, mirroring
+// the global ladder's per-match line (event=ladder.match). A tournament is N
+// matches; without this the logs showed only a single tool-level result, so an
+// individual match that timed out or produced a surprising winner was invisible.
+const logMatch = (
+  context: 'run_match' | 'run_tournament',
+  arenaId: string,
+  seed: number | undefined,
+  durationMs: number,
+  summary: Awaited<ReturnType<typeof runMatchToDecision>>
+): void => {
+  logger.info(
+    {
+      event: LogEvent.MCP_MATCH,
+      context,
+      arenaId,
+      seed,
+      decided: summary.match.decided,
+      timedOut: !summary.match.decided,
+      winnerId: summary.match.winner?.id ?? null,
+      winnerName: summary.match.winner?.name ?? null,
+      durationMs,
+    },
+    `mcp ${context} match ${summary.match.decided ? 'decided' : 'timed out'}`
+  );
+};
+
 // Build a fresh MCP server bound to one authenticated user. All tools act on
 // that user's own resources only, so there is no cross-user addressing (and no
 // :userId argument): the bearer token already identifies the actor. Exported so
@@ -176,6 +208,59 @@ export const buildServer = (user: User): McpServer => {
     name: 'robocodejs',
     version: '1.0.0',
   });
+
+  // Completion logging for every tool. logMcpRequest already emits an
+  // `event=mcp.tool` audit line BEFORE a tool runs; this wraps each handler to
+  // also emit `event=mcp.tool.result` AFTER it settles, with the outcome
+  // (ok/error), duration, and — on failure — the reason. Without it a tool that
+  // threw, timed out, or returned the wrong thing left no server-side trace (the
+  // MCP SDK turns a thrown handler into an isError result the client sees but we
+  // never logged). A rejected handler is logged then re-thrown so the SDK still
+  // reports the error to the client; an isError result is logged as ok=false.
+  // Wrapping registerTool here covers every current and future tool uniformly.
+  const rawRegister = server.registerTool.bind(server);
+  server.registerTool = ((
+    name: string,
+    config: unknown,
+    handler: ToolHandler
+  ) =>
+    rawRegister(
+      name,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      config as any,
+      async (...args: Parameters<ToolHandler>) => {
+        const startedAt = Date.now();
+        try {
+          const result = await handler(...args);
+          logger.info(
+            {
+              event: LogEvent.MCP_TOOL_RESULT,
+              userId: user.getId(),
+              tool: name,
+              durationMs: Date.now() - startedAt,
+              ok: !result?.isError,
+              ...(result?.isError ? { error: result.content?.[0]?.text } : {}),
+            },
+            `mcp tool ${name} ${result?.isError ? 'failed' : 'ok'}`
+          );
+          return result;
+        } catch (err) {
+          logger.error(
+            {
+              event: LogEvent.MCP_TOOL_RESULT,
+              userId: user.getId(),
+              tool: name,
+              durationMs: Date.now() - startedAt,
+              ok: false,
+              err: err instanceof Error ? err.message : String(err),
+            },
+            `mcp tool ${name} threw`
+          );
+          throw err;
+        }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    )) as any;
 
   // ---- Bots (apps) ----
 
@@ -768,10 +853,18 @@ export const buildServer = (user: User): McpServer => {
       if (env.getProcesses().length < 2) {
         return fail('A match needs at least two active bots in the arena.');
       }
+      const startedAt = Date.now();
       const summary = await runMatchToDecision(env, members, {
         seed,
         timeoutMs,
       });
+      logMatch(
+        'run_match',
+        arena.getId(),
+        seed,
+        Date.now() - startedAt,
+        summary
+      );
       return ok({ timedOut: !summary.match.decided, ...summary });
     }
   );
@@ -841,10 +934,18 @@ export const buildServer = (user: User): McpServer => {
       const matches: Array<Record<string, unknown>> = [];
 
       for (const seed of panel) {
+        const startedAt = Date.now();
         const summary = await runMatchToDecision(env, members, {
           seed,
           timeoutMs,
         });
+        logMatch(
+          'run_tournament',
+          arena.getId(),
+          seed,
+          Date.now() - startedAt,
+          summary
+        );
         const board = summary.leaderboard;
         const k = board.length;
         for (const entry of board) {
