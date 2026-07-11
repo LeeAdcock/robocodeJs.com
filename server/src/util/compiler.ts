@@ -964,9 +964,14 @@ export interface CheckResult {
 // Environment (which runs no tick loop and touches no database), then disposes the
 // isolate. It deliberately does NOT call logBotFault / set appCrashed — a dry-run
 // is not a real fault and must not pollute logs or fault alerting.
+//
+// The Environment/Process carry a sentinel id (not a real uuid) purely to satisfy
+// their constructors — nothing keys a DB lookup off it, and the process is flagged
+// non-persisted so persistence paths (e.g. Bot.setName) skip the database outright.
+const DRY_RUN_SENTINEL = 'dry-run';
 const check = async (source: string): Promise<CheckResult> => {
-  const env = new Environment(new Arena('dry-run', 'dry-run'));
-  const process = new Process('dry-run');
+  const env = new Environment(new Arena(DRY_RUN_SENTINEL, DRY_RUN_SENTINEL));
+  const process = new Process(DRY_RUN_SENTINEL, /* persisted */ false);
   const failure = (stage: 'compile' | 'load', e: unknown): CheckResult => {
     const message = cleanErrorMessage(
       e instanceof Error ? e.message : String(e)

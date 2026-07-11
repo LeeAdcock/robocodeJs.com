@@ -50,10 +50,19 @@ export class Process {
   public appId: AppId;
   public bots: Bot[] = [];
 
+  // Whether this process has a backing `app` row in the database. True for every
+  // real arena/ladder process (its appId is a real uuid). False only for the
+  // throwaway process a dry-run compile uses (compiler.check): its appId is a
+  // sentinel string, so any DB lookup keyed off it would reject with a uuid
+  // syntax error. Code that persists via getAppId() (e.g. Bot.setName) checks
+  // this and skips the query for a non-persisted process.
+  public readonly persisted: boolean;
+
   private sandbox: ivm.Isolate | null = null;
 
-  constructor(appId: AppId) {
+  constructor(appId: AppId, persisted = true) {
     this.appId = appId;
+    this.persisted = persisted;
   }
 
   getAppId = () => this.appId;
@@ -211,36 +220,47 @@ export default class Environment {
 
     if (eventName === 'event') {
       this.processes.forEach((process) => {
-        appService.get(process.getAppId()).then((app) => {
-          if (!app) return;
-          // Emit the app placement BEFORE its bots. The client reducer attaches
-          // each arenaPlaceBot to an already-placed app, so a bot arriving first
-          // would be dropped — the bootstrap/reconnect race that left bots
-          // missing until a restart. Emitting bots inside this `.then` (after the
-          // app) guarantees the order, matching restart()'s app-then-bots path.
-          listener({
-            type: 'arenaPlaceApp',
-            id: process.getAppId(),
-            name: app.getName(),
-          });
-          process.bots.forEach((bot) => {
+        appService
+          .get(process.getAppId())
+          .then((app) => {
+            if (!app) return;
+            // Emit the app placement BEFORE its bots. The client reducer attaches
+            // each arenaPlaceBot to an already-placed app, so a bot arriving first
+            // would be dropped — the bootstrap/reconnect race that left bots
+            // missing until a restart. Emitting bots inside this `.then` (after the
+            // app) guarantees the order, matching restart()'s app-then-bots path.
             listener({
-              type: 'arenaPlaceBot',
-              id: bot.id,
-              appId: process.getAppId(),
-              bodyOrientation: bot.orientation,
-              bodyOrientationVelocity: bot.orientationVelocity,
-              turretOrientation: bot.turret.orientation,
-              turretOrientationVelocity: bot.turret.orientationVelocity,
-              radarOrientation: bot.turret.radar.orientation,
-              radarOrientationVelocity: bot.turret.radar.orientationVelocity,
-              speed: bot.speed,
-              speedMax: bot.speedMax,
-              x: bot.x,
-              y: bot.y,
+              type: 'arenaPlaceApp',
+              id: process.getAppId(),
+              name: app.getName(),
             });
-          });
-        });
+            process.bots.forEach((bot) => {
+              listener({
+                type: 'arenaPlaceBot',
+                id: bot.id,
+                appId: process.getAppId(),
+                bodyOrientation: bot.orientation,
+                bodyOrientationVelocity: bot.orientationVelocity,
+                turretOrientation: bot.turret.orientation,
+                turretOrientationVelocity: bot.turret.orientationVelocity,
+                radarOrientation: bot.turret.radar.orientation,
+                radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+                speed: bot.speed,
+                speedMax: bot.speedMax,
+                x: bot.x,
+                y: bot.y,
+              });
+            });
+          })
+          // Fire-and-forget bootstrap replay: addListener returns synchronously,
+          // so a DB rejection here would escape as an unhandledRejection (tripping
+          // the process.fatal alarm) rather than surfacing to a caller.
+          .catch((err) =>
+            logger.warn(
+              { appId: process.getAppId(), err },
+              'arena bootstrap replay failed'
+            )
+          );
       });
 
       if (this.isRunning()) {

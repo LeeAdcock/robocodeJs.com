@@ -12,6 +12,7 @@ import { Process } from '../src/types/environment';
 import { Event } from '../src/types/event';
 import { timerTick } from '../src/util/scheduleFactory';
 import appService from '../src/services/AppService';
+import { logger } from '../src/util/logger';
 
 // These are true integration tests: they spin up a real isolated-vm isolate,
 // have compiler.init build the bot API into it, then compile/run bot code in the
@@ -480,5 +481,74 @@ describe('compiler — reload scoping (top-level const/let, E017 regression)', (
     expect(ctx.read('this.flee')).toBe(40);
     // ...while this-state (globalThis) persists across the reload, as documented.
     expect(ctx.read('this.loads')).toBe(2);
+  });
+});
+
+describe('compiler.check — dry-run must not touch the database', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Regression (root cause): a dry-run compile runs the real Bot on a throwaway,
+  // non-persisted Process whose appId is a sentinel string. A checked bot that
+  // called bot.setName() used to fire appService.get(sentinel), which Postgres
+  // rejects with a uuid syntax error (22P02); that fire-and-forget rejection had
+  // no .catch, so it escaped as an unhandledRejection and tripped the
+  // process.fatal alarm on every check_app_source. The process is now flagged
+  // non-persisted, so setName skips the DB entirely — the lookup never happens.
+  it('never queries appService when checking a bot that calls setName', async () => {
+    const getSpy = vi.spyOn(appService, 'get');
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const result = await compiler.check('bot.setName("Regression")');
+      expect(result.valid).toBe(true);
+
+      // Let any stray fire-and-forget work settle before asserting.
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(getSpy).not.toHaveBeenCalled();
+      expect(unhandled).toHaveLength(0);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+});
+
+describe('Bot.setName — persistence safety net', () => {
+  let ctx: ReturnType<typeof makeCompiledBot>;
+
+  beforeEach(() => {
+    ctx = makeCompiledBot();
+  });
+  afterEach(() => {
+    ctx.proc.dispose();
+    vi.restoreAllMocks();
+  });
+
+  // Belt-and-suspenders: on a real (persisted) process, a genuine DB failure while
+  // persisting a rename must be swallowed (logged, not fatal) rather than escaping
+  // as an unhandledRejection.
+  it('swallows a DB rejection instead of leaving it unhandled', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockReturnValue(undefined as never);
+    vi.spyOn(appService, 'get').mockRejectedValue(new Error('connection lost'));
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      // Persisted process (appId 'app1'), so setName proceeds to the DB lookup.
+      expect(ctx.proc.persisted).toBe(true);
+      ctx.bot.setName('NewName');
+
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(warn).toHaveBeenCalled();
+      expect(unhandled).toHaveLength(0);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
   });
 });
