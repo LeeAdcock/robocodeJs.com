@@ -10,6 +10,10 @@ import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
 import { DEMO_USER_ID } from '../src/types/user';
 
+// Mirror of the server's leaderboard sprite palette (AppService) — used to
+// assert each row's color is a real palette value.
+const PALETTE = ['sand', 'blue', 'red', 'dark', 'green'];
+
 const query = vi.mocked(pool.query);
 
 beforeEach(() => {
@@ -169,11 +173,19 @@ describe('AppService', () => {
     const board = await appService.getLeaderboard(20);
     expect(board[0]).toMatchObject({
       rank: 1,
-      appId: 'a1',
       ownerName: 'Lee A.', // abbreviated server-side for privacy
       rating: 1712,
       winRate: 0.75,
     });
+    // Every row carries a sprite color from the palette (self-evidently a
+    // color, not an identifier).
+    expect(PALETTE).toContain(board[0].color);
+    expect(PALETTE).toContain(board[1].color);
+    // Same app id -> same color (stable/deterministic).
+    expect((await appService.getLeaderboard(20))[0].color).toBe(board[0].color);
+    // No viewer passed -> no real app id leaks on any row.
+    expect(board[0].appId).toBeUndefined();
+    expect(board[1].appId).toBeUndefined();
     expect(board[1]).toMatchObject({ rank: 2, winRate: 0.5 });
     // Demo bots excluded; a wider scan than the display size is fetched so the
     // per-owner cap can drop rows and still fill the board.
@@ -182,6 +194,39 @@ describe('AppService', () => {
     ];
     expect(text).toContain('app.userId <> $2');
     expect(values).toEqual([500, DEMO_USER_ID]);
+  });
+
+  it('getLeaderboard() exposes the real appId only on the viewer-owned rows', async () => {
+    query.mockResolvedValue({
+      rows: [
+        {
+          appId: 'a1',
+          ownerUserId: 'u1',
+          name: 'Mine',
+          ownerName: 'Lee',
+          rating: 1700,
+          ratingGames: 10,
+          ratingWins: 6,
+        },
+        {
+          appId: 'a2',
+          ownerUserId: 'u2',
+          name: 'Theirs',
+          ownerName: 'Dana',
+          rating: 1600,
+          ratingGames: 10,
+          ratingWins: 4,
+        },
+      ],
+      rowCount: 2,
+    } as never);
+    // Viewer u1 sees their own app id, but not the other owner's.
+    const board = await appService.getLeaderboard(20, 'u1' as never);
+    expect(board[0].appId).toBe('a1');
+    expect(board[1].appId).toBeUndefined();
+    // Colors are still present on every row regardless of ownership.
+    expect(PALETTE).toContain(board[0].color);
+    expect(PALETTE).toContain(board[1].color);
   });
 
   it('getLeaderboard() caps each owner at 3 bots and re-ranks', async () => {
@@ -209,16 +254,11 @@ describe('AppService', () => {
     query.mockResolvedValue({ rows, rowCount: rows.length } as never);
 
     const board = await appService.getLeaderboard(20);
-    // 3 of u1's + both of u2's = 5, and u1's 4th/5th are dropped.
+    // 3 of u1's + both of u2's = 5, and u1's 4th/5th are dropped. (Rows carry
+    // no appId here — no viewer passed — so identify them by name: A* = u1's.)
     expect(board).toHaveLength(5);
-    expect(board.filter((e) => e.appId.startsWith('u1-'))).toHaveLength(3);
-    expect(board.map((e) => e.appId)).toEqual([
-      'u1-0',
-      'u1-1',
-      'u1-2',
-      'u2-0',
-      'u2-1',
-    ]);
+    expect(board.filter((e) => e.name.startsWith('A'))).toHaveLength(3);
+    expect(board.map((e) => e.name)).toEqual(['A0', 'A1', 'A2', 'B0', 'B1']);
     // Ranks are contiguous over the *displayed* rows, not the raw query order.
     expect(board.map((e) => e.rank)).toEqual([1, 2, 3, 4, 5]);
   });

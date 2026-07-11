@@ -105,6 +105,7 @@ describe('mcp tools', () => {
     vi.mocked(appService.getLeaderboard).mockResolvedValue([
       {
         rank: 1,
+        color: 'blue',
         appId: 'a1',
         name: 'Overlord',
         ownerName: 'Lee',
@@ -120,9 +121,11 @@ describe('mcp tools', () => {
       arguments: {},
     })) as never;
 
-    expect(appService.getLeaderboard).toHaveBeenCalled();
+    // Scoped to the acting user so only their own bots include an appId.
+    expect(appService.getLeaderboard).toHaveBeenCalledWith(20, 'u1');
     expect(JSON.parse(textOf(res))[0]).toMatchObject({
       rank: 1,
+      color: 'blue',
       name: 'Overlord',
       ownerName: 'Lee',
       rating: 1712,
