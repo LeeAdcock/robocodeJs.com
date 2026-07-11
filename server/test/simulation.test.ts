@@ -244,6 +244,28 @@ describe('Simulation.run — bullets', () => {
       expect.objectContaining({ type: 'bulletRemoved', id: 'b1' })
     );
   });
+
+  it('penalizes the shooter 3 health when its bullet leaves the arena', () => {
+    const bullet = {
+      id: 'b1',
+      x: 375,
+      y: 800, // already past the height + 32 margin
+      speed: 0,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 375 },
+      callback: vi.fn(),
+    };
+    const bot = makeBot({ id: 'a', health: 100, bullets: [bullet] });
+    const env = makeEnv([makeProcess('a', [bot])]);
+    run(env);
+    expect(bot.health).toBe(97);
+    expect(bullet.callback).toHaveBeenCalledWith({});
+    expect(env.emit).toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'botDamaged', id: 'a', health: 97 })
+    );
+  });
 });
 
 describe('Simulation.run — lifecycle', () => {

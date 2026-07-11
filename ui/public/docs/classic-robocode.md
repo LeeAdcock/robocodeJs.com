@@ -7,16 +7,16 @@ the handful of differences that will trip you up if you don't know them.
 
 ## The big picture
 
-|                | Classic Robocode                                                  | RobocodeJs                                                                                                                       |
-| -------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Language       | Java (`extends Robot` / `AdvancedRobot`)                          | JavaScript (no class — an "app" of event handlers)                                                                               |
-| Program shape  | a `run()` loop + `onX()` event methods                            | register handlers: `bot.on(Event.X, …)`, `clock.on(Event.TICK, …)`                                                               |
-| You control    | one robot per file                                                | a **team of 5 bots**, all sharing your one app                                                                                   |
-| Health         | **energy** `0–100`, spent to fire, gun heat limits fire rate      | **health** `0–100`; no firing cost, no gun heat — a **reload timer** instead                                                     |
-| Movement calls | blocking `ahead(100)` / `turnRight(45)` (or `setAhead`+`execute`) | **async** `bot.setSpeed(5)` / `bot.turn(45)` return **Promises**                                                                 |
-| Heading `0°`   | **North**, clockwise                                              | **North**, clockwise — same                                                                                                      |
-| Bearings       | relative to your heading (`getBearing()`)                         | relative to your heading — same                                                                                                  |
-| Messaging      | `TeamRobot` serializable objects                                  | any JSON message — a primitive or nested object/array — via `bot.send()`, broadcast to every bot in the arena (enemies included) |
+|                | Classic Robocode                                                  | RobocodeJs                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language       | Java (`extends Robot` / `AdvancedRobot`)                          | JavaScript (no class — an "app" of event handlers)                                                                                                 |
+| Program shape  | a `run()` loop + `onX()` event methods                            | register handlers: `bot.on(Event.X, …)`, `clock.on(Event.TICK, …)`                                                                                 |
+| You control    | one robot per file                                                | a **team of 5 bots**, all sharing your one app                                                                                                     |
+| Health         | **energy** `0–100`, spent to fire, gun heat limits fire rate      | **health** `0–100`; no cost to fire, no gun heat — a **reload timer** instead — but a **missed shot** (bullet leaves the field) costs **3 health** |
+| Movement calls | blocking `ahead(100)` / `turnRight(45)` (or `setAhead`+`execute`) | **async** `bot.setSpeed(5)` / `bot.turn(45)` return **Promises**                                                                                   |
+| Heading `0°`   | **North**, clockwise                                              | **North**, clockwise — same                                                                                                                        |
+| Bearings       | relative to your heading (`getBearing()`)                         | relative to your heading — same                                                                                                                    |
+| Messaging      | `TeamRobot` serializable objects                                  | any JSON message — a primitive or nested object/array — via `bot.send()`, broadcast to every bot in the arena (enemies included)                   |
 
 ## Good news: directions work like you expect
 
