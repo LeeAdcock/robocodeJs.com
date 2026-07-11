@@ -1,17 +1,32 @@
 # Example Bots
 
-Here are some simple bot applications that demonstrate concepts you may wish to integrate into what you build.
+Complete bot strategies you can read, run, and remix. Click one to open it in a
+read-only viewer, then use **Clone this bot** to drop a copy into your arena and
+start editing. New to bots? Work through the [lessons](/learn) first, then come
+back here to see the ideas combined.
 
-- [Lighthouse](/samples/lighthouse) A stationary bot that turns as it scans for others, then adjusting its turret for maximum accuracy before firing.
+## Getting started
 
-- [Magnetic](/samples/magnetic) Demonstrating advanced multi-bot communication, these bots use secure communication to share their location and cluster together.
+- **[Lighthouse](/samples/lighthouse)** _(beginner)_ — A stationary bot that turns as it scans, adjusting its turret onto a target before firing. The simplest scan-and-fire loop.
 
-- [Pathfinder](/samples/pathfinder) With a predefined set of waypoints, this bot navigates continuously around the arena.
+- **[Spirograph](/samples/spirograph)** _(beginner)_ — Drives straight with a fixed forward turret, tracing looping patterns while it shoots whatever wanders in front of it.
 
-- [Spirograph](/samples/spirograph) This bot makes slow looping turns through the arena, scanning straight ahead and firing if it detects something.
+- **[ReturnFire](/samples/returnfire)** _(beginner)_ — Stationary, but instantly turns to face any bot that hits or collides with it and returns fire — a purely event-driven bot with no tick loop.
 
-- [Stately](/samples/stately) Using a simple state machine, this bot shifts between different modes of operation.
+- **[Chronometer](/samples/chronometer)** _(beginner)_ — Demonstrates one-shot and repeating timers (`setInterval` / `setTimeout`) driven by the game clock.
 
-- [Chronometer](/samples/chronometer) This bot demonstrates the use of one-shot timers and scheduled interval timers.
+## Movement & navigation
 
-- [ReturnFire](/samples/returnfire) Although stationary, this bot quickly turns to face any enemy bots who collide or hit it, then returns fire.
+- **[Pathfinder](/samples/pathfinder)** _(intermediate)_ — Navigates continuously between a set of precomputed waypoints, using trig to steer toward each point.
+
+## Combat
+
+- **[Marksman](/samples/marksman)** _(advanced)_ — Predicts where a moving enemy will be and **leads** the shot, focus-fires the weakest target, and holds fire until it's actually lined up. The sharpest shooter in the set.
+
+- **[Survivor](/samples/survivor)** _(intermediate)_ — Watches its own health and switches between fighting and fleeing, dodges incoming fire, and reacts to being spotted on radar.
+
+## Teamwork
+
+- **[Magnetic](/samples/magnetic)** _(intermediate)_ — Teammates share a secret-tagged message protocol to broadcast their positions and cluster together.
+
+- **[Squad](/samples/squad)** _(intermediate)_ — Teammates broadcast the position of any enemy they spot so the whole team focus-fires one target at once.
