@@ -129,6 +129,32 @@ describe('mcp tools', () => {
     });
   });
 
+  it('create_app rejects an inappropriate name before creating anything', async () => {
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'create_app',
+      arguments: { name: 'fuck' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+    expect(appService.create).not.toHaveBeenCalled();
+  });
+
+  it('create_app accepts a clean name', async () => {
+    vi.mocked(appService.create).mockResolvedValue({
+      getId: () => 'newid',
+      getName: () => 'Nice Bot',
+      setName: vi.fn().mockResolvedValue(undefined),
+      setSource: vi.fn().mockResolvedValue(undefined),
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'create_app',
+      arguments: { name: 'Nice Bot' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBeFalsy();
+    expect(appService.create).toHaveBeenCalled();
+  });
+
   it('get_app_source returns source for an owned bot', async () => {
     vi.mocked(appService.get).mockResolvedValue({
       getUserId: () => 'u1',

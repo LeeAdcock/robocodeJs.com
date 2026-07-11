@@ -14,6 +14,8 @@ import Environment, { Process } from './environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
+import { sanitizeBotName } from '../util/botName';
+import { isNameProfane } from '../util/nameFilter';
 
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
@@ -27,7 +29,6 @@ export interface Logger {
 }
 
 // Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
-const MAX_NAME_LENGTH = 50;
 
 // Convenience method to create a promise that resolves/rejects when specific
 // conditions are met. Delegates to the environment's per-tick command registry so
@@ -194,15 +195,14 @@ export default class Bot implements Point, Orientated {
   }
 
   setName(name: string) {
-    // Bot-controlled and persisted to the DB + broadcast to every SSE client:
-    // coerce to a string, strip control characters, and bound the length before
-    // it goes anywhere. An empty result is ignored rather than applied.
-    const clean = String(name)
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u001F\u007F]/g, '')
-      .trim()
-      .slice(0, MAX_NAME_LENGTH);
-    if (clean.length === 0) return;
+    // Bot-controlled and persisted to the DB + broadcast to every SSE client, so
+    // normalize it through the shared sanitizer (control/invisible/bidi stripped,
+    // length-capped) and reject it outright if it trips the profanity filter. A
+    // rejected or empty name is silently ignored — the bot keeps its current
+    // name — since the sandbox has no channel to surface an error to. App.setName
+    // re-checks as the authoritative gate.
+    const clean = sanitizeBotName(name);
+    if (clean.length === 0 || isNameProfane(clean)) return;
     appService.get(this.process.getAppId()).then((app) => {
       if (app && app.getName() !== clean) {
         this.env.emit('event', {

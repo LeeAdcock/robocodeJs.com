@@ -2,6 +2,8 @@ import pool from '../util/db';
 import { UserId } from './user';
 import nameFactory from '../util/nameFactory';
 import { DEFAULT_RATING } from '../util/elo';
+import { sanitizeBotName } from '../util/botName';
+import { isNameProfane, NameRejectedError } from '../util/nameFilter';
 
 export type AppId = string & {};
 
@@ -107,12 +109,21 @@ export default class App {
   };
 
   getName = () => this.name || 'Unnamed';
+  // The single persistence chokepoint for a name, so every writer (sandbox
+  // bot.setName, MCP create_app, starter seeding) is sanitized by one rule.
+  // An all-junk/empty name is ignored rather than blanking the current one.
   setName = (name: string): Promise<undefined> => {
-    this.name = name;
+    const clean = sanitizeBotName(name);
+    if (clean.length === 0) return Promise.resolve(undefined);
+    // Reject (rather than mask/substitute) a name that trips the profanity
+    // filter. Direct callers (e.g. MCP) surface this; the sandbox bot.setName
+    // path pre-checks and never reaches here with a profane name.
+    if (isNameProfane(clean)) return Promise.reject(new NameRejectedError());
+    this.name = clean;
     return pool
       .query({
         text: 'UPDATE app SET name=$2, updatedTimestamp=CURRENT_TIMESTAMP WHERE id=$1',
-        values: [this.getId(), name],
+        values: [this.getId(), clean],
       })
       .then(() => undefined);
   };
