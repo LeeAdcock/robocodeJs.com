@@ -16,6 +16,16 @@ import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
 import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
+import { logger, LogEvent } from '../util/logger';
+
+// Per-tick cap on how many broadcasts a single bot may issue (setInterval-style
+// resource budget, mirroring the console-log budget in compiler.ts and the timer
+// cap in scheduleFactory.ts). Each bot.send fans out O(bots) work — the payload
+// is re-serialized and re-dispatched to every other bot in the arena — so an
+// unbounded sender can saturate the tick and flood every other bot's RECEIVED
+// handler. Sends past the budget are dropped (the bot keeps running; a dropped
+// send is not a crash). Tunable via env so it can be tightened in prod.
+export const MAX_SENDS_PER_TICK = Number(process.env.MAX_SENDS_PER_TICK) || 50;
 
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
@@ -71,6 +81,14 @@ export default class Bot implements Point, Orientated {
   public eliminatedAt: number | null = null;
   public stats: BotStats = new BotStats();
   public timers: TimersContainer = new TimersContainer();
+  // Per-tick send budget bookkeeping (see MAX_SENDS_PER_TICK / send below). The
+  // window is the simulation tick the count belongs to; it resets whenever the
+  // clock advances, so the cap is per tick rather than per match. `sendWarned`
+  // limits the console warning to once per window, matching the timer-cap (E021)
+  // and log-flood behaviours.
+  private sendCount = 0;
+  private sendWindow = -1;
+  private sendWarned = false;
   public logger!: Logger;
   public process: Process;
   public env: Environment;
@@ -362,6 +380,39 @@ export default class Bot implements Point, Orientated {
   }
 
   send(message: JsonValue) {
+    // Enforce the per-tick send budget before doing any O(bots) fan-out work.
+    // The window is the current sim tick; when it advances, reset the counter.
+    const now = this.env.getTime();
+    if (now !== this.sendWindow) {
+      this.sendWindow = now;
+      this.sendCount = 0;
+      this.sendWarned = false;
+    }
+    if (this.sendCount >= MAX_SENDS_PER_TICK) {
+      // Warn the author once per window (E021-style, non-fatal) and log the
+      // first drop as a structured abuse signal for ops (mirrors log-flood);
+      // subsequent drops in the same window are silent.
+      if (!this.sendWarned) {
+        this.sendWarned = true;
+        this.logger.warn(
+          `${ErrorCodes.E024}: send limit reached (${MAX_SENDS_PER_TICK} per tick). ` +
+            'Further bot.send calls this tick are ignored.'
+        );
+        logger.warn(
+          {
+            event: LogEvent.BOT_FAULT,
+            kind: 'send-flood',
+            appId: this.process.appId,
+            botId: this.id,
+            arenaId: this.env.getArena().getId?.(),
+          },
+          'bot exceeded per-tick send budget; dropping further broadcasts'
+        );
+      }
+      return;
+    }
+    this.sendCount += 1;
+
     this.logger.trace('Sending message', message);
     this.stats.messagesSent += 1;
     this.env.getProcesses().forEach((otherProcess) => {

@@ -109,6 +109,18 @@ instances, and other non-JSON values can't be sent, and there are caps on size
 throws, so wrap it in a `try`/`catch` if you're sending data that might exceed a
 cap. Fix: send only plain data, and keep payloads small.
 
+## E024
+
+**Send limit reached — non-fatal.** Your bot called `bot.send(...)` more than the
+per-tick limit of **50** times in a single simulation tick. Each broadcast is
+re-delivered to every other bot in the arena, so an unbounded stream of sends can
+flood the match; the extra calls this tick are ignored — they simply don't send —
+and the bot keeps playing. Sends past the cap don't throw, unlike a malformed
+message ([E023](#e023)). This almost always means `bot.send` is being called in a
+tight loop. Fix: send at most a handful of messages per tick — coordinate with a
+compact payload rather than a stream of them, and avoid calling `send` inside an
+unbounded loop. The budget resets every tick.
+
 ## Reserved codes
 
 `E002`, `E005`–`E012`, `E014`–`E016`, `W001`, and `W002` are reserved and not
