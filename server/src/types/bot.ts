@@ -14,6 +14,7 @@ import Environment, { Process } from './environment';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { normalizeAngle } from '../util/geometry';
+import { sanitizeBotName } from '../util/botName';
 
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
@@ -27,7 +28,6 @@ export interface Logger {
 }
 
 // Upper bound on a bot-chosen app name (persisted + broadcast to all clients).
-const MAX_NAME_LENGTH = 50;
 
 // Convenience method to create a promise that resolves/rejects when specific
 // conditions are met. Delegates to the environment's per-tick command registry so
@@ -197,11 +197,7 @@ export default class Bot implements Point, Orientated {
     // Bot-controlled and persisted to the DB + broadcast to every SSE client:
     // coerce to a string, strip control characters, and bound the length before
     // it goes anywhere. An empty result is ignored rather than applied.
-    const clean = String(name)
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u001F\u007F]/g, '')
-      .trim()
-      .slice(0, MAX_NAME_LENGTH);
+    const clean = sanitizeBotName(name);
     if (clean.length === 0) return;
     appService.get(this.process.getAppId()).then((app) => {
       if (app && app.getName() !== clean) {

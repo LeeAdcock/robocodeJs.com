@@ -216,6 +216,32 @@ describe('AppService', () => {
     const [{ text }] = query.mock.calls[0] as [{ text: string }];
     expect(text).toContain('broken=false');
   });
+
+  it('setName() sanitizes the name at the persistence chokepoint', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'N', source: 's' }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+
+    // Control char stripped, length capped -> the *persisted* value is cleaned.
+    query.mockClear();
+    await app!.setName('Cool' + String.fromCodePoint(0) + 'Bot');
+    let [{ values }] = query.mock.calls[0] as [{ values: unknown[] }];
+    expect(values[1]).toBe('CoolBot');
+    expect(app!.getName()).toBe('CoolBot');
+
+    query.mockClear();
+    await app!.setName('x'.repeat(80));
+    [{ values }] = query.mock.calls[0] as [{ values: unknown[] }];
+    expect((values[1] as string).length).toBe(50);
+
+    // An all-junk name is a no-op — the current name is never blanked.
+    query.mockClear();
+    await app!.setName(String.fromCodePoint(0x200b));
+    expect(query).not.toHaveBeenCalled();
+    expect(app!.getName()).toBe('x'.repeat(50));
+  });
 });
 
 describe('ArenaService', () => {
