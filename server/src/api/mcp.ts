@@ -34,6 +34,8 @@ import { runMatchToDecision } from '../util/runMatch';
 import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
+import { VERSION } from '../util/version';
+import { collectMetrics } from '../util/metrics';
 
 const app = express();
 
@@ -1000,6 +1002,30 @@ export const buildServer = (user: User): McpServer => {
   );
 
   // ---- Observation ----
+
+  server.registerTool(
+    'platform_status',
+    {
+      title: 'Platform status',
+      description:
+        'The RobocodeJs server’s health and live operational gauges — the same ' +
+        'payload as the public /health endpoint: `status`, the deployed server ' +
+        '`version` (confirm which build is live), process `uptimeSec`, and ' +
+        'point-in-time `metrics` (arena/isolate counts, the busiest arena’s ' +
+        'average tick time in ms, and process memory in MB). Platform-wide, not ' +
+        'user-scoped — like `leaderboard`, it reports on the whole service.',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      return ok({
+        status: 'ok',
+        version: VERSION,
+        uptimeSec: Math.round(process.uptime()),
+        metrics: collectMetrics(),
+      });
+    }
+  );
 
   server.registerTool(
     'recent_logs',
