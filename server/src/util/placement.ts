@@ -1,13 +1,28 @@
-// Fair, low-variance match starts.
+// Fair, low-variance match starts — with randomized (unpredictable) positions.
 //
-// The original placement (Bot constructor) dropped every bot at a uniform-random
-// point over the whole arena, so one team could spawn clumped in a corner while
-// another got the open center — and that positional luck, not skill, decided most
-// matches. computeSpawns replaces it with a ROTATIONALLY SYMMETRIC layout: every
-// team sits at the same radius from center, the same distance from the walls, and
-// the same distance from the nearest enemy team, so the start is fair by
-// construction. The seed only picks a single global rotation, so matches still
-// vary — but fairly — and a fixed seed still reproduces the layout exactly.
+// History: the original placement dropped every bot at a uniform-random point, so
+// one team could clump in a corner while another got the open center — and that
+// positional luck, not skill, decided most matches. We then moved to a fully
+// symmetric formation: fair, but a bot could read its own position and the arena
+// size and, since only a single global rotation varied, analytically reconstruct
+// every enemy's spot at t=0 without ever scanning.
+//
+// This version keeps the fairness but restores the unpredictability. Team CLUSTER
+// CENTERS still sit on a rotationally symmetric ring (every team the same distance
+// from center, walls, and nearest enemy cluster), but each team's bots are
+// scattered RANDOMLY within their cluster and then recentered so the cluster's
+// centroid lands exactly on its symmetric center. Recentering is a rigid
+// translation, so it preserves teammate spacing while keeping centroid-level
+// fairness exact — yet the individual spots are random, so opponents have to be
+// found with radar rather than predicted. A seeded team->slot shuffle keeps team
+// creation order from mapping to a fixed angular position.
+//
+// Determinism: every random choice draws from the passed [0,1) rng in a fixed
+// order, so a fixed seed reproduces the layout exactly. The rejection sampler
+// draws a variable-but-seed-deterministic number of values; because the same
+// arena rng also seeds each bot's in-isolate Math.random afterward, changing the
+// draw count here changes which reproducible match a given seed maps to — not
+// reproducibility itself.
 //
 // Pure and dependency-free (takes width/height and a [0,1) rng) so it is trivially
 // unit-testable and reproducible.
@@ -20,6 +35,10 @@ export interface Spawn {
 
 // Keep bots off the walls, matching the 16u inset the old placement used.
 const MARGIN = 16;
+// Minimum spacing between a team's own bots, and the retry budget the rejection
+// sampler gets before it falls back to the best-spaced candidate it has seen.
+const MIN_SEP = 40;
+const MAX_TRIES = 64;
 
 const normalizeDeg = (deg: number): number => ((deg % 360) + 360) % 360;
 const rad = (deg: number): number => (deg * Math.PI) / 180;
@@ -29,10 +48,11 @@ const rad = (deg: number): number => (deg * Math.PI) / 180;
 const headingToward = (x: number, y: number, tx: number, ty: number): number =>
   normalizeDeg((Math.atan2(tx - x, y - ty) * 180) / Math.PI);
 
-// Returns spawns[team][slot]. Teams are evenly spaced on a circle around the arena
-// center; each team's bots sit on a small ring around the team's point (so a team
-// is spread out, never clumped), and every bot faces the center for immediate,
-// symmetric engagement geometry.
+// Returns spawns[team][slot]. Team cluster centers are evenly spaced on a circle
+// around the arena center (symmetric → fair); each team's bots are scattered at
+// random within their cluster (unpredictable) and recentered so the cluster
+// centroid sits exactly on the symmetric center (fair by construction). Every bot
+// faces the center.
 export function computeSpawns(
   teamCount: number,
   botsPerTeam: number,
@@ -48,40 +68,79 @@ export function computeSpawns(
   // Max distance from center a bot may occupy while staying off the walls.
   const usable = Math.min(width, height) / 2 - MARGIN;
 
-  // A team's bots spread on a ring of this radius around the team point; kept
-  // small enough that the whole formation stays inside `usable`.
-  const formR = Math.min(teamCount > 1 ? 70 : 90, usable * 0.35);
-  // Distance of each team point from center. 0 for a lone team (centered); for
-  // ≥2 teams, pushed out toward the walls but leaving room for the formation, so
-  // no bot is ever clamped and symmetry is exact.
-  const teamR = teamCount <= 1 ? 0 : Math.min(usable - formR, usable * 0.62);
+  // Radius a team's bots scatter within, and how far each team's center sits from
+  // the arena center. Sized (as the old formation was) so clusters stay inside the
+  // arena and never overlap, keeping symmetry exact.
+  const clusterR = Math.min(teamCount > 1 ? 75 : 95, usable * 0.35);
+  const teamR = teamCount <= 1 ? 0 : Math.min(usable - clusterR, usable * 0.62);
 
-  // Single global rotation — the only randomness, and it advantages no team.
+  // Single global rotation of the whole formation — the first draw, advantaging
+  // no team.
   const rotation = rng() * 360;
 
+  // The symmetric center points, one per slot around the ring.
+  const centers: { x: number; y: number }[] = [];
   for (let i = 0; i < teamCount; i++) {
-    const teamAngle = rotation + (i * 360) / teamCount;
-    const bx = cx + teamR * Math.sin(rad(teamAngle));
-    const by = cy - teamR * Math.cos(rad(teamAngle));
+    const a = rotation + (i * 360) / teamCount;
+    centers.push({
+      x: cx + teamR * Math.sin(rad(a)),
+      y: cy - teamR * Math.cos(rad(a)),
+    });
+  }
 
-    const bots: Spawn[] = [];
+  // Fisher–Yates shuffle of the slot indices, so team creation order doesn't map
+  // to a fixed angular slot a bot could exploit.
+  const order = centers.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+
+  for (let i = 0; i < teamCount; i++) {
+    const center = centers[order[i]];
+
+    // Scatter the team's offsets inside the cluster disk, keeping teammates at
+    // least MIN_SEP apart (rejection sampling; on exhaustion, keep the best-spaced
+    // candidate so the loop always terminates).
+    const offsets: { x: number; y: number }[] = [];
     for (let j = 0; j < botsPerTeam; j++) {
-      // Offset by half a step so a team's bots don't all line up on the same
-      // spoke as the team direction.
-      const slotAngle = teamAngle + (j * 360) / botsPerTeam + 180 / botsPerTeam;
-      const x = bx + formR * Math.sin(rad(slotAngle));
-      const y = by - formR * Math.cos(rad(slotAngle));
-      // Safety clamp (a no-op for the square arena, where the radii above keep
-      // every bot in bounds); guards odd width/height without breaking symmetry
-      // in the common case.
-      const cxp = Math.max(MARGIN, Math.min(width - MARGIN, x));
-      const cyp = Math.max(MARGIN, Math.min(height - MARGIN, y));
-      bots.push({
-        x: cxp,
-        y: cyp,
-        orientation: headingToward(cxp, cyp, cx, cy),
-      });
+      let best = { x: 0, y: 0 };
+      let bestSep = -1;
+      for (let t = 0; t < MAX_TRIES; t++) {
+        const ang = rng() * 360;
+        const r = clusterR * Math.sqrt(rng()); // uniform over the disk
+        const cand = { x: r * Math.sin(rad(ang)), y: -r * Math.cos(rad(ang)) };
+        let sep = Infinity;
+        for (const o of offsets) {
+          sep = Math.min(sep, Math.hypot(cand.x - o.x, cand.y - o.y));
+        }
+        if (sep >= MIN_SEP) {
+          best = cand;
+          break;
+        }
+        if (sep > bestSep) {
+          bestSep = sep;
+          best = cand;
+        }
+      }
+      offsets.push(best);
     }
+
+    // Recenter the cluster onto its symmetric center (a rigid shift: preserves the
+    // MIN_SEP spacing above, and makes the team centroid exactly the fair center).
+    const mx = offsets.reduce((s, o) => s + o.x, 0) / offsets.length;
+    const my = offsets.reduce((s, o) => s + o.y, 0) / offsets.length;
+
+    const bots: Spawn[] = offsets.map((o) => {
+      // Safety clamp (a no-op for the square arena, where the radii above keep
+      // every bot in bounds); guards odd width/height in the common case.
+      const x = Math.max(MARGIN, Math.min(width - MARGIN, center.x + o.x - mx));
+      const y = Math.max(
+        MARGIN,
+        Math.min(height - MARGIN, center.y + o.y - my)
+      );
+      return { x, y, orientation: headingToward(x, y, cx, cy) };
+    });
     teams.push(bots);
   }
   return teams;
