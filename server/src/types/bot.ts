@@ -221,16 +221,33 @@ export default class Bot implements Point, Orientated {
     // re-checks as the authoritative gate.
     const clean = sanitizeBotName(name);
     if (clean.length === 0 || isNameProfane(clean)) return;
-    appService.get(this.process.getAppId()).then((app) => {
-      if (app && app.getName() !== clean) {
-        this.env.emit('event', {
-          type: 'appRenamed',
-          appId: app.getId(),
-          name: clean,
-        });
-        return app.setName(clean);
-      }
-    });
+    // A dry-run compile (compiler.check) runs this on a throwaway, non-persisted
+    // process with no backing app row — there is nothing to rename, and the lookup
+    // would only reject on the sentinel appId. Skip the DB round-trip entirely.
+    if (!this.process.persisted) return;
+    appService
+      .get(this.process.getAppId())
+      .then((app) => {
+        if (app && app.getName() !== clean) {
+          this.env.emit('event', {
+            type: 'appRenamed',
+            appId: app.getId(),
+            name: clean,
+          });
+          return app.setName(clean);
+        }
+      })
+      // Fire-and-forget persistence: a bot renaming itself must never let a DB
+      // rejection escape as an unhandledRejection (which trips the process.fatal
+      // alarm). Notably, a dry-run compile (compiler.check) runs this with the
+      // sentinel appId 'dry-run', so the lookup rejects with a uuid syntax error
+      // every time — benign, so log at warn without an alarm `event` field.
+      .catch((err) =>
+        logger.warn(
+          { appId: this.process.getAppId(), err },
+          'bot setName persistence failed'
+        )
+      );
   }
 
   getId() {
