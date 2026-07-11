@@ -12,10 +12,17 @@ opening a pull request is enough.
 
 - **Report a bug** or **request a feature** — open a [GitHub issue](https://github.com/LeeAdcock/robocodeJs.com/issues).
   A minimal repro (steps, expected vs. actual) makes bugs much faster to fix.
-- **Fix or build something** — pick up an issue, or check the backlogs:
-  [`TASKS.md`](TASKS.md) (engineering/health) and [`ENHANCEMENTS.md`](ENHANCEMENTS.md)
-  (product/feature ideas). For anything non-trivial, opening an issue first to
-  align on the approach saves everyone time.
+- **Fix or build something** — pick up an
+  [open issue](https://github.com/LeeAdcock/robocodeJs.com/issues). The backlog lives
+  in GitHub Issues, grouped by label:
+  [`enhancement`](https://github.com/LeeAdcock/robocodeJs.com/labels/enhancement)
+  (product/feature ideas),
+  [`tech-debt`](https://github.com/LeeAdcock/robocodeJs.com/labels/tech-debt)
+  (engineering/health),
+  [`ai-mcp`](https://github.com/LeeAdcock/robocodeJs.com/labels/ai-mcp) (AI/MCP), and
+  [`good first issue`](https://github.com/LeeAdcock/robocodeJs.com/labels/good%20first%20issue)
+  to get started. For anything non-trivial, opening an issue first to align on the
+  approach saves everyone time.
 - **Improve the docs** — the bot-author docs and the homepage live in
   [`ui/public/docs/`](ui/public/docs); the developer docs are the various
   `README.md` files.
