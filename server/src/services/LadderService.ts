@@ -344,11 +344,26 @@ class LadderService {
         },
       };
     } finally {
+      // Let the tick loop fully exit before releasing the isolates. pause()
+      // only flips `running` off; the loop still finishes its in-flight tick
+      // (bot handlers on the isolate thread pool). Disposing before that lands
+      // races the apply → a spurious "Isolate was disposed during execution"
+      // bot.fault. Bounded so a wedged loop can't hang teardown; dispose is
+      // safe regardless.
+      await this.waitForLoopExit(env);
       // Always release the isolates and the in-flight locks, even if the match
       // threw partway through.
       env.dispose();
       this.inFlight.delete(appIdA);
       this.inFlight.delete(appIdB);
+    }
+  };
+
+  // Poll until the environment's tick loop has stopped (or a safety cap), so a
+  // caller can dispose its isolates without racing an in-flight bot handler.
+  private waitForLoopExit = async (env: Environment): Promise<void> => {
+    for (let i = 0; i < 250 && env.isLooping(); i++) {
+      await this.delay(20);
     }
   };
 }
