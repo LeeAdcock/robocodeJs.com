@@ -52,9 +52,9 @@ describe('LeaderboardPage', () => {
     // A little tank sprite renders next to each bot.
     const imgs = document.querySelectorAll('img[src^="/sprites/tank_"]');
     expect(imgs.length).toBe(2);
-    // The #1 bot gets a trophy; runners-up do not.
+    // Podium markers: trophy for #1, silver for #2 (the two rows in the fixture).
     expect(screen.getByLabelText('First place').textContent).toBe('🏆');
-    expect(screen.getAllByText('🏆')).toHaveLength(1);
+    expect(screen.getByLabelText('Second place').textContent).toBe('🥈');
   });
 
   it('bolds rows for bots the viewer owns and leaves others normal', async () => {
