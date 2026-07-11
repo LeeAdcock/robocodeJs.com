@@ -84,6 +84,9 @@ Once connected, these tools are available (all scoped to your account):
   (`minLevel`, `appId`, `botIndex`, `contains`)
 - `recent_faults` — recent bot crashes as structured records (error code, kind,
   message, failing line) — richer than grepping the logs
+- `platform_status` — the server's health and live gauges (deployed version,
+  uptime, arena/isolate counts, memory) — the same data as the public `/health`
+  endpoint. Platform-wide, not scoped to your account
 
 Arena tools take an optional `arenaId`; omit it to act on your default arena.
 

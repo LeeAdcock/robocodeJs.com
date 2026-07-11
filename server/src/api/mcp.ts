@@ -34,6 +34,8 @@ import { runMatchToDecision } from '../util/runMatch';
 import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
+import { VERSION } from '../util/version';
+import { collectMetrics } from '../util/metrics';
 
 const app = express();
 
@@ -1000,6 +1002,41 @@ export const buildServer = (user: User): McpServer => {
   );
 
   // ---- Observation ----
+
+  server.registerTool(
+    'platform_status',
+    {
+      title: 'Platform status',
+      description:
+        'The RobocodeJs server’s health and live operational gauges — the same ' +
+        'payload as the public /health endpoint. Platform-wide, not user-scoped ' +
+        '(like `leaderboard`, it reports on the whole service). Fields:\n' +
+        '- `status` — "ok" while the server is serving\n' +
+        '- `version` — the deployed server build; use it to confirm a deploy landed\n' +
+        '- `uptimeSec` — seconds since this instance started; resets on every ' +
+        'deploy, so a small value can just mean "freshly deployed"\n' +
+        '- `metrics.arenas` — arena environments held in memory right now, running ' +
+        'or paused (each is disposed ~30 min after it stops)\n' +
+        '- `metrics.runningArenas` — of those, how many are actively ticking\n' +
+        '- `metrics.isolates` — total bot sandboxes live across all arenas (one ' +
+        '8 MB V8 isolate per app); the main resource-pressure signal for the box\n' +
+        '- `metrics.maxAvgTickMs` — the busiest arena’s average wall-clock time to ' +
+        'compute one tick; single digits are healthy, a steadily rising value ' +
+        'means an arena is struggling to keep up\n' +
+        '- `metrics.rssMB` / `metrics.heapUsedMB` — the whole server process’s ' +
+        'resident and heap memory, in MB, for this instance',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      return ok({
+        status: 'ok',
+        version: VERSION,
+        uptimeSec: Math.round(process.uptime()),
+        metrics: collectMetrics(),
+      });
+    }
+  );
 
   server.registerTool(
     'recent_logs',

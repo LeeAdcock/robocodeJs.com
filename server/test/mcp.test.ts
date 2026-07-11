@@ -34,6 +34,12 @@ vi.mock('../src/services/EnvironmentService', () => ({
     getByArenaId: vi.fn(),
     has: vi.fn(),
     dispose: vi.fn(),
+    metrics: vi.fn(() => ({
+      arenas: 2,
+      runningArenas: 1,
+      isolates: 3,
+      maxAvgTickMs: 8,
+    })),
   },
 }));
 vi.mock('../src/util/botActions', () => ({
@@ -130,6 +136,30 @@ describe('mcp tools', () => {
       ownerName: 'Lee',
       rating: 1712,
     });
+  });
+
+  it('platform_status reports version, uptime, and the /health metrics', async () => {
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'platform_status',
+      arguments: {},
+    })) as never;
+
+    const out = JSON.parse(textOf(res));
+    expect(out).toMatchObject({
+      status: 'ok',
+      metrics: {
+        arenas: 2,
+        runningArenas: 1,
+        isolates: 3,
+        maxAvgTickMs: 8,
+      },
+    });
+    expect(typeof out.version).toBe('string');
+    expect(typeof out.uptimeSec).toBe('number');
+    // Process-memory gauges come from the real collectMetrics pass.
+    expect(typeof out.metrics.rssMB).toBe('number');
+    expect(typeof out.metrics.heapUsedMB).toBe('number');
   });
 
   it('create_app rejects an inappropriate name before creating anything', async () => {
