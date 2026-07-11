@@ -3,6 +3,7 @@ import { UserId } from './user';
 import nameFactory from '../util/nameFactory';
 import { DEFAULT_RATING } from '../util/elo';
 import { sanitizeBotName } from '../util/botName';
+import { isNameProfane, NameRejectedError } from '../util/nameFilter';
 
 export type AppId = string & {};
 
@@ -114,6 +115,10 @@ export default class App {
   setName = (name: string): Promise<undefined> => {
     const clean = sanitizeBotName(name);
     if (clean.length === 0) return Promise.resolve(undefined);
+    // Reject (rather than mask/substitute) a name that trips the profanity
+    // filter. Direct callers (e.g. MCP) surface this; the sandbox bot.setName
+    // path pre-checks and never reaches here with a profane name.
+    if (isNameProfane(clean)) return Promise.reject(new NameRejectedError());
     this.name = clean;
     return pool
       .query({

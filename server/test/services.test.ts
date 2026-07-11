@@ -181,6 +181,24 @@ describe('AppService', () => {
     expect(values).toEqual([20, DEMO_USER_ID]);
   });
 
+  it('getLeaderboard() falls back to Anonymous for a profane owner name', async () => {
+    query.mockResolvedValue({
+      rows: [
+        {
+          appId: 'a1',
+          name: 'Bot',
+          ownerName: 'fucker',
+          rating: 1500,
+          ratingGames: 5,
+          ratingWins: 2,
+        },
+      ],
+      rowCount: 1,
+    } as never);
+    const board = await appService.getLeaderboard(20);
+    expect(board[0].ownerName).toBe('Anonymous');
+  });
+
   it('getLadderCandidates() excludes the demo user and maps eligible rows', async () => {
     query.mockResolvedValue({
       rows: [
@@ -232,7 +250,7 @@ describe('AppService', () => {
     expect(app!.getName()).toBe('CoolBot');
 
     query.mockClear();
-    await app!.setName('x'.repeat(80));
+    await app!.setName('a'.repeat(80));
     [{ values }] = query.mock.calls[0] as [{ values: unknown[] }];
     expect((values[1] as string).length).toBe(50);
 
@@ -240,7 +258,19 @@ describe('AppService', () => {
     query.mockClear();
     await app!.setName(String.fromCodePoint(0x200b));
     expect(query).not.toHaveBeenCalled();
-    expect(app!.getName()).toBe('x'.repeat(50));
+    expect(app!.getName()).toBe('a'.repeat(50));
+  });
+
+  it('setName() rejects a profane name without writing', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'Fine Name', source: 's' }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+    query.mockClear();
+    await expect(app!.setName('fucking bot')).rejects.toThrow(/inappropriate/i);
+    expect(query).not.toHaveBeenCalled();
+    expect(app!.getName()).toBe('Fine Name'); // unchanged
   });
 });
 

@@ -4,6 +4,8 @@ import pool from '../util/db';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_RATING } from '../util/elo';
 import { abbreviateName } from '../util/displayName';
+import { sanitizeBotName } from '../util/botName';
+import { isNameProfane } from '../util/nameFilter';
 
 // A single app eligible for global-ladder matchmaking, with just the fields the
 // selector needs (see AppService.getLadderCandidates).
@@ -116,13 +118,20 @@ export class AppService {
         res.rows.map((row, i) => {
           const games = (row.ratingGames as number | null) ?? 0;
           const wins = (row.ratingWins as number | null) ?? 0;
+          // The owner name comes from Google (account.name); apply the same
+          // precautions bot names get before showing it publicly. We can't
+          // reject a sign-in, so a profane owner name falls back to Anonymous
+          // (their real name is untouched elsewhere, e.g. their own avatar).
+          const owner = sanitizeBotName(row.ownerName as string | null);
           return {
             rank: i + 1,
             appId: row.appId as AppId,
             name: (row.name as string | null) ?? 'Unnamed',
             // Abbreviate to "First L." so the public endpoint never exposes a
             // full surname.
-            ownerName: abbreviateName(row.ownerName as string | null),
+            ownerName: isNameProfane(owner)
+              ? 'Anonymous'
+              : abbreviateName(owner),
             rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
             games,
             wins,
