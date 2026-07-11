@@ -31,10 +31,14 @@ For product feature ideas (game modes, leaderboards, onboarding, etc.) see
   source). Mostly small.
 - **Operational metrics — remaining.** (S–M) Gauges are already live on `/health`
   and emitted as a periodic `event=metrics` log heartbeat (`util/metrics.ts`,
-  `services/EnvironmentService.metrics`, `api/health.ts`, `index.ts`). Still
-  missing: a `/metrics` scrape endpoint (Prometheus) and alert wiring on the
-  `event=*` log fields (e.g. CloudWatch metric filters, thresholds seeded from
-  observed baselines).
+  `services/EnvironmentService.metrics`, `api/health.ts`, `index.ts`). Alert
+  wiring on the `event=*` log fields is **done** — CloudWatch metric-filter alarms
+  (`cloudwatch-alarms.config` security events + `cloudwatch-ops-alarms.config`
+  reliability events) plus availability/RDS/EC2 alarms, all → the `Alerts` SNS
+  topic; EB environment events are emailed too (`options.config`). Still missing:
+  a `/metrics` scrape endpoint (Prometheus); host-memory monitoring via the
+  CloudWatch agent; and the external `/health` Synthetics canary + CodePipeline
+  failure notifications (runbook in `ops/README.md`).
 
 ## Known & accepted (not action items)
 

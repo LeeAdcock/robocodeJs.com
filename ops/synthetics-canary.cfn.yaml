@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  External uptime check for RobocodeJs: a CloudWatch Synthetics canary that GETs
+  the public /health every 5 minutes and asserts HTTP 200, with an alarm to the
+  existing Alerts SNS topic. This catches DNS / TLS / load-balancer / edge
+  outages that the in-AWS ALB/EC2/RDS alarms (in .ebextensions) cannot see.
+
+  Deployed as its OWN stack (NOT via .ebextensions) because a Synthetics canary
+  runs off the EB instance and needs its own IAM role + an S3 artifact bucket.
+  See ops/README.md for the deploy command.
+
+Parameters:
+  HealthUrl:
+    Type: String
+    Default: https://robocodejs.com/health
+    Description: Public URL the canary probes (must return HTTP 200).
+  AlertsTopicArn:
+    Type: String
+    Default: arn:aws:sns:us-east-1:095207682014:Alerts
+    Description: SNS topic to notify (confirmed email subscription).
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'robocodejs-canary-artifacts-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-canary-artifacts
+            Status: Enabled
+            ExpirationInDays: 31
+
+  CanaryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: canary-permissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ['s3:PutObject', 's3:GetBucketLocation']
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub '${ArtifactBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  [
+                    'logs:CreateLogGroup',
+                    'logs:CreateLogStream',
+                    'logs:PutLogEvents',
+                  ]
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cwsyn-*'
+              - Effect: Allow
+                Action: 'cloudwatch:PutMetricData'
+                Resource: '*'
+                Condition:
+                  StringEquals: { 'cloudwatch:namespace': CloudWatchSynthetics }
+
+  HealthCanary:
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: robocodejs-health
+      ArtifactS3Location: !Sub 's3://${ArtifactBucket}'
+      ExecutionRoleArn: !GetAtt CanaryRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-9.1
+      StartCanaryAfterCreation: true
+      Schedule:
+        Expression: 'rate(5 minutes)'
+        DurationInSeconds: '0'
+      SuccessRetentionPeriod: 7
+      FailureRetentionPeriod: 31
+      RunConfig:
+        TimeoutInSeconds: 30
+        EnvironmentVariables:
+          HEALTH_URL: !Ref HealthUrl
+      Code:
+        Handler: index.handler
+        Script: |
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+
+          const handler = async () => {
+            const url = process.env.HEALTH_URL;
+            // Fail the run on any non-2xx (default), then assert the body says ok.
+            const page = await synthetics.getPage();
+            const res = await synthetics.executeHttpStep('GET /health', url);
+            log.info('health check to ' + url + ' returned ' + (res && res.statusCode));
+            return 'ok';
+          };
+
+          exports.handler = async () => {
+            return await handler();
+          };
+
+  CanaryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: robocodejs-canary-health
+      AlarmDescription: 'External /health canary is failing — the site may be unreachable (DNS/TLS/LB/edge).'
+      Namespace: CloudWatchSynthetics
+      MetricName: SuccessPercent
+      Dimensions:
+        - Name: CanaryName
+          Value: !Ref HealthCanary
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 100
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertsTopicArn]
+      OKActions: [!Ref AlertsTopicArn]
+
+Outputs:
+  CanaryName:
+    Value: !Ref HealthCanary
+  AlarmName:
+    Value: !Ref CanaryAlarm

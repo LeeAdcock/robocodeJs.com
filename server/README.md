@@ -199,14 +199,16 @@ The app emits these signals; **wiring alarms is a deploy-time/ops concern** (the
 | `event="process.fatal"` / `event="db.error"`     | Process/DB health — page on any.                                                  |
 | `event="mcp.tool"` anomalous volume per `userId` | A compromised or runaway token; the audit trail to review after an incident.      |
 
-**AWS wiring (this deployment).** Two `.ebextensions` files turn the above into CloudWatch alarms:
+**AWS wiring (this deployment).** These `.ebextensions` files are **active** and turn the above into CloudWatch alarms → the `Alerts` SNS topic (a confirmed email subscription; override via the `ALERT_SNS_TOPIC_ARN` / `ALERT_LOG_GROUP` env properties):
 
-- **`cloudwatch-logs.config`** (active) — streams the instance's stdout (where the pino JSON lands) to a CloudWatch Logs group, `/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log`. Required for any log-based alarm; also makes the logs queryable in Logs Insights.
-- **`cloudwatch-alarms.config.example`** (opt-in) — metric filters + alarms for `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, and `rate.limited`, publishing to the `Alerts` SNS topic by default (override via the `ALERT_SNS_TOPIC_ARN` / `ALERT_LOG_GROUP` env properties). EB only processes `*.config`, so this `.example` is inert until renamed — a deliberate, reversible activation.
+- **`cloudwatch-logs.config`** — streams the instance's stdout (where the pino JSON lands) to a CloudWatch Logs group, `/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log`. Required for any log-based alarm; also makes the logs queryable in Logs Insights.
+- **`cloudwatch-alarms.config`** — log-metric-filter alarms on the **security** events: `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, `rate.limited`.
+- **`cloudwatch-ops-alarms.config`** — **availability / infrastructure / reliability** alarms: ALB unhealthy-hosts + ELB/target 5xx (site-down), RDS free-storage / CPU / connections / freeable-memory, EC2 CPU + CPU-credit-balance, and the `db.error` / `http.error` log events. These reference the EB-created stack resources (`AWSEBRDSDatabase`, `AWSEBV2LoadBalancer`, `AWSEBV2LoadBalancerTargetGroup`, `AWSEBAutoScalingGroup`).
+- **`options.config`** also sets `aws:elasticbeanstalk:sns:topics` so EB's own environment events (deploy failures, environment-degraded, instance replacement) email the same inbox.
 
-  **Activate (two deploys):** (1) deploy with `cloudwatch-logs.config` and confirm the log group exists; (2) `git mv cloudwatch-alarms.config.example cloudwatch-alarms.config` and deploy again (the metric filters require the log group to already exist).
+  The log filter patterns are quoted **substring** patterns (not JSON `{ $.x = }` patterns, which wouldn't match the platform's stdout-line prefix) and are verified with `aws logs test-metric-filter` against the real pino output. Thresholds are starting points — tune per event.
 
-  The filter patterns are quoted **substring** patterns (not JSON `{ $.x = }` patterns, which wouldn't match the platform's stdout-line prefix) and are verified with `aws logs test-metric-filter` against the real pino output. The resource definitions pass `aws cloudformation validate-template`. Thresholds are starting points — tune per event. What remains deploy-only is EB's `Fn::GetOptionSetting` substitution and the metric filter binding to the EB-managed log group (the two-step rename rollout above handles the ordering), so still treat the first activation as a staging validation.
+**Not in `.ebextensions`** (they need resources outside the EB stack) — see `ops/README.md` for the runbook: an external CloudWatch Synthetics **canary** on `https://robocodejs.com/health` (`ops/synthetics-canary.cfn.yaml`), a **CodePipeline** failure notification rule, and host-**memory** monitoring via the CloudWatch agent (the `event=metrics` rssMB heartbeat is syslog-prefixed, so it can't be parsed by a metric filter; EC2 CPU/credits + RDS FreeableMemory + `process.fatal` give indirect coverage until the agent is added).
 
 ## Tests
 
