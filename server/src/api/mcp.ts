@@ -208,12 +208,13 @@ export const buildServer = (user: User): McpServer => {
       description:
         'The global bot ladder: the top-rated bots across all users by Elo ' +
         '(bot name, owner, rating, games, win rate). Not user-scoped — public ' +
-        'ranking data, no source.',
+        "ranking data, no source. Only the calling user's own bots include an " +
+        '`appId`; every row carries an opaque `id`.',
       inputSchema: {},
       annotations: READ_ONLY,
     },
     async () => {
-      return ok(await appService.getLeaderboard(20));
+      return ok(await appService.getLeaderboard(20, user.getId()));
     }
   );
 

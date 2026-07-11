@@ -7,9 +7,12 @@ vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 import axios from 'axios';
 import LeaderboardPage from '../src/page/leaderboard/leaderboardPage';
 
+// Wire shape: every row has a sprite `color`; only the viewer's own rows carry
+// a real `appId` (server-authoritative). Row 1 is the viewer's, row 2 isn't.
 const rows = [
   {
     rank: 1,
+    color: 'blue',
     appId: 'a1',
     name: 'Overlord',
     ownerName: 'Lee A.',
@@ -20,7 +23,7 @@ const rows = [
   },
   {
     rank: 2,
-    appId: 'a2',
+    color: 'red',
     name: 'Skirmisher',
     ownerName: 'Dana K.',
     rating: 1655,
@@ -49,19 +52,23 @@ describe('LeaderboardPage', () => {
     expect(screen.getByText('1712')).toBeTruthy();
     expect(screen.getByText('75%')).toBeTruthy(); // winRate rounded
     expect(screen.getByText('Skirmisher')).toBeTruthy();
-    // A little tank sprite renders next to each bot.
+    // A little tank sprite renders next to each bot, using the row's color.
     const imgs = document.querySelectorAll('img[src^="/sprites/tank_"]');
     expect(imgs.length).toBe(2);
+    expect(imgs[0].getAttribute('src')).toBe('/sprites/tank_blue.png');
+    expect(imgs[1].getAttribute('src')).toBe('/sprites/tank_red.png');
     // Podium markers: trophy for #1, silver for #2 (the two rows in the fixture).
     expect(screen.getByLabelText('First place').textContent).toBe('🏆');
     expect(screen.getByLabelText('Second place').textContent).toBe('🥈');
   });
 
   it('bolds rows for bots the viewer owns and leaves others normal', async () => {
+    // Ownership is server-authoritative now: a row is the viewer's iff the
+    // server included its real appId (row 1 here), so no client prop is needed.
     vi.mocked(axios.get).mockResolvedValue({ data: rows } as never);
     render(
       <MemoryRouter>
-        <LeaderboardPage ownAppIds={new Set(['a1'])} />
+        <LeaderboardPage />
       </MemoryRouter>
     );
     const ownRow = (await screen.findByText('Overlord')).closest('tr')!;

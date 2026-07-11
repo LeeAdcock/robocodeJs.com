@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import LeaderboardEntry from '../../types/leaderboardEntry';
-import { colors } from '../../util/colors';
 
 // The global bot ladder (GitHub #151). A read-only, public view of the top
 // rated bots across all users — reachable from the main nav even when logged
@@ -9,16 +8,6 @@ import { colors } from '../../util/colors';
 // on a slow interval to pick up changes without a reload. Themed via the app's
 // CSS variables (var(--fg)/--bg/--rule/--link), so it follows light/dark.
 const REFRESH_MS = 30000;
-
-// A stable little tank sprite per bot: hash the appId into the shared color
-// palette so each bot always shows the same color, matching the arena/roster
-// visual language (there's no arena index here, so we derive it from the id).
-const tankSrc = (appId: string): string => {
-  let h = 0;
-  for (let i = 0; i < appId.length; i++)
-    h = (h * 31 + appId.charCodeAt(i)) >>> 0;
-  return `/sprites/tank_${colors[h % colors.length]}.png`;
-};
 
 // Podium markers for the top three (shown in the far-left column). 1st gets a
 // trophy, 2nd/3rd the silver/bronze medals.
@@ -50,15 +39,7 @@ const goldFirstCell = (base: React.CSSProperties): React.CSSProperties => ({
   boxShadow: 'inset 3px 0 0 gold',
 });
 
-interface LeaderboardPageProps {
-  // App ids owned by the signed-in user; their rows are bolded. Empty when
-  // logged out.
-  ownAppIds?: Set<string>;
-}
-
-export default function LeaderboardPage({
-  ownAppIds,
-}: LeaderboardPageProps = {}) {
+export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,19 +106,21 @@ export default function LeaderboardPage({
             <tbody>
               {entries.map((e) => {
                 const top3 = e.rank <= 3;
-                const isOwn = ownAppIds?.has(e.appId) ?? false;
+                // The server includes the real appId only on the viewer's own
+                // rows, so its presence is the authoritative "is mine" signal.
+                const isOwn = e.appId != null;
                 const first = top3 ? goldFirstCell(numCell) : numCell;
                 const c = top3 ? goldCell(cell) : cell;
                 const n = top3 ? goldCell(numCell) : numCell;
                 return (
-                  <tr key={e.appId} style={{ fontWeight: isOwn ? 700 : 400 }}>
+                  <tr key={e.rank} style={{ fontWeight: isOwn ? 700 : 400 }}>
                     <td style={first} aria-label={placeLabel(e.rank)}>
                       {medal(e.rank)}
                     </td>
                     <td style={n}>{e.rank}</td>
                     <td style={c}>
                       <img
-                        src={tankSrc(e.appId)}
+                        src={`/sprites/tank_${e.color}.png`}
                         style={{
                           height: '1.1em',
                           marginRight: '8px',

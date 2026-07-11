@@ -506,17 +506,9 @@ function App() {
                 <Route path="/learn" element={<MarkdownPage path="learn" />} />
                 <Route path="/learn/:slug" element={<LessonPage />} />
                 {/* Global bot ladder — public, linked from the main nav. The
-                    signed-in user's own bots are bolded (client-side). */}
-                <Route
-                  path="/leaderboard"
-                  element={
-                    <LeaderboardPage
-                      ownAppIds={
-                        new Set((user?.apps ?? []).map((a: App) => a.id))
-                      }
-                    />
-                  }
-                />
+                    signed-in user's own bots are bolded; the server marks them
+                    by including the real appId only on the viewer's own rows. */}
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/about" element={<MarkdownPage path="about" />} />
                 {/* MCP setup guide, linked from the homepage getting-started list. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />

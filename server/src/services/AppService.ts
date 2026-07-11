@@ -7,6 +7,22 @@ import { abbreviateName } from '../util/displayName';
 import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
 
+// Tank sprite color names, mirroring the UI palette (ui/src/util/colors.ts;
+// sprites at ui/public/sprites/tank_<color>.png). The leaderboard derives each
+// row's color from its app id and returns only the color, so the wire value is
+// a self-evident sprite color, never an identifier.
+const LEADERBOARD_PALETTE = ['sand', 'blue', 'red', 'dark', 'green'] as const;
+
+// Deterministic char-rolling hash so a given app id always maps to the same
+// palette color (matching the arena/roster visual language). Only the resulting
+// color leaves the server — the app id and hash stay internal.
+const colorForAppId = (appId: string): string => {
+  let h = 0;
+  for (let i = 0; i < appId.length; i++)
+    h = (h * 31 + appId.charCodeAt(i)) >>> 0;
+  return LEADERBOARD_PALETTE[h % LEADERBOARD_PALETTE.length];
+};
+
 // A single app eligible for global-ladder matchmaking, with just the fields the
 // selector needs (see AppService.getLadderCandidates).
 export interface LadderCandidate {
@@ -19,9 +35,16 @@ export interface LadderCandidate {
 
 // One row of the public global-ladder leaderboard (see getLeaderboard). Wire
 // shape mirrored by the UI (ui/src/types/leaderboardEntry.ts). No source.
+//
+// `color` is the tank sprite color for the row (derived from the real app id),
+// present on EVERY row — the UI renders it directly and never learns the real
+// id. `appId` is the REAL app id and is present ONLY on rows the viewer owns
+// (undefined otherwise), so the board never leaks other users' app ids while
+// the viewer can still recognize and act on their own bots.
 export interface LeaderboardEntry {
   rank: number;
-  appId: AppId;
+  color: string;
+  appId?: AppId;
   name: string;
   ownerName: string;
   rating: number;
@@ -107,7 +130,10 @@ export class AppService {
   // That ceiling is provably sufficient — with MAX_APPS_PER_USER (20) and a
   // 3-per-owner cap, filling a 20-row board scans well under it — so it never
   // truncates the visible board in practice.
-  getLeaderboard = (limit = 20): Promise<LeaderboardEntry[]> => {
+  getLeaderboard = (
+    limit = 20,
+    viewerUserId?: UserId
+  ): Promise<LeaderboardEntry[]> => {
     const MAX_APPS_PER_OWNER_ON_BOARD = 3;
     const LEADERBOARD_SCAN_LIMIT = 500;
     return pool
@@ -143,7 +169,12 @@ export class AppService {
           const owner = sanitizeBotName(row.ownerName as string | null);
           entries.push({
             rank: entries.length + 1,
-            appId: row.appId as AppId,
+            // Sprite color for every row, derived from the app id (the id itself
+            // never leaves the server).
+            color: colorForAppId(row.appId as string),
+            // Real app id ONLY on the viewer's own rows; omitted for others so
+            // the public board never leaks foreign app ids.
+            appId: ownerId === viewerUserId ? (row.appId as AppId) : undefined,
             name: (row.name as string | null) ?? 'Unnamed',
             // Abbreviate to "First L." so the public endpoint never exposes a
             // full surname.
