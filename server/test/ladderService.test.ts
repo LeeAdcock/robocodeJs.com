@@ -248,16 +248,18 @@ describe('LadderService.pickPair', () => {
     rnd.mockRestore();
   });
 
-  it('prefers a different-owner opponent over a closer same-owner one', async () => {
+  it('picks the nearest-rating opponent regardless of owner (same-owner allowed)', async () => {
     const rnd = vi.spyOn(Math, 'random').mockReturnValue(0);
     getCandidates.mockResolvedValue([
       cand('anchor', 1500, 0, 'me'),
-      cand('mine', 1505, 50, 'me'), // closest, but same owner
-      cand('rival', 1520, 50, 'you'), // slightly farther, different owner
+      cand('mine', 1505, 50, 'me'), // closest, same owner — now eligible
+      cand('rival', 1520, 50, 'you'), // farther, different owner
     ] as never);
 
+    // The different-owner preference was dropped, so the closest bot wins even
+    // though it shares an owner with the anchor.
     const pair = await ladderService.pickPair();
-    expect(pair).toEqual(['anchor', 'rival']);
+    expect(pair).toEqual(['anchor', 'mine']);
     rnd.mockRestore();
   });
 });

@@ -147,9 +147,9 @@ class LadderService {
   //   1. Anchor — drawn from the least-played apps (random among the fewest-games
   //      quartile) so new/under-played bots get games and their ratings settle.
   //   2. Opponent — the closest in rating to the anchor (random among the few
-  //      nearest), since similar-strength matchups carry the most Elo signal;
-  //      a different owner is preferred so a user's own bots don't just farm
-  //      each other (which is zero-sum anyway, but wasteful).
+  //      nearest), since similar-strength matchups carry the most Elo signal.
+  //      Same-owner matchups are allowed (see below) so a dominant player's bots
+  //      still test each other.
   // In-flight apps and untouched starters are excluded.
   pickPair = async (): Promise<[AppId, AppId] | null> => {
     const pool = (await appService.getLadderCandidates()).filter(
@@ -165,15 +165,17 @@ class LadderService {
     );
     const anchor = anchorBand[Math.floor(Math.random() * anchorBand.length)];
 
-    // 2. Opponent: nearest rating to the anchor, preferring a different owner.
+    // 2. Opponent: nearest rating to the anchor (random among the few nearest
+    //    so pairings vary between rounds). Same-owner matchups are allowed on
+    //    purpose: random matchmaking already prevents targeted farming (you
+    //    can't choose your opponent) and a same-owner match is zero-sum, while
+    //    excluding them shields a dominant player's own bots from ever meeting —
+    //    which pins their ratings together and keeps them artificially undefeated.
     const others = pool.filter((c) => c.appId !== anchor.appId);
     const ratingDist = (c: LadderCandidate) =>
       Math.abs(c.rating - anchor.rating);
     const nearest = [...others].sort((a, b) => ratingDist(a) - ratingDist(b));
-    const differentOwner = nearest.filter((c) => c.userId !== anchor.userId);
-    const preferred = differentOwner.length > 0 ? differentOwner : nearest;
-    // Random among the few nearest so pairings vary between rounds.
-    const nearBand = preferred.slice(0, Math.min(5, preferred.length));
+    const nearBand = nearest.slice(0, Math.min(5, nearest.length));
     const opponent = nearBand[Math.floor(Math.random() * nearBand.length)];
 
     return [anchor.appId, opponent.appId];
