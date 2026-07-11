@@ -2,7 +2,6 @@ import pool from '../util/db';
 import { UserId } from './user';
 import nameFactory from '../util/nameFactory';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type AppId = string & {};
 
 export default class App {
