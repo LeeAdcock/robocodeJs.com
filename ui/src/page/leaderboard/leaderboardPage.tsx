@@ -110,8 +110,9 @@ export default function LeaderboardPage({
                 <th style={cell}>Bot</th>
                 <th style={cell}>Owner</th>
                 <th style={numCell}>Rating</th>
-                <th style={numCell}>Games</th>
                 <th style={numCell}>Win%</th>
+                {/* trophy column for the #1 bot */}
+                <th style={numCell} aria-hidden="true"></th>
               </tr>
             </thead>
             <tbody>
@@ -138,8 +139,13 @@ export default function LeaderboardPage({
                     </td>
                     <td style={{ ...c, color: '#888' }}>{e.ownerName}</td>
                     <td style={n}>{e.rating}</td>
-                    <td style={n}>{e.games}</td>
                     <td style={n}>{Math.round(e.winRate * 100)}%</td>
+                    <td
+                      style={n}
+                      aria-label={e.rank === 1 ? 'First place' : undefined}
+                    >
+                      {e.rank === 1 ? '🏆' : ''}
+                    </td>
                   </tr>
                 );
               })}
