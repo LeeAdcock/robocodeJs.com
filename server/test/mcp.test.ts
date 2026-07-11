@@ -577,6 +577,40 @@ describe('mcp tools', () => {
     expect(uriTemplates).toContain('robocodejs://samples/{name}');
   });
 
+  it('list_docs returns a (possibly empty) catalog without erroring', async () => {
+    // Server unit tests run without the built dist/public assets, so listPublic
+    // returns [] — the result is still a valid, non-error array (the fixed
+    // types entry is always present).
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'list_docs',
+      arguments: {},
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBeFalsy();
+    const entries = JSON.parse(textOf(res));
+    expect(Array.isArray(entries)).toBe(true);
+  });
+
+  it('read_doc rejects a bogus id', async () => {
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'read_doc',
+      arguments: { id: 'nope/x' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+  });
+
+  it('read_doc returns an error for a well-formed but unreadable id', async () => {
+    // docs/dev is a valid id shape, but the file is absent when assets aren't
+    // built — this exercises the happy-path parse + the not-found branch.
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'read_doc',
+      arguments: { id: 'docs/dev' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+  });
+
   it('marks tool behaviour with annotations and declares output schemas', async () => {
     const client = await connect();
     const { tools } = await client.listTools();

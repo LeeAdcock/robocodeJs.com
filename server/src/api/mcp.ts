@@ -1023,6 +1023,96 @@ export const buildServer = (user: User): McpServer => {
     }
   );
 
+  // The same reference material exposed via registerResources below, mirrored as
+  // plain tools. Some MCP clients (notably Claude's connector) reliably consume
+  // tools but have limited/spotty support for MCP resources — especially dynamic
+  // ResourceTemplate ones — so these tools guarantee every client can read the
+  // docs, samples, and type definitions. Ids use a canonical `<kind>/<name>`
+  // scheme that maps cleanly onto the public subdirs.
+  server.registerTool(
+    'list_docs',
+    {
+      title: 'List reference docs',
+      description:
+        'Catalog of RobocodeJs bot-authoring reference material (API docs, ' +
+        'sample bots, and the generated type definitions) to read with ' +
+        'read_doc. This mirrors the MCP resources for clients that can’t read ' +
+        'resources. Start with `docs/dev` (the API reference). Returns a list ' +
+        'of { id, kind, title }; pass an id to read_doc to fetch its content.',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const entries: Array<{ id: string; kind: string; title: string }> = [
+        ...listPublic('docs', '.md').map((file) => {
+          const slug = file.replace(/\.md$/, '');
+          return { id: `docs/${slug}`, kind: 'doc', title: `Docs: ${slug}` };
+        }),
+        ...listPublic('samples', '.js').map((file) => {
+          const name = file.replace(/\.js$/, '');
+          return {
+            id: `samples/${name}`,
+            kind: 'sample',
+            title: `Sample bot: ${name}`,
+          };
+        }),
+        {
+          id: 'types/robocode.d.ts',
+          kind: 'types',
+          title: 'Bot API type definitions (robocode.d.ts)',
+        },
+      ];
+      return ok(entries);
+    }
+  );
+
+  server.registerTool(
+    'read_doc',
+    {
+      title: 'Read a reference doc',
+      description:
+        'Read one piece of reference material by its id from list_docs (e.g. ' +
+        '`docs/dev`, `samples/<name>`, or `types/robocode.d.ts`). Returns the ' +
+        'raw markdown / JavaScript / TypeScript text. The tool fallback for the ' +
+        'MCP resources, for clients that can’t read resources.',
+      inputSchema: {
+        id: z
+          .string()
+          .describe(
+            'An id from list_docs, e.g. "docs/dev", "samples/<name>", or "types/robocode.d.ts"'
+          ),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ id }) => {
+      const slash = id.indexOf('/');
+      const kind = slash === -1 ? id : id.slice(0, slash);
+      const name = slash === -1 ? '' : id.slice(slash + 1);
+      // Map the id's kind to a public subdir. Anything else is not a valid id.
+      const sub = { docs: 'docs', samples: 'samples', types: 'ts' }[kind];
+      if (!sub || !name) {
+        return fail(
+          `Unknown id "${id}". Use an id from list_docs, e.g. "docs/dev", ` +
+            '"samples/<name>", or "types/robocode.d.ts".'
+        );
+      }
+      // Build the filename per kind. readPublic reduces it to a basename and
+      // allow-lists the subdir, so it is the traversal guard — don't join paths.
+      let filename: string;
+      if (kind === 'docs') filename = `${name}.md`;
+      else if (kind === 'samples') filename = `${name}.js`;
+      else filename = 'robocode.d.ts';
+      if (!isAllowedSub(sub)) return fail(`Unknown id "${id}".`);
+      const text = readPublic(sub, filename);
+      if (text === null) {
+        return fail(
+          `Could not read "${id}". Use an id from list_docs, e.g. "docs/dev".`
+        );
+      }
+      return ok(text);
+    }
+  );
+
   registerResources(server);
   registerPrompts(server);
 
@@ -1167,7 +1257,10 @@ const registerPrompts = (server: McpServer): void => {
               `Write a RobocodeJs bot with this goal: ${goal}\n\n` +
               `First read the resource robocodejs://docs/dev (the API reference) ` +
               `and robocodejs://types/robocode.d.ts (the exact signatures), and ` +
-              `skim a relevant sample under robocodejs://samples/. Then:\n` +
+              `skim a relevant sample under robocodejs://samples/ (or, if your ` +
+              `client can't read MCP resources, call list_docs then read_doc ` +
+              `with ids docs/dev, types/robocode.d.ts, and a samples/<name>). ` +
+              `Then:\n` +
               `1. create_app (give it a descriptive name and the initial source).\n` +
               `2. add_app_to_arena${arenaId ? ` (arenaId ${arenaId})` : ''} and ` +
               `restart_arena.\n` +
@@ -1206,9 +1299,11 @@ const registerPrompts = (server: McpServer): void => {
               `records (code, kind, message, line) — if it crashed, this is the ` +
               `fastest signal. Also read recent_logs and arena_status to see ` +
               `how it's behaving and any E0xx/W0xx error codes (look them up in ` +
-              `robocodejs://reference/error-codes). Cross-reference the API at ` +
-              `robocodejs://docs/dev and the signatures at ` +
-              `robocodejs://types/robocode.d.ts. Explain the root cause, then fix ` +
+              `robocodejs://reference/error-codes, or read_doc with id ` +
+              `docs/error-codes if your client can't read MCP resources). ` +
+              `Cross-reference the API at robocodejs://docs/dev and the ` +
+              `signatures at robocodejs://types/robocode.d.ts (or read_doc with ` +
+              `ids docs/dev and types/robocode.d.ts). Explain the root cause, then fix ` +
               `it with set_app_source and reboot_app, and confirm via recent_logs. ` +
               `Validate fixes with check_app_source before deploying.`,
           },
