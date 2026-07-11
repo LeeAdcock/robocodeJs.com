@@ -62,3 +62,23 @@ describe('UserService.create — starter arena bootstrap', () => {
     expect(resume).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('UserService.touchActivity', () => {
+  it('issues a throttled lastActiveAt update and reports whether a row was written', async () => {
+    query.mockResolvedValue({ rows: [], rowCount: 1 } as never);
+    const wrote = await userService.touchActivity('u1');
+    expect(wrote).toBe(true);
+    const [{ text, values }] = query.mock.calls.at(-1) as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('UPDATE account SET lastActiveAt=CURRENT_TIMESTAMP');
+    // The SQL self-throttles so a busy request stream can't hammer the row.
+    expect(text).toContain('interval');
+    expect(values).toEqual(['u1']);
+  });
+
+  it('reports false when the throttle window suppresses the write (no row updated)', async () => {
+    query.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    expect(await userService.touchActivity('u1')).toBe(false);
+  });
+});

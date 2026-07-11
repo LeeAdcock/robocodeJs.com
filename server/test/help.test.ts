@@ -46,28 +46,32 @@ describe('GET /api/ask', () => {
   });
 
   it('classifies event questions to the events section', async () => {
-    expect(await ask('what events are there?')).toBe('/dev#events-overview');
+    expect(await ask('what events are there?')).toBe(
+      '/learn/docs#events-overview'
+    );
   });
 
   it('classifies broadened synonyms to the right section', async () => {
-    expect(await ask('shoot')).toBe('/dev#turret');
-    expect(await ask('radar')).toBe('/dev#radar');
-    expect(await ask('timer')).toBe('/dev#clock');
-    expect(await ask('drive')).toBe('/dev#bot');
+    expect(await ask('shoot')).toBe('/learn/docs#turret');
+    expect(await ask('radar')).toBe('/learn/docs#radar');
+    expect(await ask('timer')).toBe('/learn/docs#clock');
+    expect(await ask('drive')).toBe('/learn/docs#bot');
   });
 
   it('routes common natural-language searches sensibly', async () => {
-    expect(await ask('how do I fire the turret?')).toBe('/dev#turret');
-    expect(await ask('how do I scan for enemies?')).toBe('/dev#radar');
-    expect(await ask('how do I set an interval?')).toBe('/dev#clock');
+    expect(await ask('how do I fire the turret?')).toBe('/learn/docs#turret');
+    expect(await ask('how do I scan for enemies?')).toBe('/learn/docs#radar');
+    expect(await ask('how do I set an interval?')).toBe('/learn/docs#clock');
     expect(await ask('how do I get the distance to an enemy?')).toBe(
-      '/dev#arena'
+      '/learn/docs#arena'
     );
     expect(await ask('my bot stopped working')).toBe('/error-codes');
   });
 
   it('routes a console/logs search (docs when signed out)', async () => {
-    expect(await ask('where does console.log go?')).toBe('/dev#consolelogging');
+    expect(await ask('where does console.log go?')).toBe(
+      '/learn/docs#consolelogging'
+    );
   });
 
   it('routes AI / MCP searches to the MCP guide', async () => {
@@ -96,6 +100,6 @@ describe('GET /api/ask', () => {
 
   it('still prefers a specific topic over the generic learn route', async () => {
     // "learn to fire" names a topic (fire) — that should win over /learn.
-    expect(await ask('I want to learn to fire')).toBe('/dev#turret');
+    expect(await ask('I want to learn to fire')).toBe('/learn/docs#turret');
   });
 });

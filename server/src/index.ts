@@ -12,6 +12,7 @@ import { logger, LogEvent } from './util/logger';
 import { collectMetrics } from './util/metrics';
 import pool from './util/db';
 import environmentService from './services/EnvironmentService';
+import ladderService from './services/LadderService';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
@@ -22,6 +23,7 @@ import appEndpoints from './api/app';
 import arenaEndpoints from './api/arena';
 import helpEndpoints from './api/help';
 import demoEndpoints from './api/demo';
+import leaderboardEndpoints from './api/leaderboard';
 
 const app = express();
 
@@ -77,6 +79,7 @@ app.use('/api/user', auth(true));
 app.use('/api/app', auth(true));
 
 app.use(healthEndpoints);
+app.use(leaderboardEndpoints);
 app.use(sessionEndpoints);
 // OAuth 2.1 authorization-server endpoints (/.well-known/*, /authorize, /token,
 // /register, /revoke) live at the app root — must be mounted before the SPA
@@ -156,6 +159,14 @@ if (process.env.NODE_ENV !== 'test' && metricsIntervalMs > 0) {
   metricsTimer.unref();
 }
 
+// Global bot ladder (GitHub #151): a background loop that continuously runs
+// ranked matches between eligible apps and adjusts their Elo. Opt-in via
+// LADDER_ENABLED (off by default, never under test) because it is real,
+// continuous isolate compute — see the LADDER_* knobs in LadderService.
+if (process.env.NODE_ENV !== 'test' && process.env.LADDER_ENABLED === 'true') {
+  ladderService.start();
+}
+
 // Graceful shutdown: on a deploy/restart signal, stop accepting new connections,
 // dispose every live isolate (releasing native isolated-vm memory) and close the
 // pg pool, so a redeploy doesn't leak native resources. This matters on the small
@@ -179,6 +190,9 @@ const shutdown = (signal: NodeJS.Signals) => {
     process.exit(1);
   }, 10000);
   failsafe.unref();
+
+  // Stop scheduling new ranked matches before tearing down isolates.
+  ladderService.stop();
 
   server.close(async () => {
     try {

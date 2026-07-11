@@ -191,6 +191,13 @@ export default class Environment {
   };
 
   isRunning = () => this.running;
+  // True while the async tick loop is still alive. pause() only flips `running`
+  // off; the loop finishes its in-flight tick (bot handlers on the isolate
+  // thread pool) before exiting and clearing this. A caller that disposes the
+  // isolates right after pausing (e.g. the ephemeral ladder match) must wait for
+  // this to go false first, or dispose() races an in-flight apply → an "Isolate
+  // was disposed during execution" bot.fault.
+  isLooping = () => this.looping;
   getTime = () => this.clock.time;
   getProcesses = () => this.processes;
   getAvgTickMs = () => this.avgTickMs;

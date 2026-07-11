@@ -107,7 +107,7 @@ copies to the arena (the **[+]** button) and watching them fight.
 
 ## Where to go next
 
-- The [full reference docs](/dev) — every method and event in one place.
+- The [full reference docs](/learn/docs) — every method and event in one place.
 - The [example bots](/examples) — nine complete strategies to read, run, and remix.
 
 Congratulations — you went from "what is code?" to programming a team of battling robots.

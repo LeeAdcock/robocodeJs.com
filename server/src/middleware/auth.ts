@@ -150,6 +150,10 @@ export default (required: boolean) =>
         await authService.create(user.getId(), 'google', payload.sub);
       }
       (req as AuthenticatedRequest).user = user;
+      // Record activity for ladder eligibility (GitHub #151). Fire-and-forget
+      // and throttled in SQL (~1/hour per user) so it never adds latency to, or
+      // fails, an authenticated request.
+      void userService.touchActivity(user.getId()).catch(() => undefined);
       return next();
     } catch (err: unknown) {
       logger.error(

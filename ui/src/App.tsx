@@ -1,6 +1,11 @@
 import './App.css';
 import ArenaSvg from './components/arena/arena';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+} from 'react-router-dom';
 import type App from './types/app';
 import Arena from './types/arena';
 import NavBar from './components/navbar';
@@ -44,6 +49,9 @@ const AppPage = lazy(() => import('./page/app/appPage'));
 const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
 const AddAppPage = lazy(() => import('./page/arena/addAppPage'));
 const SamplePage = lazy(() => import('./page/sample/samplePage'));
+const LeaderboardPage = lazy(
+  () => import('./page/leaderboard/leaderboardPage')
+);
 const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -468,7 +476,24 @@ function App() {
                     />
                   }
                 />
-                <Route path="/dev" element={<MarkdownPage path="dev" />} />
+                <Route
+                  path="/learn/docs"
+                  element={<MarkdownPage path="dev" />}
+                />
+                {/* Old docs URL — redirect to the new one, preserving any
+                    #section hash so existing deep links keep working. */}
+                <Route
+                  path="/dev"
+                  element={
+                    <Navigate
+                      to={{
+                        pathname: '/learn/docs',
+                        hash: window.location.hash,
+                      }}
+                      replace
+                    />
+                  }
+                />
                 <Route path="/rules" element={<MarkdownPage path="rules" />} />
                 <Route
                   path="/error-codes"
@@ -480,6 +505,18 @@ function App() {
                 />
                 <Route path="/learn" element={<MarkdownPage path="learn" />} />
                 <Route path="/learn/:slug" element={<LessonPage />} />
+                {/* Global bot ladder — public, linked from the main nav. The
+                    signed-in user's own bots are bolded (client-side). */}
+                <Route
+                  path="/leaderboard"
+                  element={
+                    <LeaderboardPage
+                      ownAppIds={
+                        new Set((user?.apps ?? []).map((a: App) => a.id))
+                      }
+                    />
+                  }
+                />
                 <Route path="/about" element={<MarkdownPage path="about" />} />
                 {/* MCP setup guide, linked from the homepage getting-started list. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />

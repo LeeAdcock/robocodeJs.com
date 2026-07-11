@@ -16,7 +16,9 @@ import cookieParser from 'cookie-parser';
 
 const logsAnswer = (req: Request): string => {
   const user = (req as unknown as AuthenticatedRequest).user;
-  return user ? `/user/${user.getId()}/arena/logs` : '/dev#consolelogging';
+  return user
+    ? `/user/${user.getId()}/arena/logs`
+    : '/learn/docs#consolelogging';
 };
 
 // Ordered by priority: the first category whose keywords appear (as whole words)
@@ -68,7 +70,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    // Aiming ahead of a mover -> the Leading lesson (no dedicated /dev anchor).
+    // Aiming ahead of a mover -> the Leading lesson (no dedicated /learn/docs anchor).
     // Placed before the turret so "aim ahead" / "moving target" wins over "aim".
     answer: '/learn/leading',
     keywords: [
@@ -100,7 +102,7 @@ const KEYWORD_ROUTES: {
   },
   {
     // Team play & messaging -> the Teamwork lesson (send/receive has no clean
-    // /dev anchor; the lesson is the better resource).
+    // /learn/docs anchor; the lesson is the better resource).
     answer: '/learn/teamwork',
     keywords: [
       'teamwork',
@@ -132,7 +134,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    answer: '/dev#turret',
+    answer: '/learn/docs#turret',
     keywords: [
       'fire',
       'fired',
@@ -152,7 +154,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    answer: '/dev#radar',
+    answer: '/learn/docs#radar',
     keywords: [
       'radar',
       'scan',
@@ -165,7 +167,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    answer: '/dev#clock',
+    answer: '/learn/docs#clock',
     keywords: [
       'timer',
       'timers',
@@ -181,7 +183,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    answer: '/dev#events-overview',
+    answer: '/learn/docs#events-overview',
     keywords: [
       'event',
       'events',
@@ -197,7 +199,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    answer: '/dev#bot',
+    answer: '/learn/docs#bot',
     keywords: [
       'move',
       'moving',
@@ -218,7 +220,7 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    answer: '/dev#arena',
+    answer: '/learn/docs#arena',
     keywords: [
       'arena',
       'marker',
@@ -390,12 +392,12 @@ classifier.train(mcp, 'mcp');
 classifier.train(about, 'about');
 
 const CLASSIFIER_ANSWERS: Record<string, string> = {
-  arena: '/dev#arena',
-  clock: '/dev#clock',
-  bot: '/dev#bot',
-  radar: '/dev#radar',
-  turret: '/dev#turret',
-  events: '/dev#events-overview',
+  arena: '/learn/docs#arena',
+  clock: '/learn/docs#clock',
+  bot: '/learn/docs#bot',
+  radar: '/learn/docs#radar',
+  turret: '/learn/docs#turret',
+  events: '/learn/docs#events-overview',
   errors: '/error-codes',
   learn: '/learn',
   mcp: '/mcp',

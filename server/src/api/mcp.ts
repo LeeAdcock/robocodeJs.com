@@ -30,6 +30,7 @@ import {
 } from '../util/botActions';
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
+import { runMatchToDecision } from '../util/runMatch';
 import { logger, LogEvent } from '../util/logger';
 
 const app = express();
@@ -160,36 +161,9 @@ const ownedArena = async (
   return arenaService.getDefaultForUser(user.getId());
 };
 
-// Run one match in an arena to a decision (or a timeout) and return its match
-// summary. Optionally reseeds first, then runs unbounded ("as fast as the bots
-// can be driven"): it restarts the arena — re-firing every bot's START — and
-// resumes it (restart() alone silently leaves the arena PAUSED), polls until at
-// most one bot still has living bots (`match.decided`) or the arena stops (all
-// dead) or the wall-clock timeout elapses, then pauses and restores the arena's
-// prior speed. Shared by the run_match and run_tournament tools.
-const DEFAULT_MATCH_TIMEOUT_MS = 60000;
-const runMatchToDecision = async (
-  env: Awaited<ReturnType<typeof environmentService.get>>,
-  members: Awaited<ReturnType<typeof arenaMemberService.getForArena>>,
-  opts: { seed?: number; timeoutMs?: number } = {}
-): Promise<Awaited<ReturnType<typeof buildMatchSummary>>> => {
-  if (opts.seed !== undefined) env.setSeed(opts.seed);
-  const priorSpeed = env.getSpeed();
-  env.setSpeed(0); // unbounded — decide the match as quickly as possible
-  await env.restart();
-  env.resume(); // restart() does not resume
-
-  const deadline = Date.now() + (opts.timeoutMs ?? DEFAULT_MATCH_TIMEOUT_MS);
-  let summary = await buildMatchSummary(env, members);
-  while (!summary.match.decided && env.isRunning() && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    summary = await buildMatchSummary(env, members);
-  }
-
-  env.pause();
-  env.setSpeed(priorSpeed);
-  return buildMatchSummary(env, members);
-};
+// The run_match / run_tournament tools drive a match with the shared
+// runMatchToDecision helper (util/runMatch.ts), which the global ladder uses too
+// so both decide a match identically.
 
 // Build a fresh MCP server bound to one authenticated user. All tools act on
 // that user's own resources only, so there is no cross-user addressing (and no
@@ -207,13 +181,37 @@ export const buildServer = (user: User): McpServer => {
     'list_apps',
     {
       title: 'List apps',
-      description: "List the authenticated user's apps (id and name).",
+      description:
+        "List the authenticated user's apps (id, name, and global-ladder rating).",
       inputSchema: {},
       annotations: READ_ONLY,
     },
     async () => {
       const apps = await appService.getForUser(user.getId());
-      return ok(apps.map((a) => ({ id: a.getId(), name: a.getName() })));
+      return ok(
+        apps.map((a) => ({
+          id: a.getId(),
+          name: a.getName(),
+          rating: a.getRating(),
+          ratingGames: a.getRatingGames(),
+        }))
+      );
+    }
+  );
+
+  server.registerTool(
+    'leaderboard',
+    {
+      title: 'Global leaderboard',
+      description:
+        'The global bot ladder: the top-rated bots across all users by Elo ' +
+        '(bot name, owner, rating, games, win rate). Not user-scoped — public ' +
+        'ranking data, no source.',
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      return ok(await appService.getLeaderboard(20));
     }
   );
 

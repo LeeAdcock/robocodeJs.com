@@ -109,20 +109,28 @@ export default function NavBar(props: NavBarProps) {
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav>
             <Navbar.Text>
-              <Link to="/" className="nav-link" style={{ padding: '0px' }}>
-                Home
-              </Link>
-            </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
-            <Navbar.Text>
               <Link to="/learn" className="nav-link" style={{ padding: '0px' }}>
                 Learn
               </Link>
             </Navbar.Text>
             <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
             <Navbar.Text>
-              <Link to="/dev" className="nav-link" style={{ padding: '0px' }}>
+              <Link
+                to="/learn/docs"
+                className="nav-link"
+                style={{ padding: '0px' }}
+              >
                 Docs
+              </Link>
+            </Navbar.Text>
+            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text>
+              <Link
+                to="/leaderboard"
+                className="nav-link"
+                style={{ padding: '0px' }}
+              >
+                Rankings
               </Link>
             </Navbar.Text>
             <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
