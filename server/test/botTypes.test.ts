@@ -7,7 +7,7 @@ vi.mock('../src/util/db', () => ({
   default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
 }));
 
-import Bot, { waitUntil } from '../src/types/bot';
+import Bot, { waitUntil, MAX_SENDS_PER_TICK } from '../src/types/bot';
 import Environment, { DEPLOY_TICKS } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { normalizeAngle } from '../src/util/geometry';
@@ -200,6 +200,36 @@ describe('Bot', () => {
     const msg = { secret: 8, x: 1, y: 2 };
     bot.send(msg);
     expect(received).toHaveBeenCalledWith(msg, { distance: 50 });
+  });
+
+  it('send() enforces a per-tick budget and resets it when the clock advances', () => {
+    const { bot, env, setTime } = makeRealBot();
+    const received = vi.fn();
+    const other = {
+      id: 'other',
+      health: 100,
+      x: 100,
+      y: 200,
+      stats: { messagesReceived: 0 },
+      handlers: { [Event.RECEIVED]: received },
+    };
+    env.getProcesses = () => [{ bots: [bot, other] }];
+
+    // Well past the cap, all in one tick (clock stays at 0).
+    for (let i = 0; i < MAX_SENDS_PER_TICK + 10; i++) bot.send(i);
+
+    // Only the budgeted sends are delivered / counted; the rest are dropped.
+    expect(received).toHaveBeenCalledTimes(MAX_SENDS_PER_TICK);
+    expect(bot.stats.messagesSent).toBe(MAX_SENDS_PER_TICK);
+    // The author is warned exactly once for the window, not per dropped send.
+    expect(bot.logger.warn).toHaveBeenCalledTimes(1);
+
+    // Advancing the sim clock opens a fresh budget window.
+    setTime(1);
+    bot.send(999);
+    expect(received).toHaveBeenCalledTimes(MAX_SENDS_PER_TICK + 1);
+    expect(received).toHaveBeenLastCalledWith(999, { distance: 100 });
+    expect(bot.stats.messagesSent).toBe(MAX_SENDS_PER_TICK + 1);
   });
 
   it('getHealth() returns health on a 0–100 scale', () => {
