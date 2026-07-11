@@ -84,7 +84,7 @@ An arena's **roster** is its `ArenaMember` rows. A member can be **enabled or di
 
 ### Security & resource limits
 
-Untrusted code + shared multi-user arenas make **access control, sandbox integrity, and resource exhaustion** the primary concerns. Hardening in place: `helmet` + CSP (`middleware/securityHeaders.ts`), rate limiting (`middleware/rateLimit.ts` — auth/compute/write/api limiters, `429` + error `E022`), RDS TLS **CA verification** (`db.ts` `sslConfig`), and resource caps — per-tank timers (`MAX_TIMERS_PER_TANK`, `E021`), per-user apps (`MAX_APPS_PER_USER`) and arenas (`MAX_ARENAS_PER_USER`) plus a global `MAX_TOTAL_ARENAS` ceiling, and the 8 MB isolate limit. A full OWASP Top 10 audit was completed and **all medium-and-above findings are remediated**; `TASKS.md`/`ENHANCEMENTS.md` are the engineering + product backlogs.
+Untrusted code + shared multi-user arenas make **access control, sandbox integrity, and resource exhaustion** the primary concerns. Hardening in place: `helmet` + CSP (`middleware/securityHeaders.ts`), rate limiting (`middleware/rateLimit.ts` — auth/compute/write/api limiters, `429` + error `E022`), RDS TLS **CA verification** (`db.ts` `sslConfig`), and resource caps — per-tank timers (`MAX_TIMERS_PER_TANK`, `E021`), per-user apps (`MAX_APPS_PER_USER`) and arenas (`MAX_ARENAS_PER_USER`) plus a global `MAX_TOTAL_ARENAS` ceiling, and the 8 MB isolate limit. A full OWASP Top 10 audit was completed and **all medium-and-above findings are remediated**; the engineering + product backlog is tracked in **GitHub Issues** (labels `tech-debt`, `enhancement`, `ai-mcp`).
 
 **Accepted / deferred security risks** (all low severity, decided deliberately — don't "fix" without cause):
 
@@ -92,7 +92,7 @@ Untrusted code + shared multi-user arenas make **access control, sandbox integri
 - **Markdown rendering relies on CSP, not a sanitizer.** `showdown` → `html-react-parser` (`ui/src/.../markdownPage.tsx`) is unsanitized, but input is only our own static `/docs/*.md`, `html-react-parser` makes injected scripts inert, and the CSP is a backstop. Escalation path if untrusted markdown is ever rendered: add `DOMPurify.sanitize` before `parse()` (noted at the render site).
 - **`showdown` ReDoS** (GHSA-rmmh-p597-ppvv, no fix available): accepted for the same reason — trusted static input only.
 - **Token entropy uses `randomUUID()`.** OAuth codes/access/refresh tokens are ~122-bit UUIDv4, stored only as sha256 hashes (`services/OAuthService.ts` via `util/hash.ts`). Adequate; `crypto.randomBytes(32)` would be the purist upgrade.
-- **Lazy DDL startup robustness.** `CREATE TABLE IF NOT EXISTS` promises fire at import time without `await`/`.catch` (e.g. `AppService.ts`) — a startup race, not a vuln. Would be tidied by the DB-migrations task (`TASKS.md`).
+- **Lazy DDL startup robustness.** `CREATE TABLE IF NOT EXISTS` promises fire at import time without `await`/`.catch` (e.g. `AppService.ts`) — a startup race, not a vuln. Would be tidied by the DB-migrations task (GitHub issue #142).
 - **`isolated-vm` ⇄ Node major coupling** (6.x needs Node ≥22; 7.x needs ≥26): move both majors together on any runtime bump.
 
 ### Services & types
