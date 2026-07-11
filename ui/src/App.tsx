@@ -54,6 +54,7 @@ interface NavProps {
   arena: Arena;
   isPaused: boolean;
   doCreateApp: () => void;
+  doLogout: () => void;
 }
 const Nav = (props: NavProps) => {
   const navigate = useNavigate();
@@ -68,6 +69,7 @@ const Nav = (props: NavProps) => {
       doResume={() => axios.post(`/api/user/${props.user.id}/arena/resume`)}
       doRestart={() => axios.post(`/api/user/${props.user.id}/arena/restart`)}
       doRefresh={() => props.doCreateApp()}
+      doLogout={props.doLogout}
       doCreateApp={() => {
         axios.post(`/api/user/${props.user.id}/app`).then((res) => {
           const appId = res.data.appId;
@@ -417,6 +419,18 @@ function App() {
               axios
                 .get(`/api/user/${user.id}`)
                 .then((res) => setUser(res.data));
+            }}
+            doLogout={() => {
+              // Stop Google from silently re-signing the user back in on the
+              // next auth poll (see the session-expiry effect below).
+              if (typeof google !== 'undefined' && google.accounts?.id) {
+                google.accounts.id.disableAutoSelect();
+              }
+              // Clear the server-side HttpOnly session cookie, then drop the
+              // client user so the UI returns to the signed-out state.
+              axios
+                .delete(`/api/session`)
+                .finally(() => setUser(null as unknown as User));
             }}
           />
 

@@ -12,6 +12,7 @@ import {
   FaPlayCircle,
   FaSun,
   FaMoon,
+  FaSignOutAlt,
 } from 'react-icons/fa';
 import { colors } from '../util/colors';
 import { useDarkMode, toggleDarkMode } from '../util/theme';
@@ -72,6 +73,9 @@ interface NavBarProps {
   // Refresh the parent's user after roster changes (so the Apps list reflects a
   // newly created bot). Optional so existing callers/tests need no change.
   doRefresh?: () => void;
+  // Sign the user out (clears the server session cookie). Optional so existing
+  // callers/tests need no change.
+  doLogout?: () => void;
 }
 
 export default function NavBar(props: NavBarProps) {
@@ -235,21 +239,30 @@ export default function NavBar(props: NavBarProps) {
         <Navbar.Collapse className="justify-content-end">
           <Nav>
             {props.user && (
-              <Nav.Link>
-                <OverlayTrigger
-                  placement={'bottom'}
-                  overlay={<Tooltip id={`user`}>{props.user?.name}</Tooltip>}
-                >
+              <NavDropdown
+                align="end"
+                id="user-nav-dropdown"
+                style={{ marginRight: '5px' }}
+                title={
                   <img
                     src={props.user?.picture}
+                    alt={props.user?.name}
                     style={{
                       borderRadius: '24px',
                       height: '24px',
                       width: '24px',
+                      border: '1px solid gold',
+                      boxSizing: 'border-box',
                     }}
                   />
-                </OverlayTrigger>
-              </Nav.Link>
+                }
+              >
+                <NavDropdown.Header>{props.user?.name}</NavDropdown.Header>
+                <NavDropdown.Divider />
+                <NavDropdown.Item onClick={() => props.doLogout?.()}>
+                  <FaSignOutAlt /> Sign out
+                </NavDropdown.Item>
+              </NavDropdown>
             )}
             {!props.user && <div id="GoogleLoginButton"></div>}
           </Nav>
