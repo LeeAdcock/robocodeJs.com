@@ -13,7 +13,6 @@ import { logger, LogEvent } from '../util/logger';
 import { mulberry32 } from '../util/random';
 import { computeSpawns } from '../util/placement';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ArenaId = string & {};
 
 // A structured record of a bot fault (a crash), captured for prominent surfacing.

@@ -27,8 +27,8 @@
     "preview": "vite preview --port 3000",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src --fix ; prettier --write src test",
-    "lint:eslint": "eslint -c .eslintrc --resolve-plugins-relative-to . --ignore-path .eslintignore --ext .js,.ts,.tsx src --fix"
+    "lint": "eslint src --fix ; prettier --write src test",
+    "lint:eslint": "eslint src --fix"
   },
   "browserslist": {
     "production": [
@@ -43,6 +43,7 @@
     ]
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -50,15 +51,14 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/showdown": "^2.0.6",
-    "@typescript-eslint/eslint-plugin": "^8.63.0",
-    "@typescript-eslint/parser": "^8.62.0",
     "@vitejs/plugin-react": "^6.0.3",
-    "eslint": "^8.57.1",
-    "eslint-plugin-react": "^7.37.5",
+    "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.5.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.9.4",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.63.0",
     "vite": "^8.1.3",
     "vitest": "^4.1.10"
   }

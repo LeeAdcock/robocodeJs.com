@@ -1,6 +1,5 @@
 import { UserId } from './user';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type ArenaId = string & {};
 
 export default class Arena {

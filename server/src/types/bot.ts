@@ -87,7 +87,7 @@ export default class Bot implements Point, Orientated {
     this.env = env;
     this.process = process;
 
-    let overallClosestBot: number | null = null;
+    let overallClosestBot: number | null;
     do {
       this.x = 16 + (env.getArena().getWidth() - 32) * env.random();
       this.y = 16 + (env.getArena().getHeight() - 32) * env.random();
