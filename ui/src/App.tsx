@@ -509,6 +509,12 @@ function App() {
                     signed-in user's own bots are bolded; the server marks them
                     by including the real appId only on the viewer's own rows. */}
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
+                {/* Explainer for the global rankings/ladder. Distinct from
+                    /leaderboard (the live board) so it doesn't collide. */}
+                <Route
+                  path="/rankings"
+                  element={<MarkdownPage path="rankings" />}
+                />
                 <Route path="/about" element={<MarkdownPage path="about" />} />
                 {/* MCP setup guide, linked from the homepage getting-started list. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
