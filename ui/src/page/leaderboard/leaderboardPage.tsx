@@ -20,6 +20,13 @@ const tankSrc = (appId: string): string => {
   return `/sprites/tank_${colors[h % colors.length]}.png`;
 };
 
+// Podium markers for the top three (shown in the far-left column). 1st gets a
+// trophy, 2nd/3rd the silver/bronze medals.
+const medal = (rank: number): string =>
+  rank === 1 ? '🏆' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+const placeLabel = (rank: number): string | undefined =>
+  ({ 1: 'First place', 2: 'Second place', 3: 'Third place' })[rank];
+
 const cell: React.CSSProperties = {
   padding: '6px 12px',
   borderBottom: '1px solid var(--rule)',
@@ -106,13 +113,13 @@ export default function LeaderboardPage({
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead>
               <tr>
+                {/* podium column (medal) for the top three, far left */}
+                <th style={numCell} aria-hidden="true"></th>
                 <th style={numCell}>#</th>
                 <th style={cell}>Bot</th>
                 <th style={cell}>Owner</th>
                 <th style={numCell}>Rating</th>
                 <th style={numCell}>Win%</th>
-                {/* trophy column for the #1 bot */}
-                <th style={numCell} aria-hidden="true"></th>
               </tr>
             </thead>
             <tbody>
@@ -124,7 +131,10 @@ export default function LeaderboardPage({
                 const n = top3 ? goldCell(numCell) : numCell;
                 return (
                   <tr key={e.appId} style={{ fontWeight: isOwn ? 700 : 400 }}>
-                    <td style={first}>{e.rank}</td>
+                    <td style={first} aria-label={placeLabel(e.rank)}>
+                      {medal(e.rank)}
+                    </td>
+                    <td style={n}>{e.rank}</td>
                     <td style={c}>
                       <img
                         src={tankSrc(e.appId)}
@@ -140,12 +150,6 @@ export default function LeaderboardPage({
                     <td style={{ ...c, color: '#888' }}>{e.ownerName}</td>
                     <td style={n}>{e.rating}</td>
                     <td style={n}>{Math.round(e.winRate * 100)}%</td>
-                    <td
-                      style={n}
-                      aria-label={e.rank === 1 ? 'First place' : undefined}
-                    >
-                      {e.rank === 1 ? '🏆' : ''}
-                    </td>
                   </tr>
                 );
               })}
