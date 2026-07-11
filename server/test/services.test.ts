@@ -147,6 +147,7 @@ describe('AppService', () => {
       rows: [
         {
           appId: 'a1',
+          ownerUserId: 'u1',
           name: 'Bot1',
           ownerName: 'Lee Adcock',
           rating: 1712.4,
@@ -155,6 +156,7 @@ describe('AppService', () => {
         },
         {
           appId: 'a2',
+          ownerUserId: 'u2',
           name: 'Bot2',
           ownerName: 'Dana',
           rating: 1655,
@@ -173,12 +175,52 @@ describe('AppService', () => {
       winRate: 0.75,
     });
     expect(board[1]).toMatchObject({ rank: 2, winRate: 0.5 });
-    // Demo bots are excluded from the rankings.
+    // Demo bots excluded; a wider scan than the display size is fetched so the
+    // per-owner cap can drop rows and still fill the board.
     const [{ text, values }] = query.mock.calls[0] as [
       { text: string; values: unknown[] },
     ];
     expect(text).toContain('app.userId <> $2');
-    expect(values).toEqual([20, DEMO_USER_ID]);
+    expect(values).toEqual([500, DEMO_USER_ID]);
+  });
+
+  it('getLeaderboard() caps each owner at 3 bots and re-ranks', async () => {
+    // u1 fields 5 top bots; u2 fields 2. Rows arrive in rating order.
+    const rows = [
+      ...[1800, 1790, 1780, 1770, 1760].map((r, k) => ({
+        appId: `u1-${k}`,
+        ownerUserId: 'u1',
+        name: `A${k}`,
+        ownerName: 'One',
+        rating: r,
+        ratingGames: 10,
+        ratingWins: 5,
+      })),
+      ...[1700, 1690].map((r, k) => ({
+        appId: `u2-${k}`,
+        ownerUserId: 'u2',
+        name: `B${k}`,
+        ownerName: 'Two',
+        rating: r,
+        ratingGames: 10,
+        ratingWins: 5,
+      })),
+    ];
+    query.mockResolvedValue({ rows, rowCount: rows.length } as never);
+
+    const board = await appService.getLeaderboard(20);
+    // 3 of u1's + both of u2's = 5, and u1's 4th/5th are dropped.
+    expect(board).toHaveLength(5);
+    expect(board.filter((e) => e.appId.startsWith('u1-'))).toHaveLength(3);
+    expect(board.map((e) => e.appId)).toEqual([
+      'u1-0',
+      'u1-1',
+      'u1-2',
+      'u2-0',
+      'u2-1',
+    ]);
+    // Ranks are contiguous over the *displayed* rows, not the raw query order.
+    expect(board.map((e) => e.rank)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('getLeaderboard() falls back to Anonymous for a profane owner name', async () => {

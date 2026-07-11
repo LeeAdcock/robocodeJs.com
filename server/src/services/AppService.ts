@@ -100,10 +100,19 @@ export class AppService {
   // played a ranked game appear (ratingGames > 0), so never-played 1500 defaults
   // and untouched starters don't clutter the board; broken/deleted apps are
   // excluded. Public — exposes only name/owner/rating/record, never source.
+  //
+  // Each owner is capped at MAX_APPS_PER_OWNER_ON_BOARD rows so one prolific
+  // player can't fill the board. The cap is applied in JS (portable — no window
+  // function needed) over a wider scan than we display: LEADERBOARD_SCAN_LIMIT.
+  // That ceiling is provably sufficient — with MAX_APPS_PER_USER (20) and a
+  // 3-per-owner cap, filling a 20-row board scans well under it — so it never
+  // truncates the visible board in practice.
   getLeaderboard = (limit = 20): Promise<LeaderboardEntry[]> => {
+    const MAX_APPS_PER_OWNER_ON_BOARD = 3;
+    const LEADERBOARD_SCAN_LIMIT = 500;
     return pool
       .query({
-        text: `SELECT app.id as "appId", app.name as "name", account.name as "ownerName",
+        text: `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
                       app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
                FROM app JOIN account ON account.id = app.userId
                WHERE NOT app.deleted
@@ -112,10 +121,19 @@ export class AppService {
                  AND app.userId <> $2
                ORDER BY app.rating DESC, app.ratingGames DESC
                LIMIT $1`,
-        values: [limit, DEMO_USER_ID],
+        values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
       })
-      .then((res) =>
-        res.rows.map((row, i) => {
+      .then((res) => {
+        const perOwner = new Map<string, number>();
+        const entries: LeaderboardEntry[] = [];
+        for (const row of res.rows) {
+          if (entries.length >= limit) break;
+          const ownerId = row.ownerUserId as string;
+          const count = perOwner.get(ownerId) ?? 0;
+          // Skip an owner's 4th+ bot so a single player can't dominate.
+          if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
+          perOwner.set(ownerId, count + 1);
+
           const games = (row.ratingGames as number | null) ?? 0;
           const wins = (row.ratingWins as number | null) ?? 0;
           // The owner name comes from Google (account.name); apply the same
@@ -123,8 +141,8 @@ export class AppService {
           // reject a sign-in, so a profane owner name falls back to Anonymous
           // (their real name is untouched elsewhere, e.g. their own avatar).
           const owner = sanitizeBotName(row.ownerName as string | null);
-          return {
-            rank: i + 1,
+          entries.push({
+            rank: entries.length + 1,
             appId: row.appId as AppId,
             name: (row.name as string | null) ?? 'Unnamed',
             // Abbreviate to "First L." so the public endpoint never exposes a
@@ -136,9 +154,10 @@ export class AppService {
             games,
             wins,
             winRate: games > 0 ? wins / games : 0,
-          };
-        })
-      );
+          });
+        }
+        return entries;
+      });
   };
 
   // Lightweight rows for global-ladder matchmaking (GitHub #151): every app
