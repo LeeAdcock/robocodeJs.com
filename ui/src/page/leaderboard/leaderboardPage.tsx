@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import LeaderboardEntry from '../../types/leaderboardEntry';
 
@@ -78,6 +79,9 @@ export default function LeaderboardPage() {
           the winner's rating goes up and the loser's goes down (an upset win
           counts for more). A bot's rating follows its current code, so
           improving it climbs the board — and neglecting it drifts back down.
+        </p>
+        <p>
+          <Link to="/rankings">How rankings work →</Link>
         </p>
       </div>
 
