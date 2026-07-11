@@ -43,6 +43,7 @@ const CADENCE_EVENTS = new Set([
 const AppPage = lazy(() => import('./page/app/appPage'));
 const ArenaLogPage = lazy(() => import('./page/arena/arenaLogsPage'));
 const AddAppPage = lazy(() => import('./page/arena/addAppPage'));
+const SamplePage = lazy(() => import('./page/sample/samplePage'));
 const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -436,6 +437,22 @@ function App() {
                 <Route
                   path="/examples"
                   element={<MarkdownPage path="examples" />}
+                />
+                {/* Read-only, in-app viewer for an example bot with a
+                    clone-into-your-arena action. Linked from examples.md. */}
+                <Route
+                  path="/samples/:name"
+                  element={
+                    <SamplePage
+                      user={user}
+                      onCloned={() =>
+                        user &&
+                        axios
+                          .get(`/api/user/${user.id}`)
+                          .then((res) => setUser(res.data))
+                      }
+                    />
+                  }
                 />
                 <Route path="/dev" element={<MarkdownPage path="dev" />} />
                 <Route path="/rules" element={<MarkdownPage path="rules" />} />

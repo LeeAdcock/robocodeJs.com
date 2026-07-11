@@ -10,12 +10,11 @@ import parse, {
 } from 'html-react-parser';
 import { Link, useLocation } from 'react-router-dom';
 
-// Open sample-source and external links in a new tab so following one doesn't
-// navigate away from the app; in-app doc links (e.g. /dev) are left alone.
+// Open external and type-definition links in a new tab so following one doesn't
+// navigate away from the app; in-app doc links (e.g. /dev, /samples/:name) are
+// left alone so they route in place.
 const opensInNewTab = (href: string) =>
-  /^https?:\/\//.test(href) ||
-  href.startsWith('/samples/') ||
-  href.startsWith('/ts/');
+  /^https?:\/\//.test(href) || href.startsWith('/ts/');
 
 const parseOptions: HTMLReactParserOptions = {
   replace: (node) => {
