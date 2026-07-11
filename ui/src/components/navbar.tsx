@@ -259,7 +259,7 @@ export default function NavBar(props: NavBarProps) {
                       borderRadius: '24px',
                       height: '24px',
                       width: '24px',
-                      border: '1px solid gold',
+                      border: '3px solid gold',
                       boxSizing: 'border-box',
                     }}
                   />
