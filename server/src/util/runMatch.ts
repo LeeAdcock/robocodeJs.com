@@ -10,6 +10,12 @@ import { buildMatchSummary } from './matchSummary';
 // dead) or the wall-clock timeout elapses, then pauses and restores the arena's
 // prior speed.
 //
+// The pause + prior-speed restore run in a `finally`: run_tournament calls this
+// once per seed on the caller's LIVE arena, so if restart() or buildMatchSummary
+// throws mid-match, the arena must not be left running at the unbounded speed we
+// set (a CPU-pinning state on the small prod box) — it has to be returned to its
+// prior speed and paused regardless of how this exits.
+//
 // Shared by the MCP run_match / run_tournament tools (api/mcp.ts) and the global
 // ladder (services/LadderService.ts) so the two drive a match identically.
 export const DEFAULT_MATCH_TIMEOUT_MS = 60000;
@@ -22,17 +28,23 @@ export const runMatchToDecision = async (
   if (opts.seed !== undefined) env.setSeed(opts.seed);
   const priorSpeed = env.getSpeed();
   env.setSpeed(0); // unbounded — decide the match as quickly as possible
-  await env.restart();
-  env.resume(); // restart() does not resume
+  try {
+    await env.restart();
+    env.resume(); // restart() does not resume
 
-  const deadline = Date.now() + (opts.timeoutMs ?? DEFAULT_MATCH_TIMEOUT_MS);
-  let summary = await buildMatchSummary(env, members);
-  while (!summary.match.decided && env.isRunning() && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    summary = await buildMatchSummary(env, members);
+    const deadline = Date.now() + (opts.timeoutMs ?? DEFAULT_MATCH_TIMEOUT_MS);
+    let summary = await buildMatchSummary(env, members);
+    while (!summary.match.decided && env.isRunning() && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      summary = await buildMatchSummary(env, members);
+    }
+
+    env.pause();
+    return await buildMatchSummary(env, members);
+  } finally {
+    // Always leave the arena paused at its prior speed, even if the match threw
+    // — otherwise a failed match strands the live arena at unbounded speed.
+    env.pause();
+    env.setSpeed(priorSpeed);
   }
-
-  env.pause();
-  env.setSpeed(priorSpeed);
-  return buildMatchSummary(env, members);
 };
