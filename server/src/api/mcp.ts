@@ -31,6 +31,8 @@ import {
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
 import { runMatchToDecision } from '../util/runMatch';
+import { sanitizeBotName } from '../util/botName';
+import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
 
 const app = express();
@@ -256,6 +258,14 @@ export const buildServer = (user: User): McpServer => {
       annotations: WRITE,
     },
     async ({ name, source }) => {
+      // Reject an inappropriate name up front, before creating anything, so no
+      // orphan app is left behind. App.setName is the authoritative gate; this
+      // just turns its rejection into a clear tool error.
+      if (name && isNameProfane(sanitizeBotName(name))) {
+        return fail(
+          'That name was rejected: it appears to contain inappropriate language.'
+        );
+      }
       const app = await appService.create(user.getId());
       if (name) await app.setName(name);
       if (source) await app.setSource(source);
