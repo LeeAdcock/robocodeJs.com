@@ -8,7 +8,7 @@ import axios from 'axios';
 import MarkdownPage from '../src/page/markdownPage';
 
 const md = [
-  '[sample](/samples/lighthouse.js)',
+  '[sample](/samples/lighthouse)',
   '[external](https://example.com/x)',
   '[types](/ts/robocode.d.ts)',
   '[internal](/dev)',
@@ -30,7 +30,7 @@ describe('MarkdownPage', () => {
     expect(axios.get).toHaveBeenCalledWith('/docs/examples.md');
   });
 
-  it('opens sample-source and external links in a new tab, but not in-app links', async () => {
+  it('opens external and type-def links in a new tab, but routes in-app links (incl. samples) in place', async () => {
     render(
       <MemoryRouter>
         <MarkdownPage path="examples" />
@@ -42,10 +42,12 @@ describe('MarkdownPage', () => {
     const types = screen.getByText('types');
     const internal = screen.getByText('internal');
 
-    expect(sample.getAttribute('target')).toBe('_blank');
-    expect(sample.getAttribute('rel')).toContain('noopener');
     expect(external.getAttribute('target')).toBe('_blank');
+    expect(external.getAttribute('rel')).toContain('noopener');
     expect(types.getAttribute('target')).toBe('_blank');
+    // Sample links now open the in-app viewer (router <Link>), not a raw file.
+    expect(sample.getAttribute('target')).toBeNull();
+    expect(sample.getAttribute('href')).toBe('/samples/lighthouse');
     expect(internal.getAttribute('target')).toBeNull();
   });
 
