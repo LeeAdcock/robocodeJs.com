@@ -1,8 +1,9 @@
-import { UserId } from '../types/user';
+import { UserId, DEMO_USER_ID } from '../types/user';
 import App, { AppId } from '../types/app';
 import pool from '../util/db';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_RATING } from '../util/elo';
+import { abbreviateName } from '../util/displayName';
 
 // A single app eligible for global-ladder matchmaking, with just the fields the
 // selector needs (see AppService.getLadderCandidates).
@@ -106,9 +107,10 @@ export class AppService {
                WHERE NOT app.deleted
                  AND NOT COALESCE(app.broken, false)
                  AND COALESCE(app.ratingGames, 0) > 0
+                 AND app.userId <> $2
                ORDER BY app.rating DESC, app.ratingGames DESC
                LIMIT $1`,
-        values: [limit],
+        values: [limit, DEMO_USER_ID],
       })
       .then((res) =>
         res.rows.map((row, i) => {
@@ -118,7 +120,9 @@ export class AppService {
             rank: i + 1,
             appId: row.appId as AppId,
             name: (row.name as string | null) ?? 'Unnamed',
-            ownerName: (row.ownerName as string | null) ?? 'Anonymous',
+            // Abbreviate to "First L." so the public endpoint never exposes a
+            // full surname.
+            ownerName: abbreviateName(row.ownerName as string | null),
             rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
             games,
             wins,
@@ -135,6 +139,7 @@ export class AppService {
   //   - edited within the last 3 months (updatedTimestamp)
   //   - owner active within the last 3 months (account.lastActiveAt, falling
   //     back to createdTimestamp so pre-tracking accounts get a grace period)
+  //   - not owned by the demo user (its bots aren't real competitors)
   // Untouched starter bots are filtered out by the caller (source comparison),
   // which SQL can't do cleanly. Returns `source` so that filter can run.
   getLadderCandidates = (): Promise<LadderCandidate[]> => {
@@ -146,7 +151,9 @@ export class AppService {
                  AND NOT COALESCE(app.broken, false)
                  AND COALESCE(app.source, '') <> ''
                  AND app.updatedTimestamp >= CURRENT_TIMESTAMP - interval '3 months'
-                 AND COALESCE(account.lastActiveAt, account.createdTimestamp) >= CURRENT_TIMESTAMP - interval '3 months'`,
+                 AND COALESCE(account.lastActiveAt, account.createdTimestamp) >= CURRENT_TIMESTAMP - interval '3 months'
+                 AND app.userId <> $1`,
+        values: [DEMO_USER_ID],
       })
       .then((res) =>
         res.rows.map((row) => ({

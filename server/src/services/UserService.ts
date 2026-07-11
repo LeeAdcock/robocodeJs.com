@@ -1,4 +1,4 @@
-import User, { UserId } from '../types/user';
+import User, { UserId, DEMO_USER_ID } from '../types/user';
 import { randomUUID } from 'node:crypto';
 import arenaService from './ArenaService';
 import pool from '../util/db';
@@ -31,7 +31,7 @@ Promise.resolve(
 ).catch(() => undefined);
 
 class UserService {
-  static demoUserId: UserId = 'c8c62d4b-37bc-45af-a86a-0e9d654aef13';
+  static demoUserId: UserId = DEMO_USER_ID;
 
   create = (
     name: string | undefined,

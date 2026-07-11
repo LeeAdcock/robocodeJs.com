@@ -20,7 +20,7 @@ to see how a bot comes together, step by step.
   needed.
 - **Coming from classic Robocode?** Read **[Coming from classic Robocode](/classic)** for
   a quick map of what's the same, what's different, and how to port your instincts.
-- **Want the details?** Keep the **[API reference](/dev)** and **[game rules &
+- **Want the details?** Keep the **[API reference](/learn/docs)** and **[game rules &
   physics](/rules)** handy, and browse the **[example bots](/examples)**.
 - **Want an AI to help?** Connect Claude (or any MCP client) to write, run, and watch
   your bots for you — see **[Connect an AI (MCP)](/mcp)**.
@@ -30,7 +30,7 @@ to see how a bot comes together, step by step.
 This quick walkthrough shows the key steps to building a bot — naming it, firing its
 turret, and getting it moving — so you can see how the pieces fit together. Prefer to
 start by reading instead? Take the guided **[Learn to Code course](/learn)** or dive into
-the full **[documentation](/dev)**.
+the full **[documentation](/learn/docs)**.
 
 Everything you control hangs off the `bot` object. **Name your bot:**
 
@@ -68,7 +68,7 @@ Save in the editor and every bot on your team picks up the new logic instantly. 
 
 That's the gist — a bot that drives, fires, and turns. It won't dominate the arena yet, but you've seen how the pieces fit together.
 
-Ready to build your own? Take the guided **[Learn to Code course](/learn)** for the full step-by-step path, skim the detailed **[RobocodeJs documentation](/dev)**, study a few **[example bots](/examples)**, or [deepen your knowledge](https://learnjavascript.online/) of JavaScript itself.
+Ready to build your own? Take the guided **[Learn to Code course](/learn)** for the full step-by-step path, skim the detailed **[RobocodeJs documentation](/learn/docs)**, study a few **[example bots](/examples)**, or [deepen your knowledge](https://learnjavascript.online/) of JavaScript itself.
 
 ---
 

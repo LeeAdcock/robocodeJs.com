@@ -8,6 +8,7 @@ import pool from '../src/util/db';
 import appService from '../src/services/AppService';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
+import { DEMO_USER_ID } from '../src/types/user';
 
 const query = vi.mocked(pool.query);
 
@@ -147,7 +148,7 @@ describe('AppService', () => {
         {
           appId: 'a1',
           name: 'Bot1',
-          ownerName: 'Lee',
+          ownerName: 'Lee Adcock',
           rating: 1712.4,
           ratingGames: 40,
           ratingWins: 30,
@@ -167,11 +168,39 @@ describe('AppService', () => {
     expect(board[0]).toMatchObject({
       rank: 1,
       appId: 'a1',
-      ownerName: 'Lee',
+      ownerName: 'Lee A.', // abbreviated server-side for privacy
       rating: 1712,
       winRate: 0.75,
     });
     expect(board[1]).toMatchObject({ rank: 2, winRate: 0.5 });
+    // Demo bots are excluded from the rankings.
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('app.userId <> $2');
+    expect(values).toEqual([20, DEMO_USER_ID]);
+  });
+
+  it('getLadderCandidates() excludes the demo user and maps eligible rows', async () => {
+    query.mockResolvedValue({
+      rows: [
+        {
+          appId: 'a1',
+          userId: 'u1',
+          rating: 1600,
+          ratingGames: 8,
+          source: '// bot',
+        },
+      ],
+      rowCount: 1,
+    } as never);
+    const candidates = await appService.getLadderCandidates();
+    expect(candidates[0]).toMatchObject({ appId: 'a1', rating: 1600 });
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('app.userId <> $1');
+    expect(values).toEqual([DEMO_USER_ID]);
   });
 
   it('setSource() clears the broken flag', async () => {

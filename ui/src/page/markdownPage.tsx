@@ -11,8 +11,8 @@ import parse, {
 import { Link, useLocation } from 'react-router-dom';
 
 // Open external and type-definition links in a new tab so following one doesn't
-// navigate away from the app; in-app doc links (e.g. /dev, /samples/:name) are
-// left alone so they route in place.
+// navigate away from the app; in-app doc links (e.g. /learn/docs, /samples/:name)
+// are left alone so they route in place.
 const opensInNewTab = (href: string) =>
   /^https?:\/\//.test(href) || href.startsWith('/ts/');
 
@@ -35,7 +35,7 @@ const parseOptions: HTMLReactParserOptions = {
           </a>
         );
       }
-      // In-app routes (e.g. /dev, /learn/aim, /dev#movement): navigate with the
+      // In-app routes (e.g. /learn/docs, /learn/aim, /learn/docs#movement): navigate with the
       // router so the page content swaps in place instead of a full reload.
       if (href.startsWith('/')) {
         return <Link to={href}>{domToReact(el.children as DOMNode[])}</Link>;

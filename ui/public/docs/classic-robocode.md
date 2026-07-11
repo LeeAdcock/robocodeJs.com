@@ -88,6 +88,6 @@ clock.on(Event.TICK, async () => {
 - The [example bots](/examples) are your "sample robots" — read `firstbot` first.
 - The [game rules & physics](/rules) page has the exact speeds, turn rates, reload times,
   and damage values.
-- The full [API reference](/dev) lists every method and event.
+- The full [API reference](/learn/docs) lists every method and event.
 - Newer to JS than to Robocode? The [Learn course](/learn) ramps quickly and you can skip
   the parts you already know.

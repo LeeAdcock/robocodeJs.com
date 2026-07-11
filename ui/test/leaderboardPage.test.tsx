@@ -49,6 +49,22 @@ describe('LeaderboardPage', () => {
     expect(screen.getByText('1712')).toBeTruthy();
     expect(screen.getByText('75%')).toBeTruthy(); // winRate rounded
     expect(screen.getByText('Skirmisher')).toBeTruthy();
+    // A little tank sprite renders next to each bot.
+    const imgs = document.querySelectorAll('img[src^="/sprites/tank_"]');
+    expect(imgs.length).toBe(2);
+  });
+
+  it('bolds rows for bots the viewer owns and leaves others normal', async () => {
+    vi.mocked(axios.get).mockResolvedValue({ data: rows } as never);
+    render(
+      <MemoryRouter>
+        <LeaderboardPage ownAppIds={new Set(['a1'])} />
+      </MemoryRouter>
+    );
+    const ownRow = (await screen.findByText('Overlord')).closest('tr')!;
+    const otherRow = screen.getByText('Skirmisher').closest('tr')!;
+    expect(ownRow.style.fontWeight).toBe('700');
+    expect(otherRow.style.fontWeight).toBe('400');
   });
 
   it('shows an empty-state message when there are no ranked bots', async () => {
