@@ -15,8 +15,6 @@ back here to see the ideas combined.
 
 - **[Chronometer](/samples/chronometer)** _(beginner)_ — Demonstrates one-shot and repeating timers (`setInterval` / `setTimeout`) driven by the game clock.
 
-## Movement & navigation
-
 - **[Pathfinder](/samples/pathfinder)** _(intermediate)_ — Navigates continuously between a set of precomputed waypoints, using trig to steer toward each point.
 
 ## Combat
