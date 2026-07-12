@@ -45,6 +45,9 @@ interface BotProps {
   x: number;
   y: number;
   radarOn: boolean;
+  // Drives the damage-pulse glow: when it changes the glow restarts (see below).
+  lastDamagedAt?: number;
+  lastDamageAmount?: number;
 }
 
 interface BotTurretProps {
@@ -147,6 +150,34 @@ const BotSvg = React.memo((props: BotProps) => {
               props.onOpen(props.appId, props.botIndex + 1, e.shiftKey);
           }}
         >
+          {/* Damage pulse (behind the tank). Keyed on lastDamagedAt so each new
+              hit remounts the circle and restarts its CSS fade; --glow-peak
+              scales the flash with how hard the hit was. */}
+          {props.health > 0 && props.lastDamagedAt !== undefined && (
+            <g
+              style={{ transition: 'all 200ms linear' }}
+              transform={translate(props.x, props.y)}
+            >
+              <circle
+                key={props.lastDamagedAt}
+                className="bot-damage-glow"
+                // The tank sprite (~16px radius) sits on top and hides the glow's
+                // core, so the radius reaches well past it to leave a visible halo.
+                r={32}
+                fill="url(#damageGlow)"
+                style={
+                  {
+                    // Peak opacity scales with the hit; a bullet (25 dmg) maxes
+                    // out, a collision graze (~3) still shows clearly.
+                    '--glow-peak': Math.min(
+                      1,
+                      0.55 + (props.lastDamageAmount ?? 0) / 30
+                    ),
+                  } as React.CSSProperties
+                }
+              />
+            </g>
+          )}
           <image
             href={'/sprites/tankBody_' + colors[props.appIndex] + '.png'}
             height="32"

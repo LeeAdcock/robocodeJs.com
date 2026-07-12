@@ -27,6 +27,12 @@ export default interface Bot extends Point {
 
   health: number;
 
+  // Wall-clock time (performance.now(), ms) when this bot last took damage, and
+  // how much, so the arena can pulse a red glow that fades over ~1s. Cosmetic,
+  // UI-only — driven off `botDamaged` events in arenaReducer, not sim state.
+  lastDamagedAt?: number;
+  lastDamageAmount?: number;
+
   // Set when the bot crashed (a fatal fault), so the arena can show a warning
   // triangle over the bot; `faultCode` is the E0xx code for the tooltip.
   crashed?: boolean;
