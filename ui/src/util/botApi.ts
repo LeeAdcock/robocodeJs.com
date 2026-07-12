@@ -87,9 +87,9 @@ export const EVENTS: ApiEvent[] = [
   },
   {
     name: 'COLLIDED',
-    payload: '{ angle: number; friendly: boolean }',
+    payload: '{ angle: number; friendly?: boolean }',
     channel: 'bot',
-    doc: 'Fires when you collide with a wall or another bot (you stop). `angle` is relative to your heading (a wall ahead is 0); `friendly` is true for a teammate.',
+    doc: 'Fires when you collide with a wall or another bot (you stop). `angle` is the bearing to the thing you hit, relative to your heading (0 = dead ahead). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall.',
   },
   {
     name: 'FIRED',

@@ -122,8 +122,8 @@ interface Bot {
   on(event: 'DETECTED', handler: () => void | Promise<unknown>): void;
   /** Fires when a bullet hits you. `angle` is the bearing the shot came from, relative to your heading. */
   on(event: 'HIT', handler: (event: { angle: number }) => void | Promise<unknown>): void;
-  /** Fires when you collide with a wall or another bot (you stop). `angle` is relative to your heading (a wall ahead is 0); `friendly` is true for a teammate. */
-  on(event: 'COLLIDED', handler: (event: { angle: number; friendly: boolean }) => void | Promise<unknown>): void;
+  /** Fires when you collide with a wall or another bot (you stop). `angle` is the bearing to the thing you hit, relative to your heading (0 = dead ahead). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall. */
+  on(event: 'COLLIDED', handler: (event: { angle: number; friendly?: boolean }) => void | Promise<unknown>): void;
   /** Fires when your turret fires a shot. */
   on(event: 'FIRED', handler: () => void | Promise<unknown>): void;
   /** Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. */

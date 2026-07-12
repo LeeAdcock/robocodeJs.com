@@ -135,10 +135,13 @@ describe('Simulation.run — rotation', () => {
 describe('Simulation.run — collisions', () => {
   it('stops the bot and applies damage at the arena boundary', () => {
     const collided = vi.fn();
+    // Against the west wall, facing south (orientation 0): the wall is 90° off
+    // the heading. COLLIDED omits `friendly` for a wall (it isn't a bot).
     const bot = makeBot({ x: 10, handlers: { [Event.COLLIDED]: collided } });
     const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
-    expect(collided).toHaveBeenCalledWith({ angle: 0 });
+    expect(collided).toHaveBeenCalledWith({ angle: 90 });
+    expect(collided.mock.calls[0][0]).not.toHaveProperty('friendly');
     expect(bot.health).toBe(99);
     expect(bot.speed).toBe(0);
     expect(bot.x).toBe(10); // movement not applied on collision
@@ -146,6 +149,32 @@ describe('Simulation.run — collisions', () => {
       'event',
       expect.objectContaining({ type: 'botStop' })
     );
+  });
+
+  it('reports a head-on wall (dead ahead) as bearing 0', () => {
+    const collided = vi.fn();
+    // Driving south (orientation 0, +y) into the south wall — hit straight on.
+    const bot = makeBot({
+      y: 740,
+      speed: 10,
+      speedTarget: 10,
+      handlers: { [Event.COLLIDED]: collided },
+    });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(collided).toHaveBeenCalledWith({ angle: 0 });
+  });
+
+  it('reports a corner wall as a diagonal bearing', () => {
+    const collided = vi.fn();
+    // Lodged in the south-east corner, facing south (orientation 0): the corner
+    // sits between dead-ahead (south) and the west-of-heading east wall.
+    const bot = makeBot({
+      x: 745,
+      y: 745,
+      handlers: { [Event.COLLIDED]: collided },
+    });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(collided).toHaveBeenCalledWith({ angle: 315 });
   });
 
   it('fires COLLIDED on two bots that overlap, flagging friendly teams', () => {
