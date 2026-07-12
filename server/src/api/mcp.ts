@@ -126,19 +126,6 @@ const fail = (message: string): ToolResult => ({
   isError: true,
 });
 
-// The MCP surface refers to an app's live instances as "bots", never "bots", so
-// rename the internal log/fault `botId`/`botIndex` fields to `botId`/`botIndex`
-// on the way out. (The internal records + SSE stream + UI keep the bot* names.)
-const botify = <T extends object>(entry: T) => {
-  if (!('botId' in entry) && !('botIndex' in entry)) return entry;
-  const { botId, botIndex, ...rest } = entry as Record<string, unknown>;
-  return {
-    ...rest,
-    ...(botId !== undefined ? { botId: botId } : {}),
-    ...(botIndex !== undefined ? { botIndex: botIndex } : {}),
-  };
-};
-
 // Behaviour hints so clients can gate/confirm actions (e.g. prompt before a
 // destructive tool, or run a read-only one freely). All tools act only on the
 // authenticated user's own resources, so none touch an "open world".
@@ -152,7 +139,7 @@ const IDEMPOTENT = { idempotentHint: true, openWorldHint: false } as const;
 const WRITE = { openWorldHint: false } as const;
 
 // Resolve an app that belongs to the authenticated user, or null. Stops a tool
-// from touching another user's bot (the MCP equivalent of requireOwner).
+// from touching another user's app (the MCP equivalent of requireOwner).
 const ownedApp = async (user: User, appId: string): Promise<App | null> => {
   const app = await appService.get(appId);
   return app && app.getUserId() === user.getId() ? app : null;
@@ -272,7 +259,7 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'List apps',
       description:
-        "List the authenticated user's apps (id, name, and global-ladder rating).",
+        "List the authenticated user's apps (appId, name, and global-ladder rating).",
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -280,7 +267,7 @@ export const buildServer = (user: User): McpServer => {
       const apps = await appService.getForUser(user.getId());
       return ok(
         apps.map((a) => ({
-          id: a.getId(),
+          appId: a.getId(),
           name: a.getName(),
           rating: a.getRating(),
           ratingGames: a.getRatingGames(),
@@ -311,18 +298,18 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Get app source',
       description: "Return an app's JavaScript source code.",
-      inputSchema: { appId: z.string().describe('The bot (app) id') },
+      inputSchema: { appId: z.string().describe('The app id') },
       annotations: READ_ONLY,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
-      if (!app) return fail('No such bot, or it is not yours.');
+      if (!app) return fail('No such app, or it is not yours.');
       const source = app.getSource();
-      // An empty string reads as ambiguous to a model (error? blank bot?). Be
-      // explicit that the bot simply has no source yet.
+      // An empty string reads as ambiguous to a model (error? blank app?). Be
+      // explicit that the app simply has no source yet.
       if (!source.trim()) {
         return ok(
-          `This bot ("${app.getName()}", ${appId}) has no source yet — it ` +
+          `This app ("${app.getName()}", ${appId}) has no source yet — it ` +
             'is empty. Add code with set_app_source.'
         );
       }
@@ -370,7 +357,7 @@ export const buildServer = (user: User): McpServer => {
         "Replace an app's source. Live arenas it's in pick up the change " +
         '(without re-firing START — use reboot_app for that).',
       inputSchema: {
-        appId: z.string().describe('The bot (app) id'),
+        appId: z.string().describe('The app id'),
         source: z.string().describe('New JavaScript source'),
       },
       outputSchema: { appId: z.string(), updated: z.boolean() },
@@ -378,7 +365,7 @@ export const buildServer = (user: User): McpServer => {
     },
     async ({ appId, source }) => {
       const app = await ownedApp(user, appId);
-      if (!app) return fail('No such bot, or it is not yours.');
+      if (!app) return fail('No such app, or it is not yours.');
       await propagateSource(app, source);
       return ok({ appId, updated: true });
     }
@@ -389,14 +376,16 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Compile app',
       description:
-        "Re-run an app's current source in each of your live arenas.",
-      inputSchema: { appId: z.string().describe('The bot (app) id') },
+        "Re-run an app's current saved source in each of your live arenas. Does " +
+        'NOT change the source (use set_app_source) and does NOT re-fire the ' +
+        'START handler (use reboot_app).',
+      inputSchema: { appId: z.string().describe('The app id') },
       outputSchema: { appId: z.string(), compiled: z.boolean() },
       annotations: WRITE,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
-      if (!app) return fail('No such bot, or it is not yours.');
+      if (!app) return fail('No such app, or it is not yours.');
       await executeInUserArenas(user.getId(), app.getId());
       return ok({ appId, compiled: true });
     }
@@ -407,13 +396,13 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Check app source',
       description:
-        'Dry-run compile a bot WITHOUT deploying it: loads the source in a ' +
+        'Dry-run compile app source WITHOUT deploying it: loads the source in a ' +
         'throwaway sandbox and reports any syntax or load error (with its error ' +
         'code — see the robocodejs://reference/error-codes resource). Pass ' +
         '`source` to check arbitrary code before creating an app, or `appId` to ' +
         'check a saved app. A clean result is `{ valid: true }`.',
       inputSchema: {
-        source: z.string().optional().describe('Bot source to check'),
+        source: z.string().optional().describe('App source to check'),
         appId: z
           .string()
           .optional()
@@ -433,7 +422,7 @@ export const buildServer = (user: User): McpServer => {
       if (code === undefined) {
         if (!appId) return fail('Provide `source` or `appId`.');
         const app = await ownedApp(user, appId);
-        if (!app) return fail('No such bot, or it is not yours.');
+        if (!app) return fail('No such app, or it is not yours.');
         code = app.getSource();
       }
       return ok(await compiler.check(code));
@@ -441,7 +430,7 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
-    'format_source',
+    'format_app_source',
     {
       title: 'Format app source',
       description:
@@ -456,7 +445,7 @@ export const buildServer = (user: User): McpServer => {
         'validate with check_app_source. For the readability conventions to ' +
         'follow beyond formatting, read robocodejs://docs/code-style.',
       inputSchema: {
-        source: z.string().optional().describe('Bot source to format'),
+        source: z.string().optional().describe('App source to format'),
         appId: z
           .string()
           .optional()
@@ -475,7 +464,7 @@ export const buildServer = (user: User): McpServer => {
       if (code === undefined) {
         if (!appId) return fail('Provide `source` or `appId`.');
         const app = await ownedApp(user, appId);
-        if (!app) return fail('No such bot, or it is not yours.');
+        if (!app) return fail('No such app, or it is not yours.');
         code = app.getSource();
       }
       const result = await formatter.format(code);
@@ -495,13 +484,13 @@ export const buildServer = (user: User): McpServer => {
       title: 'Reboot app',
       description:
         'Reload an app and re-fire its START handler in each of your live arenas.',
-      inputSchema: { appId: z.string().describe('The bot (app) id') },
+      inputSchema: { appId: z.string().describe('The app id') },
       outputSchema: { appId: z.string(), rebooted: z.boolean() },
       annotations: WRITE,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
-      if (!app) return fail('No such bot, or it is not yours.');
+      if (!app) return fail('No such app, or it is not yours.');
       await rebootInUserArenas(user.getId(), app.getId());
       return ok({ appId, rebooted: true });
     }
@@ -512,13 +501,13 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Delete app',
       description: 'Remove an app from every arena and delete it.',
-      inputSchema: { appId: z.string().describe('The bot (app) id') },
+      inputSchema: { appId: z.string().describe('The app id') },
       outputSchema: { appId: z.string(), deleted: z.boolean() },
       annotations: DESTRUCTIVE,
     },
     async ({ appId }) => {
       const app = await ownedApp(user, appId);
-      if (!app) return fail('No such bot, or it is not yours.');
+      if (!app) return fail('No such app, or it is not yours.');
       await deleteAppEverywhere(app);
       return ok({ appId, deleted: true });
     }
@@ -530,13 +519,13 @@ export const buildServer = (user: User): McpServer => {
     'list_arenas',
     {
       title: 'List arenas',
-      description: "List the authenticated user's arenas (ids).",
+      description: "List the authenticated user's arenas (arenaIds).",
       inputSchema: {},
       annotations: READ_ONLY,
     },
     async () => {
       const arenas = await arenaService.getForUser(user.getId());
-      return ok(arenas.map((a) => ({ id: a.getId() })));
+      return ok(arenas.map((a) => ({ arenaId: a.getId() })));
     }
   );
 
@@ -546,7 +535,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Create arena',
       description: `Create a new arena (up to ${MAX_ARENAS_PER_USER} per user).`,
       inputSchema: {},
-      outputSchema: { id: z.string() },
+      outputSchema: { arenaId: z.string() },
       annotations: WRITE,
     },
     async () => {
@@ -555,7 +544,7 @@ export const buildServer = (user: User): McpServer => {
         return fail(`Arena limit reached (${MAX_ARENAS_PER_USER}).`);
       }
       const arena = await arenaService.create(user.getId());
-      return ok({ id: arena.getId() });
+      return ok({ arenaId: arena.getId() });
     }
   );
 
@@ -616,7 +605,7 @@ export const buildServer = (user: User): McpServer => {
         'total health), and elimination order. Complements arena_status (which is ' +
         'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
-        'decided when at most one bot still has living bots. Omit arenaId for ' +
+        'decided when at most one app still has living bots. Omit arenaId for ' +
         'your default arena.',
       inputSchema: {
         arenaId: z
@@ -673,7 +662,7 @@ export const buildServer = (user: User): McpServer => {
       title: 'Add app to arena',
       description: `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps). Omit arenaId for your default arena.`,
       inputSchema: {
-        appId: z.string().describe('The bot (app) id'),
+        appId: z.string().describe('The app id'),
         arenaId: z
           .string()
           .optional()
@@ -688,16 +677,19 @@ export const buildServer = (user: User): McpServer => {
     },
     async ({ appId, arenaId }) => {
       const botApp = await ownedApp(user, appId);
-      if (!botApp) return fail('No such bot, or it is not yours.');
+      if (!botApp) return fail('No such app, or it is not yours.');
       const arena = await ownedArena(user, arenaId);
       if (!arena) return fail('No such arena, or it is not yours.');
 
       const members = await arenaMemberService.getForArena(arena.getId());
+      // Total roster cap is MAX_APPS_PER_ARENA + 1: the guard permits adding
+      // while the current count is <= MAX_APPS_PER_ARENA, so the last add lands
+      // the (MAX_APPS_PER_ARENA + 1)-th app. Mirrors the REST cap in api/arena.ts.
       if (members.length > MAX_APPS_PER_ARENA) {
         return fail('Arena is full.');
       }
       if (members.some((m) => m.getAppId() === appId)) {
-        return fail('Bot is already in this arena.');
+        return fail('App is already in this arena.');
       }
       const env = await environmentService.get(arena);
       env.addApp(botApp);
@@ -713,7 +705,7 @@ export const buildServer = (user: User): McpServer => {
       description:
         'Remove an app from an arena. Omit arenaId for your default arena.',
       inputSchema: {
-        appId: z.string().describe('The bot (app) id'),
+        appId: z.string().describe('The app id'),
         arenaId: z
           .string()
           .optional()
@@ -731,7 +723,7 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena, or it is not yours.');
       const members = await arenaMemberService.getForArena(arena.getId());
       const member = members.find((m) => m.getAppId() === appId);
-      if (!member) return fail('Bot is not in this arena.');
+      if (!member) return fail('App is not in this arena.');
       (await environmentService.getByArenaId(arena.getId()))?.removeApp(appId);
       await member.delete();
       return ok({ appId, arenaId: arena.getId(), removed: true });
@@ -740,10 +732,14 @@ export const buildServer = (user: User): McpServer => {
 
   // ---- Arena run control ----
 
+  // `resultKey` names the per-action boolean the tool returns (e.g. `paused`),
+  // matching the verb-specific result convention the mutating app tools use
+  // (`updated`/`compiled`/`added`) rather than a generic `ok`.
   const control = (
     name: string,
     title: string,
     description: string,
+    resultKey: string,
     action: (
       env: Awaited<ReturnType<typeof environmentService.get>>
     ) => unknown,
@@ -760,7 +756,7 @@ export const buildServer = (user: User): McpServer => {
             .optional()
             .describe('Arena id; defaults to your default arena'),
         },
-        outputSchema: { arenaId: z.string(), ok: z.boolean() },
+        outputSchema: { arenaId: z.string(), [resultKey]: z.boolean() },
         annotations: { openWorldHint: false, ...annotations },
       },
       async ({ arenaId }) => {
@@ -768,7 +764,7 @@ export const buildServer = (user: User): McpServer => {
         if (!arena) return fail('No such arena, or it is not yours.');
         const env = await environmentService.get(arena);
         await action(env);
-        return ok({ arenaId: arena.getId(), ok: true });
+        return ok({ arenaId: arena.getId(), [resultKey]: true });
       }
     );
 
@@ -778,6 +774,7 @@ export const buildServer = (user: User): McpServer => {
     'pause_arena',
     'Pause arena',
     'Pause an arena’s simulation.',
+    'paused',
     (env) => env.pause(),
     { idempotentHint: true }
   );
@@ -785,6 +782,7 @@ export const buildServer = (user: User): McpServer => {
     'resume_arena',
     'Resume arena',
     'Resume a paused arena’s simulation.',
+    'resumed',
     (env) => env.resume(),
     { idempotentHint: true }
   );
@@ -810,7 +808,7 @@ export const buildServer = (user: User): McpServer => {
       },
       outputSchema: {
         arenaId: z.string(),
-        ok: z.boolean(),
+        restarted: z.boolean(),
         seed: z.number(),
       },
       annotations: { openWorldHint: false },
@@ -821,7 +819,11 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       await env.restart();
       env.resume();
-      return ok({ arenaId: arena.getId(), ok: true, seed: env.getSeed() });
+      return ok({
+        arenaId: arena.getId(),
+        restarted: true,
+        seed: env.getSeed(),
+      });
     }
   );
 
@@ -844,6 +846,12 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Arena id; defaults to your default arena'),
       },
+      outputSchema: {
+        arenaId: z.string(),
+        speed: z.number(),
+        tickMs: z.number(),
+      },
+      annotations: IDEMPOTENT,
     },
     async ({ speed, arenaId }) => {
       const arena = await ownedArena(user, arenaId);
@@ -875,6 +883,8 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Arena id; defaults to your default arena'),
       },
+      outputSchema: { arenaId: z.string(), seed: z.number() },
+      annotations: IDEMPOTENT,
     },
     async ({ seed, arenaId }) => {
       const arena = await ownedArena(user, arenaId);
@@ -895,9 +905,9 @@ export const buildServer = (user: User): McpServer => {
         'resume → poll-match_summary loop: it optionally sets `seed` for a ' +
         'reproducible match, restarts the arena (re-firing every bot’s START), ' +
         'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
-        'fast as possible until at most one bot still has living bots ' +
+        'fast as possible until at most one app still has living bots ' +
         '(match.decided), then pauses and returns the match_summary. Needs at ' +
-        'least two active bots. Omit arenaId for your default arena.',
+        'least two apps in the arena. Omit arenaId for your default arena.',
       inputSchema: {
         arenaId: z
           .string()
@@ -929,7 +939,7 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
       if (env.getProcesses().length < 2) {
-        return fail('A match needs at least two active bots in the arena.');
+        return fail('A match needs at least two apps in the arena.');
       }
       const startedAt = Date.now();
       let summary;
@@ -1013,7 +1023,7 @@ export const buildServer = (user: User): McpServer => {
           .enum(['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'])
           .optional()
           .describe('Only entries at this level or higher (e.g. ERROR)'),
-        appId: z.string().optional().describe('Only entries from this bot'),
+        appId: z.string().optional().describe('Only entries from this app'),
         botIndex: z
           .number()
           .int()
@@ -1058,7 +1068,7 @@ export const buildServer = (user: User): McpServer => {
         return true;
       });
       // Cap AFTER filtering so `limit` counts matching entries, not raw ones.
-      return ok((limit ? logs.slice(-limit) : logs).map(botify));
+      return ok(limit ? logs.slice(-limit) : logs);
     }
   );
 
@@ -1077,7 +1087,7 @@ export const buildServer = (user: User): McpServer => {
           .string()
           .optional()
           .describe('Arena id; defaults to your default arena'),
-        appId: z.string().optional().describe('Only faults from this bot'),
+        appId: z.string().optional().describe('Only faults from this app'),
         limit: z
           .number()
           .int()
@@ -1108,7 +1118,7 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena, or it is not yours.');
       const env = await environmentService.getByArenaId(arena.getId());
       return ok({
-        faults: env ? env.getRecentFaults(limit, appId).map(botify) : [],
+        faults: env ? env.getRecentFaults(limit, appId) : [],
       });
     }
   );
@@ -1136,13 +1146,13 @@ export const buildServer = (user: User): McpServer => {
       const entries: Array<{ id: string; kind: string; title: string }> = [
         ...listPublic('docs', '.md').map((file) => {
           const slug = file.replace(/\.md$/, '');
-          return { id: `docs/${slug}`, kind: 'doc', title: `Docs: ${slug}` };
+          return { id: `docs/${slug}`, kind: 'docs', title: `Docs: ${slug}` };
         }),
         ...listPublic('samples', '.js').map((file) => {
           const name = file.replace(/\.js$/, '');
           return {
             id: `samples/${name}`,
-            kind: 'sample',
+            kind: 'samples',
             title: `Sample bot: ${name}`,
           };
         }),
@@ -1355,12 +1365,12 @@ const registerPrompts = (server: McpServer): void => {
               `name the tuning constants, pull tricky math into named helpers, and ` +
               `comment the "why" — write it so a human can get up to speed fast. ` +
               `Then:\n` +
-              `1. format_source on your code, then create_app (descriptive name + ` +
+              `1. format_app_source on your code, then create_app (descriptive name + ` +
               `the formatted source).\n` +
               `2. add_app_to_arena${arenaId ? ` (arenaId ${arenaId})` : ''} and ` +
               `restart_arena.\n` +
               `3. Check arena_status and recent_logs; iterate with set_app_source ` +
-              `+ reboot_app until it behaves (run format_source before each save). ` +
+              `+ reboot_app until it behaves (run format_app_source before each save). ` +
               `Keep the code idiomatic to the docs and readable per docs/code-style.`,
           },
         },
@@ -1375,7 +1385,7 @@ const registerPrompts = (server: McpServer): void => {
       description:
         'Diagnose why a bot misbehaves or crashes and propose a fix.',
       argsSchema: {
-        appId: z.string().describe('The bot (app) id to debug'),
+        appId: z.string().describe('The app id to debug'),
         arenaId: z
           .string()
           .optional()
@@ -1409,9 +1419,9 @@ const registerPrompts = (server: McpServer): void => {
   );
 
   server.registerPrompt(
-    'run_match',
+    'play_match',
     {
-      title: 'Run a match',
+      title: 'Play a match',
       description: 'Set up and run a battle, then report the outcome.',
       argsSchema: {
         arenaId: z

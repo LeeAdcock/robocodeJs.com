@@ -58,7 +58,7 @@ vi.mock('../src/util/matchSummary', () => ({
 // Mock the compiler so check_app_source doesn't spin a real isolate in this suite
 // (the real dry-run behaviour is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
-// Mock the formatter so format_source doesn't load Prettier here; the MCP glue
+// Mock the formatter so format_app_source doesn't load Prettier here; the MCP glue
 // (arg handling, ownership, result shaping) is what's under test.
 vi.mock('../src/util/formatter', () => ({ default: { format: vi.fn() } }));
 
@@ -109,7 +109,7 @@ describe('mcp tools', () => {
     })) as never;
 
     expect(JSON.parse(textOf(res))).toEqual([
-      { id: 'a1', name: 'Bot', rating: 1500, ratingGames: 0 },
+      { appId: 'a1', name: 'Bot', rating: 1500, ratingGames: 0 },
     ]);
   });
 
@@ -304,7 +304,7 @@ describe('mcp tools', () => {
     expect(res.isError).toBe(true);
   });
 
-  it('format_source pretty-prints raw source', async () => {
+  it('format_app_source pretty-prints raw source', async () => {
     vi.mocked(formatter.format).mockResolvedValue({
       ok: true,
       formatted: 'const x = 1;\n',
@@ -312,7 +312,7 @@ describe('mcp tools', () => {
     } as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'format_source',
+      name: 'format_app_source',
       arguments: { source: 'const  x=1' },
     })) as never;
 
@@ -324,7 +324,7 @@ describe('mcp tools', () => {
     });
   });
 
-  it('format_source resolves a saved bot by appId and enforces ownership', async () => {
+  it('format_app_source resolves a saved bot by appId and enforces ownership', async () => {
     vi.mocked(formatter.format).mockResolvedValue({
       ok: true,
       formatted: 'CODE',
@@ -336,7 +336,7 @@ describe('mcp tools', () => {
     } as never);
     const client = await connect();
     await client.callTool({
-      name: 'format_source',
+      name: 'format_app_source',
       arguments: { appId: 'a1' },
     });
     expect(formatter.format).toHaveBeenCalledWith('SAVED');
@@ -348,31 +348,31 @@ describe('mcp tools', () => {
       getSource: () => 'SECRET',
     } as never);
     const res = (await client.callTool({
-      name: 'format_source',
+      name: 'format_app_source',
       arguments: { appId: 'a1' },
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
     expect(formatter.format).not.toHaveBeenCalled();
   });
 
-  it('format_source surfaces an unparseable source as a tool error', async () => {
+  it('format_app_source surfaces an unparseable source as a tool error', async () => {
     vi.mocked(formatter.format).mockResolvedValue({
       ok: false,
       message: 'Unexpected token (1:9)',
     } as never);
     const client = await connect();
     const res = (await client.callTool({
-      name: 'format_source',
+      name: 'format_app_source',
       arguments: { source: 'function ( {' },
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
     expect(textOf(res)).toContain('check_app_source');
   });
 
-  it('format_source requires source or appId', async () => {
+  it('format_app_source requires source or appId', async () => {
     const client = await connect();
     const res = (await client.callTool({
-      name: 'format_source',
+      name: 'format_app_source',
       arguments: {},
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
@@ -521,7 +521,7 @@ describe('mcp tools', () => {
     expect(env.restart).not.toHaveBeenCalled(); // never touched the live arena
   });
 
-  it('run_match requires at least two active bots', async () => {
+  it('run_match requires at least two apps', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([{}] as never);
@@ -599,7 +599,7 @@ describe('mcp tools', () => {
     })) as { structuredContent?: unknown };
 
     expect(getRecentFaults).toHaveBeenCalledWith(10, 'a1');
-    // recent_faults renames the internal botIndex field to botIndex on output.
+    // The fault records already carry botId/botIndex, so they pass through as-is.
     expect(res.structuredContent).toEqual({
       faults: [
         {
@@ -726,7 +726,7 @@ describe('mcp tools', () => {
     expect(byName['list_apps'].annotations?.readOnlyHint).toBe(true);
     expect(byName['arena_status'].annotations?.readOnlyHint).toBe(true);
     expect(byName['check_app_source'].annotations?.readOnlyHint).toBe(true);
-    expect(byName['format_source'].annotations?.readOnlyHint).toBe(true);
+    expect(byName['format_app_source'].annotations?.readOnlyHint).toBe(true);
     // Destructive tools are hinted so a client can confirm first.
     expect(byName['delete_app'].annotations?.destructiveHint).toBe(true);
     expect(byName['delete_arena'].annotations?.destructiveHint).toBe(true);
@@ -752,7 +752,7 @@ describe('mcp tools', () => {
 
     const prompts = await client.listPrompts();
     expect(prompts.prompts.map((p) => p.name)).toEqual(
-      expect.arrayContaining(['write_app', 'debug_app', 'run_match'])
+      expect.arrayContaining(['write_app', 'debug_app', 'play_match'])
     );
 
     const filled = await client.getPrompt({
@@ -856,7 +856,7 @@ describe('mcp completion logging (mcp.tool.result)', () => {
         event: LogEvent.MCP_TOOL_RESULT,
         tool: 'run_match',
         ok: false,
-        error: expect.stringContaining('at least two active bots'),
+        error: expect.stringContaining('at least two apps'),
       }),
       expect.any(String)
     );

@@ -52,10 +52,11 @@ Once connected, these tools are available (all scoped to your account):
 - `get_app_source` — read an app's source
 - `create_app` — create an app (optionally with a name and initial source)
 - `set_app_source` — replace an app's source (live arenas pick it up)
-- `compile_app` — re-run an app's current source in your live arenas
+- `compile_app` — re-run an app's current saved source in your live arenas (does
+  not change the source or re-fire `START` — use `set_app_source` / `reboot_app`)
 - `check_app_source` — dry-run compile source (pass `source`, or `appId` for a
   saved app) and report any syntax/load error with its code — without deploying it
-- `format_source` — pretty-print bot code in the house style (pass `source`, or
+- `format_app_source` — pretty-print bot code in the house style (pass `source`, or
   `appId` for a saved app); returns the formatted text without saving it
 - `reboot_app` — reload an app and re-fire its `START` handler
 - `delete_app` — remove an app from every arena and delete it

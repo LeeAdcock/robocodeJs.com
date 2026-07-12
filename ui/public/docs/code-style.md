@@ -150,7 +150,7 @@ Consistent formatting removes a whole category of distraction. RobocodeJs uses
 (the in-app editor and the pre-commit hook both apply it). You don't have to
 hand-format: run the code through the formatter and paste the result back.
 
-AI assistants over MCP can call the **`format_source`** tool to pretty-print a bot
+AI assistants over MCP can call the **`format_app_source`** tool to pretty-print a bot
 to exactly this style before saving it — do that as the last step before
 `set_app_source`, and use **`check_app_source`** to confirm it still compiles.
 
