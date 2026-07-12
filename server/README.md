@@ -23,7 +23,8 @@ npm test        # run the Vitest suite once (test/**/*.test.ts)
 npm run test:watch  # Vitest in watch mode
 npm run smoke   # exercise the isolated-vm API surface compiler.ts relies on
 npm run lint    # prettier --write + eslint --fix
-npm run package # version bump + shrinkwrap + zip the deploy artifact
+npm run release # version bump + shrinkwrap (normal release; deploy is tag-triggered)
+npm run bundle  # zip the deploy artifact (break-glass manual EB upload only)
 ```
 
 ## Environment variables

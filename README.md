@@ -152,18 +152,18 @@ The UI build outputs directly into `server/dist/public`, which the server serves
 
 Other root scripts: `npm test` and `npm run lint` run the respective task across both packages; `npm run install:all` installs all three.
 
-### Packaging a deployable zip
+### Cutting a release
 
-`npm run package` (from the **root**) produces the deployable artifact in one step:
+`npm run release` (from the **root**) prepares a release in one step:
 
 ```bash
 npm run install:all   # once, if dependencies aren't installed
-npm run package       # builds everything, then zips the server
+npm run release       # builds everything, bumps the version, refreshes the shrinkwrap
 ```
 
-It runs the full build (`npm run build` — UI into `server/dist/public`, server into `server/dist/src`) and then the server's packaging step, which bumps the patch version, refreshes `npm-shrinkwrap.json`, and writes `server/robocodejs-<version>.zip`.
+It runs the full build (`npm run build` — UI into `server/dist/public`, server into `server/dist/src`) as a type-check gate, then bumps the patch version and refreshes `npm-shrinkwrap.json`. Commit the bump (`server/package.json` + `server/npm-shrinkwrap.json`) and push it, then push a `vX.Y.Z` tag — **the tag is what deploys** (the CodePipeline `v*` tag trigger rebuilds from source and deploys to Elastic Beanstalk). Merging to `main` on its own does not deploy.
 
-The zip contains exactly what Elastic Beanstalk needs to run — `package.json`, the lockfile, the compiled server (`dist/src`), the built UI (`dist/public`), and `.ebextensions` — and **excludes** the TypeScript sources (`src/`), tests (`test/`), coverage, `node_modules` (reinstalled on deploy), and any prior zips. On the instance, EB runs `npm install` then `npm start` (`node ./dist/src/index.js`). This mirrors the AWS CodeBuild pipeline (`buildspec.yaml`) and is the supported way to build a deploy artifact by hand.
+Release **does not** build a zip: the pipeline rebuilds from source, so nothing consumes a local artifact. If you ever need to deploy by hand (e.g. the pipeline is down), `npm run bundle` (build + zip, no version bump) writes `server/robocodejs-<version>.zip` for a manual EB-console upload. The zip contains exactly what Elastic Beanstalk needs — `package.json`, the lockfile, the compiled server (`dist/src`), the built UI (`dist/public`), and `.ebextensions` — and **excludes** the TypeScript sources (`src/`), tests, coverage, `node_modules` (reinstalled on deploy), and any prior zips. It's git-ignored.
 
 ### Code style & the pre-commit hook
 
@@ -184,7 +184,7 @@ The app deploys via AWS CodeBuild (`buildspec.yaml`) to Elastic Beanstalk (confi
 1. `ui` is built into `server/dist/public` and `server` is compiled to `server/dist`.
 2. The server runs as the single artifact, serving both the API and the static UI from one process on port `8080`.
 
-The production runtime needs the same configuration as local dev — the `RDS_*` Postgres variables and `GOOGLE_CLIENT_ID` — plus `NODE_ENV=production`, which sets the `Secure` flag on the session cookie. The native `isolated-vm` module is compiled on deploy, so the instance needs `gcc`/`gcc-c++` (installed via `server/.ebextensions/options.config`). To build a versioned deploy zip by hand, run **`npm run package`** from the root — see [Packaging a deployable zip](#packaging-a-deployable-zip).
+The production runtime needs the same configuration as local dev — the `RDS_*` Postgres variables and `GOOGLE_CLIENT_ID` — plus `NODE_ENV=production`, which sets the `Secure` flag on the session cookie. The native `isolated-vm` module is compiled on deploy, so the instance needs `gcc`/`gcc-c++` (installed via `server/.ebextensions/options.config`). Deploys are **tag-triggered** — push a `vX.Y.Z` tag and CodePipeline rebuilds from source and deploys; see [Cutting a release](#cutting-a-release). For a manual break-glass zip, run **`npm run bundle`** from the root.
 
 ## License
 
