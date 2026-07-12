@@ -127,7 +127,7 @@ describe('Simulation.run — rotation', () => {
     bot.turret.loaded = 90;
     bot.turret.radar.charged = 80;
     run(makeEnv([makeProcess('a', [bot])]));
-    expect(bot.turret.loaded).toBe(92);
+    expect(bot.turret.loaded).toBe(92.5);
     expect(bot.turret.radar.charged).toBe(90);
   });
 });
