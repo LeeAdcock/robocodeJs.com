@@ -201,11 +201,12 @@ const BotSvg = React.memo((props: BotProps) => {
                 pointerEvents="none"
                 style={
                   {
-                    // Peak opacity scales with the hit; a bullet (25 dmg) maxes
-                    // out, a collision graze (~3) still shows clearly.
+                    // Peak opacity scales with the hit; a heavy bullet approaches
+                    // the cap, a collision graze (~3) still reads. Kept subtle so
+                    // the glow suggests damage rather than dominating the sprite.
                     '--glow-peak': Math.min(
-                      1,
-                      0.55 + (props.lastDamageAmount ?? 0) / 30
+                      0.75,
+                      0.4 + (props.lastDamageAmount ?? 0) / 40
                     ),
                     opacity: glowing ? 'var(--glow-peak)' : 0,
                     transition: `opacity ${
