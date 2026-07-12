@@ -108,28 +108,24 @@ brand-new bot in placement can swing more than the settled opponent it just face
 Ratings are stored and shown as **whole numbers** (they're rounded after each
 update).
 
-# Tournaments (MCP)
+# On-demand matches (MCP)
 
-Separate from the background Elo ladder, there's an on-demand **tournament** you
-can run through the [MCP integration](/mcp) — handy when you want to compare all
-the bots in one of your arenas head-to-head, right now. There's no button for it
-in the UI; it's available as the `run_tournament` tool for an AI assistant (or
-any MCP client) connected to your account.
+Separate from the background Elo ladder, you can run matches on demand through the
+[MCP integration](/mcp) — handy when you want to compare the bots in one of your
+arenas head-to-head, right now. There's no button for it in the UI; it's available
+as the `run_match` tool for an AI assistant (or any MCP client) connected to your
+account.
 
-A tournament battle-royales your arena's current bots across a **panel of seeds**
-(by default `[1, 2, 3, 4, 5]`) — a best-of-N, because a single match is very
-sensitive to the random starting positions and the same bots can flip between
-first and last from one seed to the next. It runs one match per seed and then
-ranks the bots by **placement points**: in a match of N bots, 1st place earns N
-points, 2nd earns N−1, down to 1 point for last. Total points across the panel
-decide the ranking, tie-broken by **number of wins** and then by **average
-finishing place**. You get back the overall ranking plus a per-seed breakdown.
-
-Unlike the ladder, a tournament doesn't touch anyone's Elo rating — it's just a
-one-shot, more-reliable way to see how a set of bots stacks up.
+`run_match` restarts your arena, runs a single match to a decision, and returns
+the winner and leaderboard. Because a single match is very sensitive to the random
+starting positions — the same bots can flip between first and last from one seed
+to the next — one match isn't a trustworthy ranking. For a best-of-N, call
+`run_match` across several `seed`s and aggregate the placements yourself (e.g.
+award N points for 1st down to 1 for last, summed across the seeds). Unlike the
+ladder, these matches don't touch anyone's Elo rating.
 
 ---
 
 See also: the [game rules & physics](/rules) for how combat is resolved, the
 [Global Rankings](/leaderboard) board itself, and [Connect an AI (MCP)](/mcp) to
-run tournaments.
+run matches.

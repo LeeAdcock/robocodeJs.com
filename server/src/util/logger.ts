@@ -37,7 +37,7 @@ export const LogEvent = {
   RATE_LIMITED: 'rate.limited', // request refused by a rate limiter (429/E022)
   MCP_TOOL: 'mcp.tool', // an MCP tool was invoked (audit trail; token = full control)
   MCP_TOOL_RESULT: 'mcp.tool.result', // an MCP tool finished (outcome + durationMs; diagnostics)
-  MCP_MATCH: 'mcp.match', // a run_match / run_tournament match decided (per-match outcome)
+  MCP_MATCH: 'mcp.match', // a run_match match decided (per-match outcome)
   HTTP_ERROR: 'http.error', // unhandled error -> 5xx
   DB_ERROR: 'db.error', // database/pool error
   PROCESS_FATAL: 'process.fatal', // uncaught exception / unhandled rejection
