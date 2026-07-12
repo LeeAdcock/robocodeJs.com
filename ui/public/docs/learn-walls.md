@@ -15,8 +15,8 @@ When your robot runs into a wall or another robot, it **stops** and an event fir
 This event hands our handler some information. It comes as an **object** — a bundle of
 labeled values. We read a value with a dot and its label:
 
-- `info.angle` — the direction the thing we hit is in (in compass degrees)
-- `info.friendly` — `true` if we bumped a teammate, `false` otherwise
+- `info.angle` — the direction the thing we hit is in, relative to your heading (`0` is straight ahead)
+- `info.friendly` — `true` for a teammate and `false` for an enemy. A **wall** isn't a robot, so it has no `friendly` at all (`undefined`) — which still counts as "not true"
 
 `true`/`false` values are called **booleans**, and they let us make **decisions** with
 `if` and `else`: "**if** this is true, do one thing, **else** do another."
@@ -69,8 +69,8 @@ Same idea: the dot reaches **into** something. `bot.turn` reaches into `bot` for
 action; `info.angle` reaches into `info` for a value.
 
 **Does COLLIDED fire for walls or only robots?**
-Both — any time you run into something. Use `info.friendly` to tell a teammate apart from
-a wall or enemy.
+Both — any time you run into something. `info.friendly` tells them apart: `true` is a
+teammate, `false` is an enemy, and a wall has no `friendly` at all (`undefined`).
 
 ## You learned
 

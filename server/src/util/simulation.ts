@@ -181,20 +181,32 @@ export default {
           );
 
           // Detect if we are at the edge of the arena
+          const arenaWidth = env.getArena().getWidth();
+          const arenaHeight = env.getArena().getHeight();
           if (
             newX < 16 ||
-            newX > env.getArena().getWidth() - 16 ||
+            newX > arenaWidth - 16 ||
             newY < 16 ||
-            newY > env.getArena().getHeight() - 16
+            newY > arenaHeight - 16
           ) {
             collided = true;
             bot.stats.timesCollided += 1;
             bot.logger.trace('Collided with arena boundary');
             if (bot.handlers[Event.COLLIDED]) {
+              // Point a unit vector at whichever boundary/boundaries we crossed
+              // (west/east on x, north/south on y — both on a corner), then report
+              // the bearing to that wall relative to our heading, exactly as a bot
+              // collision reports the bearing to the other bot. A head-on hit still
+              // yields 0 (dead ahead); a glancing or corner hit is now meaningful.
+              // `friendly` is intentionally omitted for a wall (undefined — the
+              // thing we hit isn't a bot, so it's neither a teammate nor an enemy).
+              const wallX = newX < 16 ? -1 : newX > arenaWidth - 16 ? 1 : 0;
+              const wallY = newY < 16 ? -1 : newY > arenaHeight - 16 ? 1 : 0;
+              const wallAngle = normalizeAngle(
+                Math.atan2(wallY, wallX) * (180 / Math.PI) - 90
+              );
               bot.handlers[Event.COLLIDED]({
-                // A wall is in the direction you drove into it — dead ahead (0)
-                // once expressed relative to your heading.
-                angle: 0,
+                angle: toRelativeBearing(wallAngle, bot.orientation),
               });
             }
           }
