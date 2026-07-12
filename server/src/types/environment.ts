@@ -576,10 +576,30 @@ export default class Environment {
     this.settlePendingCommands();
   }
 
-  restart(): Promise<void> {
+  async restart(): Promise<void> {
     this.emitter.emit('event', {
       type: 'arenaRestart',
     });
+
+    // Stop the tick loop and let the in-flight tick fully drain before rebuilding
+    // the bots. restart() disposes and reloads each bot's isolate asynchronously
+    // (compiler.execute → script.run on the isolate thread pool), and every bot's
+    // code loads at an independent time. If the loop kept ticking during that
+    // reload it would advance clock.time while those loads resolve, so bots would
+    // fire START one at a time on different, nonzero ticks instead of all together
+    // at 0 — the reported inconsistency when restarting a *running* arena (a
+    // restart on a paused arena froze the clock at 0 and looked fine, hence
+    // "sometimes 0, sometimes not"). Freezing the clock here makes every restart
+    // lay out and start identically. restart() leaves the arena paused; callers
+    // resume() (see api/arena.ts, mcp restart_arena, util/runMatch).
+    this.running = false;
+    // Wait for the current tick's drainBotWork to finish so no tick mutates
+    // clock.time after we reset it below. Bounded (like LadderService.waitForLoopExit)
+    // so a wedged loop can't hang a restart; each tick is itself bounded by the
+    // sandbox timeout.
+    for (let i = 0; i < 250 && this.looping; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
 
     // A new match begins now: reset the tick clock to 0. Otherwise it would run
     // monotonically across restarts, so a second match in an arena whose first
