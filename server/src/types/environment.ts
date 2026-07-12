@@ -139,6 +139,11 @@ export default class Environment {
   private emitter: EventEmitter = new EventEmitter();
   private running = false;
 
+  // Set while a driven match (runMatchToDecision) is claiming this live arena, so
+  // a second concurrent driver refuses instead of corrupting the in-flight match.
+  // See beginMatch()/endMatch() below.
+  private matchInFlight = false;
+
   // Simulation speed. `1` = the baseline 100 ms/tick (10 ticks/s). Higher values
   // run proportionally faster; `0` means "unbounded" — run each tick as soon as the
   // previous one's bot work has settled ("as fast as possible"). In-memory only;
@@ -197,6 +202,30 @@ export default class Environment {
 
   dispose = () => {
     this.processes.forEach((process) => process.dispose());
+  };
+
+  // --- Single-match driver guard ------------------------------------------
+  // runMatchToDecision (util/runMatch.ts, behind the MCP run_match tool) drives a
+  // match by mutating this live arena — setSeed / restart / resume / pause. Two
+  // such drivers on the same Environment at once stomp each other's restart and
+  // speed state, producing corrupt near-instant "matches" (observed when a slow
+  // run_match timed out client-side and the client retried while the first was
+  // still running). The matchInFlight flag serializes them: beginMatch()
+  // atomically claims the arena and endMatch() releases it. The check-and-set is
+  // synchronous, so it is race-free on the single-threaded event loop. Ephemeral
+  // ladder environments are single-use, so they never contend.
+
+  // Try to claim this arena for a driven match. Returns false if one is already
+  // running (the caller should refuse rather than corrupt the in-flight match).
+  beginMatch = (): boolean => {
+    if (this.matchInFlight) return false;
+    this.matchInFlight = true;
+    return true;
+  };
+
+  // Release the claim taken by beginMatch(). Safe to call unconditionally.
+  endMatch = () => {
+    this.matchInFlight = false;
   };
 
   isRunning = () => this.running;

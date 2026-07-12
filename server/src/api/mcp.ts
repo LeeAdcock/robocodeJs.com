@@ -31,7 +31,7 @@ import {
 } from '../util/botActions';
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
-import { runMatchToDecision } from '../util/runMatch';
+import { runMatchToDecision, ArenaBusyError } from '../util/runMatch';
 import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
@@ -171,16 +171,16 @@ const ownedArena = async (
   return arenaService.getDefaultForUser(user.getId());
 };
 
-// The run_match / run_tournament tools drive a match with the shared
-// runMatchToDecision helper (util/runMatch.ts), which the global ladder uses too
-// so both decide a match identically.
+// The run_match tool drives a match with the shared runMatchToDecision helper
+// (util/runMatch.ts), which the global ladder uses too so both decide a match
+// identically.
 
-// Log one decided (or timed-out) match from run_match / run_tournament, mirroring
-// the global ladder's per-match line (event=ladder.match). A tournament is N
-// matches; without this the logs showed only a single tool-level result, so an
-// individual match that timed out or produced a surprising winner was invisible.
+// Log one decided (or timed-out) match from run_match, mirroring the global
+// ladder's per-match line (event=ladder.match). Without this the logs showed only
+// a single tool-level result, so a match that timed out or produced a surprising
+// winner was invisible.
 const logMatch = (
-  context: 'run_match' | 'run_tournament',
+  context: 'run_match',
   arenaId: string,
   seed: number | undefined,
   durationMs: number,
@@ -906,10 +906,15 @@ export const buildServer = (user: User): McpServer => {
         return fail('A match needs at least two active bots in the arena.');
       }
       const startedAt = Date.now();
-      const summary = await runMatchToDecision(env, members, {
-        seed,
-        timeoutMs,
-      });
+      let summary;
+      try {
+        summary = await runMatchToDecision(env, members, { seed, timeoutMs });
+      } catch (err) {
+        // Another match is already driving this arena — refuse cleanly rather
+        // than corrupting the in-flight match.
+        if (err instanceof ArenaBusyError) return fail(err.message);
+        throw err;
+      }
       logMatch(
         'run_match',
         arena.getId(),
@@ -918,136 +923,6 @@ export const buildServer = (user: User): McpServer => {
         summary
       );
       return ok({ timedOut: !summary.match.decided, ...summary });
-    }
-  );
-
-  server.registerTool(
-    'run_tournament',
-    {
-      title: 'Run a tournament',
-      description:
-        'Battle-royale the arena’s current bots across a panel of N seeds and ' +
-        'report an aggregate ranking — a best-of-N because outcomes are highly ' +
-        'spawn-sensitive (the same near-mirror bots can flip 1st↔last between ' +
-        'seeds), so a single match is not a trustworthy ranking. Runs one ' +
-        'run_match per seed (each restarts the roster and runs to a decision), ' +
-        'then ranks bots by total placement points (1st = N points … last = 1), ' +
-        'tie-broken by wins then average finishing rank. Returns the ranking plus ' +
-        'a per-seed breakdown. Needs at least two active bots. Omit arenaId for ' +
-        'your default arena.',
-      inputSchema: {
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
-        seeds: z
-          .array(z.number().int())
-          .max(20)
-          .optional()
-          .describe(
-            'The panel of integer seeds to run (one match each); defaults to [1,2,3,4,5]. Max 20.'
-          ),
-        timeoutMs: z
-          .number()
-          .int()
-          .positive()
-          .optional()
-          .describe(
-            'Max wall-clock ms to wait for each match to decide (default 60000)'
-          ),
-      },
-      annotations: WRITE,
-    },
-    async ({ arenaId, seeds, timeoutMs }) => {
-      const arena = await ownedArena(user, arenaId);
-      if (!arena) return fail('No such arena, or it is not yours.');
-      const env = await environmentService.get(arena);
-      const members = await arenaMemberService.getForArena(arena.getId());
-      if (env.getProcesses().length < 2) {
-        return fail(
-          'A tournament needs at least two active bots in the arena.'
-        );
-      }
-      const panel = seeds && seeds.length > 0 ? seeds : [1, 2, 3, 4, 5];
-
-      // Aggregate per-app placement points across the panel. Points for a match
-      // of K apps: 1st = K, last = 1 — so consistently high placement wins even
-      // without outright victories.
-      const agg = new Map<
-        string,
-        {
-          id: string;
-          name?: string;
-          wins: number;
-          points: number;
-          ranks: number[];
-        }
-      >();
-      const matches: Array<Record<string, unknown>> = [];
-
-      for (const seed of panel) {
-        const startedAt = Date.now();
-        const summary = await runMatchToDecision(env, members, {
-          seed,
-          timeoutMs,
-        });
-        logMatch(
-          'run_tournament',
-          arena.getId(),
-          seed,
-          Date.now() - startedAt,
-          summary
-        );
-        const board = summary.leaderboard;
-        const k = board.length;
-        for (const entry of board) {
-          const a = agg.get(entry.id) ?? {
-            id: entry.id,
-            name: entry.name,
-            wins: 0,
-            points: 0,
-            ranks: [],
-          };
-          a.name = entry.name;
-          a.ranks.push(entry.rank);
-          a.points += k - entry.rank + 1;
-          if (summary.match.winner?.id === entry.id) a.wins += 1;
-          agg.set(entry.id, a);
-        }
-        matches.push({
-          seed,
-          decided: summary.match.decided,
-          winner: summary.match.winner,
-          leaderboard: board.map((e) => ({
-            rank: e.rank,
-            id: e.id,
-            name: e.name,
-          })),
-        });
-      }
-
-      const ranking = [...agg.values()]
-        .map((a) => ({
-          id: a.id,
-          name: a.name,
-          wins: a.wins,
-          points: a.points,
-          avgRank: a.ranks.reduce((s, r) => s + r, 0) / a.ranks.length,
-          matches: a.ranks.length,
-        }))
-        .sort(
-          (x, y) =>
-            y.points - x.points || y.wins - x.wins || x.avgRank - y.avgRank
-        )
-        .map((a, i) => ({ rank: i + 1, ...a }));
-
-      return ok({
-        arenaId: arena.getId(),
-        seeds: panel,
-        matchCount: panel.length,
-        ranking,
-        matches,
-      });
     }
   );
 

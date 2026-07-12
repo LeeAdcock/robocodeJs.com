@@ -78,6 +78,22 @@ const deriveMatch = (
   };
 };
 
+// Cheap, synchronous "is the match over?" check for polling loops (runMatch.ts).
+// It encodes the SAME rule deriveMatch() uses for its `decided` flag — a real
+// contest of ≥2 apps with at most one still fielding a living bot — but reads it
+// straight off the in-memory processes, with no DB lookups and no summary build,
+// so it is safe to call every ~50ms while a match runs. buildMatchSummary /
+// deriveMatch stay the authoritative source for the emitted result; keep this
+// rule in sync with deriveMatch's `decided`.
+export const isMatchDecided = (env: Environment): boolean => {
+  const processes = env.getProcesses();
+  if (processes.length < 2) return false;
+  const appsAlive = processes.filter((process) =>
+    process.bots.some((bot) => bot.health > 0)
+  ).length;
+  return appsAlive <= 1;
+};
+
 // Builds the match-summary returned by the REST `/summary` endpoint and the MCP
 // `match_summary` tool: an outcome-oriented view (leaderboard, winner, aggregated
 // stats, elimination order) over an arena's live state. Companion to
