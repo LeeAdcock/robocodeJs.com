@@ -75,6 +75,8 @@ them a closed little universe with fixed rules, and they did science to it.
 
 That's the tradition this game hopes to inherit, more than any particular trick. The
 rules here are all [public and small](/rules). The interesting part is everything they
-imply, and most of it is still unwritten. Go read the masters, steal their oldest
-ideas, and then find something they never did. Somebody has to write the first page of
-this arena's wiki.
+imply, and most of it is still unwritten. Go read the masters: the
+[RoboWiki](https://robowiki.net) for the deep theory, or one of the lovely
+[veteran-written strategy guides](https://shanehalbach.com/robocode/) that still
+circulate from the classic era. Steal their oldest ideas, and then find something they
+never did. Somebody has to write the first page of this arena's wiki.
