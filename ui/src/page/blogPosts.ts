@@ -204,6 +204,13 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       'The single most important habit for a beginner bot, in five tactics. Sitting still is a choice, and it’s usually the wrong one.',
   },
   {
+    slug: 'a-brief-history-of-robot-tanks',
+    title: 'A brief history of robot tanks',
+    date: '2023-11-14',
+    summary:
+      'Born at IBM as a way to teach Java, kept alive by its community for two decades. The story of classic Robocode, the RoboWiki, and the players who turned a game into a science.',
+  },
+  {
     slug: 'why-javascript-not-java',
     title: 'Why JavaScript, not Java?',
     date: '2023-09-12',

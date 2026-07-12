@@ -18,7 +18,9 @@ argument. Reading it today feels like finding the collected papers of a small, o
 science.
 
 I grew up on the edges of that culture, and [it's half the reason this game
-exists](/blog/a-game-that-taught-me). So this post is a tribute with homework attached:
+exists](/blog/a-game-that-taught-me). I've told
+[the fuller history of the community before](/blog/a-brief-history-of-robot-tanks);
+this post is a tribute with homework attached:
 two of the RoboWiki's most famous ideas, and what their spirit looks like translated
 into this arena's simpler physics.
 
