@@ -84,6 +84,13 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
     apps.forEach((app) =>
       app.bots.forEach((bot) => {
         if (bot.id === data.id) {
+          // Stamp the hit (wall-clock) so the arena can pulse a damage glow.
+          // Only on an actual health drop, so no-op/heal events don't flash.
+          const delta = bot.health - data.health;
+          if (delta > 0) {
+            bot.lastDamagedAt = performance.now();
+            bot.lastDamageAmount = delta;
+          }
           bot.health = data.health;
           if (bot.health <= 0) {
             bot.speed = 0;

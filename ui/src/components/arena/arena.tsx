@@ -54,6 +54,31 @@ const ArenaStyle = React.memo((props: { width: number; height: number }) => (
       <stop offset="0" stopColor="white" stopOpacity=".1" />
       <stop offset="1" stopColor="white" stopOpacity="0" />
     </linearGradient>
+    {/* Soft radial glow used for the damage pulse; color themes via CSS var. */}
+    {/* Hold high opacity out to ~0.5 (roughly the tank's edge, since the sprite
+        covers the core) so the visible halo beyond the tank reads brightly. */}
+    <radialGradient id="damageGlow">
+      <stop
+        offset="0"
+        stopColor="var(--damage-glow-color, #ff2d2d)"
+        stopOpacity="0.9"
+      />
+      <stop
+        offset="0.5"
+        stopColor="var(--damage-glow-color, #ff2d2d)"
+        stopOpacity="0.8"
+      />
+      <stop
+        offset="0.8"
+        stopColor="var(--damage-glow-color, #ff2d2d)"
+        stopOpacity="0.35"
+      />
+      <stop
+        offset="1"
+        stopColor="var(--damage-glow-color, #ff2d2d)"
+        stopOpacity="0"
+      />
+    </radialGradient>
   </defs>
 ));
 
@@ -165,6 +190,8 @@ export default function ArenaSvg(props: ArenaSvgProps) {
                     x={bot.x}
                     y={bot.y}
                     radarOn={bot.radarOn}
+                    lastDamagedAt={bot.lastDamagedAt}
+                    lastDamageAmount={bot.lastDamageAmount}
                   />
                 ) : null
               );
