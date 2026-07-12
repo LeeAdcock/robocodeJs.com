@@ -788,14 +788,40 @@ export const buildServer = (user: User): McpServer => {
     (env) => env.resume(),
     { idempotentHint: true }
   );
-  control(
+  // restart_arena is its own tool (not via control()) so it can report the seed
+  // the new match runs on. A pinned seed reproduces every restart; an unpinned
+  // arena mints a fresh seed each restart — returning it lets a client reproduce
+  // the match afterwards (set_arena_seed to that value), since the seed is
+  // otherwise only broadcast on the SSE event stream the MCP transport can't see.
+  server.registerTool(
     'restart_arena',
-    'Restart arena',
-    'Restart an arena: reset and re-run all of its bots, and start it running ' +
-      '(a reset begins a fresh match, not a paused one).',
-    async (env) => {
+    {
+      title: 'Restart arena',
+      description:
+        'Restart an arena: reset and re-run all of its bots, and start it ' +
+        'running (a reset begins a fresh match, not a paused one). Returns the ' +
+        'seed the new match runs on — pin it with set_arena_seed to reproduce ' +
+        'this exact match. Omit arenaId for your default arena.',
+      inputSchema: {
+        arenaId: z
+          .string()
+          .optional()
+          .describe('Arena id; defaults to your default arena'),
+      },
+      outputSchema: {
+        arenaId: z.string(),
+        ok: z.boolean(),
+        seed: z.number(),
+      },
+      annotations: { openWorldHint: false },
+    },
+    async ({ arenaId }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
       await env.restart();
       env.resume();
+      return ok({ arenaId: arena.getId(), ok: true, seed: env.getSeed() });
     }
   );
 

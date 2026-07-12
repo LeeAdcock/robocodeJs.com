@@ -194,6 +194,13 @@ export default class Environment {
   // seeded nondeterministically so arenas still vary. In-memory only, like speed.
   private seed: number;
   private rng: () => number;
+  // Whether the seed was explicitly pinned by a caller (setSeed with a finite
+  // value) vs. the default nondeterministic seed. restart() branches on this: a
+  // pinned seed rewinds the stream so every restart reproduces the identical
+  // match, while an unpinned arena mints a fresh seed per restart so it keeps
+  // varying (and emits it, so the match that just ran is still reproducible after
+  // the fact by pinning that seed).
+  private seedPinned = false;
 
   constructor(arena: Arena) {
     this.arena = arena;
@@ -367,10 +374,12 @@ export default class Environment {
   random = () => this.rng();
 
   // Reseed the arena's PRNG. Resets the stream, so the next restart (which
-  // reconstructs all bots) lays out an identical match for a given seed. A
-  // non-finite value picks a fresh nondeterministic seed.
+  // reconstructs all bots) lays out an identical match for a given seed. A finite
+  // value pins the seed (restart will rewind to it and reproduce); a non-finite
+  // value picks a fresh nondeterministic seed and leaves the arena unpinned.
   setSeed(seed: number) {
-    this.seed = Number.isFinite(seed)
+    this.seedPinned = Number.isFinite(seed);
+    this.seed = this.seedPinned
       ? seed >>> 0
       : Math.floor(Math.random() * 0x100000000);
     this.rng = mulberry32(this.seed);
@@ -628,6 +637,20 @@ export default class Environment {
     this.pendingCommands = [];
     this.botOps.clear();
     this.recentFaults = [];
+
+    // Rewind the PRNG so each match's setup is drawn from a known stream position
+    // rather than wherever the previous match happened to leave it — otherwise the
+    // stream advances every restart and consecutive matches diverge even though
+    // getSeed() is unchanged. A pinned seed rewinds to that exact seed so every
+    // restart reproduces identically; an unpinned arena mints a fresh seed (and
+    // emits it) so it keeps varying while staying reproducible after the fact.
+    // (reboot_app also draws from this stream mid-match, so a truly reproducible
+    // pinned run is restart-only.)
+    if (this.seedPinned) {
+      this.rng = mulberry32(this.seed);
+    } else {
+      this.setSeed(NaN);
+    }
 
     // Compute a fair, symmetric spawn layout up front (util/placement.ts) so every
     // team gets an equivalent start — same distance to center, walls, and nearest

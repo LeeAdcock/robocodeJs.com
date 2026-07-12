@@ -433,18 +433,24 @@ describe('mcp tools', () => {
     });
   });
 
-  it('restart_arena restarts then resumes (a reset starts the arena running)', async () => {
+  it('restart_arena restarts, resumes, and reports the seed the match runs on', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
     const env = {
       restart: vi.fn().mockResolvedValue(undefined),
       resume: vi.fn(),
+      getSeed: vi.fn().mockReturnValue(12345),
     };
     vi.mocked(environmentService.get).mockResolvedValue(env as never);
     const client = await connect();
-    await client.callTool({ name: 'restart_arena', arguments: {} });
+    const res = await client.callTool({
+      name: 'restart_arena',
+      arguments: {},
+    });
     expect(env.restart).toHaveBeenCalled();
     expect(env.resume).toHaveBeenCalled();
+    // The seed is surfaced so a client can reproduce this match (set_arena_seed).
+    expect((res.structuredContent as { seed: number }).seed).toBe(12345);
   });
 
   it('run_match reseeds, restarts+resumes, runs to a decision, and returns the winner', async () => {
