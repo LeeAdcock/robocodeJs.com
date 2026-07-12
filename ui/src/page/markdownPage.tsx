@@ -74,10 +74,11 @@ export default function MarkdownPage(props: MarkdownPageProps) {
   }, []);
 
   useEffect(() => {
-    if (props.path.match(/[a-zA-Z\-_]{1,32}/)) {
-      axios
-        .get(`/docs/${encodeURIComponent(props.path)}.md`)
-        .then((res) => setMd(res.data));
+    // Allow an optional one-level subfolder (e.g. "blog/<slug>"), encoding
+    // each segment separately so the "/" survives as a path separator.
+    if (props.path.match(/^[a-zA-Z\-_]{1,32}(\/[a-zA-Z\-_]{1,32})?$/)) {
+      const encoded = props.path.split('/').map(encodeURIComponent).join('/');
+      axios.get(`/docs/${encoded}.md`).then((res) => setMd(res.data));
     }
   }, [props.path]);
 
