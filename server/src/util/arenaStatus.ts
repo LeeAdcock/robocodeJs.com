@@ -64,7 +64,7 @@ export const buildArenaStatus = async (
           bodyOrientationVelocity: bot.orientationVelocity,
           turretOrientation: bot.turret.orientation,
           turretOrientationTarget: bot.turret.orientationTarget,
-          turretOrientationVelocity: bot.turret.radar.orientationVelocity,
+          turretOrientationVelocity: bot.turret.orientationVelocity,
           radarOrientation: bot.turret.radar.orientation,
           radarOrientationTarget: bot.turret.radar.orientationTarget,
           radarOrientationVelocity: bot.turret.radar.orientationVelocity,

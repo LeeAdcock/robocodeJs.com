@@ -60,8 +60,8 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 | Thing            | Value             | In context                                            |
 | ---------------- | ----------------- | ----------------------------------------------------- |
-| Turret turn rate | **2°/tick**       | ≈20°/sec (turret turns relative to the body)          |
-| Radar turn rate  | **2°/tick**       | radar turns relative to the turret                    |
+| Turret turn rate | **4°/tick**       | ≈40°/sec (turret turns relative to the body)          |
+| Radar turn rate  | **4°/tick**       | radar turns relative to the turret                    |
 | Turret reload    | **50 ticks**      | ~5s between shots; `isReady()` / `onReady()` track it |
 | Radar recharge   | **10 ticks**      | ~1s between scans                                     |
 | Bullet speed     | **25** units/tick | ≈250 units/sec                                        |

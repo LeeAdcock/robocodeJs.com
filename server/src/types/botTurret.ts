@@ -19,7 +19,7 @@ export class BotTurret implements Orientated {
     this.bot = bot;
     this.orientation = bot.env.random() * 360;
     this.orientationTarget = this.orientation;
-    this.orientationVelocity = 2;
+    this.orientationVelocity = 4;
     this.radar = new BotRadar(bot);
     this.loaded = 0;
   }
