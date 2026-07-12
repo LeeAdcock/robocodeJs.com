@@ -4,7 +4,7 @@ Each bot's logic is defined in JavaScript that is initialized at the beginning o
 
 The in-browser code editor offers **autocomplete** for the whole bot API: type `bot.`, `arena.`, `clock.`, or `Event.` to see the available members, each with its signature and a short description.
 
-See also the [game rules & physics](/rules) for exact speeds, turn rates, reload times, and damage values, and — if you've used the classic Java Robocode — [Coming from classic Robocode](/classic). Brand new to coding? Try the [Learn course](/learn). For writing bots a human (or an AI) can read and adjust quickly, see [Writing readable bot code](/code-style).
+See also the [game rules & physics](/rules) for exact speeds, turn rates, reload times, and damage values, and — if you've used the classic Java Robocode — [Coming from classic Robocode](/classic). Brand new to coding? Try the [Learn course](/learn).
 
 - [Arena](#arena)
 - [Clock](#clock)

@@ -96,8 +96,7 @@ Arena tools take an optional `arenaId`; omit it to act on your default arena.
 
 The server also exposes read-only reference material the AI can pull in:
 
-- `robocodejs://docs/{slug}` — the bot documentation pages (including
-  `docs/code-style`, the house style for writing readable, well-documented bots)
+- `robocodejs://docs/{slug}` — the bot documentation pages
 - `robocodejs://samples/{name}` — the sample bots
 - `robocodejs://types/robocode.d.ts` — the bot API type definitions
 - `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,

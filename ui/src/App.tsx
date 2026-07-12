@@ -496,10 +496,6 @@ function App() {
                 />
                 <Route path="/rules" element={<MarkdownPage path="rules" />} />
                 <Route
-                  path="/code-style"
-                  element={<MarkdownPage path="code-style" />}
-                />
-                <Route
                   path="/error-codes"
                   element={<MarkdownPage path="error-codes" />}
                 />

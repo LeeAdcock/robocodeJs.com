@@ -1,16 +1,22 @@
 # Writing readable bot code
 
-A RobocodeJs bot is a small program, but "small" is not the same as "clear". A bot
-you (or a teammate, or an AI) can read six months from now — and adjust in
-seconds — beats a clever one-liner every time. This page is the house style for
-bot source: how to lay it out, name things, and comment so a human reader gets up
-to speed fast.
+> **A tip sheet for AI assistants generating RobocodeJs bots** over the MCP
+> connector. It is not part of the human-facing documentation and isn't linked
+> from it — it exists so that when a model writes a bot, the source it produces
+> is easy for a _person_ to read, understand, and adjust quickly.
 
-It's aimed at both people and AI assistants writing bots (see
-[Connect an AI (MCP)](/mcp)). The [sample bots](/examples) all follow it — read
-one alongside this page. For the API itself, see the
-[developer reference](/learn/docs); for the numbers (speeds, damage, reload
-times), the [game rules](/rules).
+When you generate a bot, treat the source as something a human will open next and
+optimize it for their comprehension, not just for a working match. A bot someone
+can read and adjust in seconds beats a clever one-liner every time. This page is
+the house style: how to lay a bot out, name things, and comment so a reader gets
+up to speed fast.
+
+Ground the code in the real API as you write it — the reference
+(`robocodejs://docs/dev`), the exact signatures
+(`robocodejs://types/robocode.d.ts`), and the sample bots
+(`robocodejs://samples/`, which all follow this style). If your client can't read
+MCP resources, the `read_doc` tool serves the same material by id (`docs/dev`,
+`types/robocode.d.ts`, `samples/<name>`).
 
 ## The one rule
 
@@ -115,9 +121,10 @@ bot.setSpeed(0); // hold still so aiming is the only variable
 bot.setSpeed(0); // set speed to 0
 ```
 
-Reserve a short comment for each non-obvious step of a calculation (the
-[Marksman sample](/examples) narrates its lead-the-target math this way), and for
-any workaround, so the next reader doesn't "clean it up" and reintroduce the bug.
+Reserve a short comment for each non-obvious step of a calculation (the Marksman
+sample, `robocodejs://samples/marksman`, narrates its lead-the-target math this
+way), and for any workaround, so the next reader doesn't "clean it up" and
+reintroduce the bug.
 
 ## Lean into the event-driven shape
 
@@ -128,8 +135,8 @@ Idioms that keep that readable:
   `SCANNED` does the aiming; `HIT` reacts to damage. Don't cram the whole bot
   into `TICK`.
 - **Return the Promise from an async handler** so the engine waits before
-  re-firing it — this prevents the same handler stacking up in parallel. See
-  [events](/learn/docs) in the reference.
+  re-firing it — this prevents the same handler stacking up in parallel. See the
+  events section of the API reference (`robocodejs://docs/dev`).
 - **Stash state on `this`**, set it in `START`, and give it a clear name
   (`this.targetId`, `this.mode`) so the reader knows what the bot remembers
   between ticks.
