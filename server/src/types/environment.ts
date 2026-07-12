@@ -168,9 +168,13 @@ export default class Environment {
 
   // Bounded history of the most recent bot console 'log' emits. The SSE /logs
   // stream is live-only (a late subscriber misses earlier output), so this lets a
-  // request/response caller — notably the MCP `recent_logs` tool — read what was
-  // just logged. Capped to avoid unbounded growth on a long-running arena.
-  private static readonly MAX_RECENT_LOGS = 200;
+  // request/response caller — notably the MCP `recent_logs` tool — read and search
+  // what was just logged. Capped to avoid unbounded growth on a long-running
+  // arena; deeper buffer = more searchable history but more per-arena memory
+  // (~200 B typical, ~2.3 KB worst case per entry). Env-tunable (MAX_RECENT_LOGS)
+  // like the other host-footprint caps so prod can dial it without a redeploy.
+  private static readonly MAX_RECENT_LOGS =
+    Number(process.env.MAX_RECENT_LOGS) || 1000;
   private recentLogs: unknown[] = [];
 
   // Bounded history of the most recent structured bot faults (crashes), the
