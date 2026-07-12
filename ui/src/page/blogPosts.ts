@@ -43,6 +43,27 @@ export const formatDate = (iso: string): string => {
 
 export const BLOG_POSTS: BlogPostMeta[] = [
   {
+    slug: 'what-the-masters-knew',
+    title: 'What the masters knew',
+    date: '2028-01-11',
+    summary:
+      'The classic Robocode community spent two decades doing science to a game. What wave surfing and guess-factor targeting look like translated into this arena.',
+  },
+  {
+    slug: 'who-can-see-your-code',
+    title: 'Who can see your bot’s code?',
+    date: '2027-11-09',
+    summary:
+      'Nobody can read your bot’s source but you. On share links, open spectating, and the difference between sharing the fighter and sharing the blueprint.',
+  },
+  {
+    slug: 'crossing-the-wall',
+    title: 'How bot.turn() crosses the wall',
+    date: '2027-09-14',
+    summary:
+      'The sandbox is sealed, and yet the tank turns. The bridge that lets a bot’s requests through the wall without letting anything else through.',
+  },
+  {
     slug: 'running-strangers-code',
     title: 'How do you let strangers run code on your server?',
     date: '2027-07-13',
