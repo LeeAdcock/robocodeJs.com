@@ -29,10 +29,11 @@ bot calls `bot.turn(90)`, the wrapper picks up the phone, and my side hears the 
 checks it, and applies it to the real tank.
 
 The important part is what never crosses. The sandbox library's own privileged handles
-(the objects that could reach back into my process) stay entirely on my side. The
-wrapper inside the sandbox holds nothing but those single-purpose phones. A bot can read
-its own wrapper all day and find nothing worth stealing, which is the point. I wrote the
-API surface so that the most a hostile bot can ever do is ask, loudly, for things I was
+(the objects that could reach back into my process) stay entirely on my side, which is
+the library's own first commandment for anyone running untrusted code. The wrapper
+inside the sandbox holds nothing but those single-purpose phones. A bot can read its own
+wrapper all day and find nothing worth stealing, which is the point. I wrote the API
+surface so that the most a hostile bot can ever do is ask, loudly, for things I was
 already willing to give it.
 
 ## Promises settled from outside

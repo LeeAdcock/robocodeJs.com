@@ -43,7 +43,9 @@ The wall is a library called **isolated-vm**. Each app runs in its own separate 
 sandbox: the same engine that runs JavaScript in Chrome, but a fresh, sealed instance
 with nothing in it. No filesystem. No network. No access to my server's memory or to
 any other bot's sandbox. It's a clean room, and the bot only ever sees what I choose to
-hand it.
+hand it. And I'm in good company trusting it: the same library guards Screeps, an
+entire MMO built on players' code running in the game world, and it earns its keep at
+companies far bigger than this one.
 
 Then I put limits on the room itself:
 
@@ -56,12 +58,16 @@ Then I put limits on the room itself:
   tenth-of-a-second steps. (That also keeps matches
   deterministic, a bonus I wrote about in [Making randomness repeatable](/blog/repeatable-randomness).)
 
-The most important rule is the one you can't see: the sandbox's own privileged handle,
-the thing that could reach back out into my server, is **never** given to the bot. All
-the bridging between the safe little API a bot sees (`bot.turn`, `bot.radar.scan`,
+The most important rule is the one you can't see: the sandbox's own privileged handles,
+the objects that could reach back out into my server, are **never** given to the bot.
+All the bridging between the safe little API a bot sees (`bot.turn`, `bot.radar.scan`,
 `bot.turret.fire`) and the real machinery lives on my side of the wall. The bot calls a
-thin, boring wrapper; I decide what that wrapper is allowed to do. If a bot could get
-hold of that handle, the whole thing would be over. So it never crosses the boundary.
+thin, boring wrapper; I decide what that wrapper is allowed to do. This isn't just my
+rule, it's the library's loudest one. Its own documentation warns that letting those
+internals reach untrusted code hands an attacker complete control of the process, and
+tells anyone who doesn't understand why that they "will almost certainly make a
+company-ending mistake." I took that personally, in the useful way. Nothing crosses the
+boundary.
 
 A crashed bot, a timed-out bot, a memory hog: all of them just get their tank killed
 and the game moves on. That's the design goal. Bad code should hurt the person
