@@ -18,8 +18,8 @@ artifacts:
   files:
     - 'package.json'
     # Ship the shrinkwrap so Elastic Beanstalk installs with `npm ci` from the
-    # pinned tree — matching the `npm run package` artifact used for manual
-    # deploys, so the automated and manual paths install identically.
+    # pinned tree — matching the `npm run bundle` artifact used for break-glass
+    # manual deploys, so the automated and manual paths install identically.
     - 'npm-shrinkwrap.json'
     - 'dist/**/*'
     - '.ebextensions/**/*'

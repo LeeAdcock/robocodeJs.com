@@ -13,7 +13,8 @@
     "smoke": "node ./scripts/ivm-smoke.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package": "npm version patch --no-git-tag-version && npm shrinkwrap && zip -r robocodejs-$(node -p \"require('./package.json').version\").zip ./ -x 'src/*' -x 'test/*' -x 'coverage/*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
+    "release": "npm version patch --no-git-tag-version && npm shrinkwrap",
+    "bundle": "zip -r robocodejs-$(node -p \"require('./package.json').version\").zip ./ -x 'src/*' -x 'test/*' -x 'coverage/*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
   "author": "Lee Adcock <lee@robocodejs.com>",
   "license": "MIT",
