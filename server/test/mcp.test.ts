@@ -56,12 +56,16 @@ vi.mock('../src/util/matchSummary', () => ({
 // Mock the compiler so check_app_source doesn't spin a real isolate in this suite
 // (the real dry-run behaviour is covered in compiler.test.ts).
 vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
+// Mock the formatter so format_source doesn't load Prettier here; the MCP glue
+// (arg handling, ownership, result shaping) is what's under test.
+vi.mock('../src/util/formatter', () => ({ default: { format: vi.fn() } }));
 
 import request from 'supertest';
 import mcpApp, { buildServer, logMcpRequest } from '../src/api/mcp';
 import { logger, LogEvent } from '../src/util/logger';
 import appService from '../src/services/AppService';
 import compiler from '../src/util/compiler';
+import formatter from '../src/util/formatter';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
 import environmentService from '../src/services/EnvironmentService';
@@ -293,6 +297,80 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'check_app_source',
+      arguments: {},
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+  });
+
+  it('format_source pretty-prints raw source', async () => {
+    vi.mocked(formatter.format).mockResolvedValue({
+      ok: true,
+      formatted: 'const x = 1;\n',
+      changed: true,
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'format_source',
+      arguments: { source: 'const  x=1' },
+    })) as never;
+
+    expect(formatter.format).toHaveBeenCalledWith('const  x=1');
+    expect(JSON.parse(textOf(res))).toEqual({
+      ok: true,
+      formatted: 'const x = 1;\n',
+      changed: true,
+    });
+  });
+
+  it('format_source resolves a saved bot by appId and enforces ownership', async () => {
+    vi.mocked(formatter.format).mockResolvedValue({
+      ok: true,
+      formatted: 'CODE',
+      changed: false,
+    } as never);
+    vi.mocked(appService.get).mockResolvedValue({
+      getUserId: () => 'u1',
+      getSource: () => 'SAVED',
+    } as never);
+    const client = await connect();
+    await client.callTool({
+      name: 'format_source',
+      arguments: { appId: 'a1' },
+    });
+    expect(formatter.format).toHaveBeenCalledWith('SAVED');
+
+    // A bot owned by someone else is rejected and never formatted.
+    vi.mocked(formatter.format).mockClear();
+    vi.mocked(appService.get).mockResolvedValue({
+      getUserId: () => 'someone-else',
+      getSource: () => 'SECRET',
+    } as never);
+    const res = (await client.callTool({
+      name: 'format_source',
+      arguments: { appId: 'a1' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+    expect(formatter.format).not.toHaveBeenCalled();
+  });
+
+  it('format_source surfaces an unparseable source as a tool error', async () => {
+    vi.mocked(formatter.format).mockResolvedValue({
+      ok: false,
+      message: 'Unexpected token (1:9)',
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'format_source',
+      arguments: { source: 'function ( {' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toContain('check_app_source');
+  });
+
+  it('format_source requires source or appId', async () => {
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'format_source',
       arguments: {},
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
@@ -653,6 +731,7 @@ describe('mcp tools', () => {
     expect(byName['list_apps'].annotations?.readOnlyHint).toBe(true);
     expect(byName['arena_status'].annotations?.readOnlyHint).toBe(true);
     expect(byName['check_app_source'].annotations?.readOnlyHint).toBe(true);
+    expect(byName['format_source'].annotations?.readOnlyHint).toBe(true);
     // Destructive tools are hinted so a client can confirm first.
     expect(byName['delete_app'].annotations?.destructiveHint).toBe(true);
     expect(byName['delete_arena'].annotations?.destructiveHint).toBe(true);

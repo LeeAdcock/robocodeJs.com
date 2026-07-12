@@ -55,6 +55,8 @@ Once connected, these tools are available (all scoped to your account):
 - `compile_app` — re-run an app's current source in your live arenas
 - `check_app_source` — dry-run compile source (pass `source`, or `appId` for a
   saved app) and report any syntax/load error with its code — without deploying it
+- `format_source` — pretty-print bot code in the house style (pass `source`, or
+  `appId` for a saved app); returns the formatted text without saving it
 - `reboot_app` — reload an app and re-fire its `START` handler
 - `delete_app` — remove an app from every arena and delete it
 
@@ -94,7 +96,8 @@ Arena tools take an optional `arenaId`; omit it to act on your default arena.
 
 The server also exposes read-only reference material the AI can pull in:
 
-- `robocodejs://docs/{slug}` — the bot documentation pages
+- `robocodejs://docs/{slug}` — the bot documentation pages (including
+  `docs/code-style`, the house style for writing readable, well-documented bots)
 - `robocodejs://samples/{name}` — the sample bots
 - `robocodejs://types/robocode.d.ts` — the bot API type definitions
 - `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,
