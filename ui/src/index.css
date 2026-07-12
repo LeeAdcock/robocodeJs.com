@@ -6,7 +6,7 @@
   --link: #aa6c39;
   --code: #1a7f37;
   --rule: #aa6c39;
-  /* Red glow behind a bot that just took damage (see .bot-damage-glow). */
+  /* Red glow behind a bot that just took damage (see arenaBot.tsx BotSvg). */
   --damage-glow-color: #ff2d2d;
 }
 
@@ -26,31 +26,6 @@ body.dark {
   color: var(--fg);
   --bs-body-bg: var(--bg);
   --bs-body-color: var(--fg);
-}
-
-/* Damage pulse: a soft red glow behind a bot that ramps up fast then fades over
-   ~1s whenever it takes a hit. Driven purely by CSS so it animates smoothly even
-   when the sim is paused/decided (React only re-renders on tick). Each new hit
-   restarts it by remounting the element (React key = lastDamagedAt). The peak
-   opacity (`--glow-peak`, set inline) scales with the hit size. */
-@keyframes botDamageGlow {
-  0% {
-    opacity: 0;
-  }
-  8% {
-    opacity: var(--glow-peak, 0.6);
-  }
-  /* Hold briefly at peak so the flash registers before it fades. */
-  32% {
-    opacity: var(--glow-peak, 0.6);
-  }
-  100% {
-    opacity: 0;
-  }
-}
-.bot-damage-glow {
-  animation: botDamageGlow 1s ease-out forwards;
-  pointer-events: none;
 }
 
 /* Bootstrap's default placeholder is a dark muted grey — barely legible on the

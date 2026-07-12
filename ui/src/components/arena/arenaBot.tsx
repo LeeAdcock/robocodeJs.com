@@ -26,6 +26,15 @@ function useContinuousAngle(target: number): number {
   return ref.current;
 }
 
+// Damage-glow timing (attack / sustain / release). The glow ramps in fast on a
+// hit, holds while damage keeps landing, then fades out slowly once it stops —
+// so repeated hits (a collision, a bullet burst) read as one steady glow rather
+// than a strobe. GLOW_SUSTAIN_MS spans ~2.5 nominal ticks (~100ms each) so
+// continuous per-tick damage keeps the glow lit with no gaps.
+const GLOW_ATTACK_MS = 90;
+const GLOW_RELEASE_MS = 650;
+const GLOW_SUSTAIN_MS = 260;
+
 interface BotProps {
   appName: string;
   appIndex: number;
@@ -45,7 +54,8 @@ interface BotProps {
   x: number;
   y: number;
   radarOn: boolean;
-  // Drives the damage-pulse glow: when it changes the glow restarts (see below).
+  // Drives the damage-pulse glow: a fresh timestamp (bumped on each hit) keeps
+  // the glow lit; it sustains while hits keep landing, then fades (see below).
   lastDamagedAt?: number;
   lastDamageAmount?: number;
 }
@@ -128,6 +138,29 @@ const BotRadarSvg = (props: BotRadarProps) => {
 
 const BotSvg = React.memo((props: BotProps) => {
   const body = useContinuousAngle(props.bodyOrientation);
+
+  // The glow is "active" for a short window after the most recent hit. Repeated
+  // hits keep bumping lastDamagedAt, so the window keeps extending and the glow
+  // sustains; once hits stop, the window lapses and the glow releases.
+  const glowing =
+    props.health > 0 &&
+    props.lastDamagedAt !== undefined &&
+    performance.now() - props.lastDamagedAt < GLOW_SUSTAIN_MS;
+
+  // BotSvg is memoized and normally only re-renders on tick prop changes, but the
+  // release has to fire even if ticks stall (e.g. the sim is paused mid-burst).
+  // Force one re-render when the sustain window lapses so `glowing` flips to false
+  // and the fade-out transition kicks in.
+  const [, forceRerender] = React.useReducer((n: number) => n + 1, 0);
+  React.useEffect(() => {
+    if (props.lastDamagedAt === undefined) return;
+    const remaining =
+      GLOW_SUSTAIN_MS - (performance.now() - props.lastDamagedAt);
+    if (remaining <= 0) return;
+    const id = window.setTimeout(forceRerender, remaining + 20);
+    return () => window.clearTimeout(id);
+  }, [props.lastDamagedAt]);
+
   return (
     <>
       <OverlayTrigger
@@ -150,21 +183,22 @@ const BotSvg = React.memo((props: BotProps) => {
               props.onOpen(props.appId, props.botIndex + 1, e.shiftKey);
           }}
         >
-          {/* Damage pulse (behind the tank). Keyed on lastDamagedAt so each new
-              hit remounts the circle and restarts its CSS fade; --glow-peak
+          {/* Damage pulse (behind the tank). The circle stays mounted (invisible
+              at opacity 0) so its opacity animates via a CSS transition rather than
+              snapping on mount: a fast attack ramps it up on a hit, it holds while
+              damage keeps landing, then a slow release fades it out. --glow-peak
               scales the flash with how hard the hit was. */}
-          {props.health > 0 && props.lastDamagedAt !== undefined && (
+          {props.health > 0 && (
             <g
               style={{ transition: 'all 200ms linear' }}
               transform={translate(props.x, props.y)}
             >
               <circle
-                key={props.lastDamagedAt}
-                className="bot-damage-glow"
                 // The tank sprite (~16px radius) sits on top and hides the glow's
                 // core, so the radius reaches well past it to leave a visible halo.
                 r={32}
                 fill="url(#damageGlow)"
+                pointerEvents="none"
                 style={
                   {
                     // Peak opacity scales with the hit; a bullet (25 dmg) maxes
@@ -173,6 +207,10 @@ const BotSvg = React.memo((props: BotProps) => {
                       1,
                       0.55 + (props.lastDamageAmount ?? 0) / 30
                     ),
+                    opacity: glowing ? 'var(--glow-peak)' : 0,
+                    transition: `opacity ${
+                      glowing ? GLOW_ATTACK_MS : GLOW_RELEASE_MS
+                    }ms ease-out`,
                   } as React.CSSProperties
                 }
               />
