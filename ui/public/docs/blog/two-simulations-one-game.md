@@ -32,7 +32,7 @@ arena. The truth was fine; the _presentation_ of the truth was the problem.
 
 The trick is to let the browser fill in the gaps. Between server updates, the browser
 runs its own little copy of the movement math and _predicts_ where each tank should be.
-The server said a tank was here, moving this direction, at this speed. So a sixteenth of
+The server said a tank was here, moving this direction, at this speed. So a sixtieth of
 a second later, the browser can work out where it must be now and draw it there. It keeps
 doing that, frame after smooth frame, until the next real update lands from the server.
 
@@ -45,9 +45,9 @@ want to tell your eyes.
 Conceptually it's as simple as this:
 
 ```js
-// between server ticks, in the browser:
-tank.x += Math.cos(tank.heading) * tank.speed * dt;
-tank.y += Math.sin(tank.heading) * tank.speed * dt;
+// between server ticks, in the browser (headings are compass degrees, 0 = north):
+tank.x += tank.speed * Math.sin((-tank.orientation * Math.PI) / 180) * dt;
+tank.y += tank.speed * Math.cos((-tank.orientation * Math.PI) / 180) * dt;
 
 // when the next server update arrives:
 tank.x = serverTank.x; // trust the server, correct the drift

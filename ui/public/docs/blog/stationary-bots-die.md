@@ -34,7 +34,7 @@ bot.setSpeed(5); // top speed; the default should be "moving"
 ## 2. Don't hug the walls
 
 Corners feel safe and they are a trap. Two things go wrong at the edge. First, a wall stops
-you. A collision costs **1 health every tick you're stuck against it** _and_ drops your
+you. A collision costs **a point of health every tenth of a second you're stuck against it** _and_ drops your
 speed to zero, turning you into the stationary target from rule one. Second, and
 worse, the wall shrinks the angles you have to escape through. In the open, a threat can
 come from any direction and so can your dodge. Backed into a corner, you can only run two
@@ -57,7 +57,7 @@ if (Math.random() < 0.1) {
 
 The goal is to make yourself un-leadable, not chaos for its own sake. Every time an
 enemy has to re-guess your motion, they waste a shot, and every wasted shot on their side
-costs them 3 health for missing.
+is a long reload spent hitting nothing while you're still in the fight.
 
 ## 4. Watch your health and run
 

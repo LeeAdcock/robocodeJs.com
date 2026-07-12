@@ -54,7 +54,9 @@ The first is **immutable deploys**. Instead of updating the running server in pl
 which risks a half-updated box serving broken pages, a brand-new instance is spun up
 alongside the old one, health-checked at a `/health` endpoint, and only swapped in once
 it reports healthy. If the new one is broken, the old one keeps serving and nobody
-notices. Players in the middle of a match don't see a blip.
+notices. The site never goes dark and a bad build can't take it down. The honest footnote
+is that matches live in the server's memory, so a deploy does restart any battle in
+progress; the page stays up, but the fight starts fresh.
 
 The second is that **deploys are tag-triggered**. Merging code to my main branch does
 _not_ ship anything. A deploy only happens when I push a version tag, like `v1.2.82`.

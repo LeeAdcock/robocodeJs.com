@@ -14,8 +14,10 @@ with an `angle` that's already relative to your heading, so pointing the gun str
 what you see is a single line:
 
 ```js
-const targets = await bot.radar.scan();
-if (targets.length) bot.turret.setOrientation(targets[0].angle);
+if (bot.radar.isReady()) {
+  const targets = await bot.radar.scan();
+  if (targets.length) bot.turret.setOrientation(targets[0].angle);
+}
 ```
 
 Do that and you'll hit things that stand still. The trouble is that good tanks don't stand
@@ -25,16 +27,16 @@ detail everybody forgets: your bullet is not instant.
 
 ## The bullet takes time
 
-A bullet travels at **25 units per tick**. That's fast, but the arena is 750 units across,
-so a shot at a target halfway down the board takes fifteen ticks (a second and a half)
-to arrive. In that second and a half, an enemy moving at top speed (5 units/tick) has slid
-75 units sideways. You aimed at where it _was_. The bullet showed up at that spot, politely,
-and the enemy was long gone.
+A bullet travels at **250 pixels a second** (25 per tick, the number you'll use in code).
+That's fast, but the arena is 750 pixels across, so a shot at a target halfway down the
+board takes a second and a half to arrive. In that second and a half, an enemy moving at
+top speed, about 50 pixels a second, has slid 75 pixels sideways. You aimed at where it
+_was_. The bullet showed up at that spot, politely, and the enemy was long gone.
 
-This is the single biggest jump in accuracy you can make, and it costs you a missed shot
-every time you get it wrong: a bullet that sails off the field without hitting
-anyone docks you **3 health**. Spraying at where the enemy stands isn't just ineffective,
-it slowly kills you. So you don't aim at the target. You aim at where it's _going_ to be.
+This is the single biggest jump in accuracy you can make, and every miss has a price: a
+bullet that sails off the field is a five-second reload spent on nothing, a whole shot's worth
+of opportunity gone while the enemy keeps maneuvering. So you don't aim at the target. You
+aim at where it's _going_ to be.
 
 ## Lead the target
 
@@ -44,8 +46,8 @@ someone will run, not where they're standing. Here's the recipe in words:
 1. See where the enemy is now, and figure out which way and how fast it's moving (compare
    its position across two scans, or read its motion from the scan).
 2. Guess how long your bullet will take to reach it: distance divided by the bullet's
-   speed of 25 gives you a number of ticks.
-3. Project the enemy forward by that many ticks: where will it be after that long, moving
+   speed of 25 gives you the flight time.
+3. Project the enemy forward by that flight time: where will it be after that long, moving
    the way it's moving now?
 4. Aim there instead of at the enemy itself, and fire.
 
@@ -53,14 +55,16 @@ In code the shape looks like this. The details of the geometry live in the
 [leading lesson](/learn/leading), but the bones are just "project forward, then aim":
 
 ```js
-const [target] = await bot.radar.scan();
-if (target) {
-  const ticks = target.distance / 25; // how long the bullet flies
-  // estimate where the enemy will be after `ticks`, from its motion,
-  // then point the turret at THAT spot instead of its current one:
-  const leadAngle = predictAngle(target, ticks);
-  bot.turret.setOrientation(leadAngle);
-  if (bot.turret.isReady()) bot.turret.fire();
+if (bot.radar.isReady()) {
+  const [target] = await bot.radar.scan();
+  if (target) {
+    const ticks = target.distance / 25; // flight time in ticks (each is a tenth of a second)
+    // estimate where the enemy will be after `ticks`, from its motion,
+    // then point the turret at THAT spot instead of its current one:
+    const leadAngle = predictAngle(target, ticks);
+    bot.turret.setOrientation(leadAngle);
+    if (bot.turret.isReady()) bot.turret.fire();
+  }
 }
 ```
 

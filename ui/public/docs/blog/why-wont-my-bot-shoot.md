@@ -29,10 +29,12 @@ I still start at the top of this list. So should you.
 ## The five usual suspects
 
 **1. The turret is still reloading.** This is the big one. After every shot the turret
-needs **40 ticks** (about four seconds) to reload, and if you call `fire()` during that
-window, nothing happens; the call is just ignored. If your loop is "scan, aim, fire"
-every tick, you're firing into a cooldown 39 times out of 40 and it _feels_ like the gun
-is dead. The fix is to ask first:
+needs **about five seconds** (50 ticks, if you're counting) to reload, and if you call
+`fire()` during that window, the shot doesn't happen; the call rejects and a "Turret not
+ready" error lands in your bot's log. That error is actually a gift: if your log is a
+wall of "Turret not ready", you've found your answer. If your loop is "scan, aim, fire"
+as fast as it can go, you're firing into a cooldown 49 times out of 50 and it _feels_
+like the gun is dead. The fix is to ask first:
 
 ```js
 if (bot.turret.isReady()) {
@@ -40,7 +42,7 @@ if (bot.turret.isReady()) {
 }
 ```
 
-Add a `console.log('ready?', bot.turret.isReady())` for a few ticks and watch it flip
+Add a `console.log('ready?', bot.turret.isReady())` for a few seconds and watch it flip
 between `true` and `false`. If it's `false` far more than you expected, reloading is your
 answer. Better still, stop polling and let the turret tell you when it's loaded:
 `bot.turret.onReady().then(bot.turret.fire)`. I wrote about that whole style in
@@ -66,21 +68,24 @@ looks exactly like a lazy one. Check the log for an error or an [error code](/er
 a thrown exception or a timeout will show up there. If the tank went inert all at once
 mid-match, suspect a crash before you suspect your aim.
 
-**4. You're aiming at nothing.** `bot.radar.scan()` only returns enemies your radar can
-currently see. If nobody's in view, the scan is empty, and code like
+**4. You're aiming at nothing.** `bot.radar.scan()` returns every bot your radar can
+currently see, teammates included; each result carries a `friendly` flag so you can tell
+which is which. If nobody's in view at all, the scan is empty, and code like
 `bot.turret.fire()`-only-when-there's-a-target will correctly never fire, because there's
 nothing to shoot at. This one's easy to confirm:
 
 ```js
-const seen = await bot.radar.scan();
-console.log('I can see', seen.length, 'enemies');
+if (bot.radar.isReady()) {
+  const seen = await bot.radar.scan();
+  console.log('I can see', seen.length, 'bots');
+}
 ```
 
 If that's `0` most of the time, the gun is fine and your radar isn't finding anyone.
 That's a sweeping problem, and the [radar lesson](/learn/radar) covers it.
 
 **5. Friendly fire is making you too cautious.** Remember that your bullets hit **any**
-bot within the 32-unit blast radius, including your own teammates. And you field five
+bot within the 32-pixel blast radius, including your own teammates. And you field five
 tanks that all run this same code. If you wrote a "don't shoot if a friend is near the
 line" guard (a good instinct!), double-check it isn't firing constantly with five of your
 own tanks milling around. A too-strict safety check can silence a gun as effectively as a

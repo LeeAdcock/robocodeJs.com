@@ -10,7 +10,8 @@ _March 9, 2027_
 />
 
 Most of what makes RobocodeJs fun is also what makes it hard to test. It's real-time:
-things happen tick by tick. It's visual: the proof that it works is tanks moving on a
+things happen tick by tick (a tick is the game's tenth-of-a-second heartbeat). It's
+visual: the proof that it works is tanks moving on a
 screen. And its core feature is _running other people's code inside a sandbox_, which is
 about as far from a tidy pure function as you can get. You can't exactly write
 `expect(theGame).toLookRight()`.
@@ -37,11 +38,12 @@ it's deterministic, and it lets me test every corner of the physics without the 
 the sandbox at all.
 
 ```js
-// place two mock tanks a bullet's hit-radius apart, fire, run one tick
+// (illustrative; the real tests are wordier, but this is their shape)
+// place two mock tanks 200 pixels apart, fire, let the bullet fly
 const target = mockTank({ x: 100, y: 100, health: 100 });
-const shooter = mockTank({ x: 100, y: 130 });
+const shooter = mockTank({ x: 100, y: 300 });
 fireAt(shooter, target);
-simulation.run(oneTick);
+simulation.run(ticksUntilImpact);
 expect(target.health).toBe(75); // -25 on a clean hit
 ```
 

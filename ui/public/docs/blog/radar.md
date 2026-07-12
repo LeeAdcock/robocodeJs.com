@@ -21,15 +21,15 @@ has to be _looking in the right place_.
 The radar has exactly two constraints, and your whole radar strategy is a negotiation
 between them.
 
-First, it's slow to turn. The radar swings at **4 degrees per tick**, same as the turret
-and much slower than your body, which spins at 10. You can't snap the radar across the
-board. Pointing it somewhere new takes real time, and while it's traveling, it's staring
-at whatever it passes over, not at what you want.
+First, it's slow to turn. The radar swings at about **40 degrees a second**, same as the
+turret and much slower than your body, which turns at roughly 100 degrees a second. You
+can't snap the radar across the board. Pointing it somewhere new takes real time, and
+while it's traveling, it's staring at whatever it passes over, not at what you want.
 
-Second, it recharges. After a scan, the radar needs **10 ticks** before it can scan again.
-So you don't get a continuous stream of the world; you get a snapshot roughly once a
-second, from wherever the radar happens to be aimed at that moment. Aim it badly and your
-snapshot is empty.
+Second, it recharges. After a scan, the radar needs about a second before it can scan
+again. So you don't get a continuous stream of the world; you get a snapshot roughly once
+a second, from wherever the radar happens to be aimed at that moment. Aim it badly and
+your snapshot is empty.
 
 Put those together and the radar's whole personality falls out: you get one look per
 second, and moving your gaze is expensive.

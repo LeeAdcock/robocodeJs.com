@@ -40,7 +40,7 @@ time. Same mechanism, two channels: one for the picture, one for the words.
 ## The neat part: joining a battle already in progress
 
 The detail I'm most proud of is this one. A live match is stateful: five tanks per app,
-each somewhere on the 750×750 arena, each with some health, mid-fight. If you wander in
+each somewhere in the arena, each with some health, mid-fight. If you wander in
 as a spectator halfway through, how do you catch up? You missed the first half of the
 story.
 
@@ -52,9 +52,9 @@ So a latecomer gets bootstrapped instantly. One moment you have an empty arena, 
 it's fully populated with the battle as it stands, and from there you're just riding the
 same live stream as everyone else who was already watching.
 
-It means you can send someone a [share link](/rules) to a match that's already running
-and they'll see it correctly, mid-fight, without any awkward "waiting for the next
-update" gap.
+It means you can reload the page, or close the arena and reopen it while a match is
+running, and you're instantly back in sync with the battle as it stands, without any
+awkward "waiting for the next update" gap.
 
 ## Why not WebSockets?
 

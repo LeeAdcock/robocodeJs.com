@@ -28,8 +28,9 @@ That's the mental shift: stop writing instructions for a single tank and start w
 instructions that produce good behavior no matter which of the five is asking. The best
 squads don't hard-code "tank 1 does this, tank 2 does that." They write one rule that,
 run five times from five positions, naturally produces a formation. The
-[magnetic](/samples/magnetic) sample is the cleanest example of this: every tank pushes
-away from its neighbors and the spacing just falls out of it, no coordinator required.
+[magnetic](/samples/magnetic) sample is the cleanest example of coordination through
+simple broadcast messages: every tank shouts its own position ten times a second, everyone steers
+toward the voices, and the team drifts together into a cluster, no coordinator required.
 
 I've built AI players for real-time strategy games, where you're herding dozens of units
 instead of five, and the lesson was the same there: you almost never want a general
@@ -39,24 +40,28 @@ this game I find hardest to put down.
 
 ## Talking to yourself
 
-Because all five run in the same sandbox, they can share information. If one tank's radar
-spots an enemy, it can stash that enemy's position somewhere the others can read, and
-suddenly all five know about a threat only one of them can see. That's the whole idea
-behind a coordinated squad: five sets of eyes feeding one shared picture of the arena.
+Here's the part that surprises people: even though all five tanks run the same code, each
+one is on its own. One tank can't peek at another's variables or read what its radar saw.
+The only way they share anything is by talking: `bot.send` broadcasts a message, and any
+bot listening for `Event.RECEIVED` hears it. So if one tank's radar spots an enemy, it
+broadcasts that enemy's position, the other four receive it, and suddenly all five
+converge fire on a threat only one of them can see. That's the whole idea behind a
+coordinated squad: five sets of eyes feeding one shared picture of the arena, one message
+at a time.
 
-The pattern is simpler than it sounds: a shared spot the tanks all read from and write
-to. One tank spots something, records it, and the others check that record on their next
-tick and react. You don't need networking or messages in the postal sense; you just need
-a place all five can see. The [squad](/samples/squad) sample builds exactly this, and the
-[teamwork lesson](/learn/teamwork) walks through it step by step. It's worth reading both
-side by side: `magnetic` shows coordination with _no_ communication (just local rules),
-and `squad` shows coordination _through_ communication (a shared target). Most good teams
-end up somewhere between the two.
+One caveat before you build this: the broadcast is truly public. Every bot in the arena
+hears it, enemies included, so teams tag their messages with a shared secret and ignore
+anything that doesn't carry it. Never trust a broadcast you didn't send. The
+[squad](/samples/squad) sample builds exactly this pattern, and the
+[teamwork lesson](/learn/teamwork) walks through it step by step. It's worth reading
+`magnetic` and `squad` side by side: both speak the same broadcast protocol, but
+`magnetic` uses it to pull the team together while `squad` uses it to focus fire on a
+shared target. Most good teams end up doing both.
 
 ## The friendly-fire tax
 
 Now the part that punishes you for having friends nearby: **friendly fire is on.** Your
-bullet hits any bot within its 32-unit blast radius, and it does not check jerseys. Five
+bullet hits any bot within its 32-pixel blast radius, and it does not check jerseys. Five
 of your own tanks clustered together is five chances to shoot yourself in the back.
 
 This changes how you think about both formation and firing. Clumping your tanks feels

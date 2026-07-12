@@ -10,7 +10,8 @@ _July 14, 2024_
 />
 
 Most of my bots don't have a tick loop at all. That surprises people, because everyone's
-first bot is one big loop that runs every tick and checks everything: am I being hit? is
+first bot is one big loop that runs every tick (the game's tenth-of-a-second heartbeat)
+and checks everything: am I being hit? is
 anyone on radar? is the gun ready? did I bump a wall? It works, and it's a perfectly
 reasonable place to start. But there's a second way to write a tank that's both simpler
 to read and closer to how the game wants to talk to you.
@@ -30,6 +31,7 @@ ever changes:
 ```js
 // runs every single tick
 clock.on(Event.TICK, async () => {
+  if (!bot.radar.isReady()) return; // the radar recharges; most ticks it isn't
   const targets = await bot.radar.scan();
   if (targets.length) {
     bot.turret.setOrientation(targets[0].angle);
@@ -73,7 +75,7 @@ direction every so often), you don't need a tick counter of your own. `setInterv
 time, so they pause when the match pauses and stay in step with the simulation:
 
 ```js
-setInterval(() => bot.turn(90), 30); // wheel a quarter-turn every 30 ticks
+setInterval(() => bot.turn(90), 30); // wheel a quarter-turn every 30 ticks, about every 3 seconds
 ```
 
 The mental model I'd leave you with is this: a tick loop makes your bot ask "what should I

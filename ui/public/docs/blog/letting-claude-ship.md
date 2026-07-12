@@ -28,9 +28,8 @@ RobocodeJs runs on AWS Elastic Beanstalk on a small instance. But deploying does
 copying files onto the server and crossing your fingers. A deploy is a chain of steps,
 each of which is boring on purpose:
 
-- **Cut the artifact.** `npm run package` builds the UI and server, bumps the version,
-  regenerates the lockfile, and zips a clean bundle. It's one command and it's the same
-  every time.
+- **Cut the release.** One script builds the UI and the server, bumps the version, and
+  regenerates the lockfile. Same steps, same order, every time.
 - **Nothing deploys on a merge.** Merging a change to `main` does not touch production.
   Let me say that again, because it's the load-bearing wall: merging is not shipping.
 - **Deploys are triggered by a version tag.** Production only updates when someone pushes

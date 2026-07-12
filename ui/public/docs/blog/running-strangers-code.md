@@ -52,7 +52,8 @@ Then I put limits on the room itself:
   event handler, a timer) it's on a stopwatch. The infinite loop hits the ceiling,
   the bot is killed, and the match carries on without it.
 - **No `Date`.** I switch it off on purpose, so bots can't read the wall clock. They
-  use `clock.getTime()` instead, which counts game ticks. (That also keeps matches
+  use `clock.getTime()` instead, which counts game ticks, the simulation's
+  tenth-of-a-second steps. (That also keeps matches
   deterministic, a bonus I wrote about in [Making randomness repeatable](/blog/repeatable-randomness).)
 
 The most important rule is the one you can't see: the sandbox's own privileged handle,

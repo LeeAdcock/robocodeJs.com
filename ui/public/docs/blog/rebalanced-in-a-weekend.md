@@ -23,12 +23,12 @@ was off — what you were watching that dragged.]
 
 ## Change 1: faster reload
 
-**Before:** turret reload took 50 ticks, refilling +2/tick.
-**After:** 40 ticks, refilling +2.5/tick.
+**Before:** turret reload took 50 ticks, about five seconds (refilling +2 a tick).
+**After:** 40 ticks, about four (refilling +2.5 a tick).
 
 The reload is the metronome of a fight. Everything a bot does between shots (turn, dodge,
-line up the next angle) is paced by how long it waits to fire again. At 50 ticks that
-wait was long enough that fights turned into patient standoffs. Dropping it to 40 tightens
+line up the next angle) is paced by how long it waits to fire again. At five full seconds
+that wait was long enough that fights turned into patient standoffs. Dropping it to four tightens
 the whole rhythm. Bots shoot more, commit more, and the match moves. It's a small number
 with an outsized effect on how alive the arena feels.
 
@@ -47,10 +47,10 @@ out.
 
 ## Change 3: snappier aiming
 
-**Before:** the turret and radar each turned 2°/tick.
-**After:** 4°/tick, twice as fast.
+**Before:** the turret and radar each turned 2° a tick, about 20 degrees a second.
+**After:** 4° a tick, about 40 degrees a second, twice as fast.
 
-At 2°/tick, a bot that got flanked couldn't bring its gun around in time. The
+At 20 degrees a second, a bot that got flanked couldn't bring its gun around in time. The
 turret felt like it was swinging through molasses, and the honest consequence was that
 positioning beat aiming every time: if you got behind someone, they were dead, no skill
 required. Doubling the turret and radar turn rate gives a bot a real chance to react.

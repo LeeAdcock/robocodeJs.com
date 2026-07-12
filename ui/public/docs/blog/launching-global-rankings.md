@@ -36,8 +36,9 @@ system runs matches on its own, all the time. It picks two eligible apps, hands
 them a random seed, runs the fight to a decision, and writes the new ratings back to
 both apps.
 
-Your bot is a candidate as long as it's real: it has to compile, it can't be empty, and
-you (its owner) have to have been active reasonably recently. Untouched starter bots are
+Your bot is a candidate as long as it's real: it has to compile, it can't be empty, it
+has to have been edited reasonably recently, and you (its owner) have to have been
+active reasonably recently too. Untouched starter bots are
 left out of the pool; the ladder is for bots someone actually built. Beyond that, you
 don't manage anything. You write a bot, and the ladder finds it work.
 

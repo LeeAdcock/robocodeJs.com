@@ -23,7 +23,7 @@ wall, so every incoming shot only has to account for the directions you have lef
 easier to predict, easier to corner, and easier to pin. A tank in open space can juke in any
 direction; a tank on a wall is a sitting duck with good posture.
 
-The arena is 750×750, and your tank always knows where it is. So give yourself a margin and
+The arena is 750 pixels on a side, and your tank always knows where it is. So give yourself a margin and
 steer back toward the middle whenever you get too close to an edge:
 
 ```js

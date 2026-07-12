@@ -16,22 +16,22 @@ each one does, and how they fit into the little loop that runs your whole bot.
 
 ## Three machines, three steering wheels
 
-The first part is the **tank body**. It drives and it turns, at up to 10° per tick, and it
-carries everything else around the 750×750 arena. When you tell the tank to move, this is
-what moves.
+The first part is the **tank body**. It drives and it turns, at up to about 100 degrees a
+second (a full spin in under four seconds), and it carries everything else around the
+arena, 750 pixels on a side. When you tell the tank to move, this is what moves.
 
-Bolted on top is the **turret**, the gun. It turns _relative to the body_, at 4° per tick,
-and it's what actually fires. Its angle is independent: the body can be pointed north while
-the gun points east. It also has to reload, over 40 ticks, so you can't just hold down the
-trigger; a good bot spends its shots.
+Bolted on top is the **turret**, the gun. It turns _relative to the body_, at about 20
+degrees a second, and it's what actually fires. Its angle is independent: the body can be
+pointed north while the gun points east. It also has to reload, about five seconds per
+shot, so you can't just hold down the trigger; a good bot spends its shots.
 
-Mounted on the turret is the **radar**. It turns relative to the turret, also 4° per tick,
-and it recharges every 10 ticks. The radar is how your bot _senses_: it's the only way you
+Mounted on the turret is the **radar**. It turns relative to the turret, also about 20
+degrees a second, and it recharges about once a second. The radar is how your bot _senses_: it's the only way you
 find out where the enemies are. No scan, no information; a blind tank is a dead tank.
 
 The thing to really sit with is that all three turn independently. Your body can be driving
-one direction, your gun aiming a second, and your radar sweeping a third, all in the same
-tick. That independence is the source of nearly every advanced tactic in the game. You
+one direction, your gun aiming a second, and your radar sweeping a third, all at the same
+moment. That independence is the source of nearly every advanced tactic in the game. You
 can flee to the left while shooting to the right and watching behind you, because the three
 machines don't have to agree.
 
@@ -58,7 +58,7 @@ The reason to think in these four beats rather than one big blob of code is that
 has its own limits (the reload, the recharge, the turn rates) and good play comes from
 respecting them separately. Your gun being reloaded doesn't help if your radar hasn't found
 anyone. Your radar finding someone doesn't help if your gun is pointed the wrong way and
-needs ten ticks to get there. The whole craft of a bot is keeping these three machines
+needs a couple of seconds to swing around. The whole craft of a bot is keeping these three machines
 pointed at the right things at the right time.
 
 ## Where to go next

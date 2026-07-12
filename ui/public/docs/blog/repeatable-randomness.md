@@ -45,7 +45,8 @@ replays. Nothing floats free. The starting positions, the orientations, the coin
 inside every bot: all of it descends from one number.
 
 The seed handles the randomness; the game's clockwork advance handles the timing, one
-tick at a time, each tick finishing all its work before the next begins.
+tick at a time (a tick is the game's tenth-of-a-second step), each tick finishing all
+its work before the next begins.
 Put the two together and you get something powerful: a match that unfolds
 identically every single time you run it, tick for tick, down to the last bullet. Set
 the seed, and you can reproduce a fight exactly. It's less like a recording and more
