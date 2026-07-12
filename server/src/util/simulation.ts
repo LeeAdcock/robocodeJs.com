@@ -67,7 +67,7 @@ export default {
             bot.handlers[Event.TICK]();
           }
 
-          if (bot.turret.loaded < 100) bot.turret.loaded += 2;
+          if (bot.turret.loaded < 100) bot.turret.loaded += 2.5;
           if (bot.turret.radar.charged < 100) bot.turret.radar.charged += 10;
         });
     });
