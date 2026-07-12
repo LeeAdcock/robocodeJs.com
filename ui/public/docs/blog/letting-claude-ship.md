@@ -30,10 +30,14 @@ each of which is boring on purpose:
 
 - **Cut the release.** One script builds the UI and the server, bumps the version, and
   regenerates the lockfile. Same steps, same order, every time.
-- **Nothing deploys on a merge.** Merging a change to `main` does not touch production.
-  Let me say that again, because it's the load-bearing wall: merging is not shipping.
-- **Deploys are triggered by a version tag.** Production only updates when someone pushes
-  a `vX.Y.Z` git tag. The pipeline watches for that tag and nothing else.
+- **Main is always releasable.** This is still CI/CD in the honest sense: every merge is
+  built, linted, and tested, so `main` stays in a shippable state at all times. What a
+  merge doesn't do is pick the release moment.
+- **Deploys are triggered by a version tag.** Production updates when someone pushes a
+  `vX.Y.Z` git tag, and the pipeline watches for that tag and nothing else. Sometimes a
+  tag ships one change, sometimes it collects a couple of enhancements that make sense to
+  release together. Continuous integration keeps the door always open; the tag decides
+  when to walk through it.
 - **Immutable deploys with a health check.** New instances come up alongside the old ones
   and have to pass a `/health` check before traffic moves. If the new version can't stand
   up, the old one keeps serving. Zero downtime, and a bad build doesn't take the site
