@@ -40,8 +40,12 @@ a game that had thrown away everything except the part I loved. You didn't drive
 You couldn't. You wrote its brain in Java, set it loose, and won or lost entirely on how
 well you'd thought it through beforehand. It was _all_ AI players, all the way down.
 
-[PERSONAL: the specific bot or tactic that first started winning for you, if you remember
-it — a name, a trick, a strategy you were proud of.]
+I don't remember the name of the first bot that started winning for me, but I remember
+exactly what made it win: teamwork. I had my tanks talk to each other, sharing the
+locations of enemies as their radars found them, so the whole team could gang up on one
+target at a time. Watching a pack of my little robots quietly corner something felt like
+getting away with a heist. Twenty years later that instinct is still my favorite part of
+the game.
 
 I played it through the end of high school and into college, and it quietly taught me what
 school was trying to teach me the hard way: how to reason about a system, hold it in your

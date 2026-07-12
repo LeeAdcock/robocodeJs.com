@@ -18,8 +18,12 @@ So I spent a weekend with the numbers. Four changes, all aimed at the same feeli
 fights faster, more decisive, and easier to read. Here's each one, before and after, and
 why.
 
-[PERSONAL: the specific match or matchup in playtesting that made it obvious something
-was off — what you were watching that dragged.]
+What tipped me over wasn't one match, it was a pattern. Bots that looked strong on
+paper, with good aim and sensible movement, kept losing anyway, and when I watched
+closely the reason was plain luck: where everyone happened to spawn, who happened to
+stumble into whom. Chance had too big a vote, and a well-built bot getting coin-flipped
+out of a match it deserved to win is its own kind of boring. These four changes were
+about taking some of that vote away.
 
 ## Change 1: faster reload
 

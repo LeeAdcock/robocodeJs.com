@@ -40,8 +40,12 @@ tests, read every line before it lands. The AI made me a more careful reviewer p
 because it made producing code so cheap. If I stopped reading closely, I'd be in trouble
 fast.
 
-[PERSONAL: a concrete thing the AI did genuinely well — a specific bug it found, a chunk
-of gnarly code it untangled, a refactor it nailed.]
+The moments that actually sold me weren't about code at all. It reads the application
+logs with me and points out places where players are quietly having a worse time than
+they should, the kind of small friction I'd long since stopped seeing. It suggests
+feature ideas by imagining different kinds of players and asking what each of them would
+want next, and then it helps me prioritize the list, plan the work, and ship it. That's
+not autocomplete. That's a colleague with opinions about the roadmap.
 
 ## Where it shines
 
@@ -63,9 +67,6 @@ look independent are secretly coupled by an assumption written nowhere. It will 
 produce something that's locally correct and globally wrong, and it will do it in clean,
 convincing code that reads like it knows what it's doing. That's the real hazard: not
 obvious garbage, but plausible mistakes.
-
-[PERSONAL: a concrete thing it got wrong — the plausible-looking change that would have
-broken something, and how you caught it.]
 
 So the judgment stays mine. It's superb at "how" and unreliable at
 "should." It'll implement any idea I give it, including the bad ones, without the flicker

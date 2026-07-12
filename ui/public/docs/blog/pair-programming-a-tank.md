@@ -75,10 +75,6 @@ You steered the whole thing in sentences. It did the editing, the compiling, the
 and the reading-of-results. That's pair-programming, except your pair never gets tired of
 re-running the match one more time.
 
-[PERSONAL: a genuinely fun or surprising thing an AI did when you let it loose on the
-arena — an unexpected strategy, a funny failure, a bot it built that actually impressed
-you.]
-
 I'll be honest that some part of me is still adjusting to this. I built RobocodeJs so a
 person could feel the specific joy of writing a bot and watching their idea come alive.
 Handing the keyboard to an AI could sound like it skips that. But in practice it doesn't

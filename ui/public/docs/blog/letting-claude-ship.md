@@ -19,8 +19,13 @@ prod," is the least interesting part of the setup. The interesting part is the
 plumbing around it, which I'd built long before an AI ever touched it, specifically so
 that no single actor, human or otherwise, could do something irreversible by accident.
 
-[PERSONAL: the specific moment an AI assistant either genuinely saved you or genuinely
-scared you during a deploy — what happened, what you were doing.]
+The moment that converted me came right after I first gave an assistant access to the
+AWS account. I expected it to run the deploy and report back. Instead it went reading
+first: combed through the server logs, turned up configuration errors I didn't know I
+had, fixed them, and then set up monitoring alerts so I'd hear about that class of
+problem before it hurt anyone. It didn't just do the chore. It noticed things, and then
+it made sure future problems would come find me. That's when "AI in production" stopped
+being a stunt in my head and started being staffing.
 
 ## What "shipping" actually is here
 

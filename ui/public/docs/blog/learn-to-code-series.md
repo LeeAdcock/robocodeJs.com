@@ -29,15 +29,14 @@ isn't intelligence. It's the on-ramp. Most people who "can't code" just never go
 win before the frustration outweighed the curiosity. So the entire course is engineered to
 get you a win fast, and then another one, before you have time to talk yourself out of it.
 
-I believe that because I've watched it happen up close. Years ago my daughter Claire and
-her best friend, nine years old at the time, spent a school year coding robots through
-competition missions, and their little two-girl team ended up
-[winning their age group in an international field of twenty-two thousand kids](https://www.wtvr.com/2018/05/23/this-all-girls-team-from-chesterfield-just-won-an-international-robotics-competition).
-Nobody sat them down and taught them "computer science." They had a robot, a mission, and
-a reason to care, and the programming happened to them on the way to the goal. That's the
-entire educational theory of this course: give someone a tank and a fight to win, and the
-coding sneaks in the back door. The same door it snuck through
-[for me](/blog/a-game-that-taught-me).
+I believe that because I've watched it happen up close. My daughter Claire and her best
+friend learned to code exactly this way, through robots and missions instead of
+lectures, and it carried them further than anyone expected
+([I've told that story before](/blog/it-moved-moment)). Nobody sat them down and taught
+them "computer science." They had a robot, a mission, and a reason to care, and the
+programming happened to them on the way to the goal. That's the entire educational
+theory of this course: give someone a tank and a fight to win, and the coding sneaks in
+the back door. The same door it snuck through [for me](/blog/a-game-that-taught-me).
 
 ## How it teaches
 

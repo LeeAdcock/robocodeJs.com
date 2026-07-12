@@ -61,7 +61,10 @@ dodges incoming fire, and reacts when it notices it's been spotted. It's my favo
 to point people toward once they've built something aggressive and watched it die gloriously
 in ten seconds.
 
-[PERSONAL: which sample is your personal favorite and why — one or two sentences.]
+For what it's worth, my own favorite in the whole set is still
+[Lighthouse](/samples/lighthouse). It's the simplest strategy on this page and it wins
+far more than it has any right to, which is its own little lesson: simple and consistent
+beats clever and fragile more often than anyone wants to admit.
 
 ## Teamwork
 
