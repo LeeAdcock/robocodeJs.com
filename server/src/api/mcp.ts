@@ -19,6 +19,7 @@ import Arena from '../types/arena';
 import App from '../types/app';
 import appService from '../services/AppService';
 import compiler from '../util/compiler';
+import formatter from '../util/formatter';
 import arenaService from '../services/ArenaService';
 import arenaMemberService from '../services/ArenaMemberService';
 import environmentService from '../services/EnvironmentService';
@@ -436,6 +437,55 @@ export const buildServer = (user: User): McpServer => {
         code = app.getSource();
       }
       return ok(await compiler.check(code));
+    }
+  );
+
+  server.registerTool(
+    'format_source',
+    {
+      title: 'Format app source',
+      description:
+        "Pretty-print bot JavaScript in RobocodeJs's house style — the same " +
+        'Prettier settings the in-app editor and pre-commit hook use (2-space ' +
+        'indent, single quotes, semicolons, trailing commas). Pass `source` to ' +
+        'format arbitrary code, or `appId` to format one of your saved apps. ' +
+        'Returns the formatted text and whether it `changed`; it does NOT save ' +
+        '— write the result back with set_app_source. Formatting is cosmetic ' +
+        'only and never changes behaviour or fixes logic. Unparseable source ' +
+        '(a syntax error) returns `{ ok: false }` with the parser message; ' +
+        'validate with check_app_source. For the readability conventions to ' +
+        'follow beyond formatting, read robocodejs://docs/code-style.',
+      inputSchema: {
+        source: z.string().optional().describe('Bot source to format'),
+        appId: z
+          .string()
+          .optional()
+          .describe("A saved app to format (used when 'source' is omitted)"),
+      },
+      outputSchema: {
+        ok: z.boolean(),
+        formatted: z.string().optional(),
+        changed: z.boolean().optional(),
+        message: z.string().optional(),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ source, appId }) => {
+      let code = source;
+      if (code === undefined) {
+        if (!appId) return fail('Provide `source` or `appId`.');
+        const app = await ownedApp(user, appId);
+        if (!app) return fail('No such bot, or it is not yours.');
+        code = app.getSource();
+      }
+      const result = await formatter.format(code);
+      if (!result.ok) {
+        return fail(
+          `Could not format the source: ${result.message}. It likely has a ` +
+            'syntax error — validate it with check_app_source.'
+        );
+      }
+      return ok(result);
     }
   );
 
@@ -1399,12 +1449,18 @@ const registerPrompts = (server: McpServer): void => {
               `skim a relevant sample under robocodejs://samples/ (or, if your ` +
               `client can't read MCP resources, call list_docs then read_doc ` +
               `with ids docs/dev, types/robocode.d.ts, and a samples/<name>). ` +
+              `Also read robocodejs://docs/code-style (read_doc id docs/code-style) ` +
+              `and follow it: open with a header comment stating the strategy, ` +
+              `name the tuning constants, pull tricky math into named helpers, and ` +
+              `comment the "why" — write it so a human can get up to speed fast. ` +
               `Then:\n` +
-              `1. create_app (give it a descriptive name and the initial source).\n` +
+              `1. format_source on your code, then create_app (descriptive name + ` +
+              `the formatted source).\n` +
               `2. add_app_to_arena${arenaId ? ` (arenaId ${arenaId})` : ''} and ` +
               `restart_arena.\n` +
               `3. Check arena_status and recent_logs; iterate with set_app_source ` +
-              `+ reboot_app until it behaves. Keep the code idiomatic to the docs.`,
+              `+ reboot_app until it behaves (run format_source before each save). ` +
+              `Keep the code idiomatic to the docs and readable per docs/code-style.`,
           },
         },
       ],
