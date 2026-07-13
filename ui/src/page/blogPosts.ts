@@ -43,6 +43,13 @@ export const formatDate = (iso: string): string => {
 
 export const BLOG_POSTS: BlogPostMeta[] = [
   {
+    slug: 'the-tidy-button',
+    title: 'The tidy button',
+    date: '2028-05-09',
+    summary:
+      'The editor’s Reformat button carries sixty years of history, from Lisp pretty-printers in 1967 to the winter-break project that ended the style wars. Why a tank game ships a code formatter.',
+  },
+  {
     slug: 'the-arena-is-a-web-page',
     title: 'The arena is a web page',
     date: '2028-03-14',
