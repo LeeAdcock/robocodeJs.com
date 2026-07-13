@@ -9,7 +9,7 @@ _March 11, 2025_
   style="border-radius: 50%; object-fit: cover; float: right; margin: 0.25rem 0 1rem 1.5rem; max-width: 40%;"
 />
 
-When you open a RobocodeJs arena, tanks are already moving, bullets are already flying,
+When you open a RobocodeJs arena, bots are already moving, bullets are already flying,
 and your browser somehow knows about all of it in real time. A reasonable question is:
 _how?_ Your browser didn't ask for each frame. It's not refreshing the page ten times a
 second. So how does the news of a live battle get from my server to your screen?
@@ -27,19 +27,19 @@ changes ten times a second and you'd be asking constantly.
 
 Server-Sent Events flips it. Your browser opens _one_ connection and just... leaves it
 open. Then the server sends little text messages down that pipe whenever it has something
-to say (a tank moved, a shot was fired, someone got hit), and the browser receives each
+to say (a bot moved, a shot was fired, someone got hit), and the browser receives each
 one as it arrives. The server talks, the browser listens. Under the hood it's just an
 ordinary web (HTTP) response that never quite finishes, dribbling out lines of
 text forever. That simplicity is the whole appeal.
 
 RobocodeJs runs two of these streams side by side. One carries the game events:
 the movements and hits and deaths that the arena draws. The other carries the bots'
-console logs, so when your tank prints something, you see it in the log panel in real
+console logs, so when your bot prints something, you see it in the log panel in real
 time. Same mechanism, two channels: one for the picture, one for the words.
 
 ## The neat part: joining a battle already in progress
 
-The detail I'm most proud of is this one. A live match is stateful: five tanks per app,
+The detail I'm most proud of is this one. A live match is stateful: five bots per app,
 each somewhere in the arena, each with some health, mid-fight. If you wander in
 as a spectator halfway through, how do you catch up? You missed the first half of the
 story.
@@ -47,7 +47,7 @@ story.
 The way I handle it: the arena is an **event emitter**, a little broadcaster that
 everything watching subscribes to. When a new spectator connects and subscribes, the
 first thing they receive is a **replay of the current state** (every app in the
-match, every tank and where it is right now) before the live stream continues.
+match, every bot and where it is right now) before the live stream continues.
 So a latecomer gets bootstrapped instantly. One moment you have an empty arena, the next
 it's fully populated with the battle as it stands, and from there you're just riding the
 same live stream as everyone else who was already watching.

@@ -14,9 +14,9 @@ JavaScript written by people I have never met, and runs it on my server. Not in 
 browser, where the worst they can do is crash their own tab. On my machine, the one
 that also holds everyone else's bots and the database behind them.
 
-I remember the moment that really landed. I had the arena working, tanks moving,
+I remember the moment that really landed. I had the arena working, bots moving,
 everything felt like a toy. And then it occurred to me that the whole point of the game
-is that _other people_ write the tank code. Strangers. On purpose. I was building a
+is that _other people_ write the bot code. Strangers. On purpose. I was building a
 thing whose core feature was "run untrusted code from the internet." That's usually the
 plot of a security incident, not a feature.
 
@@ -26,7 +26,7 @@ Once you accept that the code is hostile (and you have to assume it is, even whe
 isn't), the failure modes line up pretty quickly.
 
 Someone writes an infinite loop, on purpose or (far more often) by accident, and the
-whole server hangs while one tank spins forever. Someone allocates memory until the
+whole server hangs while one bot spins forever. Someone allocates memory until the
 process falls over and takes every other match down with it. Someone gets curious and
 tries to read the filesystem, or reach the database, or peek at another player's bot.
 Someone reads the real-world clock and makes their bot behave differently from one run
@@ -69,7 +69,7 @@ tells anyone who doesn't understand why that they "will almost certainly make a
 company-ending mistake." I took that personally, in the useful way. Nothing crosses the
 boundary.
 
-A crashed bot, a timed-out bot, a memory hog: all of them just get their tank killed
+A crashed bot, a timed-out bot, a memory hog: all of them just get killed in the arena
 and the game moves on. That's the design goal. Bad code should hurt the person
 who wrote it and nobody else.
 
@@ -77,7 +77,7 @@ who wrote it and nobody else.
 
 The thing I had to internalize is that "assume it's hostile" is the job, not paranoia.
 Ninety-nine percent of the code people write here is a beginner earnestly trying to
-make a tank shoot straight. But the wall can't be built for the ninety-nine percent. It
+make a bot shoot straight. But the wall can't be built for the ninety-nine percent. It
 has to be built for the one line of code, written by anyone, ever, that tries something
 it shouldn't, because I don't get to review it first. It compiles and runs the instant
 someone clicks the button.

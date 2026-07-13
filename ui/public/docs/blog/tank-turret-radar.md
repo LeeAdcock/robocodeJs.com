@@ -1,4 +1,4 @@
-# The tank, the turret, and the radar
+# The body, the turret, and the radar
 
 _July 11, 2023_
 
@@ -9,16 +9,16 @@ _July 11, 2023_
   style="border-radius: 50%; object-fit: cover; float: right; margin: 0.25rem 0 1rem 1.5rem; max-width: 40%;"
 />
 
-Your tank is not one machine. It's three machines bolted together, and each one turns on
+Your bot is not one machine. It's three machines bolted together, and each one turns on
 its own. If there's one mental model that unlocks RobocodeJs, that's it. Once it clicks,
 most of the game stops feeling mysterious. So let me walk through the three parts, what
 each one does, and how they fit into the little loop that runs your whole bot.
 
 ## Three machines, three steering wheels
 
-The first part is the **tank body**. It drives and it turns, at up to about 100 degrees a
+The first part is the **body**. It drives and it turns, at up to about 100 degrees a
 second (a full spin in under four seconds), and it carries everything else around the
-arena, 750 pixels on a side. When you tell the tank to move, this is what moves.
+arena, 750 pixels on a side. When you tell the bot to move, this is what moves.
 
 Bolted on top is the **turret**, the gun. It turns _relative to the body_, at about 20
 degrees a second, and it's what actually fires. Its angle is independent: the body can be
@@ -27,7 +27,7 @@ shot, so you can't just hold down the trigger; a good bot spends its shots.
 
 Mounted on the turret is the **radar**. It turns relative to the turret, also about 20
 degrees a second, and it recharges about once a second. The radar is how your bot _senses_: it's the only way you
-find out where the enemies are. No scan, no information; a blind tank is a dead tank.
+find out where the enemies are. No scan, no information; a blind bot is a dead bot.
 
 The thing to really sit with is that all three turn independently. Your body can be driving
 one direction, your gun aiming a second, and your radar sweeping a third, all at the same
@@ -64,12 +64,12 @@ pointed at the right things at the right time.
 ## Where to go next
 
 The best way to feel this is to watch it fail. Point your radar and gun the same direction
-and you'll see how a tank that "looks where it shoots" gets tunnel vision and drives into
+and you'll see how a bot that "looks where it shoots" gets tunnel vision and drives into
 things. Split them and it comes alive.
 
 If you want the exact turn rates, reload times, damage numbers, and everything else in one
 place, they all live on the [rules page](/rules). And if you haven't built a bot yet, the
-[lessons](/learn) walk you through this loop one beat at a time, starting from a tank that
+[lessons](/learn) walk you through this loop one beat at a time, starting from a bot that
 does nothing and ending with one that can find and hit a target. Start there, then come
 back and reread this. It lands differently once you've watched your own three machines
 argue with each other in the arena.

@@ -13,7 +13,7 @@ Most of my bots don't have a tick loop at all. That surprises people, because ev
 first bot is one big loop that runs every tick (the game's tenth-of-a-second heartbeat)
 and checks everything: am I being hit? is
 anyone on radar? is the gun ready? did I bump a wall? It works, and it's a perfectly
-reasonable place to start. But there's a second way to write a tank that's both simpler
+reasonable place to start. But there's a second way to write a bot that's both simpler
 to read and closer to how the game wants to talk to you.
 
 The game already knows when things happen to you. It fires an **event** the moment you get
@@ -50,7 +50,7 @@ bot.on(Event.HIT, (info) => {
 });
 ```
 
-That second bot is a complete, dangerous return-fire tank, and notice what's missing:
+That second bot is a complete, dangerous return-fire bot, and notice what's missing:
 there's no loop. It just sits quietly until it gets shot, then whips the turret around to
 the bearing the hit came from (a HIT event's `angle` is relative to your heading, so it
 points you straight back at your attacker) and fires the instant the gun is loaded. Nothing to poll, nothing to check. The [returnfire](/samples/returnfire) sample
@@ -85,9 +85,9 @@ to bring the things to it. The code ends up shorter, the intent is right there o
 surface, and you stop burning your whole tick budget re-checking conditions that rarely
 changed.
 
-You don't have to pick one religion. Plenty of my tanks react to HIT and COLLIDED events
+You don't have to pick one style and swear off the other. Plenty of my bots react to HIT and COLLIDED events
 but still keep a small loop for movement. But if your bot is one giant `if`-ladder running
 every tick, try turning the "did X happen?" checks into "when X happens, do Y" handlers
 and see how much falls away. The [events lesson](/learn/events) covers the full list of
 what the game will tell you about, and [returnfire](/samples/returnfire) is the loop-less
-tank to read first.
+bot to read first.

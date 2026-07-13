@@ -29,5 +29,22 @@ export default function BlogPostPage(props: { now?: Date }) {
     );
   }
 
-  return <MarkdownPage path={`blog/${slug}`} />;
+  return (
+    <>
+      <MarkdownPage path={`blog/${slug}`} />
+      {/* Every post signs off the same way — rendered here so individual
+          markdown files don't each need the image. The signature links to the
+          About page. */}
+      <div className="blog-signature" style={{ padding: '0 20px 40px' }}>
+        <Link to="/about" aria-label="About Lee, the creator of RobocodeJs">
+          <img
+            src="/docs/blog/signature.png"
+            alt="Lee's signature"
+            width="140"
+            style={{ maxWidth: '100%' }}
+          />
+        </Link>
+      </div>
+    </>
+  );
 }

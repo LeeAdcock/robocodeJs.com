@@ -39,8 +39,8 @@ Here's where it gets more interesting than simple privacy. You can hand someone 
 bot to fight against without showing them a single line.
 
 Every bot has a share link. Send it to a friend and they can add your bot to their own
-arena, where it fields its tanks and battles just like it does for you. What they get is
-a _reference_ to your bot, not a copy of it: they see your tanks drive, scan, and shoot,
+arena, where it fields its bots and battles just like it does for you. What they get is
+a _reference_ to your bot, not a copy of it: they see your bots drive, scan, and shoot,
 and they can lose to you at two in the morning as many times as they like. What the
 share link never grants is a look inside. And because it's a reference, it fields whatever
 your bot currently is; when you improve your code, every arena it's been added to starts
@@ -61,7 +61,7 @@ nobody can see is a tree falling in the woods.
 That's the line, and it's the same line the physical world uses. A chess player's moves
 are public the moment they're played; the preparation behind them stays home. Your bot's
 _behavior_ in the arena is legible to anyone who cares to study it, and a sharp opponent
-can absolutely learn from watching your tanks fight. What they can't do is skip the
+can absolutely learn from watching your bots fight. What they can't do is skip the
 studying and read the answer key.
 
 Personally, I think that's where the game gets good. In the classic Robocode community,

@@ -12,13 +12,13 @@ _December 8, 2026_
 A few weeks ago I wrote about [the wall](/blog/running-strangers-code): every bot runs
 inside a sealed sandbox with no filesystem, no network, and no way to touch my server.
 Which raises a fair question. If the sandbox is really sealed, how does `bot.turn(90)`
-do anything? Your code is locked in a soundproof room, and yet the tank turns. Somebody
+do anything? Your code is locked in a soundproof room, and yet the bot turns. Somebody
 is clearly listening. This post is about the listening.
 
 ## Two sides, one thin wire
 
 Everything a bot can do lives on the host side of the wall, in my code, where the real
-tank object and the real simulation are. What the sandbox gets is a set of deliberately
+bot object and the real simulation are. What the sandbox gets is a set of deliberately
 boring native functions I install into it before your code ever runs, one per ability.
 Think of each one as a phone that dials exactly one number.
 
@@ -26,11 +26,11 @@ Then, still before your code runs, I compile a thin JavaScript wrapper inside th
 sandbox that dresses those phones up as the friendly API you actually use: `bot.turn`,
 `bot.radar.scan`, `bot.turret.fire`, `clock`, `console`, even `setInterval`. When your
 bot calls `bot.turn(90)`, the wrapper picks up the phone, and my side hears the request,
-checks it, and applies it to the real tank.
+checks it, and applies it to the real bot.
 
 The important part is what never crosses. The sandbox library's own privileged handles
 (the objects that could reach back into my process) stay entirely on my side, which is
-the library's own first commandment for anyone running untrusted code. The wrapper
+the library's own cardinal rule for anyone running untrusted code. The wrapper
 inside the sandbox holds nothing but those single-purpose phones. A bot can read its own
 wrapper all day and find nothing worth stealing, which is the point. I wrote the API
 surface so that the most a hostile bot can ever do is ask, loudly, for things I was
@@ -63,7 +63,7 @@ The last piece is where your code actually executes. Bot code never runs on my s
 main thread. Every entry into the sandbox (loading your script, running an event
 handler, firing a timer callback) happens on a worker pool, off to the side, with a
 stopwatch on it. If your handler takes about five seconds, it's over: the run is
-cancelled, the app is marked crashed, and the simulation kills the tank and moves on.
+cancelled, the app is marked crashed, and the simulation kills the bot and moves on.
 
 That's also why the game's timers aren't real timers. `setInterval` inside a bot is
 driven by simulation ticks, not by the clock on the wall, so when a match pauses, your
@@ -79,5 +79,5 @@ handle crosses the wall, ever, in either direction, that I didn't put there on p
 If this is the layer of the game you enjoy, the test suite that keeps the bridge honest
 has [its own post](/blog/testing-a-game-engine), and the sandbox story starts in
 [How do you let strangers run code on your server?](/blog/running-strangers-code). And
-if you've never once thought about any of this while your tank happily turned left:
+if you've never once thought about any of this while your bot happily turned left:
 also the point.

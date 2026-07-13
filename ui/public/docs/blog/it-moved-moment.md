@@ -51,7 +51,7 @@ no "new game" ceremony. Your bot drops into a live fight.
 
 And the [Learn course](/learn) is built backwards from the moment. The very first lesson,
 [Hello](/learn/hello), isn't a tour of syntax or a lecture on variables. It's the shortest
-honest path to a tank that moves. I fought the urge to explain things first. Explanation
+honest path to a bot that moves. I fought the urge to explain things first. Explanation
 can wait; the spark can't.
 
 None of these are big clever features. They're mostly removals, things I chose not to put

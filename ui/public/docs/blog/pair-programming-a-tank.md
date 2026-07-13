@@ -1,4 +1,4 @@
-# Pair-programming a tank with an AI
+# Pair-programming a bot with an AI
 
 _February 10, 2026_
 

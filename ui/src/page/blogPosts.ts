@@ -47,14 +47,14 @@ export const BLOG_POSTS: BlogPostMeta[] = [
     title: 'The tidy button',
     date: '2027-04-13',
     summary:
-      'The editor’s Reformat button carries sixty years of history, from Lisp pretty-printers in 1967 to the winter-break project that ended the style wars. Why a tank game ships a code formatter.',
+      'The editor’s Reformat button carries sixty years of history, from Lisp pretty-printers in 1967 to the winter-break project that ended the style wars. Why a bot game ships a code formatter.',
   },
   {
     slug: 'the-arena-is-a-web-page',
     title: 'The arena is a web page',
     date: '2027-03-09',
     summary:
-      'Every tank you see is markup, not pixels. How the arena is drawn in SVG, smoothed by one line of CSS, painted over procedurally generated terrain, and trailed by a twenty-point memory ring.',
+      'Every bot you see is markup, not pixels. How the arena is drawn in SVG, smoothed by one line of CSS, painted over procedurally generated terrain, and trailed by a twenty-point memory ring.',
   },
   {
     slug: 'what-the-masters-knew',
@@ -75,7 +75,7 @@ export const BLOG_POSTS: BlogPostMeta[] = [
     title: 'How bot.turn() crosses the wall',
     date: '2026-12-08',
     summary:
-      'The sandbox is sealed, and yet the tank turns. The bridge that lets a bot’s requests through the wall without letting anything else through.',
+      'The sandbox is sealed, and yet the bot turns. The bridge that lets a bot’s requests through the wall without letting anything else through.',
   },
   {
     slug: 'running-strangers-code',
@@ -96,7 +96,7 @@ export const BLOG_POSTS: BlogPostMeta[] = [
     title: 'How do you unit-test a game you can’t see?',
     date: '2026-09-08',
     summary:
-      'Testing a real-time battle simulator without ever opening a browser. Mock tanks, real sandboxes, and one match played tick by tick in a test.',
+      'Testing a real-time battle simulator without ever opening a browser. Mock bots, real sandboxes, and one match played tick by tick in a test.',
   },
   {
     slug: 'repeatable-randomness',
@@ -127,13 +127,6 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       'Handing my release process to an AI assistant: tagged deploys, health checks, and the guardrails that let me sleep at night.',
   },
   {
-    slug: 'radar',
-    title: 'Radar',
-    date: '2026-05-26',
-    summary:
-      'A short one. Everything your bot knows about the world comes through the radar, and there’s an art to sweeping it.',
-  },
-  {
     slug: 'rebalanced-in-a-weekend',
     title: 'I rebalanced the whole game in a weekend',
     date: '2026-05-12',
@@ -148,15 +141,8 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       'What changed when I started building RobocodeJs with an AI pair-programmer: where it shines, where it doesn’t, and how my habits adapted.',
   },
   {
-    slug: 'learn-to-code-series',
-    title: 'You don’t need to know how to code',
-    date: '2026-03-10',
-    summary:
-      'Introducing the Learn series: a hands-on course that takes you from never having written a line of code to fielding a thinking bot.',
-  },
-  {
     slug: 'pair-programming-a-tank',
-    title: 'Pair-programming a tank with an AI',
+    title: 'Pair-programming a bot with an AI',
     date: '2026-02-10',
     summary:
       'RobocodeJs now speaks MCP, so an AI assistant can write, run, and watch your bots right alongside you. Here’s how to set it up and what it can do.',
@@ -170,10 +156,10 @@ export const BLOG_POSTS: BlogPostMeta[] = [
   },
   {
     slug: 'one-brain-five-tanks',
-    title: 'One brain, five tanks',
+    title: 'One brain, five bots',
     date: '2025-09-09',
     summary:
-      'Your bot isn’t one tank, it’s five, all running the same code. How to make them cooperate instead of tripping over each other.',
+      'Your app isn’t one bot, it’s five bots, all running the same code. How to make them cooperate instead of tripping over each other.',
   },
   {
     slug: 'why-wont-my-bot-shoot',
@@ -183,11 +169,25 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       'A debugging walkthrough: the five usual reasons a bot sits there doing nothing, and how to read the logs to find out which one is yours.',
   },
   {
+    slug: 'learn-to-code-series',
+    title: 'You don’t need to know how to code',
+    date: '2025-05-13',
+    summary:
+      'Introducing the Learn series: a hands-on course that takes you from never having written a line of code to fielding a thinking bot.',
+  },
+  {
     slug: 'streaming-the-arena',
     title: 'Watching a battle, live',
     date: '2025-03-11',
     summary:
       'How the arena in your browser stays in lockstep with the match on the server, using a decades-old, wonderfully boring web technology.',
+  },
+  {
+    slug: 'radar',
+    title: 'Radar',
+    date: '2024-12-10',
+    summary:
+      'Everything your bot knows about the world comes through the radar, and there’s an art to sweeping it.',
   },
   {
     slug: 'aim-where-theyll-be',
@@ -233,7 +233,7 @@ export const BLOG_POSTS: BlogPostMeta[] = [
   },
   {
     slug: 'tank-turret-radar',
-    title: 'The tank, the turret, and the radar',
+    title: 'The body, the turret, and the radar',
     date: '2023-07-11',
     summary:
       'Your bot is three machines bolted together, each of which turns on its own. Understanding that is most of understanding the game.',

@@ -44,7 +44,7 @@ strategies open up.
 
 **[Pathfinder](/samples/pathfinder)** is the first step into real navigation. It moves
 between a set of waypoints, using a little trigonometry to steer toward each point in turn.
-If you've ever wanted your tank to go _somewhere specific_ instead of just wandering, this
+If you've ever wanted your bot to go _somewhere specific_ instead of just wandering, this
 is the pattern to steal.
 
 ## Combat
@@ -68,7 +68,7 @@ beats clever and fragile more often than anyone wants to admit.
 
 ## Teamwork
 
-Every app in RobocodeJs fields five tanks that share one program, and these two are about
+Every app in RobocodeJs fields five bots that share one program, and these two are about
 making those five act like a team instead of five strangers.
 
 **[Magnetic](/samples/magnetic)** has teammates broadcast their positions to each other

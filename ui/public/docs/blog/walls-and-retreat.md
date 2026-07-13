@@ -11,7 +11,7 @@ _March 14, 2023_
 
 New bots don't die of bad marksmanship. They die of positioning and stubbornness. Once
 your bot can find an enemy and hit it, the next jump in skill is two boring habits, not a
-cleverer aiming trick. They keep your tank _alive long enough_ for the aiming to matter,
+cleverer aiming trick. They keep your bot _alive long enough_ for the aiming to matter,
 and they win more matches than any fancy shot: stay off the walls, and know when to run.
 
 ## Habit one: stop hugging the walls
@@ -20,10 +20,10 @@ Watch a beginner bot for a minute and you'll usually see it drift into a corner 
 stuck there. It feels safe; nothing can sneak up from behind a wall. It's the opposite of
 safe. Against the edge you've thrown away half your escape angles: you can't dodge into the
 wall, so every incoming shot only has to account for the directions you have left. You're
-easier to predict, easier to corner, and easier to pin. A tank in open space can juke in any
-direction; a tank on a wall is a sitting duck with good posture.
+easier to predict, easier to corner, and easier to pin. A bot in open space can juke in any
+direction; a bot on a wall is a sitting duck with good posture.
 
-The arena is 750 pixels on a side, and your tank always knows where it is. So give yourself a margin and
+The arena is 750 pixels on a side, and your bot always knows where it is. So give yourself a margin and
 steer back toward the middle whenever you get too close to an edge:
 
 ```js
@@ -39,7 +39,7 @@ if (x < MARGIN || x > 750 - MARGIN || y < MARGIN || y > 750 - MARGIN) {
 ```
 
 You don't have to be fancy about it. Even a crude "if I'm near an edge, head back toward the
-middle" rule will noticeably extend how long your tank survives. And surviving is how you
+middle" rule will noticeably extend how long your bot survives. And surviving is how you
 win. The best players treat the walls as lava and live in the open center where they always
 have somewhere to run.
 
@@ -48,7 +48,7 @@ have somewhere to run.
 The second habit is knowing that not every fight is worth finishing. Health is 100, and a
 single bullet takes 25 of it, so four clean hits and you're gone. A lot of bots don't track
 this at all. They trade shots to the bitter end and die in even matchups they could have
-walked away from. A tank that flees at 25 health and comes back later beats a tank that
+walked away from. A bot that flees at 25 health and comes back later beats a bot that
 stands its ground at 25 health and doesn't come back at all.
 
 Your bot can check its own health any time, so let it change its mind when things get thin:
@@ -84,7 +84,7 @@ keep their options open (room to move, health to spend) so they're still around 
 the opening comes.
 
 The exact numbers (health, damage, top speed, the arena size) all live on the
-[rules page](/rules) if you want to tune your margins precisely. And if your tank keeps
-getting picked off before positioning even matters, get it moving first: a tank that
+[rules page](/rules) if you want to tune your margins precisely. And if your bot keeps
+getting picked off before positioning even matters, get it moving first: a bot that
 stands still is the easiest kill in the game. Then come back and teach it where _not_
 to move.

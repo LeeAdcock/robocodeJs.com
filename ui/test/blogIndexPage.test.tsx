@@ -31,7 +31,7 @@ describe('BlogIndexPage', () => {
     expect(screen.queryByText('Why won’t my bot shoot?')).toBeNull();
     // And so must the scheduled 2026/2027 posts:
     expect(screen.queryByText('Every bot now has a number')).toBeNull();
-    expect(screen.queryByText('One brain, five tanks')).toBeNull();
+    expect(screen.queryByText('One brain, five bots')).toBeNull();
   });
 
   it('reveals a post on its exact date', () => {

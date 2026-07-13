@@ -1,6 +1,6 @@
 # You don't need to know how to code
 
-_March 10, 2026_
+_May 13, 2025_
 
 <img
   src="/docs/lee_headshot.jpg"
@@ -20,7 +20,7 @@ door in. It takes you from "I've never done this" to "I wrote that, and it moved
 ## Who this is for
 
 It's for the person who's always felt like coding was a locked room other people had the
-key to. It's for the kid who likes the idea of tanks fighting and doesn't care about
+key to. It's for the kid who likes the idea of bots fighting and doesn't care about
 "learning to program" as a goal in itself. It's for the adult who's tried a tutorial or
 two, hit a wall of jargon, and quietly concluded it wasn't for them.
 
@@ -35,7 +35,7 @@ lectures, and it carried them further than anyone expected
 ([I've told that story before](/blog/it-moved-moment)). Nobody sat them down and taught
 them "computer science." They had a robot, a mission, and a reason to care, and the
 programming happened to them on the way to the goal. That's the entire educational
-theory of this course: give someone a tank and a fight to win, and the coding sneaks in
+theory of this course: give someone a bot and a fight to win, and the coding sneaks in
 the back door. The same door it snuck through [for me](/blog/a-game-that-taught-me).
 
 ## How it teaches
@@ -43,8 +43,8 @@ the back door. The same door it snuck through [for me](/blog/a-game-that-taught-
 You don't read about programming. You build a bot, immediately, and you keep building the
 same bot as it grows.
 
-Every lesson is short and ends in a live tank doing something you told it to. Your first
-one, [Hello](/learn/hello), gets a tank on screen and moving in about as long as it takes
+Every lesson is short and ends in a live bot doing something you told it to. Your first
+one, [Hello](/learn/hello), gets a bot on screen and moving in about as long as it takes
 to read this paragraph. That's deliberate. The "it moved!" moment is the hook the whole
 rest of the course hangs on, and I want you to hit it in minutes, not after an afternoon
 of setup. There's nothing to install. You open a page, you type, it runs.
@@ -60,11 +60,11 @@ The lessons give you a working thing; the Experiments turn it into _your_ thing.
 The course runs about fourteen lessons, grouped into four parts, and each part is a real
 gear-shift in what your bot can do:
 
-1. **Getting moving.** Just drive. Make a tank go, turn, and stop where you want. This is
+1. **Getting moving.** Just drive. Make a bot go, turn, and stop where you want. This is
    pure "I control this," and it's where the spark catches.
 2. **Fighting back.** Now it has a gun. You learn to aim the turret, fire, and start
    dealing with the fact that there's someone else in the arena trying to end you.
-3. **Thinking bots.** The jump from a tank that _does_ things to a tank that _decides_
+3. **Thinking bots.** The jump from a bot that _does_ things to a bot that _decides_
    things: scanning for enemies, reacting to what it finds, making choices tick by tick.
 4. **Going pro.** The polish. Sharper tactics and the habits that separate a bot that
    works from a bot that wins.
@@ -85,5 +85,5 @@ That's really all this post is. The course is free, and it asks nothing of you
 except curiosity and a few minutes. If some part of you has always wondered whether you
 could, whether the locked room was really locked or just unfamiliar, go find out.
 
-Start at [/learn/hello](/learn/hello). Get a tank moving. Then go one lesson further than
+Start at [/learn/hello](/learn/hello). Get a bot moving. Then go one lesson further than
 you meant to. That's how it always goes.

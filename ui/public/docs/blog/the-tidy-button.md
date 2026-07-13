@@ -70,7 +70,7 @@ unconfigurable. You don't debate where the brace goes; the tool decides, everyon
 code comes out the same, and the argument evaporates, not because anyone won but
 because there's nothing left to argue about. Within a few years the overwhelming
 majority of JavaScript developers had adopted it, and the idea spread to other
-languages' formatters. The holy war didn't end in victory. It ended in irrelevance.
+languages' formatters. The old argument didn't end in victory. It ended in irrelevance.
 
 I find that genuinely beautiful, and it's the same philosophy this game leans on
 everywhere: [remove the decision, keep the momentum](/blog/it-moved-moment). You don't
@@ -78,6 +78,6 @@ configure the formatter here, just as you don't set up a toolchain or pick a
 project structure. You write your bot, you mash Ctrl-R, and the machine sweats the
 layout so you can spend your opinions on something that actually wins matches.
 
-Sixty years from GRINDEF to a button in a tank game. The dream was always the same:
+Sixty years from GRINDEF to a button in a bot game. The dream was always the same:
 let humans think about what the code _does_, and let the computer worry about how it
 looks.

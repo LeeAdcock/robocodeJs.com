@@ -202,3 +202,15 @@ body .tooltip {
   --bs-tooltip-bg: #3a3f4b;
   --bs-tooltip-color: #d6d6d6;
 }
+
+/* Blog signature: the PNG is black ink on a white background. Multiply blends
+   the white away against the light page; in night mode, invert the ink to
+   light and screen-blend the (now black) background away against the dark
+   page. Rendered by BlogPostPage under every published post. */
+.blog-signature img {
+  mix-blend-mode: multiply;
+}
+body.dark .blog-signature img {
+  filter: invert(1);
+  mix-blend-mode: screen;
+}

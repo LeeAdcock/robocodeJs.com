@@ -61,7 +61,7 @@ anyone made me, but because that's where the interesting work went.
 
 So the honest answer to "why JavaScript?" has a second half. The browser picked the
 language, and the language turned out to be worthy of it. The same JavaScript that makes
-your first tank move in a lunch break is, structurally, the JavaScript I'd happily run in
+your first bot move in a lunch break is, structurally, the JavaScript I'd happily run in
 production. A beginner's language and a professional's language turned out to be the same
 language, and that almost never happens.
 

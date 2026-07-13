@@ -11,35 +11,35 @@ _September 8, 2026_
 
 Most of what makes RobocodeJs fun is also what makes it hard to test. It's real-time:
 things happen tick by tick (a tick is the game's tenth-of-a-second heartbeat). It's
-visual: the proof that it works is tanks moving on a
+visual: the proof that it works is bots moving on a
 screen. And its core feature is _running other people's code inside a sandbox_, which is
 about as far from a tidy pure function as you can get. You can't exactly write
 `expect(theGame).toLookRight()`.
 
-So how do I know that a bullet does 25 damage, that a timeout kills a bot, that a tank
+So how do I know that a bullet does 25 damage, that a timeout kills a bot, that a bot
 turns when told to, without opening a browser and squinting at it? The answer
 is automated tests: small programs whose only job is to re-check the game's promises,
 automatically, every time I change the code. I've landed on three patterns of them, each
 aimed at a different layer, and together they cover a surprising amount.
 
-## Pattern one: fake tanks, real physics
+## Pattern one: fake bots, real physics
 
 The physics engine (movement, collisions, damage, who-hit-whom) is the beating heart of
-the game, and happily it's also the part that doesn't _care_ where its tanks came from.
-The engine just reads a tank's position and heading and speed, does the math, and writes
+the game, and happily it's also the part that doesn't _care_ where its bots came from.
+The engine just reads a bot's position and heading and speed, does the math, and writes
 the results back. It doesn't need a sandbox or real bot code, only objects shaped like
-tanks.
+bots.
 
-So the first pattern is to hand the engine **lightweight mock tanks**, plain objects with
+So the first pattern is to hand the engine **lightweight mock bots**, plain objects with
 the right fields. Place them exactly where I want, run one tick, and check what happened.
-Put two tanks close enough and assert they collide. Fire a bullet into one and assert its
+Put two bots close enough and assert they collide. Fire a bullet into one and assert its
 health dropped by 25. Miss a shot and assert the small penalty landed instead. It's fast,
 it's deterministic, and it lets me test every corner of the physics without the weight of
 the sandbox at all.
 
 ```js
 // (illustrative; the real tests are wordier, but this is their shape)
-// place two mock tanks 200 pixels apart, fire, let the bullet fly
+// place two mock bots 200 pixels apart, fire, let the bullet fly
 const target = mockTank({ x: 100, y: 100, health: 100 });
 const shooter = mockTank({ x: 100, y: 300 });
 fireAt(shooter, target);
@@ -52,7 +52,7 @@ of bug, which is the most common thing I break.
 
 ## Pattern two: a real sandbox, to lock the contract
 
-The mock tanks prove the physics. They don't prove the thing bots actually touch: the
+The mock bots prove the physics. They don't prove the thing bots actually touch: the
 API surface. When a bot writes `bot.turret.fire()` or `bot.radar.scan()`, is that call
 wired to the right machinery? Does `clock.getTime()` return a number? Is `Date` really
 switched off like it's supposed to be?
@@ -71,7 +71,7 @@ The first two patterns test the halves. The third tests the whole thing glued to
 because that's where the interesting bugs hide.
 
 This pattern takes a **real bot**, compiles it into a **real isolate**, drops it into the
-simulation, and then drives the match forward one tick at a time, asserting the tank's
+simulation, and then drives the match forward one tick at a time, asserting the bot's
 state as it goes. This is the closest thing to "playing the game" that a test can be, and
 it's caught things the isolated tests never could, because it exercises the seam between
 the async sandbox and the synchronous physics.
@@ -79,13 +79,13 @@ the async sandbox and the synchronous physics.
 That seam is subtle, and worth understanding: a bot's commands are **asynchronous** (the
 bot `await`s them) but their _effects_ land synchronously. When a bot sets its target
 speed, that intent is recorded immediately; then the physics engine applies it gradually,
-over ticks, as the tank accelerates. So the test does a little dance: advance a tick, let
-the bot's async work settle, check the state, advance again. Watching a real tank crawl up
+over ticks, as the bot accelerates. So the test does a little dance: advance a tick, let
+the bot's async work settle, check the state, advance again. Watching a real bot crawl up
 to speed across a handful of ticks, in a test, with no browser open, is oddly satisfying.
 
 ## What each one buys me
 
-The three form a ladder. The mock-tank tests are cheap and plentiful and cover the physics
+The three form a ladder. The mock-bot tests are cheap and plentiful and cover the physics
 exhaustively. The real-isolate tests are fewer but they guard the exact promises bots rely
 on. The full integration tests are the fewest and slowest, but they're the ones that prove
 the pieces actually work _together_.

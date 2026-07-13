@@ -20,7 +20,7 @@ if (bot.radar.isReady()) {
 }
 ```
 
-Do that and you'll hit things that stand still. The trouble is that good tanks don't stand
+Do that and you'll hit things that stand still. The trouble is that good bots don't stand
 still (that's the whole point of [Stationary bots die](/blog/stationary-bots-die)), and
 against anything moving, aiming _at_ it will miss almost every time. The reason is the one
 detail everybody forgets: your bullet is not instant.

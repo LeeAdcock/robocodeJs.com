@@ -10,7 +10,7 @@ _August 11, 2026_
 />
 
 There's a small contradiction sitting at the heart of RobocodeJs, and I had to solve it
-before the game could ever be fair. A good match needs randomness: tanks shouldn't start
+before the game could ever be fair. A good match needs randomness: bots shouldn't start
 in the same spot every time, or the whole thing becomes a memorization exercise. But a
 good match also needs to be _repeatable_. If a bot mysteriously loses, I want to run that
 exact fight again and watch what went wrong. Randomness and repeatability sound like
@@ -28,13 +28,13 @@ tomorrow and it produces the exact same sequence, number for number.
 
 That's the trapdoor out of the contradiction. If every unpredictable thing in a match is
 drawn from one seeded generator, then the seed _is_ the match. RobocodeJs uses a tiny,
-fast generator called mulberry32 for this. Give it seed 12345 and the tanks spawn in one
+fast generator called mulberry32 for this. Give it seed 12345 and the bots spawn in one
 arrangement; give it 12346 and they spawn in another. Both feel random to a player. Both
 are perfectly reproducible to me.
 
 ## One seed, the whole match
 
-The part that makes it work: the seed doesn't just place the tanks. It
+The part that makes it work: the seed doesn't just place the bots. It
 drives _every_ source of randomness in the match, including the one inside your bot.
 
 When your bot calls `Math.random()`, it isn't getting the browser's or the server's real

@@ -59,7 +59,7 @@ The best classic gunners kept whole statistical profiles per opponent and hit do
 bots that "couldn't" be hit.
 
 Your bot can carry the pocket version. It has memory; nothing stops you keeping a
-little tally: when I led by a full tank-length, did I hit? When I aimed straight at
+little tally: when I led by a full bot-length, did I hit? When I aimed straight at
 them? Even two or three buckets, updated as the match runs, will start telling you which
 kind of mover you're fighting, and a bot that adapts its lead mid-match is a genuinely
 scary thing to face. The [leading lesson](/learn/leading) gives you the geometric

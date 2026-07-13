@@ -74,7 +74,7 @@ beginner can feel powerful, and we'd buried that magic under a software installa
 So the goal I set myself was almost embarrassingly simple: get someone from nothing to
 _their code, alive in the arena_ as fast as possible. No download. No toolchain. No
 account with a credit card. You open a web page, you write a few lines of JavaScript, and
-you watch your tank do the thing you told it to.
+you watch your bot do the thing you told it to.
 
 Everything else I build here, from the arena to the sandbox that runs your code safely to
 the [Learn course](/learn) and the docs, is really in service of that one moment. I want

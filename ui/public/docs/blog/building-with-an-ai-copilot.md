@@ -91,4 +91,4 @@ name is on the thing. It drafts; I decide. That division of labor is the whole g
 as long as I keep it, this is the most productive, and least lonely, this project has
 ever been. If you want to see what happens
 when you point one of these models at the game itself instead of the codebase, I wrote
-about that too, over in [pair-programming a tank](/blog/pair-programming-a-tank).
+about that too, over in [pair-programming a bot](/blog/pair-programming-a-tank).

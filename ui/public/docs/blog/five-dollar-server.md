@@ -9,7 +9,7 @@ _November 11, 2025_
   style="border-radius: 50%; object-fit: cover; float: right; margin: 0.25rem 0 1rem 1.5rem; max-width: 40%;"
 />
 
-Every battle you've ever watched on this site (every tank, every bullet, every match)
+Every battle you've ever watched on this site (every bot, every bullet, every match)
 happens on a single small computer humming away in an Amazon data center, and most
 months it costs me nothing at all. The server and its little database both fit inside
 AWS's free tier. What I actually pay for is the exceptions: release days, when two
@@ -81,7 +81,7 @@ can't ship features that only work if I throw hardware at them.
 
 So "good enough" here means: it stays up, it recovers from a spike instead of dying to
 one, and a bad deploy fails without taking the site with it. That's the bar. Not five nines of uptime for a
-game where the stakes are a tank drawing on a screen, just a reliable, cheap, boring box
+game where the stakes are a bot drawing on a screen, just a reliable, cheap, boring box
 that's still going to be here next year.
 
 A lot of that same constraint shows up elsewhere, like in how the game streams matches
