@@ -43,6 +43,13 @@ export const formatDate = (iso: string): string => {
 
 export const BLOG_POSTS: BlogPostMeta[] = [
   {
+    slug: 'the-arena-is-a-web-page',
+    title: 'The arena is a web page',
+    date: '2028-03-14',
+    summary:
+      'Every tank you see is markup, not pixels. How the arena is drawn in SVG, smoothed by one line of CSS, painted over procedurally generated terrain, and trailed by a twenty-point memory ring.',
+  },
+  {
     slug: 'what-the-masters-knew',
     title: 'What the masters knew',
     date: '2028-01-11',
