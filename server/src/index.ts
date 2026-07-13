@@ -82,6 +82,10 @@ app.use('/api', apiRateLimit);
 app.use(
   '/',
   express.static('./dist/public', {
+    // Don't auto-serve index.html for "/" — let it fall through to the SPA
+    // fallback below so the homepage gets its per-page SEO metadata injected
+    // like every other route.
+    index: false,
     // The raw markdown sources (/docs/**.md) and the blog manifest are fetched
     // by the SPA at runtime, but they are not human-facing pages — the real
     // routes are /blog/<slug>, /learn/<slug>, etc. Tell crawlers not to index

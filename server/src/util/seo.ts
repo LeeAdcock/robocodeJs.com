@@ -45,88 +45,90 @@ export interface SeoDeps {
 const SITE = 'RobocodeJs';
 const DEFAULT_DESCRIPTION =
   'RobocodeJs is a free browser game where you write JavaScript bots that ' +
-  'battle in a live arena. No install, no setup — write a few lines and watch ' +
+  'battle in a live arena. No install, no setup: write a few lines and watch ' +
   'them fight. Learn to code by building battle bots.';
 
 // Curated titles/descriptions for the top-level pages. Anything not listed and
 // not a /blog or /learn route falls back to the site default.
+// Titles are brand-first ("RobocodeJs | <page>") so a tab is recognizable at a
+// glance when the user has many open; descriptions carry the keyword detail.
 const STATIC_PAGES: Record<string, { title: string; description: string }> = {
   '/': {
-    title: 'RobocodeJs — Learn to code by building battle bots',
+    title: 'RobocodeJs | Learn to code by building battle bots',
     description: DEFAULT_DESCRIPTION,
   },
   '/about': {
-    title: 'About RobocodeJs',
+    title: 'RobocodeJs | About',
     description:
       'The story behind RobocodeJs: a browser reimagining of the classic ' +
       'Robocode, built to hand the spark of programming to anyone who has ' +
       'never written a line of code.',
   },
   '/learn': {
-    title: 'Learn to Code with Robots — RobocodeJs',
+    title: 'RobocodeJs | Learn to Code with Robots',
     description:
       'A free, hands-on course that teaches you to code from scratch by ' +
-      'building battle bots. No experience needed — every idea explained in ' +
+      'building battle bots. No experience needed. Every idea is explained in ' +
       'plain words with examples you can run right away.',
   },
   '/learn/docs': {
-    title: 'Bot API Reference — RobocodeJs',
+    title: 'RobocodeJs | Bot API Reference',
     description:
       'The full developer reference for writing RobocodeJs bots: movement, ' +
       'radar, turret, events, timers, and the arena API.',
   },
   '/rules': {
-    title: 'Game Rules & Physics — RobocodeJs',
+    title: 'RobocodeJs | Game Rules & Physics',
     description:
       'The numbers behind RobocodeJs: directions, speeds, reload and radar ' +
       'timing, damage, and how combat resolves.',
   },
   '/examples': {
-    title: 'Example Bots — RobocodeJs',
+    title: 'RobocodeJs | Example Bots',
     description:
-      'Complete bot strategies you can read, run, and remix — from a simple ' +
+      'Complete bot strategies you can read, run, and remix, from a simple ' +
       'scan-and-fire lighthouse to a shot-leading marksman and a coordinated ' +
       'squad.',
   },
   '/blog': {
-    title: 'Blog — RobocodeJs',
+    title: 'RobocodeJs | Blog',
     description:
       'Notes from building RobocodeJs: bot strategy, debugging, how the game ' +
       'works under the hood, and what it is like to build and run a small ' +
       'game on the side.',
   },
   '/rankings': {
-    title: 'How the Global Rankings Work — RobocodeJs',
+    title: 'RobocodeJs | How the Global Rankings Work',
     description:
       'Every eligible bot earns a persistent Elo rating from background ' +
       'matches. How the ladder works and why your rating follows your current ' +
       'code.',
   },
   '/leaderboard': {
-    title: 'Global Rankings — RobocodeJs',
+    title: 'RobocodeJs | Global Rankings',
     description:
       'The top-rated bots across all players, ranked by Elo from head-to-head ' +
       'matches.',
   },
   '/mcp': {
-    title: 'AI Integration (MCP) — RobocodeJs',
+    title: 'RobocodeJs | AI Integration (MCP)',
     description:
       'Connect an AI assistant to RobocodeJs over the Model Context Protocol ' +
       'to write, run, and watch your bots.',
   },
   '/classic': {
-    title: 'Coming from classic Robocode? — RobocodeJs',
+    title: 'RobocodeJs | Coming from classic Robocode?',
     description:
       'A migration guide mapping classic (Java) Robocode concepts onto ' +
       'RobocodeJs for players who already know the original game.',
   },
   '/error-codes': {
-    title: 'Bot Error Codes — RobocodeJs',
+    title: 'RobocodeJs | Bot Error Codes',
     description:
       'What each E0xx error code in your bot log means, and how to fix it.',
   },
   '/privacy': {
-    title: 'Privacy — RobocodeJs',
+    title: 'RobocodeJs | Privacy',
     description: 'How RobocodeJs handles your data.',
   },
 };
@@ -223,9 +225,9 @@ export const createSeoResolver = (deps: SeoDeps) => {
       const published = !!post && post.date <= isoNow();
       if (post && published) {
         return {
-          // "… — RobocodeJs Blog" so search results signal an article/post
+          // "RobocodeJs | Blog | <title>" so tabs read brand-first and search results
           // (distinct from the /learn lessons and reference docs).
-          title: `${post.title} — ${SITE} Blog`,
+          title: `${SITE} | Blog | ${post.title}`,
           description: clamp(post.summary),
           canonical,
           ogType: 'article',
@@ -244,7 +246,7 @@ export const createSeoResolver = (deps: SeoDeps) => {
       }
       // Unknown or not-yet-published post: keep it out of the index.
       return {
-        title: `Blog — ${SITE}`,
+        title: `${SITE} | Blog`,
         description: STATIC_PAGES['/blog'].description,
         canonical: origin + '/blog',
         ogType: 'website',
@@ -260,14 +262,14 @@ export const createSeoResolver = (deps: SeoDeps) => {
         const t = titleOf(md);
         const d = describeMarkdown(md);
         return {
-          title: t ? `${t} — Learn — ${SITE}` : `Learn — ${SITE}`,
+          title: t ? `${SITE} | Learn | ${t}` : `${SITE} | Learn`,
           description: d ? clamp(d) : STATIC_PAGES['/learn'].description,
           canonical,
           ogType: 'article',
         };
       }
       return {
-        title: `Learn — ${SITE}`,
+        title: `${SITE} | Learn`,
         description: STATIC_PAGES['/learn'].description,
         canonical: origin + '/learn',
         ogType: 'website',
@@ -281,7 +283,7 @@ export const createSeoResolver = (deps: SeoDeps) => {
       const name = sampleMatch[1];
       const pretty = name.charAt(0).toUpperCase() + name.slice(1);
       return {
-        title: `${pretty} — Example Bot — ${SITE}`,
+        title: `${SITE} | Example Bot | ${pretty}`,
         description: `Read the source of the ${pretty} example bot and clone it into your own arena.`,
         canonical,
         ogType: 'article',

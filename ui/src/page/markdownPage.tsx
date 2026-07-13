@@ -9,6 +9,7 @@ import parse, {
   HTMLReactParserOptions,
 } from 'html-react-parser';
 import { Link, useLocation } from 'react-router-dom';
+import { useDocumentTitle, brandTitle } from '../util/useDocumentTitle';
 
 // Open external and type-definition links in a new tab so following one doesn't
 // navigate away from the app; in-app doc links (e.g. /learn/docs, /samples/:name)
@@ -48,11 +49,20 @@ const parseOptions: HTMLReactParserOptions = {
 
 interface MarkdownPageProps {
   path: string;
+  // Optional middle segment for the tab title, e.g. "Blog" or "Learn". The title
+  // is built brand-first as "RobocodeJs | <section> | <h1>" to match what the
+  // server injects on load (see util/useDocumentTitle + server/src/util/seo.ts).
+  titleSection?: string;
 }
 
 export default function MarkdownPage(props: MarkdownPageProps) {
   const [html, setHtml] = useState('');
   const [md, setMd] = useState('');
+
+  // Keep the tab title current on in-app navigation (the server sets it on the
+  // initial load; see util/useDocumentTitle).
+  const h1 = md.match(/^#\s+(.+)$/m)?.[1].trim();
+  useDocumentTitle(h1 ? brandTitle(props.titleSection, h1) : null);
 
   const divRef = useRef<HTMLDivElement>(null);
 

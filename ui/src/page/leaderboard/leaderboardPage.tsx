@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import LeaderboardEntry from '../../types/leaderboardEntry';
+import { brandTitle, useDocumentTitle } from '../../util/useDocumentTitle';
 
 // The global bot ladder (GitHub #151). A read-only, public view of the top
 // rated bots across all users — reachable from the main nav even when logged
@@ -41,6 +42,7 @@ const goldFirstCell = (base: React.CSSProperties): React.CSSProperties => ({
 });
 
 export default function LeaderboardPage() {
+  useDocumentTitle(brandTitle('Global Rankings'));
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
