@@ -1,6 +1,6 @@
 # Two simulations, one game
 
-_May 11, 2027_
+_January 12, 2027_
 
 <img
   src="/docs/lee_headshot.jpg"

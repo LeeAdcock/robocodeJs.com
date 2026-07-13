@@ -45,70 +45,70 @@ export const BLOG_POSTS: BlogPostMeta[] = [
   {
     slug: 'the-tidy-button',
     title: 'The tidy button',
-    date: '2028-05-09',
+    date: '2027-07-13',
     summary:
       'The editor’s Reformat button carries sixty years of history, from Lisp pretty-printers in 1967 to the winter-break project that ended the style wars. Why a tank game ships a code formatter.',
   },
   {
     slug: 'the-arena-is-a-web-page',
     title: 'The arena is a web page',
-    date: '2028-03-14',
+    date: '2027-06-08',
     summary:
       'Every tank you see is markup, not pixels. How the arena is drawn in SVG, smoothed by one line of CSS, painted over procedurally generated terrain, and trailed by a twenty-point memory ring.',
   },
   {
     slug: 'what-the-masters-knew',
     title: 'What the masters knew',
-    date: '2028-01-11',
+    date: '2027-05-11',
     summary:
       'The classic Robocode community spent two decades doing science to a game. What wave surfing and guess-factor targeting look like translated into this arena.',
   },
   {
     slug: 'who-can-see-your-code',
     title: 'Who can see your bot’s code?',
-    date: '2027-11-09',
+    date: '2027-04-13',
     summary:
       'Nobody can read your bot’s source but you. On share links, open spectating, and the difference between sharing the fighter and sharing the blueprint.',
   },
   {
     slug: 'crossing-the-wall',
     title: 'How bot.turn() crosses the wall',
-    date: '2027-09-14',
+    date: '2027-03-09',
     summary:
       'The sandbox is sealed, and yet the tank turns. The bridge that lets a bot’s requests through the wall without letting anything else through.',
   },
   {
     slug: 'running-strangers-code',
     title: 'How do you let strangers run code on your server?',
-    date: '2027-07-13',
+    date: '2027-02-09',
     summary:
       'Every bot is code written by someone I’ve never met, running on my machine. The story of the sandbox that makes that safe.',
   },
   {
     slug: 'two-simulations-one-game',
     title: 'Two simulations, one game',
-    date: '2027-05-11',
+    date: '2027-01-12',
     summary:
       'The server decides what really happens; your browser quietly predicts the in-between frames. Why the game runs the physics twice, and how they stay in sync.',
   },
   {
     slug: 'testing-a-game-engine',
     title: 'How do you unit-test a game you can’t see?',
-    date: '2027-03-09',
+    date: '2026-12-08',
     summary:
       'Testing a real-time battle simulator without ever opening a browser. Mock tanks, real sandboxes, and one match played tick by tick in a test.',
   },
   {
     slug: 'one-brain-five-tanks',
     title: 'One brain, five tanks',
-    date: '2027-01-12',
+    date: '2026-11-10',
     summary:
       'Your bot isn’t one tank, it’s five, all running the same code. How to make them cooperate instead of tripping over each other.',
   },
   {
     slug: 'radar',
     title: 'Radar',
-    date: '2026-11-10',
+    date: '2026-10-13',
     summary:
       'A short one. Everything your bot knows about the world comes through the radar, and there’s an art to sweeping it.',
   },

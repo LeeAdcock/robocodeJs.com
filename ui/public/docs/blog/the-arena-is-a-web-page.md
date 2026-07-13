@@ -1,6 +1,6 @@
 # The arena is a web page
 
-_March 14, 2028_
+_June 8, 2027_
 
 <img
   src="/docs/lee_headshot.jpg"

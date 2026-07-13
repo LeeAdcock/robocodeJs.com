@@ -1,6 +1,6 @@
 # What the masters knew
 
-_January 11, 2028_
+_May 11, 2027_
 
 <img
   src="/docs/lee_headshot.jpg"

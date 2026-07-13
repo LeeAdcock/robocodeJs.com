@@ -1,6 +1,6 @@
 # How bot.turn() crosses the wall
 
-_September 14, 2027_
+_March 9, 2027_
 
 <img
   src="/docs/lee_headshot.jpg"
