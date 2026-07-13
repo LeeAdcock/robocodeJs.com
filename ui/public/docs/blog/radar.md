@@ -61,8 +61,27 @@ bot.on(Event.SCANNED, (targets) => {
 });
 ```
 
-If there's one thing to take away, it's that radar is the sense that makes everything else
-possible, and it's the one beginners neglect. You can have the best aim and the smartest
-movement in the arena, but if your beam is pointed at a wall, none of it fires. Get your
-eyes working first. The [radar lesson](/learn/radar) goes deeper, and
-[lighthouse](/samples/lighthouse) is fifteen lines of tank that never stops looking.
+## The class where the sensors were real
+
+I learned to respect this part of the problem in the physical world. At Georgia Tech I
+took a class that was, more or less, Robocode in real life: small robots we programmed
+ourselves, set loose in a real arena. The goal was to find infrared emitters placed
+around the arena and push them to the very center; our score was the total distance of
+the emitters from center when time ran out.
+
+Real sensors, it turns out, lie constantly. Before our bot could push anything, it had
+to figure out where it even _was_: discover the size and orientation of the arena,
+then search until its unreliable infrared eyes finally caught an emitter, then do some
+careful algebra to swing around _behind_ the thing so that shoving it moved it toward
+the center and not off into a corner. Ninety percent of the work was sensing and
+positioning. The shove was the easy part. I'll never forget that class, and it left me
+with the conviction this post is built on: a robot is only as good as its picture of
+the world.
+
+Your radar here is a miracle of honesty by comparison. It never lies about what it
+sees; it just doesn't see much at once. But the discipline it teaches is the same one
+those infrared sensors taught me: sense first, act second. You can have the best aim
+and the smartest movement in the arena, but if your beam is pointed at a wall, none of
+it fires. Get your eyes working first. The [radar lesson](/learn/radar) goes deeper,
+and [lighthouse](/samples/lighthouse) is fifteen lines of tank that never stops
+looking.
