@@ -1,6 +1,6 @@
 # One brain, five tanks
 
-_September 8, 2026_
+_September 9, 2025_
 
 <img
   src="/docs/lee_headshot.jpg"

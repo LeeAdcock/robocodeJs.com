@@ -1,6 +1,6 @@
 # Radar
 
-_August 25, 2026_
+_May 26, 2026_
 
 <img
   src="/docs/lee_headshot.jpg"

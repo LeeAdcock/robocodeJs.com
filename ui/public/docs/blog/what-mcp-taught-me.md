@@ -1,6 +1,6 @@
 # The user who reads the manual
 
-_July 28, 2026_
+_June 23, 2026_
 
 <img
   src="/docs/lee_headshot.jpg"

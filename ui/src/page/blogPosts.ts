@@ -94,23 +94,9 @@ export const BLOG_POSTS: BlogPostMeta[] = [
   {
     slug: 'testing-a-game-engine',
     title: 'How do you unit-test a game you can’t see?',
-    date: '2026-09-22',
-    summary:
-      'Testing a real-time battle simulator without ever opening a browser. Mock tanks, real sandboxes, and one match played tick by tick in a test.',
-  },
-  {
-    slug: 'one-brain-five-tanks',
-    title: 'One brain, five tanks',
     date: '2026-09-08',
     summary:
-      'Your bot isn’t one tank, it’s five, all running the same code. How to make them cooperate instead of tripping over each other.',
-  },
-  {
-    slug: 'radar',
-    title: 'Radar',
-    date: '2026-08-25',
-    summary:
-      'A short one. Everything your bot knows about the world comes through the radar, and there’s an art to sweeping it.',
+      'Testing a real-time battle simulator without ever opening a browser. Mock tanks, real sandboxes, and one match played tick by tick in a test.',
   },
   {
     slug: 'repeatable-randomness',
@@ -120,13 +106,6 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       'A fair ladder needs matches you can replay exactly. How a single number makes the game’s “randomness” perfectly reproducible.',
   },
   {
-    slug: 'what-mcp-taught-me',
-    title: 'The user who reads the manual',
-    date: '2026-07-28',
-    summary:
-      'Building an MCP interface for AI assistants turned out to be the strangest API design work I’ve ever done. What a perfectly literal user taught me about naming, observability, and worst cases.',
-  },
-  {
     slug: 'launching-global-rankings',
     title: 'Every bot now has a number',
     date: '2026-07-12',
@@ -134,11 +113,25 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       'The Global Rankings are live: every eligible bot now carries a persistent Elo rating, earned in matches it never has to enter. How the ladder works, and why your rating rides your current code.',
   },
   {
+    slug: 'what-mcp-taught-me',
+    title: 'The user who reads the manual',
+    date: '2026-06-23',
+    summary:
+      'Building an MCP interface for AI assistants turned out to be the strangest API design work I’ve ever done. What a perfectly literal user taught me about naming, observability, and worst cases.',
+  },
+  {
     slug: 'letting-claude-ship',
     title: 'I let an AI push to production',
     date: '2026-06-09',
     summary:
       'Handing my release process to an AI assistant: tagged deploys, health checks, and the guardrails that let me sleep at night.',
+  },
+  {
+    slug: 'radar',
+    title: 'Radar',
+    date: '2026-05-26',
+    summary:
+      'A short one. Everything your bot knows about the world comes through the radar, and there’s an art to sweeping it.',
   },
   {
     slug: 'rebalanced-in-a-weekend',
@@ -174,6 +167,13 @@ export const BLOG_POSTS: BlogPostMeta[] = [
     date: '2025-11-11',
     summary:
       'RobocodeJs runs on a very small server. A tour of the frugal hosting setup, the night it ran out of memory, and what I learned.',
+  },
+  {
+    slug: 'one-brain-five-tanks',
+    title: 'One brain, five tanks',
+    date: '2025-09-09',
+    summary:
+      'Your bot isn’t one tank, it’s five, all running the same code. How to make them cooperate instead of tripping over each other.',
   },
   {
     slug: 'why-wont-my-bot-shoot',
