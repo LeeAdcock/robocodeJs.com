@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import MarkdownPage from './markdownPage';
 import { findPost, isPublished, formatDate } from './blogPosts';
+import { useDocumentTitle, brandTitle } from '../util/useDocumentTitle';
 
 // Renders a single blog post. The /blog/:slug route maps to the markdown file
 // blog/<slug>.md (served from public/docs), reusing the docs renderer — mirrors
@@ -10,8 +11,13 @@ import { findPost, isPublished, formatDate } from './blogPosts';
 export default function BlogPostPage(props: { now?: Date }) {
   const { slug } = useParams();
   const post = slug ? findPost(slug) : undefined;
+  const published = !!post && isPublished(post, props.now ?? new Date());
+  // Match the server: "RobocodeJs | Blog | <title>" (or just the blog section).
+  useDocumentTitle(
+    published ? brandTitle('Blog', post!.title) : brandTitle('Blog')
+  );
 
-  if (!post || !isPublished(post, props.now ?? new Date())) {
+  if (!published) {
     return (
       <div className="markdown">
         <h1>Blog</h1>
@@ -31,7 +37,7 @@ export default function BlogPostPage(props: { now?: Date }) {
 
   return (
     <>
-      <MarkdownPage path={`blog/${slug}`} />
+      <MarkdownPage path={`blog/${slug}`} titleSection="Blog" />
       {/* Every post signs off the same way — rendered here so individual
           markdown files don't each need the image. The signature links to the
           About page. */}

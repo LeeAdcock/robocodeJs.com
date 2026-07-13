@@ -48,4 +48,14 @@ describe('BlogPostPage', () => {
     expect(screen.getByText("There's no post here.")).toBeTruthy();
     expect(axios.get).not.toHaveBeenCalled();
   });
+
+  it('sets the tab title for a published post', () => {
+    renderAt('stationary-bots-die', new Date(2025, 0, 1));
+    expect(document.title).toBe('RobocodeJs | Blog | Stationary bots die');
+  });
+
+  it('falls back to the blog title for an unpublished post', () => {
+    renderAt('launching-global-rankings', new Date(2025, 6, 12));
+    expect(document.title).toBe('RobocodeJs | Blog');
+  });
 });

@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { publishedPosts, formatDate, BlogPostMeta } from './blogPosts';
+import { brandTitle, useDocumentTitle } from '../util/useDocumentTitle';
 
 // The /blog index. Renders the post manifest (blogPosts.ts) filtered to posts
 // whose date has arrived, so future-dated posts can ship in a deploy and appear
 // on schedule. Uses the client clock — good enough for an embargo whose content
 // is already in the public bundle. `now` is injectable for tests.
 export default function BlogIndexPage(props: { now?: Date }) {
+  useDocumentTitle(brandTitle('Blog'));
   const posts = publishedPosts(props.now ?? new Date());
 
   // Group by year for the section headers, preserving newest-first order.

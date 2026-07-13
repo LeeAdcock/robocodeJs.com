@@ -5,5 +5,5 @@ import MarkdownPage from './markdownPage';
 // file learn-<slug>.md (served from public/docs), reusing the docs renderer.
 export default function LessonPage() {
   const { slug } = useParams();
-  return <MarkdownPage path={`learn-${slug}`} />;
+  return <MarkdownPage path={`learn-${slug}`} titleSection="Learn" />;
 }

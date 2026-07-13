@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "RobocodeJs",
+  "name": "RobocodeJs | Learn to code by building battle bots",
+  "description": "A free browser game where you write JavaScript bots that battle in a live arena.",
   "icons": [
     {
       "src": "/sprites/tank_sand.png",
