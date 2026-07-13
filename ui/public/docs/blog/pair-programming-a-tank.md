@@ -48,7 +48,8 @@ language and it's turning the cranks.
 
 The whole thing is bearer-token auth: you generate a token, point your assistant at
 RobocodeJs's MCP endpoint, and from then on it acts as _you_. Only your bots, only your
-arenas. It can't reach anyone else's private code, same as you can't. I wrote the full
+arenas. It's held to the same ownership rules you are, with no path to anyone else's
+private code that you don't have yourself. I wrote the full
 walkthrough at [/mcp](/mcp), including where to get your token and how to connect the
 common assistants. It's a five-minute setup and then it just works.
 

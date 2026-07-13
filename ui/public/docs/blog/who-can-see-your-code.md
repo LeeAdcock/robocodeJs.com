@@ -14,9 +14,10 @@ paranoia sets in: can other people see my code? You've spent evenings tuning tha
 sweep. The aiming trick is yours. In a game where the strategy _is_ the game, "someone
 could just read my strategy" would poison the whole thing.
 
-So let me answer it plainly: no. Nobody can read your bot's source but you. And the
-reasons run deeper than a privacy checkbox, because the game is deliberately built
-around a distinction I care about: **you share the fighter, never the blueprint.**
+So let me answer it plainly: the game is built so that nobody but you can read your
+bot's source. And the reasons run deeper than a privacy checkbox, because the whole
+design turns on a distinction I care about: **you share the fighter, never the
+blueprint.**
 
 ## Your code is yours alone
 
@@ -40,8 +41,8 @@ bot to fight against without showing them a single line.
 Every bot has a share link. Send it to a friend and they can add your bot to their own
 arena, where it fields its tanks and battles just like it does for you. What they get is
 a _reference_ to your bot, not a copy of it: they see your tanks drive, scan, and shoot,
-and they can lose to you at two in the morning as many times as they like. What they
-can't do, ever, is open it up. And because it's a reference, it always fields whatever
+and they can lose to you at two in the morning as many times as they like. What the
+share link never grants is a look inside. And because it's a reference, it fields whatever
 your bot currently is; when you improve your code, every arena it's been added to starts
 facing the improved version.
 

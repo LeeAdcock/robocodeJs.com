@@ -15,10 +15,14 @@ to catch the obvious thing you've been staring past for an hour. RobocodeJs has 
 kind of project for most of its life: one person, one head, every decision and every bug
 living and dying with me.
 
-Sometime in the last stretch, that changed. Not because I hired anyone (it's still just
-me) but because I started building alongside a language model, and the day-to-day shape
-of the work is different now. I want to be honest about what that's like, because the
-marketing version and the real version don't fully overlap.
+Let me be precise about the foundation first, because it matters to me. I wrote the
+original RobocodeJs entirely by hand: the design, the architecture, the sandbox, the
+simulation, the bones of the whole implementation are mine, built up over years of
+evenings. What changed in the last stretch isn't who built this thing. It's the company
+I keep while evolving it. Not because I hired anyone (it's still just me) but because I
+started working alongside a language model, and the day-to-day shape of the work is
+different now. I want to be honest about what that's like, because the marketing
+version and the real version don't fully overlap.
 
 ## What actually changed
 

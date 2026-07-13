@@ -56,9 +56,9 @@ alongside the old one, gets health-checked at a `/health` endpoint, and traffic 
 over only once it reports healthy. If the new version is broken, the old one keeps
 serving and nobody notices.
 
-That one change solved both problems at once. No box ever has to hold two versions of
-the app again, so the memory squeeze is gone by construction. And the site never goes
-dark during a release, because the old version keeps serving until the new one has
+That one change solved both problems at once. No box has to hold two versions of
+the app anymore, so the memory squeeze is gone by construction. And releases stopped
+being a downtime risk, because the old version keeps serving until the new one has
 proven itself. The honest footnote is that matches live in the server's memory, so a
 deploy does restart any battle in progress; the page stays up, but the fight starts
 fresh.
@@ -80,7 +80,7 @@ of the small baseline keeps the code honest: I can't get sloppy about memory, an
 can't ship features that only work if I throw hardware at them.
 
 So "good enough" here means: it stays up, it recovers from a spike instead of dying to
-one, and a bad deploy can't take it down. That's the bar. Not five nines of uptime for a
+one, and a bad deploy fails without taking the site with it. That's the bar. Not five nines of uptime for a
 game where the stakes are a tank drawing on a screen, just a reliable, cheap, boring box
 that's still going to be here next year.
 
