@@ -2,7 +2,16 @@ import express, { NextFunction, Request, Response } from 'express';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
+import fs from 'node:fs';
 import path from 'node:path';
+
+import {
+  createSeoResolver,
+  renderHeadTags,
+  SEO_REGION,
+  type BlogEntry,
+} from './util/seo';
+import { buildSitemap } from './util/sitemap';
 
 import auth from './middleware/auth';
 import securityHeaders from './middleware/securityHeaders';
@@ -70,7 +79,20 @@ app.use('/api/session', authRateLimit);
 app.use('/api/oauth', authRateLimit);
 app.use('/api', apiRateLimit);
 
-app.use('/', express.static('./dist/public'));
+app.use(
+  '/',
+  express.static('./dist/public', {
+    // The raw markdown sources (/docs/**.md) and the blog manifest are fetched
+    // by the SPA at runtime, but they are not human-facing pages — the real
+    // routes are /blog/<slug>, /learn/<slug>, etc. Tell crawlers not to index
+    // them, so they don't compete with the canonical pages as duplicate content.
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.md') || filePath.endsWith('blog-index.json')) {
+        res.setHeader('X-Robots-Tag', 'noindex');
+      }
+    },
+  })
+);
 
 app.use('/api/user', auth(true));
 // Bot metadata-by-id (GET /api/app/:appId) is readable by any signed-in user for
@@ -92,11 +114,91 @@ app.use(userEndpoints);
 app.use(appEndpoints);
 app.use(arenaEndpoints);
 
+// --- SEO: per-page metadata + sitemap for the client-rendered public pages ---
+// The UI is a single-page app, so every route below returns the same index.html
+// shell. Without help, a crawler (and every social link-preview scraper that
+// doesn't run JS) would see one generic <title> and empty description for the
+// homepage, docs, lessons, and blog. We compute per-route metadata from the
+// shared blog manifest and the markdown, and inject it into the shell.
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
+const PUBLIC_ORIGIN = (
+  process.env.PUBLIC_ORIGIN || 'https://robocodejs.com'
+).replace(/\/+$/, '');
+const OG_IMAGE = PUBLIC_ORIGIN + '/og-card.png';
+
+const readPublic = (rel: string): string | null => {
+  try {
+    return fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+const loadBlogIndex = (): BlogEntry[] => {
+  const raw = readPublic('blog-index.json');
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as BlogEntry[];
+  } catch {
+    return [];
+  }
+};
+
+const seo = createSeoResolver({
+  blogIndex: loadBlogIndex(),
+  readDoc: (name) => readPublic(`docs/${name}.md`),
+  now: () => new Date(),
+  origin: PUBLIC_ORIGIN,
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const lessonSlugs = (() => {
+    try {
+      return fs
+        .readdirSync(path.join(PUBLIC_DIR, 'docs'))
+        .filter((f) => f.startsWith('learn-') && f.endsWith('.md'))
+        .map((f) => f.slice('learn-'.length, -'.md'.length));
+    } catch {
+      return [];
+    }
+  })();
+  res.type('application/xml').send(
+    buildSitemap({
+      blogIndex: loadBlogIndex(),
+      lessonSlugs,
+      now: () => new Date(),
+      origin: PUBLIC_ORIGIN,
+    })
+  );
+});
+
+// The shell is read once and cached; its <!--SEO:start--> … <!--SEO:end-->
+// region is replaced per request with the computed <head> tags.
+const shellHtml = (() => {
+  try {
+    return fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
+  } catch {
+    return null;
+  }
+})();
+
 // SPA fallback: serve index.html for any request not handled above. Express 5
 // (path-to-regexp v8) no longer accepts a bare '*' route, so use a path-less
 // middleware, which matches every method and path including the root.
 app.use(function (req, res) {
-  res.sendFile(path.resolve(__dirname + '/../public/index.html'));
+  // Only GET navigations get the SEO treatment; other methods just get the
+  // shell (or fall through to sendFile if the shell couldn't be read).
+  if (req.method !== 'GET' || !shellHtml || !SEO_REGION.test(shellHtml)) {
+    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+    return;
+  }
+  const meta = seo.resolve(req.path);
+  const head = renderHeadTags(meta, OG_IMAGE);
+  const html = shellHtml.replace(
+    SEO_REGION,
+    `<!--SEO:start-->\n    ${head}\n    <!--SEO:end-->`
+  );
+  res.type('html').send(html);
 });
 
 // Catch-all error handler: anything that throws/rejects into Express lands here
