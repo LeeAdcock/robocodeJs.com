@@ -223,7 +223,9 @@ export const createSeoResolver = (deps: SeoDeps) => {
       const published = !!post && post.date <= isoNow();
       if (post && published) {
         return {
-          title: `${post.title} — ${SITE}`,
+          // "… — RobocodeJs Blog" so search results signal an article/post
+          // (distinct from the /learn lessons and reference docs).
+          title: `${post.title} — ${SITE} Blog`,
           description: clamp(post.summary),
           canonical,
           ogType: 'article',

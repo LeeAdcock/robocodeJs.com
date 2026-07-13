@@ -46,7 +46,7 @@ const resolver = () =>
 describe('seo resolver', () => {
   it('gives a published blog post article metadata + JSON-LD', () => {
     const m = resolver().resolve('/blog/published-post');
-    expect(m.title).toBe('A Published Post — RobocodeJs');
+    expect(m.title).toBe('A Published Post — RobocodeJs Blog');
     expect(m.description).toBe('This one is live and should be indexed.');
     expect(m.canonical).toBe('https://example.test/blog/published-post');
     expect(m.ogType).toBe('article');
@@ -129,7 +129,7 @@ describe('renderHeadTags', () => {
   it('emits escaped title/description, canonical, og and twitter tags', () => {
     const m = resolver().resolve('/blog/published-post');
     const head = renderHeadTags(m, 'https://example.test/og-card.png');
-    expect(head).toContain('<title>A Published Post — RobocodeJs</title>');
+    expect(head).toContain('<title>A Published Post — RobocodeJs Blog</title>');
     expect(head).toContain('property="og:type" content="article"');
     expect(head).toContain(
       '<link rel="canonical" href="https://example.test/blog/published-post" />'
