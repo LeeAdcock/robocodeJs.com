@@ -28,6 +28,23 @@ Codewords bot I once took to a hackathon and watched hold its own against every 
 sat down across from it. An AI with nobody to fight is half an AI. Now every bot on this
 site gets what mine got that day: a real opponent, and a real answer.
 
+## Where the number comes from
+
+A quick aside, because it's a good story. "Elo" isn't an acronym. It's a person: Arpad
+Elo, a Hungarian-American physics professor and chess master who'd been part of the U.S.
+Chess Federation since it was founded in 1939. Chess back then used a rating system that
+mostly worked but sometimes produced numbers people found hard to trust, and Elo, being a
+physicist, figured he could do better with some real statistics behind it. He did. The
+federation switched to his method in 1960, and the international chess body adopted it in
+1970. It's been [how we rank competitors](https://en.wikipedia.org/wiki/Elo_rating_system)
+ever since.
+
+The idea is small enough to hold in your head. Your rating predicts how you'll fare against
+someone else's: 100 points ahead, and you're expected to score about 64%. After a game the
+winner takes points from the loser, and an upset moves far more than an expected result.
+Beat someone you had no business beating, and your number jumps. That same little engine, a
+chess idea from 1960, is now quietly scoring tank bots while you sleep.
+
 ## You don't enter the matches
 
 The part that surprises people: you don't play ranked matches. You don't queue,
