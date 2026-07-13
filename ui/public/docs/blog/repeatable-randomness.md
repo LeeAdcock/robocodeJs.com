@@ -1,6 +1,6 @@
 # Making randomness repeatable
 
-_September 8, 2026_
+_August 11, 2026_
 
 <img
   src="/docs/lee_headshot.jpg"

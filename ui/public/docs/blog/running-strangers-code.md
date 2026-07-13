@@ -1,6 +1,6 @@
 # How do you let strangers run code on your server?
 
-_February 9, 2027_
+_November 10, 2026_
 
 <img
   src="/docs/lee_headshot.jpg"

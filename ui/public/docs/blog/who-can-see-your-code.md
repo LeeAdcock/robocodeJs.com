@@ -1,6 +1,6 @@
 # Who can see your bot's code?
 
-_April 13, 2027_
+_January 12, 2027_
 
 <img
   src="/docs/lee_headshot.jpg"

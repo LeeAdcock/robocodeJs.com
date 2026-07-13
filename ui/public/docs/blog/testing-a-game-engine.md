@@ -1,6 +1,6 @@
 # How do you unit-test a game you can't see?
 
-_December 8, 2026_
+_September 22, 2026_
 
 <img
   src="/docs/lee_headshot.jpg"
