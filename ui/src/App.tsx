@@ -11,6 +11,8 @@ import Arena from './types/arena';
 import NavBar from './components/navbar';
 import MarkdownPage from './page/markdownPage';
 import LessonPage from './page/lessonPage';
+import BlogIndexPage from './page/blogIndexPage';
+import BlogPostPage from './page/blogPostPage';
 import User from './types/user';
 import ArenaToolbar from './components/arena/arenaToolbar';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -515,6 +517,11 @@ function App() {
                   path="/rankings"
                   element={<MarkdownPage path="rankings" />}
                 />
+                {/* Dev blog — a manifest-driven index (posts appear once their
+                    date arrives) + per-post markdown pages, mirroring /learn.
+                    Posts are markdown at public/docs/blog/<slug>.md. */}
+                <Route path="/blog" element={<BlogIndexPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/about" element={<MarkdownPage path="about" />} />
                 {/* MCP setup guide, linked from the homepage getting-started list. */}
                 <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
