@@ -8,6 +8,7 @@ import pool from '../src/util/db';
 import appService from '../src/services/AppService';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
+import rankedMatchService from '../src/services/RankedMatchService';
 import { DEMO_USER_ID } from '../src/types/user';
 
 // Mirror of the server's leaderboard sprite palette (AppService) — used to
@@ -500,5 +501,38 @@ describe('ArenaMemberService', () => {
     );
     expect(member.getAppId()).toBe('app1');
     expect(member.getArenaId()).toBe('arena1');
+  });
+});
+
+describe('RankedMatchService', () => {
+  it('deltasSince() folds each match into one delta row per side', async () => {
+    query.mockResolvedValue({
+      rows: [
+        { appa: 'a1', appb: 'a2', deltaa: 12, deltab: -12 },
+        { appa: 'a3', appb: 'a1', deltaa: -8, deltab: 8 },
+      ],
+      rowCount: 2,
+    } as never);
+    const deltas = await rankedMatchService.deltasSince(new Date(0));
+    expect(deltas).toEqual([
+      { appId: 'a1', delta: 12 },
+      { appId: 'a2', delta: -12 },
+      { appId: 'a3', delta: -8 },
+      { appId: 'a1', delta: 8 },
+    ]);
+  });
+
+  it('deltasSince() counts only RATED matches (winnerId not null) since the cutoff', async () => {
+    query.mockResolvedValue({ rows: [], rowCount: 0 } as never);
+    const cutoff = new Date('2026-01-01T00:00:00Z');
+    await rankedMatchService.deltasSince(cutoff);
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    // The rated filter is what keeps unrated timeouts/double-crashes (which never
+    // bumped ratingGames) from understating an app's pre-window game count.
+    expect(text).toContain('createdTimestamp >= $1');
+    expect(text).toContain('winnerId IS NOT NULL');
+    expect(values).toEqual([cutoff]);
   });
 });
