@@ -11,6 +11,7 @@ import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/
 import { z } from 'zod';
 
 import { AuthenticatedRequest, ensureDevUser } from '../middleware/auth';
+import { mcpRateLimit } from '../middleware/rateLimit';
 import { isLocalDev } from '../util/devMode';
 import userService from '../services/UserService';
 import { provider, RESOURCE_URL } from './oauth';
@@ -1510,7 +1511,9 @@ export const logMcpRequest = (userId: string, body: unknown): void => {
   }
 };
 
-app.post('/api/mcp', mcpAuth, async (req, res) => {
+// mcpRateLimit runs AFTER mcpAuth so req.user is populated and the limit keys
+// per user (u:<id>) rather than falling back to IP — see rateLimit.ts.
+app.post('/api/mcp', mcpAuth, mcpRateLimit, async (req, res) => {
   const user = (req as AuthenticatedRequest).user;
   logMcpRequest(user.getId(), req.body);
   const server = buildServer(user);

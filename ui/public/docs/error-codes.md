@@ -95,9 +95,10 @@ too many requests in a short period, so the server returned **HTTP 429** with th
 code _instead of_ performing the action. Unlike the other codes here, this is an
 API response surfaced in the app or your tooling — not a bot console message. The
 limits apply to signing in, to checking/deploying/rebooting code (each compiles
-your bot in a fresh sandbox), and to creating apps and arenas. Fix: slow down and
-retry after a short wait; if a script is driving the API, add a delay between
-calls. The specific budgets are listed under [Game rules](/rules).
+your bot in a fresh sandbox), to creating apps and arenas, and to the MCP endpoint
+an AI assistant uses. Fix: slow down and retry after a short wait; if a script (or
+an AI assistant) is driving the API, add a delay between calls. The specific
+budgets are listed under [Game rules](/rules).
 
 ## E023
 
