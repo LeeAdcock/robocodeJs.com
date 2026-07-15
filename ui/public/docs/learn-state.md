@@ -90,6 +90,14 @@ other four don't see it, and a top-level `let` variable is private to a single b
 (they run the same code, but each keeps its own copy). To share something across your
 team, you **send a message** — that's [Lesson 15](/learn/teamwork).
 
+**What happens to my variables when I Save?**
+Saving **reloads your code** — it runs again from the top. So a top-level `let value = 123`
+is set right back to `123` on every Save, losing whatever it had grown to. But `this.value`
+lives on the notebook that _survives_ a reload, so it keeps its value across Saves. That's
+the real reason to reach for `this` for anything your robot needs to remember while you keep
+tweaking its code mid-match. (A **Reboot** is the exception — it wipes the notebook too and
+re-runs `START` from scratch.)
+
 **What does `filter` do (vs `forEach`)?**
 `forEach` _visits_ every item. `filter` _builds a new shorter list_ of just the items that
 match — here, the enemies.
