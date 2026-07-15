@@ -98,6 +98,17 @@ export const writeRateLimit = makeLimiter('write', {
   limit: num('RATE_LIMIT_WRITE_MAX', 30),
 });
 
+// POST /api/mcp: the highest-privilege surface — a bearer token grants full
+// control of a user's bots/arenas, and MCP tool handlers front the
+// isolate-spawning ops (compile / reboot) directly (they don't ride
+// computeRateLimit). Keyed per user via the default userOrIpKey, so it must be
+// mounted AFTER mcpAuth resolves req.user; a compromised token then shares the
+// victim's budget, which is the intended per-user framing.
+export const mcpRateLimit = makeLimiter('mcp', {
+  windowMs: 60 * 1000,
+  limit: num('RATE_LIMIT_MCP_MAX', 30),
+});
+
 // Broad backstop across the whole API, IP-keyed. Generous — the targeted
 // limiters above do the real work; this only catches gross floods.
 export const apiRateLimit = makeLimiter('api', {

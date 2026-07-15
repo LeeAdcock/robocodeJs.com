@@ -142,16 +142,18 @@ per bot, and each app fields five bots.)
 ## Rate limits
 
 The API is also **rate limited**. If requests arrive too quickly — signing in,
-saving/checking/deploying code, or creating apps and arenas — the server replies
-with **HTTP 429** and error code **E022**, and the action is skipped. Wait a moment
-and retry; if a script is driving the API, add a small delay between calls. Typical
-budgets (per account, or per IP address for sign-in):
+saving/checking/deploying code, creating apps and arenas, or driving your bots
+through an AI assistant (MCP) — the server replies with **HTTP 429** and error
+code **E022**, and the action is skipped. Wait a moment and retry; if a script is
+driving the API, add a small delay between calls. Typical budgets (per account, or
+per IP address for sign-in):
 
 | Action                             | Budget      |
 | ---------------------------------- | ----------- |
 | Sign in                            | 20 / 10 min |
 | Check, deploy, or reboot code      | 60 / min    |
 | Create an app or arena             | 30 / min    |
+| AI assistant tools (MCP)           | 30 / min    |
 | Any API request (overall backstop) | 600 / min   |
 
 See [Error codes](/error-codes) for **E021** and **E022**.
