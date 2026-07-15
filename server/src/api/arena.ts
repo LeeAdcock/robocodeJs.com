@@ -93,7 +93,7 @@ app.delete(
 );
 
 // Get an arena status
-const getStatus = async (req: Request, res: Response) => {
+export const getStatus = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
   const env = await environmentService.get(arena);
   const members = await arenaMemberService.getForArena(arena.getId());
@@ -106,7 +106,7 @@ app.get(dual(''), loadUser, resolveArena, getStatus);
 // Get an outcome-oriented match summary (leaderboard, winner, aggregated stats,
 // elimination order) — most useful once a match is decided. Read-only, same open
 // access as getStatus (spectating is intentionally not owner-gated).
-const getSummary = async (req: Request, res: Response) => {
+export const getSummary = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
   const env = await environmentService.get(arena);
   const members = await arenaMemberService.getForArena(arena.getId());
@@ -119,7 +119,7 @@ app.get(dual('/summary'), loadUser, resolveArena, getSummary);
 // Get the lightweight match status (decided flag, winner, coarse standings) —
 // the cheap-to-poll companion to getSummary, without the per-bot stat blocks or
 // per-bot arrays. Same open, un-owner-gated access (spectating is intentional).
-const getMatchStatus = async (req: Request, res: Response) => {
+export const getMatchStatus = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
   const env = await environmentService.get(arena);
   const members = await arenaMemberService.getForArena(arena.getId());
@@ -360,7 +360,7 @@ const setSeed = async (req: Request, res: Response) => {
 app.post(dual('/seed'), loadUser, requireOwner, resolveArena, setSeed);
 
 // Listen to an arena's game events
-const events = async (req: Request, res: Response) => {
+export const events = async (req: Request, res: Response) => {
   openSseStream(res);
 
   function listener(event: unknown) {

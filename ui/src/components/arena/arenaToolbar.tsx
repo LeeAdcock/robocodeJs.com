@@ -5,13 +5,21 @@ import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 
-import { FaSyncAlt, FaPauseCircle, FaPlayCircle } from 'react-icons/fa';
+import {
+  FaSyncAlt,
+  FaPauseCircle,
+  FaPlayCircle,
+  FaShareAlt,
+} from 'react-icons/fa';
 
 interface EditorToolbarProps {
   isPaused: boolean;
   doPause: React.MouseEventHandler<HTMLElement>;
   doResume: React.MouseEventHandler<HTMLElement>;
   doRestart: React.MouseEventHandler<HTMLElement>;
+  // Copy a public /watch/:arenaId link to the clipboard. Absent until the arena
+  // snapshot (which carries the arena id) has loaded.
+  doShare?: React.MouseEventHandler<HTMLElement>;
 }
 
 export default function EditorToolbar(props: EditorToolbarProps) {
@@ -53,6 +61,17 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               <FaSyncAlt />
             </Button>
           </OverlayTrigger>
+
+          {props.doShare && (
+            <OverlayTrigger
+              placement={'bottom'}
+              overlay={<Tooltip id={`share`}>Copy public watch link</Tooltip>}
+            >
+              <Button variant="secondary" size="sm" onClick={props.doShare}>
+                <FaShareAlt />
+              </Button>
+            </OverlayTrigger>
+          )}
         </ButtonGroup>
       </ButtonToolbar>
     </>

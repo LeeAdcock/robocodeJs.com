@@ -142,3 +142,33 @@ export const resolveArena = async (
   }
   next();
 };
+
+// Resolves an arena by its UUID alone into req.targetArena — no :userId, no
+// ownership. Unlike resolveArena (which ties the arena to the path :userId user),
+// this powers the PUBLIC spectator routes (`/api/arena/:arenaId`): the arena UUID
+// is the bearer capability, so anyone holding a share link can watch. Only the
+// non-owner-gated view handlers (status/events/summary/match-status) are mounted
+// on it — never logs or any mutation. 404s if the id is unknown.
+export const resolvePublicArena = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  // Treat a lookup failure as "not found" too: this is a public, guessable URL,
+  // so a mangled share link (e.g. a non-UUID id the DB rejects with a cast error)
+  // must render the friendly not-found page — a 404 the watch UI handles — rather
+  // than a 500.
+  let arena;
+  try {
+    arena = await arenaService.get(req.params.arenaId as string);
+  } catch {
+    arena = undefined;
+  }
+  if (!arena) {
+    res.status(404);
+    res.send('Invalid arena id');
+    return;
+  }
+  (req as ArenaScopedRequest).targetArena = arena;
+  next();
+};

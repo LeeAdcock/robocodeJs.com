@@ -6,7 +6,6 @@ import {
   Routes,
   Navigate,
 } from 'react-router-dom';
-import type App from './types/app';
 import Arena from './types/arena';
 import NavBar from './components/navbar';
 import MarkdownPage from './page/markdownPage';
@@ -19,30 +18,9 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import PointInTime from './types/pointInTime';
-import applyArenaEvent from './util/arenaReducer';
-import PlaybackBuffer from './util/playbackBuffer';
-import { setPlaybackTime } from './util/playbackClock';
+import useArenaStream from './util/useArenaStream';
 import { useDarkMode } from './util/theme';
 import { Emitter } from './util/emitter';
-
-// High-frequency simulation events are played back through the jitter buffer on
-// a steady local clock. Everything else (structural/control events: app & bot
-// placement/removal, pause/resume/restart, renames, crashes) is applied the
-// instant it arrives, so bootstrap and the toolbar controls stay responsive.
-const CADENCE_EVENTS = new Set([
-  'tick',
-  'botTurn',
-  'botAccelerate',
-  'botStop',
-  'turretTurn',
-  'radarTurn',
-  'radarScan',
-  'botDamaged',
-  'bulletFired',
-  'bulletRemoved',
-  'bulletExploded',
-]);
 
 // Lazy-loaded so the heavy editor chunk (ace-builds + prettier) isn't part of
 // the initial arena/home bundle. Declared after the imports so the `lazy`
@@ -115,13 +93,9 @@ function NavBridge({
 
 function App() {
   const [user, setUser] = useState(null as unknown as User);
-  const [arena, setArena] = useState({
-    clock: { time: 0 },
-    apps: [] as App[],
-  } as Arena);
-  const [time, setTime] = useState(0);
-  const [isPaused, setPaused] = useState(true);
-  const eventSource = useRef<EventSource | undefined>(undefined);
+  // Transient confirmation shown under the arena toolbar after the Share button
+  // copies the public watch link.
+  const [shareNotice, setShareNotice] = useState('');
   // navigate captured from inside the Router (see NavBridge), so the arena — which
   // renders outside it — can open a bot's source/logs on double-click.
   const navigateRef = useRef<((to: string) => void) | null>(null);
@@ -138,13 +112,60 @@ function App() {
     );
   };
 
-  // The jitter buffer plus refs the rAF playback loop reads, so the loop sees
-  // the latest arena/time without being re-created on every render.
-  const buffer = useRef(new PlaybackBuffer());
-  const arenaRef = useRef(arena);
-  arenaRef.current = arena;
-  const timeRef = useRef(time);
-  timeRef.current = time;
+  // The arena data-plane (REST snapshot bootstrap + SSE stream + jitter-buffered
+  // interpolation) lives in a shared hook, so the public /watch page renders the
+  // exact same live arena. Signed-in → the user's own arena; signed-out → the
+  // public demo arena. `emitter` forwards raw events to the log console; the
+  // appRenamed callback refetches the user so the sidebar shows the new name.
+  const { arena, time, isPaused } = useArenaStream({
+    snapshotUrl: user ? `/api/user/${user.id}/arena` : `/api/demo/arena`,
+    eventsUrl: user
+      ? `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
+      : `${window.location.protocol}//${window.location.host}/api/demo/events`,
+    emitter,
+    onAppRenamed: () => {
+      if (user) {
+        axios.get(`/api/user/${user.id}`).then((res) => setUser(res.data));
+      }
+    },
+  });
+
+  // Copy a public "watch" link for the current arena to the clipboard. The link
+  // points at /watch/:arenaId, a controls-free full-screen spectator view served
+  // from the public (unauthenticated) /api/arena/:arenaId routes — anyone with
+  // the link can watch, but bot source and console logs stay private. Mirrors the
+  // clipboard pattern in page/app/appPage.tsx (async Clipboard API where
+  // available, with a legacy execCommand fallback for plain-http / older
+  // browsers). No-op until the snapshot has loaded the arena id.
+  const doShare = () => {
+    if (!arena.id) return;
+    const link = `${window.location.origin}/watch/${arena.id}`;
+    const done = () => {
+      setShareNotice('Watch link copied to your clipboard.');
+      setTimeout(() => setShareNotice(''), 4000);
+    };
+    const fallback = () => {
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        done();
+      } catch {
+        setShareNotice(`Could not copy. Link: ${link}`);
+        setTimeout(() => setShareNotice(''), 8000);
+      }
+      document.body.removeChild(textarea);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  };
 
   // Whole-app theme: reflect the preference onto <body> so CSS (variables under
   // `body.dark`) re-themes the page, docs, and log console; the boolean is also
@@ -174,39 +195,6 @@ function App() {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  const doReloadArena = () => {
-    console.log('reloading arena');
-    // Any buffered motion belongs to the pre-reload arena; discard it.
-    buffer.current.flush();
-    return new Promise((resolve) => {
-      axios
-        .get(user ? `/api/user/${user.id}/arena` : `/api/demo/arena`)
-        .then((res) => {
-          setTime(res.data.clock.time);
-          setPlaybackTime(res.data.clock.time);
-          // Adopt the server's current simulation speed so playback runs at the
-          // rate the arena is actually being simulated.
-          if (typeof res.data.tickMs === 'number') {
-            buffer.current.setTickMs(res.data.tickMs);
-          }
-          res.data.apps.forEach((app: App) =>
-            app.bots.forEach((bot) => {
-              bot.path = Array<PointInTime>(20);
-              bot.path[0] = {
-                x: bot.x,
-                y: bot.y,
-                time,
-              };
-              bot.pathIndex = 1;
-            })
-          );
-          setArena(res.data);
-          setPaused(!res.data.running);
-          resolve(res.data);
-        });
-    });
-  };
 
   useEffect(() => {
     // Google Identity Services may be unavailable in local dev (the GSI script is
@@ -285,127 +273,6 @@ function App() {
       });
     }
   }, [darkMode, user]);
-
-  useEffect(() => {
-    doReloadArena();
-  }, [user]);
-
-  // Playback loop: drain the jitter buffer on a steady local clock so buffered
-  // simulation events are applied at an even cadence regardless of how bursty
-  // their network arrival was. Mounted once; reads live state through refs.
-  useEffect(() => {
-    let raf = 0;
-    let last = 0;
-    const frame = (now: number) => {
-      // First frame establishes the baseline; clamp big gaps (e.g. a
-      // backgrounded tab) so we catch up over frames instead of one spike.
-      const dt = last === 0 ? 0 : Math.min(now - last, 250);
-      last = now;
-
-      let latestTick: number | null = null;
-      buffer.current.drain(dt, (event) => {
-        applyArenaEvent(arenaRef.current, event, timeRef.current);
-        if (event.type === 'tick') latestTick = event.time;
-      });
-      // A tick advanced the clock — trigger the React re-render ArenaSvg needs,
-      // and publish the displayed time so the log panel reveals lines in step.
-      if (latestTick !== null) {
-        setTime(latestTick);
-        setPlaybackTime(latestTick);
-      }
-
-      raf = requestAnimationFrame(frame);
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  useEffect(() => {
-    if (eventSource.current) {
-      eventSource.current.close();
-      eventSource.current = undefined;
-    }
-    // A fresh stream replays current state; drop anything left from the old one.
-    buffer.current.flush();
-    const source = new EventSource(
-      user
-        ? `${window.location.protocol}//${window.location.host}/api/user/${user.id}/arena/events`
-        : `${window.location.protocol}//${window.location.host}/api/demo/events`
-    );
-    eventSource.current = source;
-
-    // On a *re*connect (network blip, laptop sleep/wake), the browser silently
-    // reopens the stream and the server replays current placement — but any
-    // structural events missed during the gap (removes, bullet lifecycle) are
-    // lost, leaving ghosts or a stale arena. Reconcile from the authoritative
-    // snapshot on every open after the first; the initial state is already
-    // loaded by the doReloadArena effect, so skip that one.
-    let hasOpened = false;
-    source.onopen = () => {
-      if (hasOpened) {
-        buffer.current.flush();
-        doReloadArena();
-      }
-      hasOpened = true;
-    };
-
-    source.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-      emitter.emit(data.type, data);
-
-      // High-frequency simulation events: queue for steady playback. The rAF
-      // loop applies them (and advances `time`) on its own cadence.
-      if (CADENCE_EVENTS.has(data.type)) {
-        buffer.current.push(data);
-        return;
-      }
-
-      // Structural / control events: apply immediately.
-      if (data.type === 'arenaPaused') {
-        setPaused(true);
-      } else if (data.type === 'arenaResumed') {
-        setPaused(false);
-      } else if (data.type === 'arenaSpeed') {
-        // The server changed simulation speed; pace playback to match. Applied
-        // immediately (not jitter-buffered) so the cadence tracks the server.
-        buffer.current.setTickMs(data.tickMs);
-        return;
-      } else if (data.type === 'appRenamed') {
-        if (user) {
-          axios.get(`/api/user/${user.id}`).then((res) => setUser(res.data));
-        }
-      } else if (data.type === 'arenaRestart') {
-        // The arena is being rebuilt — drop buffered motion for the old one.
-        buffer.current.flush();
-        setPaused((isPaused) => {
-          if (isPaused) doReloadArena();
-          else setArena((arena) => ({ ...arena, apps: [] }));
-          return isPaused;
-        });
-        return;
-      }
-
-      setArena((arena) => applyArenaEvent(arena, data, timeRef.current));
-    };
-
-    // Returning to a backgrounded tab: the rAF playback loop was suspended while
-    // hidden, so the jitter buffer holds a stale backlog that would fast-forward
-    // ("rapid update") when the loop resumes. Drop it and resync from the current
-    // snapshot instead of replaying the backlog.
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        buffer.current.flush();
-        doReloadArena();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      source.close();
-      eventSource.current = undefined;
-    };
-  }, [user]);
 
   return (
     <>
@@ -596,7 +463,23 @@ function App() {
               doPause={() => axios.post(`/api/user/${user.id}/arena/pause`)}
               doResume={() => axios.post(`/api/user/${user.id}/arena/resume`)}
               doRestart={() => axios.post(`/api/user/${user.id}/arena/restart`)}
+              doShare={arena.id ? doShare : undefined}
             />
+            {shareNotice && (
+              <div
+                style={{
+                  marginTop: '6px',
+                  fontSize: '0.8rem',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: '#fff',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  display: 'inline-block',
+                }}
+              >
+                {shareNotice}
+              </div>
+            )}
           </div>
         )}
         <ArenaSvg

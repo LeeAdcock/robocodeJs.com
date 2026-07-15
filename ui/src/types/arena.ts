@@ -5,6 +5,10 @@ interface Clock {
 }
 
 export default interface Arena {
+  // The arena's UUID (present on the status snapshot). Used to build the public
+  // "watch" share link. Optional because the initial placeholder arena state in
+  // App.tsx is created before the first snapshot loads.
+  id?: string;
   apps: App[];
   clock: Clock;
   height: number;

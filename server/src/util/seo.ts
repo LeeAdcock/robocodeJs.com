@@ -290,6 +290,21 @@ export const createSeoResolver = (deps: SeoDeps) => {
       };
     }
 
+    // Public "watch" spectator page (/watch/:arenaId). A per-arena, ephemeral
+    // view — give it a friendly brand title for the browser tab / link preview,
+    // but keep it out of the index (it's transient and has no stable content).
+    // Unknown routes already default to noindex; this is explicit so a shared
+    // link still shows a sensible title rather than the generic soft-404 one.
+    if (/^\/watch\/[^/]+$/.test(path)) {
+      return {
+        title: `${SITE} | Watch a live match`,
+        description: 'Spectate a live RobocodeJs match.',
+        canonical,
+        ogType: 'website',
+        noindex: true,
+      };
+    }
+
     const stat = STATIC_PAGES[path];
     if (stat) {
       return {
