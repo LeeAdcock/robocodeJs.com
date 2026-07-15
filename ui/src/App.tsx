@@ -14,6 +14,7 @@ import BlogIndexPage from './page/blogIndexPage';
 import BlogPostPage from './page/blogPostPage';
 import User from './types/user';
 import ArenaToolbar from './components/arena/arenaToolbar';
+import Alert from 'react-bootstrap/Alert';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import axios from 'axios';
@@ -466,12 +467,15 @@ function App() {
               doShare={arena.id ? doShare : undefined}
             />
             {shareNotice && (
-              // Positioned absolutely (out of flow) just below the toolbar: the
-              // toolbar's container shrinks to fit and the ButtonToolbar is
-              // right-aligned, so an in-flow notice wider than the buttons would
-              // widen the container and shove the buttons. This floats the toast
-              // without disturbing the toolbar layout.
-              <div
+              // The same green "success" theme as the bot share-link notice
+              // (page/app/appPage.tsx), kept compact. Positioned absolutely (out
+              // of flow) just below the toolbar: the toolbar's container shrinks
+              // to fit and the ButtonToolbar is right-aligned, so an in-flow
+              // notice wider than the buttons would widen the container and shove
+              // them — this floats the toast without disturbing the layout.
+              <Alert
+                variant="success"
+                className="py-1 px-2 mb-0"
                 style={{
                   position: 'absolute',
                   top: '100%',
@@ -479,14 +483,10 @@ function App() {
                   marginTop: '6px',
                   whiteSpace: 'nowrap',
                   fontSize: '0.8rem',
-                  background: 'rgba(0, 0, 0, 0.7)',
-                  color: '#fff',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
                 }}
               >
                 {shareNotice}
-              </div>
+              </Alert>
             )}
           </div>
         )}
