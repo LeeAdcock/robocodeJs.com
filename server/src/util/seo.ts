@@ -315,9 +315,11 @@ export const createSeoResolver = (deps: SeoDeps) => {
       };
     }
 
-    // Unknown route: default site meta, and don't let soft-404s be indexed.
+    // Unknown route: soft-404. Title matches the client NotFoundPage (App.tsx
+    // `path="*"`) so the tab is consistent on load and after navigation, and
+    // don't let soft-404s be indexed.
     return {
-      title: SITE,
+      title: `${SITE} | Page not found`,
       description: DEFAULT_DESCRIPTION,
       canonical,
       ogType: 'website',
