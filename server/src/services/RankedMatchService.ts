@@ -6,21 +6,35 @@ import { AppId } from '../types/app';
 // ratings, the signed rating deltas, the winning app (null if the match timed
 // out undecided), and the seed used. Kept for audit and future leaderboard
 // trend views; the live ratings themselves live on the `app` row.
-pool.query(`
-  CREATE TABLE IF NOT EXISTS ranked_match (
-    id UUID,
-    appA UUID,
-    appB UUID,
-    winnerId UUID,
-    ratingABefore real,
-    ratingBBefore real,
-    deltaA integer,
-    deltaB integer,
-    seed bigint,
-    createdTimestamp timestamp default CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
+// Index createdTimestamp: the leaderboard "movement" query (deltasSince) filters
+// on it every request, and this table grows one row per ranked match forever, so
+// an index keeps that scan off a full-table seq scan as history accumulates.
+// Chained off the CREATE so the table exists first; Promise.resolve tolerates a
+// mocked pool.query returning undefined, and errors are swallowed (same lazy-DDL
+// idiom as the other services — see the accepted "lazy DDL startup" risk).
+Promise.resolve(
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS ranked_match (
+      id UUID,
+      appA UUID,
+      appB UUID,
+      winnerId UUID,
+      ratingABefore real,
+      ratingBBefore real,
+      deltaA integer,
+      deltaB integer,
+      seed bigint,
+      createdTimestamp timestamp default CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    )
+  `)
+)
+  .then(() =>
+    pool.query(
+      'CREATE INDEX IF NOT EXISTS idx_ranked_match_created ON ranked_match(createdTimestamp)'
+    )
   )
-`);
+  .catch(() => undefined);
 
 export interface RankedMatchRecord {
   appA: AppId;
