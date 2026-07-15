@@ -19,4 +19,7 @@ export default interface LeaderboardEntry {
   games: number;
   wins: number;
   winRate: number; // 0..1
+  // Rank on the board ~24h ago; drives the up/down movement arrow (compare to
+  // `rank`). Omitted when the app wasn't ranked 24h ago — a new entrant.
+  previousRank?: number;
 }

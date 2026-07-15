@@ -6,21 +6,35 @@ import { AppId } from '../types/app';
 // ratings, the signed rating deltas, the winning app (null if the match timed
 // out undecided), and the seed used. Kept for audit and future leaderboard
 // trend views; the live ratings themselves live on the `app` row.
-pool.query(`
-  CREATE TABLE IF NOT EXISTS ranked_match (
-    id UUID,
-    appA UUID,
-    appB UUID,
-    winnerId UUID,
-    ratingABefore real,
-    ratingBBefore real,
-    deltaA integer,
-    deltaB integer,
-    seed bigint,
-    createdTimestamp timestamp default CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
+// Index createdTimestamp: the leaderboard "movement" query (deltasSince) filters
+// on it every request, and this table grows one row per ranked match forever, so
+// an index keeps that scan off a full-table seq scan as history accumulates.
+// Chained off the CREATE so the table exists first; Promise.resolve tolerates a
+// mocked pool.query returning undefined, and errors are swallowed (same lazy-DDL
+// idiom as the other services — see the accepted "lazy DDL startup" risk).
+Promise.resolve(
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS ranked_match (
+      id UUID,
+      appA UUID,
+      appB UUID,
+      winnerId UUID,
+      ratingABefore real,
+      ratingBBefore real,
+      deltaA integer,
+      deltaB integer,
+      seed bigint,
+      createdTimestamp timestamp default CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    )
+  `)
+)
+  .then(() =>
+    pool.query(
+      'CREATE INDEX IF NOT EXISTS idx_ranked_match_created ON ranked_match(createdTimestamp)'
+    )
   )
-`);
+  .catch(() => undefined);
 
 export interface RankedMatchRecord {
   appA: AppId;
@@ -33,7 +47,34 @@ export interface RankedMatchRecord {
   seed: number;
 }
 
+// Raw both-sides rows for matches played since a cutoff. Each match yields two
+// rows (one per participant) so a caller can fold them per app in JS — used to
+// rewind ratings for the leaderboard "movement" arrows (rank change over a
+// window). Kept as raw rows rather than a SQL GROUP BY to stay portable across
+// pg-mem (dev/test) and Postgres.
+export interface RankedMatchDelta {
+  appId: AppId;
+  delta: number;
+}
+
 class RankedMatchService {
+  // Every per-app rating delta from matches at or after `cutoff`. Folds the two
+  // sides (appA/deltaA, appB/deltaB) of each match into one flat list; the
+  // caller sums per app to reconstruct each app's rating as of the cutoff.
+  deltasSince = (cutoff: Date): Promise<RankedMatchDelta[]> => {
+    return pool
+      .query({
+        text: 'SELECT appA, appB, deltaA, deltaB FROM ranked_match WHERE createdTimestamp >= $1',
+        values: [cutoff],
+      })
+      .then((res) =>
+        res.rows.flatMap((row) => [
+          { appId: row.appa as AppId, delta: (row.deltaa as number) ?? 0 },
+          { appId: row.appb as AppId, delta: (row.deltab as number) ?? 0 },
+        ])
+      );
+  };
+
   record = (m: RankedMatchRecord): Promise<void> => {
     return pool
       .query({

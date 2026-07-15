@@ -18,6 +18,36 @@ const medal = (rank: number): string =>
 const placeLabel = (rank: number): string | undefined =>
   ({ 1: 'First place', 2: 'Second place', 3: 'Third place' })[rank];
 
+// Movement over the last day: compare the row's current rank to where it sat
+// ~24h ago (server-provided `previousRank`). A lower rank number is better, so a
+// previousRank *above* the current rank means the bot climbed. Only movers get a
+// marker — green ▲ up / red ▼ down with the number of places; unchanged rows and
+// new entrants (no previousRank) render nothing. Colors read on light and dark.
+const MOVE_UP = '#2e7d32';
+const MOVE_DOWN = '#c0392b';
+interface Move {
+  symbol: string;
+  color: string;
+  label: string;
+}
+const movement = (e: LeaderboardEntry): Move | null => {
+  if (e.previousRank == null) return null; // new entrant — no marker
+  const delta = e.previousRank - e.rank;
+  if (delta > 0)
+    return {
+      symbol: '▲',
+      color: MOVE_UP,
+      label: `Up ${delta} ${delta === 1 ? 'place' : 'places'} since yesterday`,
+    };
+  if (delta < 0)
+    return {
+      symbol: '▼',
+      color: MOVE_DOWN,
+      label: `Down ${-delta} ${delta === -1 ? 'place' : 'places'} since yesterday`,
+    };
+  return null; // unchanged — no marker
+};
+
 const cell: React.CSSProperties = {
   padding: '6px 12px',
   borderBottom: '1px solid var(--rule)',
@@ -102,7 +132,9 @@ export default function LeaderboardPage() {
               <tr>
                 {/* podium column (medal) for the top three, far left */}
                 <th style={numCell} aria-hidden="true"></th>
-                <th style={numCell}>#</th>
+                <th style={cell} title="Rank, with change over the last 24h">
+                  #
+                </th>
                 <th style={cell}>Bot</th>
                 <th style={cell}>Owner</th>
                 <th style={numCell}>Rating</th>
@@ -118,12 +150,29 @@ export default function LeaderboardPage() {
                 const first = top3 ? goldFirstCell(numCell) : numCell;
                 const c = top3 ? goldCell(cell) : cell;
                 const n = top3 ? goldCell(numCell) : numCell;
+                const mv = movement(e);
                 return (
                   <tr key={e.rank} style={{ fontWeight: isOwn ? 700 : 400 }}>
                     <td style={first} aria-label={placeLabel(e.rank)}>
                       {medal(e.rank)}
                     </td>
-                    <td style={n}>{e.rank}</td>
+                    <td style={c}>
+                      {e.rank}
+                      {mv && (
+                        <span
+                          style={{
+                            color: mv.color,
+                            marginLeft: 6,
+                            fontSize: '0.85em',
+                            whiteSpace: 'nowrap',
+                          }}
+                          aria-label={mv.label}
+                          title={mv.label}
+                        >
+                          {mv.symbol}
+                        </span>
+                      )}
+                    </td>
                     <td style={c}>
                       <img
                         src={`/sprites/tank_${e.color}.png`}

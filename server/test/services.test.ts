@@ -281,6 +281,95 @@ describe('AppService', () => {
     expect(board[0].ownerName).toBe('Anonymous');
   });
 
+  it('getLeaderboard() derives previousRank from the last 24h of ranked matches', async () => {
+    // Current board (already rating-sorted): a1 > a2 > a3 > a4, all different owners.
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          appId: 'a1',
+          ownerUserId: 'u1',
+          name: 'A1',
+          ownerName: 'One',
+          rating: 1700,
+          ratingGames: 20,
+          ratingWins: 12,
+        },
+        {
+          appId: 'a2',
+          ownerUserId: 'u2',
+          name: 'A2',
+          ownerName: 'Two',
+          rating: 1690,
+          ratingGames: 20,
+          ratingWins: 10,
+        },
+        {
+          appId: 'a3',
+          ownerUserId: 'u3',
+          name: 'A3',
+          ownerName: 'Three',
+          rating: 1680,
+          ratingGames: 20,
+          ratingWins: 9,
+        },
+        {
+          appId: 'a4',
+          ownerUserId: 'u4',
+          name: 'A4',
+          ownerName: 'Four',
+          rating: 1670,
+          ratingGames: 1,
+          ratingWins: 1,
+        },
+      ],
+      rowCount: 4,
+    } as never);
+    // Window deltas (ranked_match rows: appa/appb + deltaa/deltab, one row/match).
+    // a1 lost 30 (was ahead), a2 gained 40 (was behind), a3 flat, a4 played its
+    // only-ever ranked game inside the window (so it wasn't on the board 24h ago).
+    query.mockResolvedValueOnce({
+      rows: [
+        { appa: 'a1', appb: 'a2', deltaa: -30, deltab: 40 },
+        { appa: 'a4', appb: 'a3', deltaa: 20, deltab: 0 },
+      ],
+      rowCount: 2,
+    } as never);
+
+    const board = await appService.getLeaderboard(20);
+    const byName = Object.fromEntries(board.map((e) => [e.name, e]));
+    // Rewound board 24h ago was a1(1730) > a3(1680) > a2(1650); a4 had 0 games.
+    expect(byName.A1.previousRank).toBe(1); // rank 1 now, was 1 → unchanged
+    expect(byName.A2.previousRank).toBe(3); // rank 2 now, was 3 → climbed
+    expect(byName.A3.previousRank).toBe(2); // rank 3 now, was 2 → slipped
+    expect(byName.A4.previousRank).toBeUndefined(); // new entrant
+
+    // The second query is the ranked_match window scan (deltasSince).
+    const [{ text }] = query.mock.calls[1] as [{ text: string }];
+    expect(text).toContain('ranked_match');
+  });
+
+  it('getLeaderboard() marks every row new when there is no ranked history', async () => {
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          appId: 'a1',
+          ownerUserId: 'u1',
+          name: 'A1',
+          ownerName: 'One',
+          rating: 1700,
+          ratingGames: 20,
+          ratingWins: 12,
+        },
+      ],
+      rowCount: 1,
+    } as never);
+    query.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
+    const board = await appService.getLeaderboard(20);
+    // No deltas to rewind → prevRating == current, so ranks are unchanged, not
+    // "new": an app only reads as new when it hadn't played 24h ago.
+    expect(board[0].previousRank).toBe(1);
+  });
+
   it('getLadderCandidates() excludes the demo user and maps eligible rows', async () => {
     query.mockResolvedValue({
       rows: [

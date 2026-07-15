@@ -6,6 +6,7 @@ import { DEFAULT_RATING } from '../util/elo';
 import { abbreviateName } from '../util/displayName';
 import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
+import rankedMatchService from './RankedMatchService';
 
 // Tank sprite color names, mirroring the UI palette (ui/src/util/colors.ts;
 // sprites at ui/public/sprites/tank_<color>.png). The leaderboard derives each
@@ -51,6 +52,11 @@ export interface LeaderboardEntry {
   games: number;
   wins: number;
   winRate: number;
+  // The app's rank on the board as it stood ~24h ago, reconstructed by rewinding
+  // its rating by the deltas it earned since then (see getLeaderboard). The UI
+  // renders an up/down movement arrow from `previousRank` vs `rank`. Omitted when
+  // the app wasn't on the board 24h ago (a new entrant), which the UI marks as new.
+  previousRank?: number;
 }
 
 pool.query(`
@@ -130,65 +136,117 @@ export class AppService {
   // That ceiling is provably sufficient — with MAX_APPS_PER_USER (20) and a
   // 3-per-owner cap, filling a 20-row board scans well under it — so it never
   // truncates the visible board in practice.
-  getLeaderboard = (
+  getLeaderboard = async (
     limit = 20,
     viewerUserId?: UserId
   ): Promise<LeaderboardEntry[]> => {
     const MAX_APPS_PER_OWNER_ON_BOARD = 3;
     const LEADERBOARD_SCAN_LIMIT = 500;
-    return pool
-      .query({
-        text: `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
-                      app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
-               FROM app JOIN account ON account.id = app.userId
-               WHERE NOT app.deleted
-                 AND NOT COALESCE(app.broken, false)
-                 AND COALESCE(app.ratingGames, 0) > 0
-                 AND app.userId <> $2
-               ORDER BY app.rating DESC, app.ratingGames DESC
-               LIMIT $1`,
-        values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
-      })
-      .then((res) => {
-        const perOwner = new Map<string, number>();
-        const entries: LeaderboardEntry[] = [];
-        for (const row of res.rows) {
-          if (entries.length >= limit) break;
-          const ownerId = row.ownerUserId as string;
-          const count = perOwner.get(ownerId) ?? 0;
-          // Skip an owner's 4th+ bot so a single player can't dominate.
-          if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
-          perOwner.set(ownerId, count + 1);
+    // How far back "movement" looks: the up/down arrow compares each app's
+    // current rank to where it stood this long ago. A rolling day is stable
+    // enough to be meaningful (vs. per-match jitter) yet fresh for daily movers.
+    const MOVEMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-          const games = (row.ratingGames as number | null) ?? 0;
-          const wins = (row.ratingWins as number | null) ?? 0;
-          // The owner name comes from Google (account.name); apply the same
-          // precautions bot names get before showing it publicly. We can't
-          // reject a sign-in, so a profane owner name falls back to Anonymous
-          // (their real name is untouched elsewhere, e.g. their own avatar).
-          const owner = sanitizeBotName(row.ownerName as string | null);
-          entries.push({
-            rank: entries.length + 1,
-            // Sprite color for every row, derived from the app id (the id itself
-            // never leaves the server).
-            color: colorForAppId(row.appId as string),
-            // Real app id ONLY on the viewer's own rows; omitted for others so
-            // the public board never leaks foreign app ids.
-            appId: ownerId === viewerUserId ? (row.appId as AppId) : undefined,
-            name: (row.name as string | null) ?? 'Unnamed',
-            // Abbreviate to "First L." so the public endpoint never exposes a
-            // full surname.
-            ownerName: isNameProfane(owner)
-              ? 'Anonymous'
-              : abbreviateName(owner),
-            rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
-            games,
-            wins,
-            winRate: games > 0 ? wins / games : 0,
-          });
-        }
-        return entries;
+    const res = await pool.query({
+      text: `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
+                    app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
+             FROM app JOIN account ON account.id = app.userId
+             WHERE NOT app.deleted
+               AND NOT COALESCE(app.broken, false)
+               AND COALESCE(app.ratingGames, 0) > 0
+               AND app.userId <> $2
+             ORDER BY app.rating DESC, app.ratingGames DESC
+             LIMIT $1`,
+      values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
+    });
+
+    // Reconstruct the board as of MOVEMENT_WINDOW_MS ago: rewind each app's
+    // rating by the deltas it earned inside the window, then re-rank with the
+    // same sort + owner cap so the two ranks are on a comparable scale. Derived
+    // from ranked_match history (no rank is persisted), so it needs no schema.
+    const cutoff = new Date(Date.now() - MOVEMENT_WINDOW_MS);
+    const windowDeltas = await rankedMatchService.deltasSince(cutoff);
+    // appId -> { sumDelta, matches } over the window. `matches` (one delta row
+    // per match the app played) rewinds ratingGames so an app that first crossed
+    // the ratingGames > 0 threshold inside the window reads as a new entrant.
+    const rewind = new Map<string, { sumDelta: number; matches: number }>();
+    for (const d of windowDeltas) {
+      const acc = rewind.get(d.appId) ?? { sumDelta: 0, matches: 0 };
+      acc.sumDelta += d.delta;
+      acc.matches += 1;
+      rewind.set(d.appId, acc);
+    }
+
+    // Build the previous ordering from the same candidate rows, using each app's
+    // rating/games as of the cutoff. Apps that hadn't yet played a ranked game
+    // then (prevGames <= 0) simply don't appear — they get no previousRank.
+    const previousRankByApp = new Map<string, number>();
+    const prevOrdered = res.rows
+      .map((row) => {
+        const w = rewind.get(row.appId as string);
+        const currentRating = (row.rating as number | null) ?? DEFAULT_RATING;
+        const currentGames = (row.ratingGames as number | null) ?? 0;
+        return {
+          appId: row.appId as string,
+          ownerId: row.ownerUserId as string,
+          prevRating: currentRating - (w?.sumDelta ?? 0),
+          prevGames: currentGames - (w?.matches ?? 0),
+        };
+      })
+      .filter((r) => r.prevGames > 0)
+      .sort((a, b) =>
+        b.prevRating !== a.prevRating
+          ? b.prevRating - a.prevRating
+          : b.prevGames - a.prevGames
+      );
+    const prevPerOwner = new Map<string, number>();
+    for (const r of prevOrdered) {
+      const count = prevPerOwner.get(r.ownerId) ?? 0;
+      if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
+      prevPerOwner.set(r.ownerId, count + 1);
+      // Rank across the full ordering (not truncated to `limit`) so a bot that
+      // climbed from, say, #34 into the visible board still shows real movement.
+      previousRankByApp.set(r.appId, previousRankByApp.size + 1);
+    }
+
+    const perOwner = new Map<string, number>();
+    const entries: LeaderboardEntry[] = [];
+    for (const row of res.rows) {
+      if (entries.length >= limit) break;
+      const ownerId = row.ownerUserId as string;
+      const count = perOwner.get(ownerId) ?? 0;
+      // Skip an owner's 4th+ bot so a single player can't dominate.
+      if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
+      perOwner.set(ownerId, count + 1);
+
+      const games = (row.ratingGames as number | null) ?? 0;
+      const wins = (row.ratingWins as number | null) ?? 0;
+      // The owner name comes from Google (account.name); apply the same
+      // precautions bot names get before showing it publicly. We can't
+      // reject a sign-in, so a profane owner name falls back to Anonymous
+      // (their real name is untouched elsewhere, e.g. their own avatar).
+      const owner = sanitizeBotName(row.ownerName as string | null);
+      entries.push({
+        rank: entries.length + 1,
+        // Sprite color for every row, derived from the app id (the id itself
+        // never leaves the server).
+        color: colorForAppId(row.appId as string),
+        // Real app id ONLY on the viewer's own rows; omitted for others so
+        // the public board never leaks foreign app ids.
+        appId: ownerId === viewerUserId ? (row.appId as AppId) : undefined,
+        name: (row.name as string | null) ?? 'Unnamed',
+        // Abbreviate to "First L." so the public endpoint never exposes a
+        // full surname.
+        ownerName: isNameProfane(owner) ? 'Anonymous' : abbreviateName(owner),
+        rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
+        games,
+        wins,
+        winRate: games > 0 ? wins / games : 0,
+        // Where this app sat 24h ago; undefined for a new entrant (no game then).
+        previousRank: previousRankByApp.get(row.appId as string),
       });
+    }
+    return entries;
   };
 
   // Lightweight rows for global-ladder matchmaking (GitHub #151): every app
