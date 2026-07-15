@@ -106,7 +106,7 @@ export const writeRateLimit = makeLimiter('write', {
 // victim's budget, which is the intended per-user framing.
 export const mcpRateLimit = makeLimiter('mcp', {
   windowMs: 60 * 1000,
-  limit: num('RATE_LIMIT_MCP_MAX', 30),
+  limit: num('RATE_LIMIT_MCP_MAX', 60),
 });
 
 // Broad backstop across the whole API, IP-keyed. Generous — the targeted

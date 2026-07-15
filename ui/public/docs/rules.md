@@ -153,7 +153,7 @@ per IP address for sign-in):
 | Sign in                            | 20 / 10 min |
 | Check, deploy, or reboot code      | 60 / min    |
 | Create an app or arena             | 30 / min    |
-| AI assistant tools (MCP)           | 30 / min    |
+| AI assistant tools (MCP)           | 60 / min    |
 | Any API request (overall backstop) | 600 / min   |
 
 See [Error codes](/error-codes) for **E021** and **E022**.
