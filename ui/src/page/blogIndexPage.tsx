@@ -22,20 +22,19 @@ export default function BlogIndexPage(props: { now?: Date }) {
   return (
     // Reuse the shared markdown styling so the page matches the doc pages.
     <div className="markdown">
-      <h1>Blog</h1>
       <p>
-        Notes from building RobocodeJs: strategy for your bots, the odd
-        debugging war story, how the game works under the hood, and what it's
-        like to build and run a small game on the side. Some posts are for
-        players, some are for the curious, and a few are just me thinking out
-        loud. New here? The <Link to="/about">About page</Link> is a good place
-        to start, or jump straight into the{' '}
-        <Link to="/learn">Learn course</Link>.
+        RobocodeJs first launched back in 2022 as a small browser reimagining of
+        the classic Robocode, and it has been quietly evolving ever since. Over
+        the last several years it has grown from a bare arena into a full game:
+        an in-browser editor, a sandboxed engine, a Learn course, global
+        rankings, and an MCP integration that lets an AI write and battle bots
+        alongside you. These posts chart that journey, part strategy guide for
+        your bots, part debugging war story, and part running diary of building
+        and evolving a small game on the side.
       </p>
-      <hr />
       {byYear.map(([year, yearPosts]) => (
         <div key={year}>
-          <h2>{year}</h2>
+          <h1>{year}</h1>
           <ul>
             {yearPosts.map((post) => (
               <li key={post.slug} style={{ marginBottom: '0.75em' }}>

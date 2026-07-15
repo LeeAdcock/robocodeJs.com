@@ -82,8 +82,9 @@ the first "it moved!" to be minutes away, not an afternoon of setup away.
 
 This is a tribute, not a replacement. The original Robocode is still going, still
 wonderful, and if you enjoy this you should go play it too. But I think there's room for a
-version that a curious ten-year-old can start playing on a school Chromebook during lunch.
-No installation, no permission slip, and definitely no negotiating with the bus driver.
+version that anyone with a passion for technology and problem solving can open and start
+playing in a browser during a spare lunch break. No installation, no toolchain, and
+definitely no negotiating with the bus driver.
 
 That's why this exists. In the posts that follow I'll get into the fun stuff: strategy,
 the guts of the simulation, the occasional bug that cost me a weekend. But I wanted the

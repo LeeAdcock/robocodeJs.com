@@ -18,9 +18,9 @@ the foundation for my career in software development and technology leadership, 
 the feeling of _my code, alive in the arena_ is a big part of why I still love this
 work today.
 
-RobocodeJs is my attempt to hand that same spark to the next generation, especially
-anyone who's never written a line of code. The classic meant installing a Java app
-and wrestling a toolchain before you could even play. I rebuilt the idea for the
+RobocodeJs is my attempt to hand that same spark to anyone with a passion for
+technology and problem solving. The classic meant installing a Java app and
+wrestling a toolchain before you could even play. I rebuilt the idea for the
 browser and JavaScript so there's nothing to download, nothing to configure, and
 nothing between you and your first bot: sign in, write a few lines, and watch them
 fight. The arena, the sandbox, the Learn course, the docs, I built all of it to make
