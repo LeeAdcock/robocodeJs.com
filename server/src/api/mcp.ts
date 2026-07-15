@@ -158,6 +158,28 @@ const ownedArena = async (
   return arenaService.getDefaultForUser(user.getId());
 };
 
+// Read-only spectating: resolve an arena by id WITHOUT requiring ownership, so
+// the view tools (arena_status/match_summary/match_status) can watch any arena
+// whose id the caller has — the MCP counterpart of the public REST route
+// GET /api/arena/:arenaId and the /watch share link. Omitting arenaId still
+// targets the caller's own default arena. Write/control tools keep using
+// ownedArena, so only the owner can pause, restart, change speed/seed, or edit
+// the roster. A malformed id (which the DB rejects) resolves to null → a clean
+// "no such arena" rather than a thrown error.
+const readableArena = async (
+  user: User,
+  arenaId?: string
+): Promise<Arena | null> => {
+  if (arenaId) {
+    try {
+      return (await arenaService.get(arenaId)) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return arenaService.getDefaultForUser(user.getId());
+};
+
 // The run_match tool drives a match with the shared runMatchToDecision helper
 // (util/runMatch.ts), which the global ladder uses too so both decide a match
 // identically.
@@ -573,21 +595,24 @@ export const buildServer = (user: User): McpServer => {
       title: 'Arena status',
       description:
         'Snapshot of an arena: size, running state, clock, and every ' +
-        "app's bots (position, orientation, health, bullets). Omit arenaId " +
-        'for your default arena.',
+        "app's bots (position, orientation, health, bullets). Read-only, so it " +
+        "works for ANY arena id you have (spectate someone else's match via a " +
+        'shared arena id), not just your own. Omit arenaId for your default arena.',
       inputSchema: {
         arenaId: z
           .string()
           .optional()
-          .describe('Arena id; defaults to your default arena'),
+          .describe(
+            'Arena id — yours or any arena you want to watch; defaults to your default arena'
+          ),
       },
       // The snapshot is large and evolving, so it's returned as structuredContent
       // without a formal outputSchema rather than pinning a brittle shape here.
       annotations: READ_ONLY,
     },
     async ({ arenaId }) => {
-      const arena = await ownedArena(user, arenaId);
-      if (!arena) return fail('No such arena, or it is not yours.');
+      const arena = await readableArena(user, arenaId);
+      if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
       return ok(await buildArenaStatus(env, members));
@@ -605,21 +630,24 @@ export const buildServer = (user: User): McpServer => {
         'total health), and elimination order. Complements arena_status (which is ' +
         'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
-        'decided when at most one app still has living bots. Omit arenaId for ' +
+        'decided when at most one app still has living bots. Read-only, so it ' +
+        'works for ANY arena id you have, not just your own. Omit arenaId for ' +
         'your default arena.',
       inputSchema: {
         arenaId: z
           .string()
           .optional()
-          .describe('Arena id; defaults to your default arena'),
+          .describe(
+            'Arena id — yours or any arena you want to watch; defaults to your default arena'
+          ),
       },
       // Like arena_status: the shape is broad and evolving, so it is returned as
       // structuredContent without pinning a brittle outputSchema.
       annotations: READ_ONLY,
     },
     async ({ arenaId }) => {
-      const arena = await ownedArena(user, arenaId);
-      if (!arena) return fail('No such arena, or it is not yours.');
+      const arena = await readableArena(user, arenaId);
+      if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
       return ok(await buildMatchSummary(env, members));
@@ -638,18 +666,21 @@ export const buildServer = (user: User): McpServer => {
         'positions. Use this to watch a running match ("is it decided yet / ' +
         'who’s ahead?") without pulling the large payloads; once decided, call ' +
         'match_summary for the full outcome + stats, or arena_status for exact ' +
-        'bot positions. Omit arenaId for your default arena.',
+        'bot positions. Read-only, so it works for ANY arena id you have, not ' +
+        'just your own. Omit arenaId for your default arena.',
       inputSchema: {
         arenaId: z
           .string()
           .optional()
-          .describe('Arena id; defaults to your default arena'),
+          .describe(
+            'Arena id — yours or any arena you want to watch; defaults to your default arena'
+          ),
       },
       annotations: READ_ONLY,
     },
     async ({ arenaId }) => {
-      const arena = await ownedArena(user, arenaId);
-      if (!arena) return fail('No such arena, or it is not yours.');
+      const arena = await readableArena(user, arenaId);
+      if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
       return ok(await buildMatchStatus(env, members));

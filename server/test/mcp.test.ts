@@ -393,6 +393,35 @@ describe('mcp tools', () => {
     expect(JSON.parse(textOf(res))).toEqual({ running: true });
   });
 
+  it('arena_status spectates an arena owned by someone else (read-only, by id)', async () => {
+    // Owned by u2, caller is u1 — read-only view tools resolve by id without an
+    // ownership check, so this must succeed (the arena id is the capability).
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildArenaStatus).mockResolvedValue({ running: true } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'arena_status',
+      arguments: { arenaId: 'ar2' },
+    })) as never;
+
+    expect(arenaService.get).toHaveBeenCalledWith('ar2');
+    expect(JSON.parse(textOf(res))).toEqual({ running: true });
+  });
+
+  it('pause_arena refuses an arena owned by someone else (writes stay owner-only)', async () => {
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'pause_arena',
+      arguments: { arenaId: 'ar2' },
+    })) as { isError?: boolean };
+
+    expect(res.isError).toBe(true);
+  });
+
   it('match_summary resolves the default arena and returns the summary', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
