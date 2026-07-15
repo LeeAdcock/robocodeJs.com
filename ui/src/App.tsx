@@ -466,15 +466,23 @@ function App() {
               doShare={arena.id ? doShare : undefined}
             />
             {shareNotice && (
+              // Positioned absolutely (out of flow) just below the toolbar: the
+              // toolbar's container shrinks to fit and the ButtonToolbar is
+              // right-aligned, so an in-flow notice wider than the buttons would
+              // widen the container and shove the buttons. This floats the toast
+              // without disturbing the toolbar layout.
               <div
                 style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
                   marginTop: '6px',
+                  whiteSpace: 'nowrap',
                   fontSize: '0.8rem',
                   background: 'rgba(0, 0, 0, 0.7)',
                   color: '#fff',
                   padding: '3px 8px',
                   borderRadius: '4px',
-                  display: 'inline-block',
                 }}
               >
                 {shareNotice}

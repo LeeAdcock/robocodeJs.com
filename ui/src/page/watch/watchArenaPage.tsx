@@ -26,11 +26,13 @@ export default function WatchArenaPage({ arenaId }: { arenaId: string }) {
       style={{
         position: 'fixed',
         inset: 0,
+        // No padding: the arena renders edge-to-edge and fills the whole
+        // viewport. The ocean bleeds past the square board into any letterbox
+        // area, so there's no white border. Flex only centers the not-found note.
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '10px',
-        boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       {notFound ? (
@@ -42,7 +44,7 @@ export default function WatchArenaPage({ arenaId }: { arenaId: string }) {
           <p>This match has ended or the link is no longer valid.</p>
         </div>
       ) : (
-        <ArenaSvg darkMode={darkMode} arena={arena} time={time} />
+        <ArenaSvg darkMode={darkMode} arena={arena} time={time} hideBorder />
       )}
     </div>
   );
