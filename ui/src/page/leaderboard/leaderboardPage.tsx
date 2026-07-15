@@ -20,34 +20,32 @@ const placeLabel = (rank: number): string | undefined =>
 
 // Movement over the last day: compare the row's current rank to where it sat
 // ~24h ago (server-provided `previousRank`). A lower rank number is better, so a
-// previousRank *above* the current rank means the bot climbed. Green ▲ up / red
-// ▼ down / muted – unchanged, and a "new" tag when the bot wasn't ranked a day
-// ago. Colors are chosen to read on both the light and dark page background.
+// previousRank *above* the current rank means the bot climbed. Only movers get a
+// marker — green ▲ up / red ▼ down with the number of places; unchanged rows and
+// new entrants (no previousRank) render nothing. Colors read on light and dark.
 const MOVE_UP = '#2e7d32';
 const MOVE_DOWN = '#c0392b';
-const MOVE_FLAT = '#888';
 interface Move {
   symbol: string;
   color: string;
   label: string;
 }
-const movement = (e: LeaderboardEntry): Move => {
-  if (e.previousRank == null)
-    return { symbol: 'new', color: MOVE_FLAT, label: 'New to the rankings' };
+const movement = (e: LeaderboardEntry): Move | null => {
+  if (e.previousRank == null) return null; // new entrant — no marker
   const delta = e.previousRank - e.rank;
   if (delta > 0)
     return {
-      symbol: `▲ ${delta}`,
+      symbol: '▲',
       color: MOVE_UP,
       label: `Up ${delta} ${delta === 1 ? 'place' : 'places'} since yesterday`,
     };
   if (delta < 0)
     return {
-      symbol: `▼ ${-delta}`,
+      symbol: '▼',
       color: MOVE_DOWN,
       label: `Down ${-delta} ${delta === -1 ? 'place' : 'places'} since yesterday`,
     };
-  return { symbol: '–', color: MOVE_FLAT, label: 'Unchanged since yesterday' };
+  return null; // unchanged — no marker
 };
 
 const cell: React.CSSProperties = {
@@ -134,12 +132,8 @@ export default function LeaderboardPage() {
               <tr>
                 {/* podium column (medal) for the top three, far left */}
                 <th style={numCell} aria-hidden="true"></th>
-                <th style={numCell}>#</th>
-                <th
-                  style={numCell}
-                  title="Change in rank over the last 24 hours"
-                >
-                  24h
+                <th style={cell} title="Rank, with change over the last 24h">
+                  #
                 </th>
                 <th style={cell}>Bot</th>
                 <th style={cell}>Owner</th>
@@ -162,13 +156,22 @@ export default function LeaderboardPage() {
                     <td style={first} aria-label={placeLabel(e.rank)}>
                       {medal(e.rank)}
                     </td>
-                    <td style={n}>{e.rank}</td>
-                    <td
-                      style={{ ...n, color: mv.color, whiteSpace: 'nowrap' }}
-                      aria-label={mv.label}
-                      title={mv.label}
-                    >
-                      {mv.symbol}
+                    <td style={c}>
+                      {e.rank}
+                      {mv && (
+                        <span
+                          style={{
+                            color: mv.color,
+                            marginLeft: 6,
+                            fontSize: '0.85em',
+                            whiteSpace: 'nowrap',
+                          }}
+                          aria-label={mv.label}
+                          title={mv.label}
+                        >
+                          {mv.symbol}
+                        </span>
+                      )}
                     </td>
                     <td style={c}>
                       <img

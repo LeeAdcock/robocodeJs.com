@@ -111,16 +111,17 @@ describe('LeaderboardPage', () => {
       </MemoryRouter>
     );
     await screen.findByText('Overlord');
-    expect(screen.getByLabelText('Up 2 places since yesterday').textContent).toBe(
-      '▲ 2'
-    );
+    expect(
+      screen.getByLabelText('Up 2 places since yesterday').textContent
+    ).toBe('▲');
     expect(
       screen.getByLabelText('Down 2 places since yesterday').textContent
-    ).toBe('▼ 2');
-    expect(screen.getByLabelText('Unchanged since yesterday').textContent).toBe(
-      '–'
-    );
-    expect(screen.getByLabelText('New to the rankings').textContent).toBe('new');
+    ).toBe('▼');
+    // Unchanged rows and new entrants get no marker at all.
+    expect(screen.queryByLabelText(/Unchanged/i)).toBeNull();
+    expect(screen.queryByLabelText(/New to/i)).toBeNull();
+    expect(screen.queryByText('–')).toBeNull();
+    expect(screen.queryByText('new')).toBeNull();
   });
 
   it('shows an empty-state message when there are no ranked bots', async () => {
