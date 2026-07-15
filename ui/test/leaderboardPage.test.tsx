@@ -77,10 +77,10 @@ describe('LeaderboardPage', () => {
     expect(otherRow.style.fontWeight).toBe('400');
   });
 
-  it('renders 24h movement arrows from previousRank', async () => {
+  it('renders movement: rank change plus new-and-winning, nothing otherwise', async () => {
     const moveRows = [
-      { ...rows[0], rank: 1, previousRank: 3 }, // climbed two places
-      { ...rows[1], rank: 2, previousRank: 2 }, // unchanged
+      { ...rows[0], rank: 1, previousRank: 3 }, // climbed two places → ▲
+      { ...rows[1], rank: 2, previousRank: 2 }, // unchanged → no marker
       {
         rank: 3,
         color: 'green',
@@ -90,18 +90,27 @@ describe('LeaderboardPage', () => {
         games: 15,
         wins: 6,
         winRate: 0.4,
-        previousRank: 1, // dropped two places
+        previousRank: 1, // dropped two places → ▼
       },
       {
         rank: 4,
         color: 'sand',
         name: 'Rookie',
         ownerName: 'Nia P.',
-        rating: 1550,
+        rating: 1550, // new entrant above the 1500 start → ▲
         games: 3,
         wins: 2,
         winRate: 0.67,
-        // no previousRank → new entrant
+      },
+      {
+        rank: 5,
+        color: 'dark',
+        name: 'Greenhorn',
+        ownerName: 'Ola B.',
+        rating: 1460, // new entrant at/below the start → no marker
+        games: 2,
+        wins: 0,
+        winRate: 0,
       },
     ];
     vi.mocked(axios.get).mockResolvedValue({ data: moveRows } as never);
@@ -117,11 +126,15 @@ describe('LeaderboardPage', () => {
     expect(
       screen.getByLabelText('Down 2 places since yesterday').textContent
     ).toBe('▼');
-    // Unchanged rows and new entrants get no marker at all.
-    expect(screen.queryByLabelText(/Unchanged/i)).toBeNull();
-    expect(screen.queryByLabelText(/New to/i)).toBeNull();
+    // New + above the starting rating gets a ▲ (already winning).
+    expect(
+      screen.getByLabelText(/New — already above the 1500 starting rating/)
+        .textContent
+    ).toBe('▲');
+    // Unchanged and new-but-not-winning rows get no marker: exactly 2 ▲, 1 ▼.
+    expect(screen.getAllByText('▲')).toHaveLength(2);
+    expect(screen.getAllByText('▼')).toHaveLength(1);
     expect(screen.queryByText('–')).toBeNull();
-    expect(screen.queryByText('new')).toBeNull();
   });
 
   it('shows an empty-state message when there are no ranked bots', async () => {

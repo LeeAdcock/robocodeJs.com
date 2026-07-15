@@ -21,17 +21,31 @@ const placeLabel = (rank: number): string | undefined =>
 // Movement over the last day: compare the row's current rank to where it sat
 // ~24h ago (server-provided `previousRank`). A lower rank number is better, so a
 // previousRank *above* the current rank means the bot climbed. Only movers get a
-// marker — green ▲ up / red ▼ down with the number of places; unchanged rows and
-// new entrants (no previousRank) render nothing. Colors read on light and dark.
+// marker — green ▲ up / red ▼ down; unchanged rows render nothing. Colors read
+// on light and dark.
 const MOVE_UP = '#2e7d32';
 const MOVE_DOWN = '#c0392b';
+// The rating every app starts at (mirrors the server's DEFAULT_RATING). A brand
+// -new entrant has no reconstructable previousRank, so we can't show a rank
+// change — but if it's already above the starting line it has a winning record,
+// which we surface as a ▲. New bots at or below the start show no marker (no
+// need to paint a fresh bot red on day one).
+const STARTING_RATING = 1500;
 interface Move {
   symbol: string;
   color: string;
   label: string;
 }
 const movement = (e: LeaderboardEntry): Move | null => {
-  if (e.previousRank == null) return null; // new entrant — no marker
+  if (e.previousRank == null)
+    // New entrant (no ranked standing 24h ago): ▲ only if it's already winning.
+    return e.rating > STARTING_RATING
+      ? {
+          symbol: '▲',
+          color: MOVE_UP,
+          label: `New — already above the ${STARTING_RATING} starting rating`,
+        }
+      : null;
   const delta = e.previousRank - e.rank;
   if (delta > 0)
     return {
