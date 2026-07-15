@@ -84,6 +84,12 @@ A `let` inside a handler is forgotten when that handler ends. `this.mode` lives 
 robot's shared notebook, so every handler sees the same value — and it even survives a
 code Save, so editing mid-match won't wipe your robot's memory.
 
+**Do my five robots share this memory?**
+No — each robot gets its **own** private notebook. When one bot sets `this.mode`, the
+other four don't see it, and a top-level `let` variable is private to a single bot too
+(they run the same code, but each keeps its own copy). To share something across your
+team, you **send a message** — that's [Lesson 15](/learn/teamwork).
+
 **What does `filter` do (vs `forEach`)?**
 `forEach` _visits_ every item. `filter` _builds a new shorter list_ of just the items that
 match — here, the enemies.
