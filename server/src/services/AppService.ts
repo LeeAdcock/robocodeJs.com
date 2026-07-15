@@ -166,9 +166,12 @@ export class AppService {
     // from ranked_match history (no rank is persisted), so it needs no schema.
     const cutoff = new Date(Date.now() - MOVEMENT_WINDOW_MS);
     const windowDeltas = await rankedMatchService.deltasSince(cutoff);
-    // appId -> { sumDelta, matches } over the window. `matches` (one delta row
-    // per match the app played) rewinds ratingGames so an app that first crossed
-    // the ratingGames > 0 threshold inside the window reads as a new entrant.
+    // appId -> { sumDelta, matches } over the window. `matches` counts one row
+    // per RATED match the app played (deltasSince excludes unrated timeouts /
+    // double-crashes, which never bumped ratingGames) and rewinds ratingGames,
+    // so an app that first crossed the ratingGames > 0 threshold inside the
+    // window reads as a new entrant — while a busy, crash-prone but established
+    // bot keeps a positive prevGames and a real previousRank.
     const rewind = new Map<string, { sumDelta: number; matches: number }>();
     for (const d of windowDeltas) {
       const acc = rewind.get(d.appId) ?? { sumDelta: 0, matches: 0 };

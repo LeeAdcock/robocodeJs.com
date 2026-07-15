@@ -58,13 +58,20 @@ export interface RankedMatchDelta {
 }
 
 class RankedMatchService {
-  // Every per-app rating delta from matches at or after `cutoff`. Folds the two
-  // sides (appA/deltaA, appB/deltaB) of each match into one flat list; the
-  // caller sums per app to reconstruct each app's rating as of the cutoff.
+  // Every per-app rating delta from RATED matches at or after `cutoff`. Folds
+  // the two sides (appA/deltaA, appB/deltaB) of each match into one flat list;
+  // the caller sums the deltas per app to rewind ratings AND counts the rows to
+  // rewind ratingGames, so both must reflect only matches that actually moved a
+  // rating. `winnerId IS NOT NULL` selects exactly those: the ladder records a
+  // row for every match but leaves winnerId null (and deltas 0) for unrated ones
+  // — timeouts and double-crashes — which never bumped ratingGames. Counting
+  // those would understate an app's pre-window games and wrongly flag a busy,
+  // crash-prone but long-established bot as a brand-new entrant. (Sudden death
+  // forces a winner, so a rated draw with a null winnerId isn't produced.)
   deltasSince = (cutoff: Date): Promise<RankedMatchDelta[]> => {
     return pool
       .query({
-        text: 'SELECT appA, appB, deltaA, deltaB FROM ranked_match WHERE createdTimestamp >= $1',
+        text: 'SELECT appA, appB, deltaA, deltaB FROM ranked_match WHERE createdTimestamp >= $1 AND winnerId IS NOT NULL',
         values: [cutoff],
       })
       .then((res) =>
