@@ -1,20 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 
-import { FaSyncAlt, FaPauseCircle, FaPlayCircle } from 'react-icons/fa';
+import {
+  FaSyncAlt,
+  FaPauseCircle,
+  FaPlayCircle,
+  FaShareAlt,
+} from 'react-icons/fa';
 
 interface EditorToolbarProps {
   isPaused: boolean;
   doPause: React.MouseEventHandler<HTMLElement>;
   doResume: React.MouseEventHandler<HTMLElement>;
   doRestart: React.MouseEventHandler<HTMLElement>;
+  // Copy a public /watch/:arenaId link to the clipboard. Absent until the arena
+  // snapshot (which carries the arena id) has loaded.
+  doShare?: React.MouseEventHandler<HTMLElement>;
 }
 
 export default function EditorToolbar(props: EditorToolbarProps) {
+  // The share tooltip is controlled so a click can dismiss it: on hover it would
+  // otherwise stay up (the cursor is still over the button) and cover the "copied"
+  // toast that appears just below the toolbar. Hover still opens it normally.
+  const [showShareTip, setShowShareTip] = useState(false);
   return (
     <>
       <ButtonToolbar style={{ justifyContent: 'flex-end' }}>
@@ -53,6 +65,28 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               <FaSyncAlt />
             </Button>
           </OverlayTrigger>
+
+          {props.doShare && (
+            <OverlayTrigger
+              placement={'bottom'}
+              show={showShareTip}
+              onToggle={(next) => setShowShareTip(next)}
+              overlay={<Tooltip id={`share`}>Copy public watch link</Tooltip>}
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  // Dismiss the tooltip so it doesn't overlap the "copied" toast;
+                  // it reopens on the next hover.
+                  setShowShareTip(false);
+                  props.doShare?.(e);
+                }}
+              >
+                <FaShareAlt />
+              </Button>
+            </OverlayTrigger>
+          )}
         </ButtonGroup>
       </ButtonToolbar>
     </>

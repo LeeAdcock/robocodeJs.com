@@ -19,6 +19,9 @@ export const buildArenaStatus = async (
   );
 
   return {
+    // The arena's own UUID — the token the UI needs to build a public "watch"
+    // share link (/watch/:arenaId) from the snapshot it already fetches.
+    id: arena.getId(),
     height: arena.getHeight(),
     width: arena.getWidth(),
     running: env.isRunning(),

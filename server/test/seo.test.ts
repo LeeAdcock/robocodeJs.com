@@ -85,6 +85,12 @@ describe('seo resolver', () => {
     expect(resolver().resolve('/no/such/page').noindex).toBe(true);
   });
 
+  it('noindexes the public watch page but gives it a friendly title', () => {
+    const m = resolver().resolve('/watch/3f2504e0-4f89-41d3-9a0c-0305e82c3301');
+    expect(m.noindex).toBe(true);
+    expect(m.title).toContain('Watch');
+  });
+
   it('ignores a trailing slash', () => {
     expect(resolver().resolve('/about/').canonical).toBe(
       'https://example.test/about'

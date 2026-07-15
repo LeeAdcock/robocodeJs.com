@@ -88,6 +88,10 @@ interface ArenaSvgProps {
   time: number;
   // Open a bot from the arena: double-click → source, shift+double-click → logs.
   onOpenBot?: (appId: string, botIndex: number, shiftKey: boolean) => void;
+  // Drop the framing border for an edge-to-edge, full-viewport render (the public
+  // /watch spectator page). The ocean rect already bleeds past the viewBox, so
+  // without the border the arena fills the whole container.
+  hideBorder?: boolean;
 }
 
 export default function ArenaSvg(props: ArenaSvgProps) {
@@ -100,7 +104,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
       preserveAspectRatio="xMidYMid meet"
       xmlns="http://www.w3.org/2000/svg"
       style={{
-        border: '2px solid rgb(33,37,41)',
+        border: props.hideBorder ? undefined : '2px solid rgb(33,37,41)',
         // Contain the night-mode blend overlay so it multiplies only the arena,
         // not whatever is painted behind the SVG.
         isolation: 'isolate',

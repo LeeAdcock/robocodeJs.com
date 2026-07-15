@@ -32,6 +32,7 @@ import appEndpoints from './api/app';
 import arenaEndpoints from './api/arena';
 import helpEndpoints from './api/help';
 import demoEndpoints from './api/demo';
+import watchArenaEndpoints from './api/watchArena';
 import leaderboardEndpoints from './api/leaderboard';
 
 const app = express();
@@ -113,6 +114,11 @@ app.use(sessionEndpoints);
 app.use(oauthEndpoints);
 app.use(mcpEndpoints);
 app.use(demoEndpoints);
+// Public spectator routes (/api/arena/:arenaId...) — mounted here, before the
+// /api/user tree, so the auth(true) gate above never runs on them; anonymous
+// share-link visitors can watch a match. Read-only; logs and mutations stay
+// owner-gated under /api/user.
+app.use(watchArenaEndpoints);
 app.use(helpEndpoints);
 app.use(userEndpoints);
 app.use(appEndpoints);
