@@ -77,6 +77,52 @@ describe('LeaderboardPage', () => {
     expect(otherRow.style.fontWeight).toBe('400');
   });
 
+  it('renders 24h movement arrows from previousRank', async () => {
+    const moveRows = [
+      { ...rows[0], rank: 1, previousRank: 3 }, // climbed two places
+      { ...rows[1], rank: 2, previousRank: 2 }, // unchanged
+      {
+        rank: 3,
+        color: 'green',
+        name: 'Slipper',
+        ownerName: 'Sam T.',
+        rating: 1600,
+        games: 15,
+        wins: 6,
+        winRate: 0.4,
+        previousRank: 1, // dropped two places
+      },
+      {
+        rank: 4,
+        color: 'sand',
+        name: 'Rookie',
+        ownerName: 'Nia P.',
+        rating: 1550,
+        games: 3,
+        wins: 2,
+        winRate: 0.67,
+        // no previousRank → new entrant
+      },
+    ];
+    vi.mocked(axios.get).mockResolvedValue({ data: moveRows } as never);
+    render(
+      <MemoryRouter>
+        <LeaderboardPage />
+      </MemoryRouter>
+    );
+    await screen.findByText('Overlord');
+    expect(screen.getByLabelText('Up 2 places since yesterday').textContent).toBe(
+      '▲ 2'
+    );
+    expect(
+      screen.getByLabelText('Down 2 places since yesterday').textContent
+    ).toBe('▼ 2');
+    expect(screen.getByLabelText('Unchanged since yesterday').textContent).toBe(
+      '–'
+    );
+    expect(screen.getByLabelText('New to the rankings').textContent).toBe('new');
+  });
+
   it('shows an empty-state message when there are no ranked bots', async () => {
     vi.mocked(axios.get).mockResolvedValue({ data: [] } as never);
     render(

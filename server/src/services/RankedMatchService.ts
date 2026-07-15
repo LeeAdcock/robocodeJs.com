@@ -33,7 +33,34 @@ export interface RankedMatchRecord {
   seed: number;
 }
 
+// Raw both-sides rows for matches played since a cutoff. Each match yields two
+// rows (one per participant) so a caller can fold them per app in JS — used to
+// rewind ratings for the leaderboard "movement" arrows (rank change over a
+// window). Kept as raw rows rather than a SQL GROUP BY to stay portable across
+// pg-mem (dev/test) and Postgres.
+export interface RankedMatchDelta {
+  appId: AppId;
+  delta: number;
+}
+
 class RankedMatchService {
+  // Every per-app rating delta from matches at or after `cutoff`. Folds the two
+  // sides (appA/deltaA, appB/deltaB) of each match into one flat list; the
+  // caller sums per app to reconstruct each app's rating as of the cutoff.
+  deltasSince = (cutoff: Date): Promise<RankedMatchDelta[]> => {
+    return pool
+      .query({
+        text: 'SELECT appA, appB, deltaA, deltaB FROM ranked_match WHERE createdTimestamp >= $1',
+        values: [cutoff],
+      })
+      .then((res) =>
+        res.rows.flatMap((row) => [
+          { appId: row.appa as AppId, delta: (row.deltaa as number) ?? 0 },
+          { appId: row.appb as AppId, delta: (row.deltab as number) ?? 0 },
+        ])
+      );
+  };
+
   record = (m: RankedMatchRecord): Promise<void> => {
     return pool
       .query({
