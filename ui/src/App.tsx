@@ -11,6 +11,7 @@ import NavBar from './components/navbar';
 import MarkdownPage from './page/markdownPage';
 import LessonPage from './page/lessonPage';
 import BlogIndexPage from './page/blogIndexPage';
+import NotFoundPage from './page/notFoundPage';
 import BlogPostPage from './page/blogPostPage';
 import User from './types/user';
 import ArenaToolbar from './components/arena/arenaToolbar';
@@ -431,6 +432,10 @@ function App() {
                     />
                   }
                 />
+                {/* Catch-all: any unmatched URL gets a friendly 404 instead of
+                    an empty content area. The server marks unknown routes
+                    noindex (util/seo.ts). Keep this LAST. */}
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </div>

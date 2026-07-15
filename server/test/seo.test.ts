@@ -81,8 +81,10 @@ describe('seo resolver', () => {
     expect(about.title).toBe('RobocodeJs | About');
   });
 
-  it('noindexes unknown routes (soft-404s)', () => {
-    expect(resolver().resolve('/no/such/page').noindex).toBe(true);
+  it('noindexes unknown routes (soft-404s) with a Page not found title', () => {
+    const m = resolver().resolve('/no/such/page');
+    expect(m.noindex).toBe(true);
+    expect(m.title).toBe('RobocodeJs | Page not found');
   });
 
   it('noindexes the public watch page but gives it a friendly title', () => {
