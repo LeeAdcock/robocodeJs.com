@@ -37,6 +37,24 @@ Both packages use **Vitest** (`npm test` runs `vitest run`, `npm run test:watch`
 
 To cut a release, run `npm run release` from the **root**. It builds `ui` + `server` (a pre-release type-check gate), then bumps the version (`npm version patch --no-git-tag-version`, no npm commit/tag) and regenerates `npm-shrinkwrap.json`. **Always commit the resulting version bump (`server/package.json` + `server/npm-shrinkwrap.json`) and push it to `main`** with a `build: bump server to vX.Y.Z (from npm run release)` message — this is the established convention. Then **tag the release**: `git tag -a vX.Y.Z -m "Release vX.Y.Z" <bump-commit>` and `git push origin vX.Y.Z` (annotated tags, created separately from the bump commit). **Pushing the tag is what deploys** — the V2 pipeline's `v*` tag trigger runs Source→Build→Deploy against the tagged commit, so the bump commit reaching `main` on its own does nothing until the tag is pushed. (This replaced the old branch-push trigger, under which the bump commit *and* every feature merge each deployed — two deploys per release, plus a prod deploy on every incidental merge.) Bump commits through **v1.2.68** were backfilled with tags; every release from v1.2.68 on is tagged.
 
+**Every release gets GitHub release notes.** The tag list is the deploy history, so a bare tag is a gap in it. After pushing the tag, publish a Release describing what changed:
+
+```bash
+gh release create vX.Y.Z --verify-tag --title "vX.Y.Z" --notes-file <notes.md>
+```
+
+Creating a Release against an **existing** tag fires a `release` event, not a tag `push`, so it does **not** re-trigger the deploy pipeline — notes can be written or revised at any time, including well after the deploy. Source the notes from `git log --no-merges <prev-tag>..<tag>`; reach for `git show <sha>` or `gh pr view <n>` when a subject is too terse to explain what actually changed. House style:
+
+- Open with **one headline sentence** naming the release's theme, then grouped bullets under bold headings — **Features** / **Fixes** / **Build & Tests** / **Docs**. Omit any group with no content.
+- Add a **Breaking** group **first** whenever the release changes a bot-facing or MCP-client contract (a renamed tool, a changed response key, a removed capability). Consistency matters here: these are the bullets readers most need to find.
+- Rewrite commit subjects into **user-facing language** and drop the `feat(server):` prefixes. Consolidate related commits into one bullet; if a change landed in several passes, describe the **shipped end state**, not the journey.
+- **Omit** the `build: bump server to vX.Y.Z` commit — release plumbing, not a change. Don't pad a small release: a headline plus one bullet is a correct note.
+- Notes are **historical**. Describe what that tag shipped, using the names it shipped with — don't retro-correct for a tool later renamed or removed.
+- **Never invent.** If a commit's intent isn't recoverable from its message or diff, leave it out rather than guess. Terminology per the Conventions below: "app" = the code, "bot" = a live instance.
+- No emoji, no AI-attribution footer.
+
+v1.2.46–v1.2.91 were backfilled on 2026-07-16 and are the style reference — v1.2.90 is a typical small release, v1.2.46 the outlier (a 104-commit narrative spanning the 2023→2026 dormancy gap). The nine 2023 tags (v1.0.0–v1.2.45) are **deliberately left bare**: their commit subjects (`refactor`, `updates`, `db integraiton`) are too thin to summarize honestly.
+
 `npm run release` deliberately does **not** build a deploy zip — the pipeline rebuilds from source (`buildspec.yaml`), so nothing consumes a local zip. The separate `npm run bundle` (root: build + `server` zip, no version bump) is a **break-glass fallback** that produces `server/robocodejs-vX.Y.Z.zip` for a **manual EB-console upload** — use it only if the pipeline is down (e.g. a broken CodeBuild). The zip is git-ignored.
 
 ## Runtime requirements
