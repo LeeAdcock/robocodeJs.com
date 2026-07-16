@@ -101,7 +101,16 @@ export default function MarkdownPage(props: MarkdownPageProps) {
     // ever renders untrusted markdown — and if you swap renderers, preserve
     // showdown's auto-generated header ids (lowercased, spaces -> hyphens) that
     // scrollToSection and the in-page TOC anchors depend on.
-    setHtml(new showdown.Converter({ tables: true }).makeHtml(md));
+    // ghCompatibleHeaderId gives headings GitHub-style ids (lowercased,
+    // spaces -> hyphens, punctuation dropped). Without it showdown strips
+    // spaces entirely ("Bot events" -> "botevents"), silently breaking every
+    // hyphenated anchor link the docs use (#bot-events, #combat--health, ...).
+    setHtml(
+      new showdown.Converter({
+        tables: true,
+        ghCompatibleHeaderId: true,
+      }).makeHtml(md)
+    );
   }, [md]);
 
   useEffect(() => {
