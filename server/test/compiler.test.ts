@@ -295,6 +295,33 @@ describe('compiler — bot API in a real isolate', () => {
     expect(msgs).toEqual(expect.arrayContaining(['i', 'w', 'e', 'd', 't']));
   });
 
+  it('tags each broadcast log entry with its bunyan level and levelName', () => {
+    // Each console/logger method must ride its own level to the SSE stream so
+    // the UI's per-level coloring and "Levels" filter work (GitHub #147).
+    // browser-bunyan levels: trace=10, debug=20, info=30, warn=40, error=50.
+    ctx.run(`
+      console.log('l');
+      console.info('i');
+      console.warn('w');
+      console.error('e');
+      console.debug('d');
+      logger.trace('t');
+    `);
+    const entryFor = (msg: string) =>
+      ctx.emit.mock.calls
+        .filter((c) => c[0] === 'log')
+        .map((c) => c[1])
+        .find((e) => e.msg === msg);
+
+    // console.log and console.info both map to info.
+    expect(entryFor('l')).toMatchObject({ level: 30, levelName: 'info' });
+    expect(entryFor('i')).toMatchObject({ level: 30, levelName: 'info' });
+    expect(entryFor('w')).toMatchObject({ level: 40, levelName: 'warn' });
+    expect(entryFor('e')).toMatchObject({ level: 50, levelName: 'error' });
+    expect(entryFor('d')).toMatchObject({ level: 20, levelName: 'debug' });
+    expect(entryFor('t')).toMatchObject({ level: 10, levelName: 'trace' });
+  });
+
   it('hides the raw _log channel from bot code', () => {
     // Bots must go through the formatting wrappers; the raw native channel that
     // can crash on un-cloneable arguments is removed after setup.
