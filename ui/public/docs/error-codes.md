@@ -122,6 +122,16 @@ tight loop. Fix: send at most a handful of messages per tick — coordinate with
 compact payload rather than a stream of them, and avoid calling `send` inside an
 unbounded loop. The budget resets every tick.
 
+## E025
+
+**Source too large — the save was rejected.** The submitted bot source exceeded
+the maximum size of **256 KB**. Like [E022](#e022), this is an API response
+(**HTTP 413**) surfaced in the app or your tooling — not a bot console message —
+and it applies to both the editor's save and the MCP `set_app_source` /
+`create_app` tools. Bots are small programs, so this almost always means
+unintended content (a huge paste, or generated boilerplate) landed in the editor.
+Fix: trim the source below the limit.
+
 ## Reserved codes
 
 `E002`, `E005`–`E012`, `E014`–`E016`, `W001`, and `W002` are reserved and not

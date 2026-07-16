@@ -7,7 +7,9 @@ import {
   executeInUserArenas,
   rebootInUserArenas,
   deleteAppEverywhere,
+  sourceSizeError,
 } from '../util/botActions';
+import { ErrorCodes } from '../types/ErrorCodes';
 
 import {
   loadUser,
@@ -82,18 +84,27 @@ app.get('/api/user/:userId/app/:appId', loadUser, loadApp, (req, res) => {
 // Put app source code
 app.put(
   '/api/user/:userId/app/:appId/source',
+  writeRateLimit,
   loadUser,
   requireOwner,
   loadApp,
   requireAppOwner,
-  (req, res) => {
+  async (req, res) => {
     const app = scopedApp(req);
-    // Saves are not gated on validity (authors save work-in-progress); the
-    // editor's Check button / POST .../check dry-run surfaces errors separately.
-    return propagateSource(app, req.body.toString('utf-8')).then(() => {
-      res.status(200);
-      res.send();
-    });
+    const source = req.body.toString('utf-8');
+    // Bound the source size (resource exhaustion) before persisting anything, so
+    // an oversized upload gets a clean, documented 413/E025 rather than a generic
+    // parser 413. Saves are otherwise NOT gated on validity (authors save
+    // work-in-progress); the editor's Check button / POST .../check dry-run
+    // surfaces syntax errors separately.
+    const tooLarge = sourceSizeError(source);
+    if (tooLarge) {
+      res.status(413).json({ code: ErrorCodes.E025, error: tooLarge });
+      return;
+    }
+    await propagateSource(app, source);
+    res.status(200);
+    res.send();
   }
 );
 
@@ -108,7 +119,16 @@ app.post(
   loadApp,
   requireAppOwner,
   async (req, res) => {
-    const result = await compiler.check(req.body.toString('utf-8'));
+    const source = req.body.toString('utf-8');
+    // Same source-size cap as the save route: bound the untrusted code compiled
+    // in the throwaway isolate (the octet-stream parser's limit is only a higher
+    // memory backstop).
+    const tooLarge = sourceSizeError(source);
+    if (tooLarge) {
+      res.status(413).json({ code: ErrorCodes.E025, error: tooLarge });
+      return;
+    }
+    const result = await compiler.check(source);
     res.status(200);
     res.send(result);
   }

@@ -47,6 +47,12 @@ vi.mock('../src/util/botActions', () => ({
   executeInUserArenas: vi.fn().mockResolvedValue(undefined),
   rebootInUserArenas: vi.fn().mockResolvedValue(undefined),
   deleteAppEverywhere: vi.fn().mockResolvedValue(undefined),
+  // Real size-guard behavior (the async helpers above are what we stub out).
+  MAX_SOURCE_BYTES: 256 * 1024,
+  sourceSizeError: (source: string) =>
+    Buffer.byteLength(source, 'utf-8') > 256 * 1024
+      ? 'Source is too large; the limit is 256 KB.'
+      : null,
 }));
 vi.mock('../src/util/arenaStatus', () => ({ buildArenaStatus: vi.fn() }));
 vi.mock('../src/util/matchSummary', () => ({
@@ -234,6 +240,23 @@ describe('mcp tools', () => {
     });
 
     expect(propagateSource).toHaveBeenCalledWith(app, 'NEW');
+  });
+
+  // Resource-exhaustion guard (GitHub #147). The same MAX_SOURCE_BYTES (256 KB)
+  // cap the REST source PUT enforces also gates set_app_source — an oversized
+  // source is rejected before it reaches the shared propagateSource helper.
+  it('set_app_source rejects source over the size cap', async () => {
+    const app = { getId: () => 'a1', getUserId: () => 'u1' };
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_app_source',
+      arguments: { appId: 'a1', source: 'x'.repeat(256 * 1024 + 1) },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/too large/i);
+    expect(propagateSource).not.toHaveBeenCalled();
   });
 
   it('check_app_source dry-run compiles raw source', async () => {
