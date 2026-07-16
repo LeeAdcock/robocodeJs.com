@@ -135,3 +135,30 @@ describe('NavBar search', () => {
     expect(document.activeElement).not.toBe(search);
   });
 });
+
+describe('NavBar badges link', () => {
+  afterEach(cleanup);
+
+  const renderNav = (props: any) =>
+    render(
+      <MemoryRouter>
+        <NavBar {...baseProps} {...props} />
+      </MemoryRouter>
+    );
+
+  // react-bootstrap only mounts a dropdown's children once it's open, so the
+  // menu has to be opened before its items exist in the DOM.
+  const openUserMenu = () => fireEvent.click(screen.getByAltText('Ada L.'));
+
+  it('offers "Your badges" in the user menu when signed in', () => {
+    renderNav({ user: { id: 'u1', name: 'Ada L.', picture: '/a.png' } });
+    openUserMenu();
+    expect(screen.getByText('Your badges')).toBeTruthy();
+  });
+
+  it('hides the whole user menu when signed out — there is no public profile', () => {
+    renderNav({ user: null });
+    expect(screen.queryByAltText('Ada L.')).toBeNull();
+    expect(screen.queryByText('Your badges')).toBeNull();
+  });
+});

@@ -206,3 +206,13 @@ describe('buildSitemap', () => {
     expect(xml.trim().endsWith('</urlset>')).toBe(true);
   });
 });
+
+describe('resolve — /profile (private badges page)', () => {
+  it('gives a real title but keeps the page out of the index', () => {
+    const m = resolver().resolve('/profile');
+    // A friendly title, not the soft-404 one — the page exists, it's just private.
+    expect(m.title).toBe('RobocodeJs | Your badges');
+    // Badges are per-user and behind auth: never index them.
+    expect(m.noindex).toBe(true);
+  });
+});

@@ -13,6 +13,7 @@ import {
   FaSun,
   FaMoon,
   FaSignOutAlt,
+  FaMedal,
 } from 'react-icons/fa';
 import { colors } from '../util/colors';
 import { useDarkMode, toggleDarkMode } from '../util/theme';
@@ -320,6 +321,9 @@ export default function NavBar(props: NavBarProps) {
               >
                 <NavDropdown.Header>{props.user?.name}</NavDropdown.Header>
                 <NavDropdown.Divider />
+                <NavDropdown.Item onClick={() => navigate('/profile')}>
+                  <FaMedal /> Your badges
+                </NavDropdown.Item>
                 <NavDropdown.Item onClick={() => props.doLogout?.()}>
                   <FaSignOutAlt /> Sign out
                 </NavDropdown.Item>

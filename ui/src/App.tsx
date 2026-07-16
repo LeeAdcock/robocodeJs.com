@@ -35,6 +35,7 @@ const SamplePage = lazy(() => import('./page/sample/samplePage'));
 const LeaderboardPage = lazy(
   () => import('./page/leaderboard/leaderboardPage')
 );
+const ProfilePage = lazy(() => import('./page/profile/profilePage'));
 const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -388,6 +389,9 @@ function App() {
                     signed-in user's own bots are bolded; the server marks them
                     by including the real appId only on the viewer's own rows. */}
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
+                {/* Own badges (GitHub #121) — private, so the page gates itself
+                    on the API's 401 rather than on the app's user state. */}
+                <Route path="/profile" element={<ProfilePage />} />
                 {/* Explainer for the global rankings/ladder. Distinct from
                     /leaderboard (the live board) so it doesn't collide. */}
                 <Route
