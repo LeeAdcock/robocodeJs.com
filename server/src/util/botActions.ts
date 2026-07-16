@@ -15,14 +15,23 @@ export const propagateSource = async (
   app: App,
   source: string
 ): Promise<void> => {
+  // Capture this BEFORE setSource mutates the app's stored source.
+  const changed = source !== app.getSource();
+  // Always persist: setSource also clears the ladder `broken` flag and bumps
+  // updatedTimestamp, so re-saving identical source is how a user un-breaks a
+  // ladder-broken app and marks it "actively edited" — never guard this.
   await app.setSource(source);
-  const members = await arenaMemberService.getForApp(app.getId());
-  await Promise.all(
-    members.map(async (member) => {
-      const env = await environmentService.getByArenaId(member.getArenaId());
-      await env?.execute(member.getAppId());
-    })
-  );
+  // The isolate re-execute (reload/recompile) is the expensive part; skip it
+  // when the source did not actually change.
+  if (changed) {
+    const members = await arenaMemberService.getForApp(app.getId());
+    await Promise.all(
+      members.map(async (member) => {
+        const env = await environmentService.getByArenaId(member.getArenaId());
+        await env?.execute(member.getAppId());
+      })
+    );
+  }
 };
 
 // Re-run a bot's current source in each of the user's arenas that have a live

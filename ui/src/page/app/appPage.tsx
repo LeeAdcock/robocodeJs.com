@@ -44,6 +44,11 @@ export default function AppPage(props: AppPageProps) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
+  // The last source we know is persisted on the server (from the initial load
+  // or an explicit/auto save). Used to skip redundant no-op saves — most
+  // importantly the just-loaded source, which the debounced effect would
+  // otherwise PUT straight back unchanged on every editor open.
+  const lastSavedRef = useRef<string | undefined>(undefined);
 
   // Editor font size, persisted so the preference survives reloads.
   const [fontSize, setFontSize] = useState(() => {
@@ -101,9 +106,11 @@ export default function AppPage(props: AppPageProps) {
   });
 
   useEffect(() => {
-    axios
-      .get(`/api/user/${userId}/app/${appId}/source`)
-      .then((res) => setCode(res.data));
+    axios.get(`/api/user/${userId}/app/${appId}/source`).then((res) => {
+      // The freshly loaded source is already what's on the server.
+      lastSavedRef.current = res.data;
+      setCode(res.data);
+    });
     axios
       .get(`/api/user/${userId}/app/${appId}`)
       .then((res) => setApp(res.data));
@@ -113,6 +120,9 @@ export default function AppPage(props: AppPageProps) {
   useEffect(() => {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
+      // Nothing changed since the last save/load — skip the pointless PUT.
+      if (code === lastSavedRef.current) return;
+      lastSavedRef.current = code;
       axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
         headers: { 'content-type': 'application/octet-stream' },
       });
@@ -121,6 +131,7 @@ export default function AppPage(props: AppPageProps) {
   }, [code, userId, appId]);
 
   const doExecute = () => {
+    lastSavedRef.current = code;
     axios
       .put(`/api/user/${userId}/app/${appId}/source`, code, {
         headers: { 'content-type': 'application/octet-stream' },
@@ -132,6 +143,7 @@ export default function AppPage(props: AppPageProps) {
   // saving updates the logic without re-initializing, so this is the explicit
   // way to re-run startup setup.
   const doReboot = () => {
+    lastSavedRef.current = code;
     axios
       .put(`/api/user/${userId}/app/${appId}/source`, code, {
         headers: { 'content-type': 'application/octet-stream' },
