@@ -79,6 +79,15 @@ export default class Bot implements Point, Orientated {
   // Environment.tick; never read by the physics, so it can't affect determinism.
   // A restart builds fresh Bot instances, so it resets to null automatically.
   public eliminatedAt: number | null = null;
+  // The bot whose bullet last damaged this bot, or null when the most recent
+  // health loss had no attributable enemy source (collision, wall, self-inflicted
+  // missed shot, sudden-death decay, or a crash). Every site that lowers health
+  // writes this field — the unattributed ones clear it — so the kill rule is
+  // simply "the last hit was an enemy bullet", and an unattributed death credits
+  // nobody by construction. Read once by applyEliminations; never read by the
+  // physics, so it can't affect determinism (same contract as eliminatedAt).
+  // A restart builds fresh Bot instances, so it resets automatically.
+  public lastDamagedBy: Bot | null = null;
   public stats: BotStats = new BotStats();
   public timers: TimersContainer = new TimersContainer();
   // Per-tick send budget bookkeeping (see MAX_SENDS_PER_TICK / send below). The
