@@ -10,7 +10,7 @@ import MarkdownPage from '../src/page/markdownPage';
 const md = [
   '[sample](/samples/lighthouse)',
   '[external](https://example.com/x)',
-  '[types](/ts/robocode.d.ts)',
+  '[types](/docs/ts/robocode.d.ts)',
   '[internal](/dev)',
 ].join('\n\n');
 

@@ -3,7 +3,7 @@
 // This model drives two things that must never drift apart:
 //   1. The in-editor Ace autocomplete (context-aware completions + hover docs)
 //      — see `completionsFor` and `appEditor.tsx`.
-//   2. The generated `public/robocode.d.ts` — see `generateDts` (and the
+//   2. The generated `public/docs/ts/robocode.d.ts` — see `generateDts` (and the
 //      `botApi.test.ts` snapshot guard that keeps the committed file in sync).
 //
 // It is derived from the real sandbox surface compiled in
