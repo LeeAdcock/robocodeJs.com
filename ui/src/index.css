@@ -60,10 +60,20 @@ code {
   padding-right: 0px !important;
 }
 
+/* Items that belong only in the collapsed hamburger menu. On wider screens the
+   brand logo is a visible, obvious way home, so a "Home" link there is just
+   redundant clutter. */
+.topNavBar .nav-mobile-only {
+  display: none;
+}
+
 /* Below the navbar's `expand="sm"` breakpoint the menu collapses and its items
    stack vertically, so the inline `|` dividers land on their own lines and just
    pad out the hamburger. Hide them (and their side margins) on phones. */
 @media (max-width: 575.98px) {
+  .topNavBar .nav-mobile-only {
+    display: block;
+  }
   .topNavBar .nav-sep {
     display: none;
   }
