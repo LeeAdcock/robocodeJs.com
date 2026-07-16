@@ -21,6 +21,7 @@ const STATIC_ROUTES = [
   '/learn',
   '/learn/docs',
   '/rules',
+  '/faq',
   '/examples',
   '/rankings',
   '/leaderboard',
