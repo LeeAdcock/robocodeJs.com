@@ -3,6 +3,7 @@ import {
   ACHIEVEMENTS,
   counterAchievements,
   testAchievements,
+  accountAchievements,
   LadderFacts,
 } from '../src/util/achievements';
 
@@ -36,15 +37,20 @@ describe('achievement catalog invariants', () => {
     }
   });
 
-  it('defines each badge as exactly one of counter+threshold or test', () => {
+  it('gives each badge at most one way to be earned', () => {
+    // Three predicate forms, plus "none" for the edge-triggered ones. More than
+    // one would make it ambiguous which path can award the badge.
     for (const a of ACHIEVEMENTS) {
-      const isCounter = a.counter !== undefined;
-      const isTest = a.test !== undefined;
+      const forms = [
+        a.counter !== undefined,
+        a.test !== undefined,
+        a.accountTest !== undefined,
+      ].filter(Boolean).length;
       expect(
-        isCounter !== isTest,
-        `${a.id} must be exactly one of counter/test`
-      ).toBe(true);
-      if (isCounter) {
+        forms,
+        `${a.id} must have at most one predicate form`
+      ).toBeLessThan(2);
+      if (a.counter !== undefined) {
         expect(a.threshold, `${a.id} needs a threshold`).toBeTypeOf('number');
         expect(
           a.threshold!,
@@ -52,6 +58,27 @@ describe('achievement catalog invariants', () => {
         ).toBeGreaterThan(0);
       }
     }
+  });
+
+  // A badge with no predicate can only ever be awarded by a hand-written call at
+  // its event site, so it must be a deliberate choice — not a forgotten predicate.
+  // Only the account scope has moments that leave no state to re-derive.
+  it('allows a predicate-less (edge-triggered) badge only in the account scope', () => {
+    const edgeTriggered = ACHIEVEMENTS.filter(
+      (a) => !a.counter && !a.test && !a.accountTest
+    );
+    expect(edgeTriggered.map((a) => a.id).sort()).toEqual([
+      'account-mcp-token',
+      'account-repair',
+    ]);
+    for (const a of edgeTriggered) expect(a.scope).toBe('account');
+  });
+
+  it('scopes every accountTest badge to the account scope', () => {
+    const offenders = ACHIEVEMENTS.filter(
+      (a) => a.accountTest && a.scope !== 'account'
+    );
+    expect(offenders.map((a) => a.id)).toEqual([]);
   });
 
   // Encodes the sink's limitation so it can't regress into a badge that silently
@@ -151,5 +178,45 @@ describe('testAchievements (ladder)', () => {
       testAchievements('sandbox', win({ timesHit: 0, botsAlive: 5 }))
     ).toEqual([]);
     expect(testAchievements('account', win())).toEqual([]);
+  });
+});
+
+describe('accountAchievements', () => {
+  const state = (over = {}) => ({
+    authoredApps: 0,
+    accountAgeDays: 0,
+    ...over,
+  });
+
+  it('awards Hello, World for the first authored bot', () => {
+    expect(ids(accountAchievements(state()))).not.toContain(
+      'account-first-bot'
+    );
+    expect(ids(accountAchievements(state({ authoredApps: 1 })))).toContain(
+      'account-first-bot'
+    );
+  });
+
+  it('awards Bot Factory at five, and every tier below it', () => {
+    const got = ids(accountAchievements(state({ authoredApps: 5 })));
+    expect(got).toContain('account-five-bots');
+    expect(got).toContain('account-first-bot');
+  });
+
+  it('awards Anniversary on the 365th day, not the 364th', () => {
+    expect(
+      ids(accountAchievements(state({ accountAgeDays: 364 })))
+    ).not.toContain('account-veteran');
+    expect(ids(accountAchievements(state({ accountAgeDays: 365 })))).toContain(
+      'account-veteran'
+    );
+  });
+
+  it('never returns an edge-triggered badge — those have no predicate to satisfy', () => {
+    const got = ids(
+      accountAchievements(state({ authoredApps: 99, accountAgeDays: 9999 }))
+    );
+    expect(got).not.toContain('account-repair');
+    expect(got).not.toContain('account-mcp-token');
   });
 });

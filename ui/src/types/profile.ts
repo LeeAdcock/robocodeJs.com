@@ -26,7 +26,8 @@ export interface UnlockedAchievement {
 }
 
 export interface Profile {
-  user: { name?: string; picture?: string };
+  // memberSince is absent for a legacy account row with no createdTimestamp.
+  user: { name?: string; picture?: string; memberSince?: string };
   catalog: CatalogEntry[];
   unlocked: UnlockedAchievement[];
   // Lifetime totals, keyed by counter name. A missing key means zero.

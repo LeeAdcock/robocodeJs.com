@@ -11,17 +11,23 @@ export default class User {
   private name: string | undefined;
   private picture: string | undefined;
   private email: string | undefined;
+  // When the account was created. Optional because the create path knows the row
+  // it just wrote without reading it back; only UserService.get hydrates it.
+  // Drives the "member since" line and the anniversary badge (GitHub #121).
+  private createdTimestamp: Date | undefined;
 
   constructor(
     id: UserId,
     name: string | undefined,
     picture: string | undefined,
-    email: string | undefined
+    email: string | undefined,
+    createdTimestamp?: Date
   ) {
     this.id = id;
     this.name = name;
     this.picture = picture;
     this.email = email;
+    this.createdTimestamp = createdTimestamp;
   }
   getId(): UserId {
     return this.id;
@@ -34,5 +40,8 @@ export default class User {
   }
   getEmail() {
     return this.email;
+  }
+  getCreatedTimestamp() {
+    return this.createdTimestamp;
   }
 }

@@ -7,7 +7,10 @@ import {
   LadderFacts,
   counterAchievements,
   testAchievements,
+  accountAchievements,
 } from './achievements';
+import appService from '../services/AppService';
+import { isUntouchedStarter } from './starterBots';
 import { BotStats } from '../types/botStats';
 import { UserId } from '../types/user';
 import { AppId } from '../types/app';
@@ -17,6 +20,8 @@ import { logger, LogEvent } from './logger';
 // bump the user's lifetime counters, work out what that unlocked, and store it.
 // AchievementService stays DB-only, mirroring RankedMatchService; the policy lives
 // here.
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // The BotStats counters that feed a lifetime total. Deliberately a subset — there
 // is no badge for being shot, and `damageTaken`/`timesHit` as a lifetime "score"
@@ -167,5 +172,88 @@ export const recordLadderResult = async (
       { err, userId: result.userId },
       'ladder achievement award failed'
     );
+  }
+};
+
+// Award the account-scope badges (GitHub #121) that the user's current state
+// earns: bots written, time as a member. Costs one app query plus the account row
+// the caller already has, so it is cheap enough to run on every profile load —
+// which is what makes it SELF-HEALING. That matters more than it sounds:
+// account-veteran has no event at all (nothing happens when a year passes), and a
+// missed hook elsewhere heals on the user's next visit rather than losing a badge
+// forever.
+//
+// Edge-triggered account badges (the source-repair and MCP-token moments) leave no
+// state to re-derive, so they carry no predicate and are awarded at their event by
+// awardEdgeAchievement instead.
+//
+// Never throws: this runs inside a page load and a save path.
+export const evaluateAccountAchievements = async (
+  userId: UserId,
+  createdTimestamp?: Date
+): Promise<string[]> => {
+  try {
+    const apps = await appService.getForUser(userId);
+    // "Authored" excludes an untouched starter for the same reason the ladder
+    // benches them: being handed a bot isn't writing one.
+    const authoredApps = apps.filter((app) => {
+      const source = app.getSource();
+      return source.trim().length > 0 && !isUntouchedStarter(source);
+    }).length;
+
+    const accountAgeDays = createdTimestamp
+      ? Math.floor((Date.now() - createdTimestamp.getTime()) / MS_PER_DAY)
+      : 0;
+
+    const earned = accountAchievements({ authoredApps, accountAgeDays });
+    if (earned.length === 0) return [];
+
+    // appId stays null: an account badge is about the user, not any one bot.
+    const unlocked = await achievementService.unlock(
+      userId,
+      earned.map((a) => ({ id: a.id, appId: null }))
+    );
+    if (unlocked.length) {
+      logger.info(
+        {
+          event: LogEvent.ACHIEVEMENT_UNLOCKED,
+          userId,
+          unlocked,
+          scope: 'account',
+        },
+        'achievements unlocked'
+      );
+    }
+    return unlocked;
+  } catch (err) {
+    logger.warn({ err, userId }, 'account achievement evaluation failed');
+    return [];
+  }
+};
+
+// Award a single edge-triggered badge at the moment it happens. Idempotent via
+// ON CONFLICT DO NOTHING, so a caller never has to check whether it's already held.
+// Never throws: none of these moments is worth failing its request over.
+export const awardEdgeAchievement = async (
+  userId: UserId,
+  id: string
+): Promise<void> => {
+  try {
+    const unlocked = await achievementService.unlock(userId, [
+      { id, appId: null },
+    ]);
+    if (unlocked.length) {
+      logger.info(
+        {
+          event: LogEvent.ACHIEVEMENT_UNLOCKED,
+          userId,
+          unlocked,
+          scope: 'account',
+        },
+        'achievements unlocked'
+      );
+    }
+  } catch (err) {
+    logger.warn({ err, userId, id }, 'edge achievement award failed');
   }
 };

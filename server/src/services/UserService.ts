@@ -40,19 +40,28 @@ class UserService {
     demo = false
   ): Promise<User> => {
     const userId: UserId = demo ? UserService.demoUserId : randomUUID();
-    const user = new User(userId, name, picture, email);
     logger.info({ userId }, 'creating user');
     return pool
       .query({
-        text: 'INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4)',
-        values: [
-          user.getId(),
-          user.getName(),
-          user.getPicture(),
-          user.getEmail(),
-        ],
+        // RETURNING the row's own createdTimestamp rather than stamping one here:
+        // the column defaults to CURRENT_TIMESTAMP, so this is the only way the
+        // returned User carries the same value a later get() would read. Without
+        // it, a freshly-created User has no "member since" — which local dev shows
+        // permanently, since it memoizes the User from this call (ensureDevUser).
+        text: 'INSERT INTO account(id, name, picture, email) VALUES($1, $2, $3, $4) RETURNING createdTimestamp as "createdTimestamp"',
+        values: [userId, name, picture, email],
       })
-      .then(() =>
+      .then((res) => {
+        const user = new User(
+          userId,
+          name,
+          picture,
+          email,
+          res.rows[0]?.createdTimestamp
+        );
+        return user;
+      })
+      .then((user) =>
         arenaService.create(user.getId()).then((arena) =>
           Promise.all(
             // Seed each new account's starter bots from the shared templates
@@ -89,7 +98,7 @@ class UserService {
   get = (userId: UserId): Promise<User | undefined> => {
     return pool
       .query({
-        text: 'SELECT account.name, account.picture, account.email FROM account WHERE id=$1',
+        text: 'SELECT account.name, account.picture, account.email, account.createdTimestamp as "createdTimestamp" FROM account WHERE id=$1',
         values: [userId],
       })
       .then((res) => {
@@ -99,7 +108,8 @@ class UserService {
               userId,
               res.rows[0].name,
               res.rows[0].picture,
-              res.rows[0].email
+              res.rows[0].email,
+              res.rows[0].createdTimestamp
             );
       });
   };
