@@ -27,6 +27,7 @@
     "preview": "vite preview --port 3000",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src --fix ; prettier --write src test",
     "lint:eslint": "eslint src --fix"
   },
@@ -52,6 +53,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/showdown": "^2.0.6",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.7.0",

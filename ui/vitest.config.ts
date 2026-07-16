@@ -7,5 +7,15 @@ export default defineConfig({
     // a `// @vitest-environment jsdom` docblock at the top of the file.
     environment: 'node',
     include: ['test/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      reportsDirectory: './coverage',
+      // Measure the app source only. Vitest already excludes test files,
+      // node_modules, configs, and .d.ts by default; we add the SPA entry
+      // point and the wire-DTO type mirrors (no logic to exercise).
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/main.tsx', 'src/types/**'],
+    },
   },
 });
