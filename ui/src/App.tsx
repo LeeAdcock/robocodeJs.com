@@ -22,6 +22,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useArenaStream from './util/useArenaStream';
 import { useDarkMode } from './util/theme';
+import { useIsMobile } from './util/useIsMobile';
 import { Emitter } from './util/emitter';
 
 // Lazy-loaded so the heavy editor chunk (ace-builds + prettier) isn't part of
@@ -177,6 +178,13 @@ function App() {
     document.body.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
+  // On phone-sized viewports (below the navbar's `expand="sm"` breakpoint) the
+  // 50/50 split is unusable, so the arena pane is dropped entirely and the
+  // content pane widens to fill the screen. The arena data stream stays wired
+  // up (see useArenaStream above) so the arena is instantly correct if the
+  // viewport widens back (e.g. rotation) — only its render is gated.
+  const isMobile = useIsMobile();
+
   // Reset the experience if the user session expires
   useEffect(() => {
     const interval = setInterval(() => {
@@ -282,7 +290,7 @@ function App() {
         style={{
           position: 'absolute',
           height: '100%',
-          width: '50%',
+          width: isMobile ? '100%' : '50%',
           top: 0,
           left: 0,
           padding: '10px 5px 10px 10px',
@@ -441,67 +449,71 @@ function App() {
           </div>
         </Router>
       </div>
-      <div
-        style={{
-          position: 'absolute',
-          height: '100%',
-          width: '50%',
-          top: 0,
-          left: '50%',
-          padding: '10px 10px 10px 5px',
-        }}
-      >
-        {user && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '22px',
-              left: '22px',
-              // The arena SVG below sets `isolation: isolate`, which gives it its
-              // own stacking context in the positioned-paint layer; being later
-              // in the DOM it would otherwise paint over this toolbar. Lift the
-              // toolbar above it so the pause/resume/restart controls stay visible.
-              zIndex: 1,
-            }}
-          >
-            <ArenaToolbar
-              isPaused={isPaused}
-              doPause={() => axios.post(`/api/user/${user.id}/arena/pause`)}
-              doResume={() => axios.post(`/api/user/${user.id}/arena/resume`)}
-              doRestart={() => axios.post(`/api/user/${user.id}/arena/restart`)}
-              doShare={arena.id ? doShare : undefined}
-            />
-            {shareNotice && (
-              // The same green "success" theme as the bot share-link notice
-              // (page/app/appPage.tsx), kept compact. Positioned absolutely (out
-              // of flow) just below the toolbar: the toolbar's container shrinks
-              // to fit and the ButtonToolbar is right-aligned, so an in-flow
-              // notice wider than the buttons would widen the container and shove
-              // them — this floats the toast without disturbing the layout.
-              <Alert
-                variant="success"
-                className="py-1 px-2 mb-0"
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '6px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '0.8rem',
-                }}
-              >
-                {shareNotice}
-              </Alert>
-            )}
-          </div>
-        )}
-        <ArenaSvg
-          darkMode={darkMode}
-          arena={arena}
-          time={time}
-          onOpenBot={openBot}
-        ></ArenaSvg>
-      </div>
+      {!isMobile && (
+        <div
+          style={{
+            position: 'absolute',
+            height: '100%',
+            width: '50%',
+            top: 0,
+            left: '50%',
+            padding: '10px 10px 10px 5px',
+          }}
+        >
+          {user && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '22px',
+                left: '22px',
+                // The arena SVG below sets `isolation: isolate`, which gives it its
+                // own stacking context in the positioned-paint layer; being later
+                // in the DOM it would otherwise paint over this toolbar. Lift the
+                // toolbar above it so the pause/resume/restart controls stay visible.
+                zIndex: 1,
+              }}
+            >
+              <ArenaToolbar
+                isPaused={isPaused}
+                doPause={() => axios.post(`/api/user/${user.id}/arena/pause`)}
+                doResume={() => axios.post(`/api/user/${user.id}/arena/resume`)}
+                doRestart={() =>
+                  axios.post(`/api/user/${user.id}/arena/restart`)
+                }
+                doShare={arena.id ? doShare : undefined}
+              />
+              {shareNotice && (
+                // The same green "success" theme as the bot share-link notice
+                // (page/app/appPage.tsx), kept compact. Positioned absolutely (out
+                // of flow) just below the toolbar: the toolbar's container shrinks
+                // to fit and the ButtonToolbar is right-aligned, so an in-flow
+                // notice wider than the buttons would widen the container and shove
+                // them — this floats the toast without disturbing the layout.
+                <Alert
+                  variant="success"
+                  className="py-1 px-2 mb-0"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '6px',
+                    whiteSpace: 'nowrap',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  {shareNotice}
+                </Alert>
+              )}
+            </div>
+          )}
+          <ArenaSvg
+            darkMode={darkMode}
+            arena={arena}
+            time={time}
+            onOpenBot={openBot}
+          ></ArenaSvg>
+        </div>
+      )}
     </>
   );
 }
