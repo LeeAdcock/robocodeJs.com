@@ -514,7 +514,6 @@ describe('applyEliminations — kill credit', () => {
     bots.forEach((bot) => {
       (bot as unknown as { process: unknown }).process = process;
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return process as any;
   };
 
