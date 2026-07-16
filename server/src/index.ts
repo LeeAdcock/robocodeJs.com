@@ -101,9 +101,11 @@ app.use(
       }
       // The mime registry maps .ts to video/mp2t (MPEG transport stream), so
       // the published robocode.d.ts would download instead of rendering as
-      // text in the browser. Pre-set the type; send() won't override it.
+      // text in the browser. text/typescript is unregistered but descriptive,
+      // and browsers treat an unknown text/* subtype as displayable text.
+      // Pre-set the type; send() won't override it.
       if (filePath.endsWith('.d.ts')) {
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Type', 'text/typescript; charset=utf-8');
       }
     },
   })
