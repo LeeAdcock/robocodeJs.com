@@ -35,8 +35,7 @@ Elo, a Hungarian-American physics professor and chess master who'd been part of 
 Chess Federation since it was founded in 1939. Chess back then used a rating system that
 mostly worked but sometimes produced numbers people found hard to trust, and Elo, being a
 physicist, figured he could do better with some real statistics behind it. He did. The
-federation switched to his method in 1960, and the international chess body adopted it in
-1970. It's been [how we rank competitors](https://en.wikipedia.org/wiki/Elo_rating_system)
+federation switched to his method in 1960, and the international chess body adopted it in 1970. It's been [how we rank competitors](https://en.wikipedia.org/wiki/Elo_rating_system)
 ever since.
 
 The idea is small enough to hold in your head. Your rating predicts how you'll fare against
