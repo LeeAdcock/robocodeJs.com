@@ -125,7 +125,12 @@ export default function NavBar(props: NavBarProps) {
                 Learn
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
             <Navbar.Text>
               <Link
                 to="/learn/docs"
@@ -135,7 +140,12 @@ export default function NavBar(props: NavBarProps) {
                 Docs
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
             <Navbar.Text>
               <Link
                 to="/leaderboard"
@@ -145,13 +155,23 @@ export default function NavBar(props: NavBarProps) {
                 Rankings
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
             <Navbar.Text>
               <Link to="/blog" className="nav-link" style={{ padding: '0px' }}>
                 Blog
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
 
             {props.user && (
               <>
@@ -181,7 +201,12 @@ export default function NavBar(props: NavBarProps) {
                     View example applications
                   </NavDropdown.Item>
                 </NavDropdown>
-                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+                <Navbar.Text
+                  className="nav-sep"
+                  style={{ margin: '0 10px 0 10px' }}
+                >
+                  |
+                </Navbar.Text>
                 <NavDropdown title="Arena" id="basic-nav-dropdown">
                   <NavDropdown.Item onClick={() => setShowRoster(true)}>
                     Manage apps
@@ -207,11 +232,16 @@ export default function NavBar(props: NavBarProps) {
                     </NavDropdown.Item>
                   )}
                 </NavDropdown>
-                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+                <Navbar.Text
+                  className="nav-sep"
+                  style={{ margin: '0 10px 0 10px' }}
+                >
+                  |
+                </Navbar.Text>
               </>
             )}
           </Nav>
-          <Nav>
+          <Nav className="nav-tools">
             <Form>
               <Form.Control
                 size="sm"
