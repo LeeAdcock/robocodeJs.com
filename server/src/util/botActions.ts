@@ -3,11 +3,12 @@ import { UserId } from '../types/user';
 import arenaService from '../services/ArenaService';
 import environmentService from '../services/EnvironmentService';
 import arenaMemberService from '../services/ArenaMemberService';
+import compiler, { CheckResult } from './compiler';
 import {
   awardEdgeAchievement,
   evaluateAccountAchievements,
 } from './awardAchievements';
-import { ACCOUNT_REPAIR } from './achievements';
+import { ACCOUNT_REPAIR, ACCOUNT_CHECK } from './achievements';
 
 // Bot lifecycle operations shared by the REST API (api/app.ts) and the MCP tools
 // (api/mcp.ts). Each was originally inlined in a route handler; extracting them
@@ -71,6 +72,26 @@ export const propagateSource = async (
   if (wasBroken) void awardEdgeAchievement(app.getUserId(), ACCOUNT_REPAIR);
   // Writing a bot is itself an account milestone, so re-derive those too.
   void evaluateAccountAchievements(app.getUserId());
+};
+
+// Dry-run compile source without deploying it, and credit the author for having
+// used the checker (GitHub #121).
+//
+// Extracted for the same reason propagateSource was: this is the shared path, and
+// both entry points — the editor's Check button (POST .../app/:appId/check) and
+// the MCP check_app_source tool — must behave identically. They each called
+// compiler.check directly before this, which is exactly how two callers drift.
+//
+// The badge is for USING the checker, so it lands whatever the verdict: catching a
+// syntax error is the tool working, not the user failing.
+export const checkSource = async (
+  userId: UserId,
+  source: string
+): Promise<CheckResult> => {
+  const result = await compiler.check(source);
+  // Fire-and-forget: a badge must never fail or slow a check.
+  void awardEdgeAchievement(userId, ACCOUNT_CHECK);
+  return result;
 };
 
 // Re-run a bot's current source in each of the user's arenas that have a live

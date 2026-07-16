@@ -19,13 +19,13 @@ import User from '../types/user';
 import Arena from '../types/arena';
 import App from '../types/app';
 import appService from '../services/AppService';
-import compiler from '../util/compiler';
 import formatter from '../util/formatter';
 import arenaService from '../services/ArenaService';
 import arenaMemberService from '../services/ArenaMemberService';
 import environmentService from '../services/EnvironmentService';
 import {
   propagateSource,
+  checkSource,
   executeInUserArenas,
   rebootInUserArenas,
   deleteAppEverywhere,
@@ -455,7 +455,7 @@ export const buildServer = (user: User): McpServer => {
         if (!app) return fail('No such app, or it is not yours.');
         code = app.getSource();
       }
-      return ok(await compiler.check(code));
+      return ok(await checkSource(user.getId(), code));
     }
   );
 

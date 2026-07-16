@@ -108,6 +108,7 @@ export const ACCOUNT_REPAIR = 'account-repair';
 export const ACCOUNT_MCP_TOKEN = 'account-mcp-token';
 export const ACCOUNT_SHARED = 'account-shared';
 export const ACCOUNT_BORROWED = 'account-borrowed';
+export const ACCOUNT_CHECK = 'account-check';
 
 export const ACHIEVEMENTS: Achievement[] = [
   // ── ladder: prestige, un-farmable ───────────────────────────────────────────
@@ -347,6 +348,17 @@ export const ACHIEVEMENTS: Achievement[] = [
     name: 'Sparring Partner',
     description: "Add someone else's bot to your arena.",
     icon: '🤝',
+  },
+  // A feature-discovery badge, like Plugged In: it rewards using a tool rather
+  // than achieving something. That earns its place when the tool is genuinely
+  // useful and genuinely easy to miss — the badge list is where a user finds out
+  // the checker exists. Hold that line, or this scope becomes "click every button".
+  {
+    id: ACCOUNT_CHECK,
+    scope: 'account',
+    name: 'Sanity Check',
+    description: 'Check a bot for errors before running it.',
+    icon: '🔍',
   },
 ];
 
