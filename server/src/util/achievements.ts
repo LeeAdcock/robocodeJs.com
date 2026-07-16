@@ -49,7 +49,20 @@ export interface LadderFacts {
   timesHit: number;
   botsAlive: number;
   botsTotal: number;
+  // Shots the user's bots fired and landed this match, for the accuracy badge.
+  shotsFired: number;
+  shotsHit: number;
+  // Whether the match ran past SUDDEN_DEATH_TIME into health decay. Match-level,
+  // so both sides of a match see the same value.
+  suddenDeath: boolean;
 }
+
+// Sharpshooter's bar: land at least this share of your shots, over at least this
+// many. The minimum matters more than it looks — a match settled by one lucky
+// point-blank shot is 100% accuracy, so without a floor the badge would mean
+// nothing at all.
+const SHARPSHOOTER_ACCURACY = 0.5;
+const SHARPSHOOTER_MIN_SHOTS = 10;
 
 // A snapshot of what a user has DONE with their account, as opposed to what their
 // bots did in a match. Cheap to gather (one app query plus the account row), so
@@ -145,6 +158,40 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '🐉',
     test: (f) =>
       f.won && f.opponentRatingBefore - f.myRatingBefore >= UPSET_MARGIN,
+  },
+  // Land half your shots — over enough of them to mean it. Deliberately the
+  // opposite incentive to Trigger Happy: that one rewards volume, this one rewards
+  // aim, and a bot optimised for either is a different bot.
+  {
+    id: 'ladder-sharpshooter',
+    scope: 'ladder',
+    name: 'Sharpshooter',
+    description: `Win a ranked match landing at least half of ${SHARPSHOOTER_MIN_SHOTS}+ shots.`,
+    icon: '🏹',
+    test: (f) =>
+      f.won &&
+      f.shotsFired >= SHARPSHOOTER_MIN_SHOTS &&
+      f.shotsHit / f.shotsFired >= SHARPSHOOTER_ACCURACY,
+  },
+  // The grindy matches earn nothing today. This one celebrates them.
+  {
+    id: 'ladder-sudden-death',
+    scope: 'ladder',
+    name: 'Sudden Death Survivor',
+    description: 'Win a ranked match that ran into sudden death.',
+    icon: '⏱️',
+    test: (f) => f.won && f.suddenDeath,
+  },
+  // The emotional opposite of Untouchable: won with the squad all but wiped out.
+  // Exactly one left — winning with zero alive is possible (the last bot
+  // eliminated takes it), but that's a different, sadder story.
+  {
+    id: 'ladder-pyrrhic',
+    scope: 'ladder',
+    name: 'Pyrrhic Victory',
+    description: 'Win a ranked match with a single bot left standing.',
+    icon: '🩸',
+    test: (f) => f.won && f.botsAlive === 1,
   },
   {
     id: 'ladder-wins-10',

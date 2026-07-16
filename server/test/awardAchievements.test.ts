@@ -39,6 +39,9 @@ const facts = (over = {}) => ({
   timesHit: 5,
   botsAlive: 3,
   botsTotal: 5,
+  shotsFired: 40,
+  shotsHit: 4,
+  suddenDeath: false,
   ...over,
 });
 

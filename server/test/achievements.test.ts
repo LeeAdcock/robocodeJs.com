@@ -19,6 +19,9 @@ const win = (over: Partial<LadderFacts> = {}): LadderFacts => ({
   timesHit: 5,
   botsAlive: 3,
   botsTotal: 5,
+  shotsFired: 40,
+  shotsHit: 4,
+  suddenDeath: false,
   ...over,
 });
 
@@ -186,6 +189,61 @@ describe('testAchievements (ladder)', () => {
     expect(ids(testAchievements('ladder', stomp))).not.toContain(
       'ladder-giant-slayer'
     );
+  });
+
+  it('awards Sharpshooter for landing half your shots', () => {
+    const sharp = win({ shotsFired: 20, shotsHit: 10 });
+    expect(ids(testAchievements('ladder', sharp))).toContain(
+      'ladder-sharpshooter'
+    );
+    const nearly = win({ shotsFired: 20, shotsHit: 9 });
+    expect(ids(testAchievements('ladder', nearly))).not.toContain(
+      'ladder-sharpshooter'
+    );
+  });
+
+  // The floor is the whole point: a match settled by one lucky point-blank shot is
+  // 100% accuracy, and without this it would earn a marksmanship badge.
+  it('does not award Sharpshooter on a tiny sample, however perfect', () => {
+    const lucky = win({ shotsFired: 9, shotsHit: 9 });
+    expect(ids(testAchievements('ladder', lucky))).not.toContain(
+      'ladder-sharpshooter'
+    );
+    // One more shot and the same aim now counts.
+    const enough = win({ shotsFired: 10, shotsHit: 10 });
+    expect(ids(testAchievements('ladder', enough))).toContain(
+      'ladder-sharpshooter'
+    );
+  });
+
+  it('never awards Sharpshooter for a loss, however good the aim', () => {
+    const lost = win({ won: false, shotsFired: 50, shotsHit: 50 });
+    expect(ids(testAchievements('ladder', lost))).not.toContain(
+      'ladder-sharpshooter'
+    );
+  });
+
+  it('awards Sudden Death Survivor only for a win that ran into decay', () => {
+    expect(
+      ids(testAchievements('ladder', win({ suddenDeath: true })))
+    ).toContain('ladder-sudden-death');
+    expect(
+      ids(testAchievements('ladder', win({ suddenDeath: false })))
+    ).not.toContain('ladder-sudden-death');
+  });
+
+  it('awards Pyrrhic Victory for winning with exactly one bot left', () => {
+    expect(ids(testAchievements('ladder', win({ botsAlive: 1 })))).toContain(
+      'ladder-pyrrhic'
+    );
+    expect(
+      ids(testAchievements('ladder', win({ botsAlive: 2 })))
+    ).not.toContain('ladder-pyrrhic');
+    // Winning with none alive is possible — the last bot eliminated takes it —
+    // but that is not what this badge says.
+    expect(
+      ids(testAchievements('ladder', win({ botsAlive: 0 })))
+    ).not.toContain('ladder-pyrrhic');
   });
 
   it('never awards a ladder badge when asked for another scope', () => {
