@@ -514,9 +514,7 @@ describe('applyEliminations — kill credit', () => {
     bots.forEach((bot) => {
       (bot as unknown as { process: unknown }).process = process;
     });
-    return process as unknown as Parameters<
-      typeof applyEliminations
-    >[0][number];
+    return process as any;
   };
 
   it('credits the enemy who landed the last hit, and records the death tick', () => {
