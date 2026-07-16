@@ -13,6 +13,7 @@
     "smoke": "node ./scripts/ivm-smoke.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "release": "npm version patch --no-git-tag-version && npm shrinkwrap",
     "bundle": "zip -r robocodejs-$(node -p \"require('./package.json').version\").zip ./ -x 'src/*' -x 'test/*' -x 'coverage/*' -x '*.git' -x '*robocodejs*zip*' -x '*artifact.zip*' -x '*node_modules*'"
   },
@@ -42,6 +43,7 @@
     "@types/node": "^24.13.2",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.7.0",
     "globals": "^17.7.0",
     "nodemon": "^3.1.14",
