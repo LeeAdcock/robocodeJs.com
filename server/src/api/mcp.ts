@@ -59,7 +59,7 @@ const PUBLIC_DIR = path.join(__dirname, '../../public');
 // so `sub` can never regress into a path-traversal vector even if a future
 // caller sourced it from request input (the `filename`/basename guard only
 // covers the last path segment, not `sub`).
-const PUBLIC_SUBDIRS = ['docs', 'samples', 'ts'] as const;
+const PUBLIC_SUBDIRS = ['docs', 'samples', 'docs/ts'] as const;
 const isAllowedSub = (sub: string): boolean =>
   (PUBLIC_SUBDIRS as readonly string[]).includes(sub);
 
@@ -1228,7 +1228,7 @@ export const buildServer = (user: User): McpServer => {
       const kind = slash === -1 ? id : id.slice(0, slash);
       const name = slash === -1 ? '' : id.slice(slash + 1);
       // Map the id's kind to a public subdir. Anything else is not a valid id.
-      const sub = { docs: 'docs', samples: 'samples', types: 'ts' }[kind];
+      const sub = { docs: 'docs', samples: 'samples', types: 'docs/ts' }[kind];
       if (!sub || !name) {
         return fail(
           `Unknown id "${id}". Use an id from list_docs, e.g. "docs/dev", ` +
@@ -1336,7 +1336,7 @@ const registerResources = (server: McpServer): void => {
       mimeType: 'text/plain',
     },
     async (uri) => {
-      const text = readPublic('ts', 'robocode.d.ts');
+      const text = readPublic('docs/ts', 'robocode.d.ts');
       if (text === null) throw new Error('Type definitions are unavailable.');
       return { contents: [{ uri: uri.href, mimeType: 'text/plain', text }] };
     }

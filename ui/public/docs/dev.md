@@ -283,7 +283,7 @@ Because the game runs in "simulated time" instead of real-world time, the `Date`
 
 # Type definitions
 
-If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/ts/robocode.d.ts`](/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
+If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/docs/ts/robocode.d.ts`](/docs/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
 
 Reference them from a bot file with a triple-slash directive:
 

@@ -65,9 +65,9 @@ describe('generateDts', () => {
   // Generates (on first run / `-u`) and then guards the committed file the docs
   // link to, so the shipped type definitions can never silently drift from the
   // model that powers in-editor autocomplete.
-  it('matches the committed public/ts/robocode.d.ts', async () => {
+  it('matches the committed public/docs/ts/robocode.d.ts', async () => {
     await expect(generateDts()).toMatchFileSnapshot(
-      '../public/ts/robocode.d.ts'
+      '../public/docs/ts/robocode.d.ts'
     );
   });
 });
