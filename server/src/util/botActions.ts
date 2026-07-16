@@ -8,6 +8,27 @@ import arenaMemberService from '../services/ArenaMemberService';
 // (api/mcp.ts). Each was originally inlined in a route handler; extracting them
 // keeps the two callers behaving identically.
 
+// Maximum byte length (UTF-8) of a bot's source. Bots are tiny programs, so this
+// is a generous ceiling; its job is to bound the memory a single save can consume
+// (resource exhaustion is a primary security axis here), alongside the per-user
+// app/arena caps. Enforced identically by the REST source PUT (api/app.ts) and the
+// MCP set_app_source/create_app tools (api/mcp.ts) via sourceSizeError below, so
+// both entry points reject oversized source with a documented error (E025). The
+// octet-stream body parser (index.ts) keeps a higher hard limit as a backstop.
+export const MAX_SOURCE_BYTES = 256 * 1024; // 256 KB
+
+// Shared source-size guard. Returns a human-readable error message if `source`
+// exceeds MAX_SOURCE_BYTES, otherwise null. Callers translate the message into
+// their own error shape (REST: 413 + E025; MCP: a tool error).
+export const sourceSizeError = (source: string): string | null => {
+  const bytes = Buffer.byteLength(source, 'utf-8');
+  if (bytes <= MAX_SOURCE_BYTES) return null;
+  return (
+    `Source is too large (${bytes} bytes); the limit is ${MAX_SOURCE_BYTES} ` +
+    `bytes (256 KB). Bots are small programs — trim the source below the limit.`
+  );
+};
+
 // Persist new source, then re-run it in every *live* arena the bot belongs to so
 // a running bot picks up the change. Saving deliberately does NOT re-fire START
 // (see Environment.execute) — use reboot for that.

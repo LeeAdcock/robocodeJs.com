@@ -791,8 +791,12 @@ const init = (env: Environment, process: Process, bot: Bot) => {
       m.length > MAX_LOG_LENGTH ? m.slice(0, MAX_LOG_LENGTH) + '…' : m;
     // The bot-side wrappers (below) format every argument into a single string
     // before it crosses the isolate boundary, so the host only ever receives a
-    // string here. Coerce defensively in case `_log` is called directly.
-    bot.getContext().global.setSync('_log', (msg: unknown) => {
+    // primitive level string plus a message string here. Coerce defensively in
+    // case `_log` is called directly. `level` is validated against the bunyan
+    // method allowlist so a bot can't reach an arbitrary property of the logger.
+    const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error'] as const;
+    type LogLevel = (typeof LOG_LEVELS)[number];
+    bot.getContext().global.setSync('_log', (level: unknown, msg: unknown) => {
       const now = env.getTime();
       if (now !== logWindow) {
         logWindow = now;
@@ -811,9 +815,15 @@ const init = (env: Environment, process: Process, bot: Bot) => {
         return;
       }
       logCount += 1;
-      bot.logger.info(clampLog(typeof msg === 'string' ? msg : String(msg)));
+      // Anything unexpected (a bot calling `_log` directly, an unknown method)
+      // falls back to INFO — the bunyan method name rides the SSE entry as
+      // `levelName`, driving the UI's per-level coloring/filtering.
+      const method: LogLevel = LOG_LEVELS.includes(level as LogLevel)
+        ? (level as LogLevel)
+        : 'info';
+      bot.logger[method](clampLog(typeof msg === 'string' ? msg : String(msg)));
     });
-    // TODO better log-level support
+    // Bot console/logger methods differentiate log levels (GitHub #147):
     //
     // console.log / logger.* accept any mix of arguments — strings, numbers,
     // objects, arrays, Errors. We format them into one display string *inside*
@@ -826,6 +836,12 @@ const init = (env: Environment, process: Process, bot: Bot) => {
     // only displays the message text. The helpers live in a closure so they
     // can't be clobbered, and `_log` is captured before being hidden so bots
     // can't reach the raw (crash-prone) channel directly.
+    //
+    // Each method passes its level as a PRIMITIVE string ('trace'/'debug'/
+    // 'info'/'warn'/'error') alongside the already-formatted message; only
+    // those two primitives cross the boundary (primitives clone safely), never
+    // an object or function. The host maps the level to the matching bunyan
+    // method so the level rides the SSE entry (see `_log` above).
     process
       .getSandbox()
       .compileScriptSync(
@@ -894,23 +910,28 @@ const init = (env: Environment, process: Process, bot: Bot) => {
               parts.push(disp(arguments[i]));
             return parts.join(' ');
           }
-          var log = function () {
-            emit(fmt.apply(null, arguments));
-          };
+          // Build a logging function bound to one level. The level is a plain
+          // string primitive so it clones safely across the isolate boundary;
+          // only it and the formatted message string are ever passed to emit.
+          function at(level) {
+            return function () {
+              emit(level, fmt.apply(null, arguments));
+            };
+          }
           logger = {
-            log: log,
-            info: log,
-            trace: log,
-            debug: log,
-            warn: log,
-            error: log,
+            log: at('info'),
+            info: at('info'),
+            trace: at('trace'),
+            debug: at('debug'),
+            warn: at('warn'),
+            error: at('error'),
           };
           console = {
-            log: log,
-            info: log,
-            warn: log,
-            error: log,
-            debug: log,
+            log: at('info'),
+            info: at('info'),
+            warn: at('warn'),
+            error: at('error'),
+            debug: at('debug'),
           };
         })();
         _log = undefined;

@@ -66,9 +66,13 @@ app.use(
 
 app.use('/api', [
   // Bound request body sizes: JSON covers the auth credential and small
-  // payloads; the octet-stream body is bot source code.
+  // payloads; the octet-stream body is bot source code. The octet-stream limit
+  // is a hard memory backstop set above the app-level source cap
+  // (MAX_SOURCE_BYTES = 256 KB, enforced in api/app.ts) so a normal oversized
+  // save is rejected in-route with a clean, documented 413/E025 rather than this
+  // parser's generic 413; only a pathological body trips the parser.
   bodyParser.json({ limit: '256kb' }),
-  bodyParser.raw({ type: 'application/octet-stream', limit: '64kb' }),
+  bodyParser.raw({ type: 'application/octet-stream', limit: '512kb' }),
   cookieParser(),
 ]);
 

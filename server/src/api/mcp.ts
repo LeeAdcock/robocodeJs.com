@@ -29,6 +29,7 @@ import {
   executeInUserArenas,
   rebootInUserArenas,
   deleteAppEverywhere,
+  sourceSizeError,
 } from '../util/botActions';
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
@@ -365,6 +366,10 @@ export const buildServer = (user: User): McpServer => {
           'That name was rejected: it appears to contain inappropriate language.'
         );
       }
+      if (source) {
+        const tooLarge = sourceSizeError(source);
+        if (tooLarge) return fail(tooLarge);
+      }
       const app = await appService.create(user.getId());
       if (name) await app.setName(name);
       if (source) await app.setSource(source);
@@ -389,6 +394,8 @@ export const buildServer = (user: User): McpServer => {
     async ({ appId, source }) => {
       const app = await ownedApp(user, appId);
       if (!app) return fail('No such app, or it is not yours.');
+      const tooLarge = sourceSizeError(source);
+      if (tooLarge) return fail(tooLarge);
       await propagateSource(app, source);
       return ok({ appId, updated: true });
     }

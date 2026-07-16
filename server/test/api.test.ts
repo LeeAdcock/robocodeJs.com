@@ -62,6 +62,7 @@ import appRouter from '../src/api/app';
 import arenaRouter from '../src/api/arena';
 import { buildMatchSummary } from '../src/util/matchSummary';
 import { propagateSource } from '../src/util/botActions';
+import { writeRateLimit } from '../src/middleware/rateLimit';
 
 // Build an Express app around a router, injecting an authenticated user the way
 // the real auth middleware would (the routers read req.user for ownership checks).
@@ -71,7 +72,11 @@ function makeApp(
 ) {
   const app = express();
   app.use(bodyParser.json());
-  app.use(bodyParser.raw({ type: 'application/octet-stream' }));
+  // Mirror the production octet-stream limit (index.ts): a hard backstop above
+  // the in-route MAX_SOURCE_BYTES (256 KB) cap, so an oversized-but-not-absurd
+  // source reaches the handler and gets the clean 413/E025 rather than this
+  // parser's generic 413.
+  app.use(bodyParser.raw({ type: 'application/octet-stream', limit: '512kb' }));
   app.use(cookieParser());
   app.use((req, _res, next) => {
     if (authedUser) (req as unknown as { user: unknown }).user = authedUser;
@@ -91,6 +96,7 @@ const mockApp = (id: string) => ({
   getName: () => `App ${id}`,
   getUserId: () => 'u1',
   getSource: () => '// bot code',
+  setSource: vi.fn().mockResolvedValue(undefined),
   delete: vi.fn().mockResolvedValue(undefined),
 });
 
@@ -326,6 +332,19 @@ describe('app endpoints', () => {
     expect(compiler.check).not.toHaveBeenCalled();
   });
 
+  it('POST .../app/:appId/check rejects oversized source with 413 + E025', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    const res = await request(makeApp(appRouter, mockUser('u1')))
+      .post('/api/user/u1/app/a1/check')
+      .set('content-type', 'application/octet-stream')
+      .send('x'.repeat(256 * 1024 + 1));
+    expect(res.status).toBe(413);
+    expect(res.body).toMatchObject({ code: 'E025' });
+    // The isolate is never spun up for an oversized dry-run.
+    expect(compiler.check).not.toHaveBeenCalled();
+  });
+
   // Object-level access control (A01-1). requireAppOwner must reject a caller
   // who owns the :userId in the path (passing requireOwner) but references
   // another user's :appId — the IDOR that would otherwise leak/overwrite/delete
@@ -349,6 +368,75 @@ describe('app endpoints', () => {
       .set('content-type', 'application/octet-stream')
       .send('// malicious overwrite');
     expect(res.status).toBe(401);
+  });
+
+  it('PUT .../app/:appId/source saves a normal-sized body (200)', async () => {
+    const app = mockApp('a1'); // owned by u1
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    // propagateSource fans out to the app's arena members; none here.
+    vi.mocked(arenaMemberService.getForApp).mockResolvedValue([] as never);
+
+    const res = await request(makeApp(appRouter, mockUser('u1')))
+      .put('/api/user/u1/app/a1/source')
+      .set('content-type', 'application/octet-stream')
+      .send('clock.on(Event.TICK, () => {});');
+
+    expect(res.status).toBe(200);
+    expect(app.setSource).toHaveBeenCalledWith(
+      'clock.on(Event.TICK, () => {});'
+    );
+  });
+
+  // The source PUT is a write, so it must sit behind writeRateLimit like the
+  // create-app POST (the limiter is a no-op under NODE_ENV=test, so assert it's
+  // wired onto the route rather than trying to trip it here — rateLimit.test.ts
+  // exercises the limiter's 429 behavior directly).
+  it('PUT .../app/:appId/source is guarded by writeRateLimit', () => {
+    const stack =
+      (appRouter as unknown as { router?: { stack: unknown[] } }).router
+        ?.stack ??
+      (appRouter as unknown as { _router?: { stack: unknown[] } })._router
+        ?.stack ??
+      [];
+    type Layer = {
+      route?: {
+        path: string;
+        methods: Record<string, boolean>;
+        stack: { handle: unknown }[];
+      };
+    };
+    const putSource = (stack as Layer[]).find(
+      (l) =>
+        l.route?.path === '/api/user/:userId/app/:appId/source' &&
+        l.route?.methods.put
+    );
+    expect(putSource).toBeDefined();
+    expect(
+      putSource!.route!.stack.some((h) => h.handle === writeRateLimit)
+    ).toBe(true);
+  });
+
+  // Resource-exhaustion guard (GitHub #147). An oversized upload is rejected with
+  // HTTP 413 + error code E025 BEFORE any persistence — the byte cap is
+  // MAX_SOURCE_BYTES (256 KB), shared with the MCP set_app_source/create_app path.
+  it('PUT .../app/:appId/source rejects an oversized body with 413 + E025', async () => {
+    const app = mockApp('a1'); // owned by u1
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    vi.mocked(arenaMemberService.getForApp).mockResolvedValue([] as never);
+
+    const oversized = 'x'.repeat(256 * 1024 + 1); // one byte over the 256 KB cap
+    const res = await request(makeApp(appRouter, mockUser('u1')))
+      .put('/api/user/u1/app/a1/source')
+      .set('content-type', 'application/octet-stream')
+      .send(oversized);
+
+    expect(res.status).toBe(413);
+    expect(res.body).toMatchObject({ code: 'E025' });
+    expect(res.body.error).toMatch(/too large/i);
+    // Nothing was persisted.
+    expect(app.setSource).not.toHaveBeenCalled();
   });
 
   it("DELETE .../app/:appId cannot delete another user's app", async () => {
