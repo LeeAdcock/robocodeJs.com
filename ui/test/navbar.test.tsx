@@ -7,7 +7,7 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 
 vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 import axios from 'axios';
@@ -49,6 +49,44 @@ describe('NavBar night-mode toggle', () => {
     expect(getDarkMode()).toBe(true);
     // The control now offers the inverse action.
     expect(screen.getByLabelText('Switch to light mode')).toBeTruthy();
+  });
+});
+
+describe('NavBar collapsed menu', () => {
+  afterEach(cleanup);
+
+  // Regression: on a phone the collapsed (hamburger) menu used to stay open
+  // after tapping a link, covering the page you just navigated to. The menu is
+  // now controlled and a useLocation effect closes it on every route change.
+  it('closes the open menu when navigation changes the route', async () => {
+    const Harness = () => {
+      const navigate = useNavigate();
+      return (
+        <>
+          <NavBar {...baseProps} />
+          <button onClick={() => navigate('/examples')}>go</button>
+        </>
+      );
+    };
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Harness />
+      </MemoryRouter>
+    );
+
+    const toggle = screen.getByRole('button', { name: /toggle navigation/i });
+    // react-bootstrap reflects the collapsed state as a `collapsed` class on the
+    // toggle button (present when closed, removed when open).
+    const isOpen = () => !toggle.classList.contains('collapsed');
+    expect(isOpen()).toBe(false);
+
+    // Open the hamburger menu.
+    fireEvent.click(toggle);
+    expect(isOpen()).toBe(true);
+
+    // Navigating to a new route should collapse it again.
+    fireEvent.click(screen.getByText('go'));
+    await waitFor(() => expect(isOpen()).toBe(false));
   });
 });
 

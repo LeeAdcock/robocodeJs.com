@@ -60,6 +60,20 @@ code {
   padding-right: 0px !important;
 }
 
+/* Below the navbar's `expand="sm"` breakpoint the menu collapses and its items
+   stack vertically, so the inline `|` dividers land on their own lines and just
+   pad out the hamburger. Hide them (and their side margins) on phones. */
+@media (max-width: 575.98px) {
+  .topNavBar .nav-sep {
+    display: none;
+  }
+  /* The search box and light/dark toggle add clutter to the collapsed menu on
+     phones; hide them there (the theme still follows the OS preference). */
+  .topNavBar .nav-tools {
+    display: none;
+  }
+}
+
 .markdown {
   padding-top: 10px;
 }

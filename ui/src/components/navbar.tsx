@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from 'react-bootstrap/Navbar';
 import Nav from 'react-bootstrap/Nav';
 import NavDropdown from 'react-bootstrap/NavDropdown';
@@ -16,7 +16,7 @@ import {
 } from 'react-icons/fa';
 import { colors } from '../util/colors';
 import { useDarkMode, toggleDarkMode } from '../util/theme';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import App from '../types/app';
 import User from '../types/user';
 import Arena from '../types/arena';
@@ -80,8 +80,18 @@ interface NavBarProps {
 
 export default function NavBar(props: NavBarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const darkMode = useDarkMode();
   const [showRoster, setShowRoster] = useState(false);
+  // Control the collapsed (hamburger) menu ourselves so we can close it on
+  // navigation. react-bootstrap otherwise keeps this state internally, and none
+  // of our navigation paths — the top-level <Link>s, the NavDropdown.Item
+  // onClick→navigate() items, or the search box — would collapse it, so on a
+  // phone the open menu stays over the page you just navigated to.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    setExpanded(false);
+  }, [location.pathname]);
 
   return (
     <>
@@ -89,6 +99,8 @@ export default function NavBar(props: NavBarProps) {
         bg="dark"
         variant="dark"
         expand="sm"
+        expanded={expanded}
+        onToggle={setExpanded}
         style={{ padding: '10px' }}
         className="topNavBar"
       >
@@ -113,7 +125,12 @@ export default function NavBar(props: NavBarProps) {
                 Learn
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
             <Navbar.Text>
               <Link
                 to="/learn/docs"
@@ -123,7 +140,12 @@ export default function NavBar(props: NavBarProps) {
                 Docs
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
             <Navbar.Text>
               <Link
                 to="/leaderboard"
@@ -133,13 +155,23 @@ export default function NavBar(props: NavBarProps) {
                 Rankings
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
             <Navbar.Text>
               <Link to="/blog" className="nav-link" style={{ padding: '0px' }}>
                 Blog
               </Link>
             </Navbar.Text>
-            <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+            <Navbar.Text
+              className="nav-sep"
+              style={{ margin: '0 10px 0 10px' }}
+            >
+              |
+            </Navbar.Text>
 
             {props.user && (
               <>
@@ -169,7 +201,12 @@ export default function NavBar(props: NavBarProps) {
                     View example applications
                   </NavDropdown.Item>
                 </NavDropdown>
-                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+                <Navbar.Text
+                  className="nav-sep"
+                  style={{ margin: '0 10px 0 10px' }}
+                >
+                  |
+                </Navbar.Text>
                 <NavDropdown title="Arena" id="basic-nav-dropdown">
                   <NavDropdown.Item onClick={() => setShowRoster(true)}>
                     Manage apps
@@ -195,11 +232,16 @@ export default function NavBar(props: NavBarProps) {
                     </NavDropdown.Item>
                   )}
                 </NavDropdown>
-                <Navbar.Text style={{ margin: '0 10px 0 10px' }}>|</Navbar.Text>
+                <Navbar.Text
+                  className="nav-sep"
+                  style={{ margin: '0 10px 0 10px' }}
+                >
+                  |
+                </Navbar.Text>
               </>
             )}
           </Nav>
-          <Nav>
+          <Nav className="nav-tools">
             <Form>
               <Form.Control
                 size="sm"
