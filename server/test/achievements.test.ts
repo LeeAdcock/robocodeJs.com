@@ -4,6 +4,7 @@ import {
   counterAchievements,
   testAchievements,
   accountAchievements,
+  rankAchievements,
   LadderFacts,
 } from '../src/util/achievements';
 
@@ -38,13 +39,14 @@ describe('achievement catalog invariants', () => {
   });
 
   it('gives each badge at most one way to be earned', () => {
-    // Three predicate forms, plus "none" for the edge-triggered ones. More than
+    // Four predicate forms, plus "none" for the edge-triggered ones. More than
     // one would make it ambiguous which path can award the badge.
     for (const a of ACHIEVEMENTS) {
       const forms = [
         a.counter !== undefined,
         a.test !== undefined,
         a.accountTest !== undefined,
+        a.rankThreshold !== undefined,
       ].filter(Boolean).length;
       expect(
         forms,
@@ -65,7 +67,7 @@ describe('achievement catalog invariants', () => {
   // Only the account scope has moments that leave no state to re-derive.
   it('allows a predicate-less (edge-triggered) badge only in the account scope', () => {
     const edgeTriggered = ACHIEVEMENTS.filter(
-      (a) => !a.counter && !a.test && !a.accountTest
+      (a) => !a.counter && !a.test && !a.accountTest && !a.rankThreshold
     );
     expect(edgeTriggered.map((a) => a.id).sort()).toEqual([
       'account-mcp-token',
@@ -77,6 +79,16 @@ describe('achievement catalog invariants', () => {
   it('scopes every accountTest badge to the account scope', () => {
     const offenders = ACHIEVEMENTS.filter(
       (a) => a.accountTest && a.scope !== 'account'
+    );
+    expect(offenders.map((a) => a.id)).toEqual([]);
+  });
+
+  // A rank is a position on the global ladder, so a rank badge is meaningless
+  // anywhere else — and it must never become farmable by leaking into a scope the
+  // user's own arena can feed.
+  it('scopes every rank badge to the ladder scope', () => {
+    const offenders = ACHIEVEMENTS.filter(
+      (a) => a.rankThreshold !== undefined && a.scope !== 'ladder'
     );
     expect(offenders.map((a) => a.id)).toEqual([]);
   });
@@ -210,6 +222,23 @@ describe('accountAchievements', () => {
     expect(ids(accountAchievements(state({ accountAgeDays: 365 })))).toContain(
       'account-veteran'
     );
+  });
+
+  it('unlocks a rank badge at its exact boundary but not one rank short', () => {
+    expect(rankAchievements(10).map((a) => a.id)).toEqual(['ladder-top-10']);
+    expect(rankAchievements(11).map((a) => a.id)).toEqual([]);
+    expect(rankAchievements(3).map((a) => a.id)).toContain('ladder-top-3');
+    expect(rankAchievements(4).map((a) => a.id)).not.toContain('ladder-top-3');
+  });
+
+  // Reaching #1 should not leave the lesser rungs mysteriously locked — a user who
+  // arrives already dominant earned all three on the way past.
+  it('awards every lesser rank badge when a better rank is reached', () => {
+    expect(
+      rankAchievements(1)
+        .map((a) => a.id)
+        .sort()
+    ).toEqual(['ladder-top-1', 'ladder-top-10', 'ladder-top-3']);
   });
 
   it('never returns an edge-triggered badge — those have no predicate to satisfy', () => {

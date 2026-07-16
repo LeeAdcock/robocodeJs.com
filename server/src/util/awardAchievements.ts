@@ -5,9 +5,11 @@ import {
   AchievementScope,
   CounterKey,
   LadderFacts,
+  MIN_RANKED_GAMES_FOR_RANK,
   counterAchievements,
   testAchievements,
   accountAchievements,
+  rankAchievements,
 } from './achievements';
 import appService from '../services/AppService';
 import { isUntouchedStarter } from './starterBots';
@@ -63,7 +65,12 @@ export const toCounterDeltas = (
 const award = async (
   userId: UserId,
   deltas: Partial<Record<CounterKey, number>>,
-  match?: { scope: AchievementScope; facts: LadderFacts; appId?: AppId | null }
+  match?: {
+    scope: AchievementScope;
+    facts: LadderFacts;
+    appId?: AppId | null;
+    rankedApps?: RankedApp[];
+  }
 ): Promise<string[]> => {
   const totals = await achievementService.bump(userId, deltas);
 
@@ -78,9 +85,45 @@ const award = async (
     for (const a of testAchievements(match.scope, match.facts)) {
       unlocks.push({ id: a.id, appId: match.appId ?? null });
     }
+    const best = bestRankedApp(match.rankedApps);
+    if (best) {
+      // The app that got there is the earner — this is exactly the "Robinhood
+      // reached the top 10" case the appId column exists for.
+      for (const a of rankAchievements(best.rank)) {
+        unlocks.push({ id: a.id, appId: best.appId });
+      }
+    }
   }
 
   return achievementService.unlock(userId, unlocks);
+};
+
+// One app the user fielded in a ladder match, as it stands on the board AFTER the
+// match's rating update.
+export interface RankedApp {
+  appId: AppId;
+  // Board rank, or undefined when the app isn't on the board at all.
+  rank?: number;
+  // Ranked games played, including the match just finished.
+  ratingGames: number;
+}
+
+// The best (lowest) board rank among the apps a user fielded, once the placement
+// gate is applied. A user can field several apps in one match (a same-owner
+// matchup), and a rank badge is about their best bot — awarding on the worse one
+// would be a strange reading of "reach the top 10".
+const bestRankedApp = (
+  apps: RankedApp[] | undefined
+): { appId: AppId; rank: number } | null => {
+  let best: { appId: AppId; rank: number } | null = null;
+  for (const app of apps ?? []) {
+    // An unranked app has no rank to earn with; a young one hasn't settled yet.
+    if (app.rank === undefined) continue;
+    if (app.ratingGames < MIN_RANKED_GAMES_FOR_RANK) continue;
+    if (best === null || app.rank < best.rank)
+      best = { appId: app.appId, rank: app.rank };
+  }
+  return best;
 };
 
 // Sandbox path: a user's own arena flushed some bot stats. Counter badges only —
@@ -123,6 +166,10 @@ export interface LadderResult {
   // The app that won it — recorded as the earner on ladder badges. Null when the
   // user didn't win, since nothing is awarded then anyway.
   winningAppId?: AppId | null;
+  // The user's apps in this match with their board rank AFTER the rating update,
+  // for the rank badges. Deliberately not gated on winning: "reach the top 10" is
+  // about where the bot stands, not how this one match went.
+  rankedApps?: RankedApp[];
   // Whether the match counted for rating (LadderService's `rate`: decided, and not
   // a double crash). An unrated match still fires shots, so its combat counters are
   // real, but it is NOT a ranked result: no ladderMatchesPlayed/ladderWins and no
@@ -153,6 +200,7 @@ export const recordLadderResult = async (
             scope: 'ladder',
             facts: result.facts,
             appId: result.facts.won ? (result.winningAppId ?? null) : null,
+            rankedApps: result.rankedApps,
           }
         : undefined
     );
