@@ -13,12 +13,14 @@ vi.mock('../src/page/app/appEditor', () => ({
     code: string;
     clearMarkersSignal?: number;
     faultAnnotation?: unknown;
+    onChange?: (value: string) => void;
   }) => (
     <textarea
       data-testid="editor"
       data-clear-markers={props.clearMarkersSignal ?? 0}
       data-fault={props.faultAnnotation ? 'set' : 'none'}
       defaultValue={props.code}
+      onChange={(e) => props.onChange?.(e.target.value)}
     />
   ),
   // The toolbar and page import these bounds from appEditor; the real module
@@ -134,6 +136,40 @@ describe('AppPage (bot editor)', () => {
     expect(
       await screen.findByText('Share link copied to your clipboard.')
     ).toBeTruthy();
+  });
+
+  it('does NOT re-save the just-loaded source when the debounce elapses', async () => {
+    vi.useFakeTimers();
+    try {
+      renderPage();
+      // Flush the source/app GETs (sets code + the "already saved" ref), then
+      // let the 30s debounce elapse. The loaded source equals what's on the
+      // server, so the auto-save must be skipped — no round-trip on open.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(30000);
+      expect(axios.put).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auto-saves after a real edit once the debounce elapses', async () => {
+    vi.useFakeTimers();
+    try {
+      renderPage();
+      // Let the initial load settle before editing.
+      await vi.advanceTimersByTimeAsync(0);
+      const editor = screen.getByTestId('editor') as HTMLTextAreaElement;
+      fireEvent.change(editor, { target: { value: 'bot.turn(90)' } });
+      await vi.advanceTimersByTimeAsync(30000);
+      expect(axios.put).toHaveBeenCalledWith(
+        '/api/user/u1/app/a1/source',
+        'bot.turn(90)',
+        { headers: { 'content-type': 'application/octet-stream' } }
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a clean recompile hides the previous error and clears editor markers', async () => {

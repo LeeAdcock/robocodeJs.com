@@ -61,6 +61,7 @@ import userRouter from '../src/api/user';
 import appRouter from '../src/api/app';
 import arenaRouter from '../src/api/arena';
 import { buildMatchSummary } from '../src/util/matchSummary';
+import { propagateSource } from '../src/util/botActions';
 import { writeRateLimit } from '../src/middleware/rateLimit';
 
 // Build an Express app around a router, injecting an authenticated user the way
@@ -459,6 +460,58 @@ describe('app endpoints', () => {
     );
     expect(res.status).toBe(400);
     expect(appService.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('propagateSource (save + re-execute)', () => {
+  // A minimal App double: getSource returns the currently stored source, and
+  // setSource records the write (the real one also clears `broken` / bumps the
+  // timestamp — the reason we never guard it).
+  const makeStoredApp = (id: string, stored: string) => {
+    let source = stored;
+    return {
+      getId: () => id,
+      getSource: () => source,
+      setSource: vi.fn().mockImplementation((s: string) => {
+        source = s;
+        return Promise.resolve(undefined);
+      }),
+    };
+  };
+
+  it('re-executes the bot in every live arena when the source changed', async () => {
+    const app = makeStoredApp('a1', '// old');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(arenaMemberService.getForApp).mockResolvedValue([
+      { getArenaId: () => 'ar1', getAppId: () => 'a1' },
+    ] as never);
+    vi.mocked(environmentService.getByArenaId).mockResolvedValue({
+      execute,
+    } as never);
+
+    await propagateSource(app as never, '// new');
+
+    // Always persisted (setSource clears `broken` / bumps updatedTimestamp).
+    expect(app.setSource).toHaveBeenCalledWith('// new');
+    // And the changed source is re-run in the live arena.
+    expect(arenaMemberService.getForApp).toHaveBeenCalledWith('a1');
+    expect(execute).toHaveBeenCalledWith('a1');
+  });
+
+  it('still persists but skips the isolate re-execute when the source is unchanged', async () => {
+    const app = makeStoredApp('a1', '// same');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(environmentService.getByArenaId).mockResolvedValue({
+      execute,
+    } as never);
+
+    await propagateSource(app as never, '// same');
+
+    // setSource still runs (un-breaks a ladder-broken app, bumps the timestamp).
+    expect(app.setSource).toHaveBeenCalledWith('// same');
+    // But the expensive re-execute loop is skipped entirely.
+    expect(arenaMemberService.getForApp).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
