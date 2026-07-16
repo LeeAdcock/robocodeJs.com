@@ -187,7 +187,7 @@ The radar provides the ability to detect other nearby bots. Only bots within **3
 
 - `bot.radar.onReady(): Promise` Returns a promise that resolves when the radar is ready to scan. If the radar scans through another thread while this promise is pending, the promise will be rejected.
 - `bot.radar.isReady(): boolean` Returns a boolean indicating whether the radar is ready to scan.
-- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`
+- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`. Note the two direction fields answer different questions: `angle` is where the detected bot **is** — the bearing from you to it, relative to your heading (so `bot.turret.setOrientation(angle)` aims at it) — while `orientation` is which way that bot itself is **facing**, as an absolute compass heading (0 = north); combine `orientation` with `speed` to predict where it is going. The other fields are described under the `SCANNED` event in [Bot events](#bot-events).
 
 # Coding Tips
 
