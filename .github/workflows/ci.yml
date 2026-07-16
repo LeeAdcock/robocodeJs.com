@@ -14,6 +14,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Prettier is applied by the husky pre-commit hook, but a hook is not a gate:
+  # it is skipped by `--no-verify` and absent until someone runs a root
+  # `npm install`. This job is the gate. It runs at the root because the
+  # per-package `lint` scripts only cover `src test` — nothing else checks
+  # top-level files or `ui/public/**`, which is exactly where formatting drifted.
+  # `--check` (never `--write`): CI reports, it does not mutate the checkout.
+  format:
+    name: format (prettier --check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # Driven off `git ls-files` so only tracked files are checked; a bare
+      # `**/*` glob walks node_modules and hangs. `.prettierignore` still applies.
+      # -z/-0 keeps paths with spaces intact.
+      - name: Check formatting of tracked files
+        run: |
+          git ls-files -z '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.css' '*.md' '*.yml' '*.yaml' \
+            | xargs -0 npx prettier --check
+
   server:
     name: server (lint · build · test · audit)
     runs-on: ubuntu-latest
