@@ -64,7 +64,7 @@ still runs, the RoboWiki still answers questions, and the game's creator eventua
 returned to build a modern successor,
 [Robocode Tank Royale](https://github.com/robocode-dev/tank-royale), which lets you
 write bots in almost any language. Twenty-plus years for a piece of software is
-geologic time. Twenty-plus years for a *community* is rarer still.
+geologic time. Twenty-plus years for a _community_ is rarer still.
 
 RobocodeJs is my small branch on that family tree. I rebuilt the idea
 [for the browser and JavaScript](/blog/why-javascript-not-java) because I wanted the

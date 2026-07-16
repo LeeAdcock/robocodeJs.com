@@ -3,7 +3,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import ArenaSvg from '../src/components/arena/arena';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const arena: any = { width: 750, height: 750, clock: { time: 0 }, apps: [] };
 
 afterEach(cleanup);

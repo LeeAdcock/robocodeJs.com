@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import applyArenaEvent from '../src/util/arenaReducer';
 
 // applyArenaEvent mutates the arena in place and returns it.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const apply = (arena: any, data: any, time = 0) =>
   applyArenaEvent(arena, data, time);
 
