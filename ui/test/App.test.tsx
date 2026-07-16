@@ -81,6 +81,9 @@ describe('App', () => {
       class extends FakeEventSource {
         constructor(url: string) {
           super(url);
+          // Capturing the instance is the point: the test needs a handle on the
+          // EventSource the component constructs internally.
+          // eslint-disable-next-line @typescript-eslint/no-this-alias
           last = this;
         }
       }

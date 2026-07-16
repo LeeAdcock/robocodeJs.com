@@ -15,13 +15,9 @@ vi.mock('axios', () => ({
 import axios from 'axios';
 import AddAppPage from '../src/page/arena/addAppPage';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const user: any = { id: 'u1', name: 'Me', apps: [] };
 
-const renderAt = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  props: any
-) =>
+const renderAt = (props: any) =>
   render(
     <MemoryRouter initialEntries={['/add-app/xyz']}>
       <Routes>

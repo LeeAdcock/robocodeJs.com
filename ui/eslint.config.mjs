@@ -21,4 +21,21 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  // Tests are linted too (CI runs `eslint src test`), but they build partial
+  // mock shapes — an arena with two fields where the DTO has twenty — and
+  // typing those fully adds noise without adding safety. `any` is the
+  // deliberate idiom there, so the rule is off for tests rather than carried
+  // as ~20 scattered disable comments. Every other rule still applies.
+  {
+    files: ['test/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser, ...globals.node },
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 );

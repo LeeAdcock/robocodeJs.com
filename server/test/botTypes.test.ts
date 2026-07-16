@@ -47,7 +47,6 @@ function makeRealBot() {
       void Promise.resolve(op).catch(() => undefined);
     },
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bot = new Bot(env as any, proc as any);
   bot.logger = {
     trace: vi.fn(),
@@ -64,10 +63,8 @@ function makeRealBot() {
   bot.turret.orientationTarget = 0;
   bot.turret.radar.orientation = 0;
   bot.turret.radar.orientationTarget = 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return {
     bot,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     env: env as any,
     proc,
     emit,

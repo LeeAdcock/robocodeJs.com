@@ -20,7 +20,6 @@ interface PendingCommand {
 }
 
 export interface SimEnv {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   env: any;
   processes: Process[];
   events: { name: string; payload: unknown }[];
@@ -46,7 +45,6 @@ export function makeSimEnv(
     seed?: number;
     // Run physics for one tick; injected so this helper needn't import Simulation
     // (keeps it usable by tests that drive Simulation directly).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     run: (env: any) => void;
   } = { run: () => undefined }
 ): SimEnv {
@@ -76,7 +74,6 @@ export function makeSimEnv(
     return settled;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const env: any = {
     getArena: () => ({
       getWidth: () => opts.width ?? 750,

@@ -32,9 +32,7 @@ vi.mock('../src/page/app/appEditor', () => ({
 import axios from 'axios';
 import AppPage from '../src/page/app/appPage';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const emitter = { addListener: vi.fn(), removeListener: vi.fn() } as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const arena = { clock: { time: 0 }, apps: [] } as any;
 
 describe('AppPage (bot editor)', () => {

@@ -41,7 +41,6 @@ const members = [
   },
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const arena: any = { clock: { time: 0 }, apps: [{ id: 'a1' }] };
 
 const renderRoster = () =>
