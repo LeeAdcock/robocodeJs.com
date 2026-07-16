@@ -73,9 +73,7 @@ function makeEnv(
   };
 }
 
-const run = (env: ReturnType<typeof makeEnv>) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Simulation.run(env as any);
+const run = (env: ReturnType<typeof makeEnv>) => Simulation.run(env as any);
 
 describe('Simulation.run — movement', () => {
   it('advances a bot along its orientation (0° = +y)', () => {

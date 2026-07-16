@@ -20,4 +20,20 @@ export default tseslint.config(
       ],
     },
   },
+  // Tests are linted too (CI runs `eslint src test`), but they build partial
+  // mock shapes — a tank with three fields where the class has twenty — and
+  // typing those fully adds noise without adding safety. `any` is the
+  // deliberate idiom there, so the rule is off for tests rather than carried
+  // as scattered disable comments. Every other rule still applies.
+  {
+    files: ['test/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 );

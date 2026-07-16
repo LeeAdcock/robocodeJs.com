@@ -45,7 +45,6 @@ function makeCompiledBot() {
       void Promise.resolve(op).catch(() => undefined);
     },
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bot = new Bot(env as any, proc as any);
   bot.x = 100;
   bot.y = 200;
@@ -55,7 +54,6 @@ function makeCompiledBot() {
   bot.speedTarget = 0;
   proc.bots.push(bot);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   compiler.init(env as any, proc, bot);
 
   // Run bot code in the sandbox.

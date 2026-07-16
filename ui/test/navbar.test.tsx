@@ -15,7 +15,6 @@ import NavBar from '../src/components/navbar';
 import { getDarkMode, setDarkMode } from '../src/util/theme';
 
 const noop = () => undefined;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const baseProps: any = {
   apps: [],
   user: null,
