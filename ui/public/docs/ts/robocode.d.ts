@@ -82,11 +82,11 @@ interface Turret {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the turret is currently turning. */
   isTurning(): boolean;
-  /** Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire. */
+  /** Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire (reloading, or during the opening deployment hold). */
   fire(): Promise<{ id?: string }>;
   /** Resolves when the turret is ready to fire again. Rejects if it fires (from elsewhere) while pending. */
   onReady(): Promise<void>;
-  /** Returns whether the turret is ready to fire. */
+  /** Returns whether the turret is ready to fire (false while reloading, and during the opening deployment hold). */
   isReady(): boolean;
 }
 
@@ -114,7 +114,7 @@ interface Bot {
   radar: Radar;
   /** The turret, for firing. */
   turret: Turret;
-  /** Fires once when the bot starts — and again every time you save your code. Set up state here on `this`. */
+  /** Fires when the bot first starts, when the arena restarts, and when you reboot the app — an ordinary save does NOT re-fire it. Set up state here on `this`. */
   on(event: 'START', handler: () => void | Promise<unknown>): void;
   /** Fires after your radar scans. The handler receives the array of bots the scan detected. */
   on(event: 'SCANNED', handler: (event: ScanResult[]) => void | Promise<unknown>): void;
@@ -193,9 +193,11 @@ declare const logger: {
   error(...args: unknown[]): void;
 };
 
-/** Runs the handler every N simulation ticks (not milliseconds). */
+/** Runs the handler every N simulation ticks (not milliseconds).
+ *  Returns -1 if the per-bot timer cap is hit (E021). */
 declare function setInterval(handler: () => void, ticks: number): number;
 declare function clearInterval(id: number): void;
-/** Runs the handler once after N simulation ticks (not milliseconds). */
+/** Runs the handler once after N simulation ticks (not milliseconds).
+ *  Returns -1 if the per-bot timer cap is hit (E021). */
 declare function setTimeout(handler: () => void, ticks: number): number;
 declare function clearTimeout(id: number): void;

@@ -59,7 +59,7 @@ export const EVENTS: ApiEvent[] = [
     name: 'START',
     payload: 'void',
     channel: 'bot',
-    doc: 'Fires once when the bot starts — and again every time you save your code. Set up state here on `this`.',
+    doc: 'Fires when the bot first starts, when the arena restarts, and when you reboot the app — an ordinary save does NOT re-fire it. Set up state here on `this`.',
   },
   {
     name: 'TICK',
@@ -272,7 +272,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'fire',
         kind: 'method',
         type: 'Promise<{ id?: string }>',
-        doc: 'Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire.',
+        doc: 'Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire (reloading, or during the opening deployment hold).',
       },
       {
         name: 'onReady',
@@ -284,7 +284,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'isReady',
         kind: 'method',
         type: 'boolean',
-        doc: 'Returns whether the turret is ready to fire.',
+        doc: 'Returns whether the turret is ready to fire (false while reloading, and during the opening deployment hold).',
       },
     ],
   },
@@ -500,7 +500,7 @@ export const GLOBALS: ApiGlobal[] = [
   {
     name: 'setInterval',
     signature: 'setInterval(handler: () => void, ticks: number): number',
-    doc: 'Runs the handler every N simulation ticks (not milliseconds). Create it inside START.',
+    doc: 'Runs the handler every N simulation ticks (not milliseconds). Create it inside START. Returns -1 if the per-bot timer cap is hit (E021).',
   },
   {
     name: 'clearInterval',
@@ -510,7 +510,7 @@ export const GLOBALS: ApiGlobal[] = [
   {
     name: 'setTimeout',
     signature: 'setTimeout(handler: () => void, ticks: number): number',
-    doc: 'Runs the handler once after N simulation ticks (not milliseconds).',
+    doc: 'Runs the handler once after N simulation ticks (not milliseconds). Returns -1 if the per-bot timer cap is hit (E021).',
   },
   {
     name: 'clearTimeout',
@@ -729,15 +729,17 @@ export function generateDts(): string {
   lines.push('};');
   lines.push('');
   lines.push(
-    '/** Runs the handler every N simulation ticks (not milliseconds). */'
+    '/** Runs the handler every N simulation ticks (not milliseconds).'
   );
+  lines.push(' *  Returns -1 if the per-bot timer cap is hit (E021). */');
   lines.push(
     'declare function setInterval(handler: () => void, ticks: number): number;'
   );
   lines.push('declare function clearInterval(id: number): void;');
   lines.push(
-    '/** Runs the handler once after N simulation ticks (not milliseconds). */'
+    '/** Runs the handler once after N simulation ticks (not milliseconds).'
   );
+  lines.push(' *  Returns -1 if the per-bot timer cap is hit (E021). */');
   lines.push(
     'declare function setTimeout(handler: () => void, ticks: number): number;'
   );
