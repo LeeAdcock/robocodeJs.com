@@ -120,6 +120,11 @@ export default function NavBar(props: NavBarProps) {
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav>
+            <Navbar.Text className="nav-mobile-only">
+              <Link to="/" className="nav-link" style={{ padding: '0px' }}>
+                Home
+              </Link>
+            </Navbar.Text>
             <Navbar.Text>
               <Link to="/learn" className="nav-link" style={{ padding: '0px' }}>
                 Learn

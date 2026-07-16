@@ -90,6 +90,27 @@ describe('NavBar collapsed menu', () => {
   });
 });
 
+describe('NavBar home link', () => {
+  afterEach(cleanup);
+
+  // The link is for the collapsed hamburger menu only — on wider screens the
+  // brand logo already goes home. Visibility is CSS-driven (`.nav-mobile-only`
+  // is `display: none` until the `expand="sm"` breakpoint), which jsdom does not
+  // evaluate, so assert the link and the gating class rather than the media
+  // query.
+  it('renders a Home link gated to the collapsed menu', () => {
+    render(
+      <MemoryRouter>
+        <NavBar {...baseProps} />
+      </MemoryRouter>
+    );
+
+    const home = screen.getByRole('link', { name: 'Home' });
+    expect(home.getAttribute('href')).toBe('/');
+    expect(home.closest('.nav-mobile-only')).toBeTruthy();
+  });
+});
+
 describe('NavBar search', () => {
   afterEach(cleanup);
 
