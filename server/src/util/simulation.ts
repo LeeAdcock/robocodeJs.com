@@ -1,12 +1,70 @@
 import { Event } from '../types/event';
 import { timerTick } from './scheduleFactory';
 import Environment from '../types/environment';
+// Type-only: Process is declared in environment.ts, which imports this module.
+// `import type` is erased at compile time, so the cycle never exists at runtime.
+import type { Process } from '../types/environment';
+import type Bot from '../types/bot';
 import { normalizeAngle, toRelativeBearing } from './geometry';
 
 /*
   These functions calculate the changes and interaction between active
   elements in the arena, specifically bots and their bullets.
 */
+
+// Apply `amount` damage to `bot` and record who did it (`source`, or null when the
+// cause has no attributable enemy: a collision, the arena wall, the bot's own
+// missed shot, sudden-death decay, or a crash).
+//
+// Only a blow that finds the bot ALIVE counts or changes attribution. Health is
+// allowed to go negative and several damage events can land on one bot in a single
+// tick — the enclosing `health > 0` checks are made once per tick, and a dead bot's
+// bullets keep flying and still penalize it for missing — so without this guard a
+// hit on an already-dead bot would both over-count damage and overwrite
+// lastDamagedBy, stealing the kill from whoever actually landed the killing blow.
+// Once a bot is dead its attribution is frozen, which is exactly what "the last hit
+// that took it to <= 0" means.
+//
+// The health arithmetic itself is deliberately left untouched (it still runs for a
+// dead bot, and still goes negative): match ranking sums totalHealth, so changing
+// it would change match outcomes.
+const damage = (bot: Bot, amount: number, source: Bot | null): number => {
+  const wasAlive = bot.health > 0;
+  const dealt = wasAlive ? Math.min(amount, bot.health) : 0;
+  bot.health -= amount;
+  if (wasAlive) {
+    bot.stats.damageTaken += dealt;
+    bot.lastDamagedBy = source;
+  }
+  return dealt;
+};
+
+// Record the tick each bot died — crash, bullet, collision, self-inflicted miss,
+// or sudden-death decay — and credit the kill when one is owed. Called once per
+// tick by Environment.tick, AFTER decay, so it sees each bot's final health and
+// final attribution for the tick.
+//
+// The eliminatedAt === null guard is the once-latch: a bot is processed on the
+// first tick it is found dead and never again, so a kill can't be double-counted.
+// Read-only for the physics — this never feeds back into the simulation.
+export const applyEliminations = (processes: Process[], time: number): void => {
+  for (const process of processes) {
+    for (const bot of process.bots) {
+      if (bot.health > 0 || bot.eliminatedAt !== null) continue;
+      bot.eliminatedAt = time;
+
+      // Credit the last-hit shooter, but only a genuine enemy: an unattributed
+      // death (collision, decay, crash, own missed shot) leaves lastDamagedBy
+      // null, and friendly fire — including shooting yourself — earns no kill
+      // even though the damage was recorded. A dead shooter still gets credit
+      // for a bullet that was already in flight, which is correct.
+      const killer = bot.lastDamagedBy;
+      if (killer && killer.process.getAppId() !== process.getAppId()) {
+        killer.stats.kills += 1;
+      }
+    }
+  }
+};
 
 export default {
   // Handles all object movement
@@ -17,6 +75,9 @@ export default {
         .filter((bot) => bot.health > 0 && bot.appCrashed)
         .forEach((bot) => {
           bot.health = 0;
+          // A crash is a forfeit, not damage: nobody dealt it, so it credits no
+          // kill and counts toward no damage total.
+          bot.lastDamagedBy = null;
           env.emit('event', {
             type: 'botDamaged',
             id: bot.id,
@@ -153,9 +214,14 @@ export default {
                         });
                       }
 
-                      bot.health -= 25;
+                      // The last-hit rule: whoever landed this shot is on the hook
+                      // for the kill if the bot doesn't recover. Friendly fire is
+                      // recorded here too — it really happened — but applyEliminations
+                      // refuses to credit it as a kill.
+                      const dealt = damage(bot, 25, otherBot);
                       bot.stats.timesHit += 1;
                       otherBot.stats.shotsHit += 1;
+                      otherBot.stats.damageDealt += dealt;
 
                       bullet.exploded = true;
                       if (bullet.callback) bullet.callback({ id: bot.id });
@@ -231,7 +297,12 @@ export default {
           } else {
             bot.speedTarget = 0;
             bot.speed = 0;
-            bot.health -= 1;
+            // Collision damage is deliberately unattributed: `collided` is set by
+            // both the bot-bot branch above and the arena-boundary branch, and the
+            // penalty is applied once without knowing which — so there is no ram
+            // kill credit. Passing null (rather than leaving a stale shooter) is
+            // what makes a collision death credit nobody.
+            damage(bot, 1, null);
             // Handle a collision
             env.emit('event', {
               type: 'botStop',
@@ -305,7 +376,10 @@ export default {
               // penalized 3 health for the missed shot, then the bullet is
               // removed. (Elimination at health <= 0 is handled in
               // Environment.tick, so a miss can be a self-inflicted killing blow.)
-              bot.health -= 3;
+              // Self-inflicted, so nobody is credited. This runs for dead bots too
+              // — their bullets stay in flight — but `damage` freezes a dead bot's
+              // attribution, so a corpse's stray miss can't rob its killer.
+              damage(bot, 3, null);
               env.emit('event', {
                 type: 'bulletRemoved',
                 time: env.getTime(),

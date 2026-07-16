@@ -175,6 +175,30 @@ describe('buildMatchSummary', () => {
     const a2 = summary.leaderboard.find((e) => e.id === 'a2')!;
     expect(a2.stats.accuracy).toBe(0);
   });
+
+  it('aggregates the combat counters across an app’s bots', async () => {
+    // Guards the STAT_KEYS auto-flow: the keys are derived from a fresh BotStats
+    // (now in types/botStats.ts, not here), so a counter added to that class must
+    // appear in both the per-app totals and the per-bot detail with no change to
+    // matchSummary. If this breaks, the derivation broke.
+    const env = makeEnv([
+      makeProcess('a1', [
+        makeBot('t1', 100, null, {
+          kills: 2,
+          damageDealt: 50,
+          damageTaken: 25,
+        }),
+        makeBot('t2', 100, null, { kills: 1, damageDealt: 25, damageTaken: 0 }),
+      ]),
+    ]);
+    const summary = await buildMatchSummary(env, [makeMember('a1', 1)]);
+
+    const a1 = summary.leaderboard.find((e) => e.id === 'a1')!;
+    expect(a1.stats.kills).toBe(3);
+    expect(a1.stats.damageDealt).toBe(75);
+    expect(a1.stats.damageTaken).toBe(25);
+    expect(a1.bots[0].stats.kills).toBe(2);
+  });
 });
 
 describe('buildMatchStatus', () => {

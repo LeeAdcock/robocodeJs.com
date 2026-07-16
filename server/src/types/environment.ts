@@ -6,7 +6,7 @@ import ivm from 'isolated-vm';
 import Arena from './arena';
 import compiler from '../util/compiler';
 
-import Simulation from '../util/simulation';
+import Simulation, { applyEliminations } from '../util/simulation';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
@@ -527,21 +527,20 @@ export default class Environment {
         process.bots
           .filter((bot) => bot.health > 0)
           .forEach((bot) => {
+            bot.stats.damageTaken += Math.min(1, bot.health);
             bot.health = Math.max(0, bot.health - 1);
+            // Decay is the arena killing everyone, not an opponent — so a bot
+            // that is ground down to zero here dies unattributed. The filter
+            // above means only living bots reach this, so a bot already shot
+            // dead this tick keeps its attribution.
+            bot.lastDamagedBy = null;
           });
       });
     }
 
-    // Record the tick each bot died (crash, bullet, collision, or decay above),
-    // once, so the match summary can rank apps by elimination order. Read-only for
-    // the physics — this never feeds back into the simulation.
-    this.processes.forEach((process) =>
-      process.bots.forEach((bot) => {
-        if (bot.health <= 0 && bot.eliminatedAt === null) {
-          bot.eliminatedAt = this.clock.time;
-        }
-      })
-    );
+    // Record eliminations and credit kills, once per bot. Runs after decay so it
+    // sees each bot's final health and attribution for the tick.
+    applyEliminations(this.processes, this.clock.time);
 
     // Calculate application health
     const appHealth: number[] = this.processes.map(
