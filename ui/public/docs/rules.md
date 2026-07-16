@@ -167,6 +167,7 @@ See [Error codes](/error-codes) for **E021** and **E022**.
 
 ---
 
-See also: the [API reference](/learn/docs) for every method and event, and the
+See also: the [API reference](/learn/docs) for every method and event, the
+[FAQ](/faq) for quick answers to common questions, and the
 [example bots](/examples). New here? The [Learn course](/learn) teaches all of this
 step by step.
