@@ -144,6 +144,21 @@ describe('Bot', () => {
     await expect(p).rejects.toBe('Speed change cancelled');
   });
 
+  it('setSpeed() clamps below -speedMax (an unreachable target never settles)', async () => {
+    const { bot, emit } = makeRealBot();
+    // Already at full reverse: with the target clamped to -speedMax the command
+    // is satisfied immediately. Unclamped, the -1000 target is unreachable (the
+    // physics caps speed at ±speedMax) and the promise could never resolve.
+    bot.speed = -bot.speedMax;
+    const p = bot.setSpeed(-1000);
+    expect(bot.speedTarget).toBe(-bot.speedMax);
+    expect(emit).toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'botAccelerate', speedTarget: -5 })
+    );
+    await expect(p).resolves.toBeUndefined();
+  });
+
   it('setSpeed() to the current target is a no-op (no event)', async () => {
     const { bot, emit } = makeRealBot();
     await expect(bot.setSpeed(0)).resolves.toBeUndefined();
