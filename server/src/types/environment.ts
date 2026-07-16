@@ -12,6 +12,7 @@ import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
 import { mulberry32 } from '../util/random';
 import { computeSpawns } from '../util/placement';
+import { BotStats, STAT_KEYS } from './botStats';
 
 export type ArenaId = string & {};
 
@@ -160,6 +161,21 @@ export default class Environment {
   // flags an overloaded arena. 0 until the first tick completes.
   private avgTickMs = 0;
 
+  // Where this arena's cumulative bot stats go when they're flushed, or null to
+  // discard them. Null by DEFAULT, and that default is load-bearing: only
+  // EnvironmentService.get installs a sink, and it is the sole place a real
+  // arena's Environment is constructed. LadderService builds its ephemeral
+  // Environment directly (`new Environment(arena)`), so it never gets a sink and
+  // every flush below is a silent no-op there — the ladder hook owns ranked
+  // counters exclusively, and its dispose() cannot double-count them. That's a
+  // structural guarantee rather than an owner check somebody has to remember.
+  //
+  // Keeping it an injected callback also means Environment never imports the
+  // achievement layer: no import cycle, and the existing env tests keep running
+  // with no database mock.
+  private statsSink:
+    ((deltas: Partial<Record<keyof BotStats, number>>) => void) | null = null;
+
   // Commands the bots are awaiting, settled deterministically each tick.
   private pendingCommands: PendingCommand[] = [];
   // In-flight isolate operations (event-handler dispatches, command settlements,
@@ -211,7 +227,48 @@ export default class Environment {
     this.rng = mulberry32(this.seed);
   }
 
+  setStatsSink = (
+    sink: ((deltas: Partial<Record<keyof BotStats, number>>) => void) | null
+  ) => {
+    this.statsSink = sink;
+  };
+
+  // Hand this arena's accumulated bot stats to the sink as a DELTA since the last
+  // flush, then re-snapshot.
+  //
+  // Delta-based rather than absolute because bot stats live only in memory and are
+  // destroyed by restart() (which disposes and rebuilds every Bot), while the only
+  // sandbox game-over fires when EVERY app is dead — so no single moment sees a
+  // match's final totals reliably. Flushing at every point where the stats are about
+  // to die would double-count if it were absolute; because it's a delta with a
+  // re-snapshot, a second call with no ticks in between emits nothing, so it is safe
+  // to call from all of them.
+  //
+  // `> 0` (not `!== 0`) because the counters are monotonic — it also makes a negative
+  // bump impossible if a bot is ever rebuilt underneath a stale snapshot.
+  private flushStats = (): void => {
+    if (!this.statsSink) return;
+    const deltas: Partial<Record<keyof BotStats, number>> = {};
+    let any = false;
+    for (const process of this.processes) {
+      for (const bot of process.bots) {
+        for (const key of STAT_KEYS) {
+          const delta = bot.stats[key] - bot.flushedStats[key];
+          if (delta > 0) {
+            deltas[key] = (deltas[key] ?? 0) + delta;
+            any = true;
+          }
+          bot.flushedStats[key] = bot.stats[key];
+        }
+      }
+    }
+    if (any) this.statsSink(deltas);
+  };
+
   dispose = () => {
+    // Last chance: this runs on the 30-minute idle GC, on arena delete, and on
+    // shutdown, and the bots (with their stats) are gone immediately after.
+    this.flushStats();
     this.processes.forEach((process) => process.dispose());
   };
 
@@ -561,6 +618,9 @@ export default class Environment {
         type: 'arenaPaused',
       });
       this.running = false;
+      // The one moment a sandbox match actually ends, so bank its totals now
+      // rather than waiting for a restart or the idle GC.
+      this.flushStats();
     }
 
     // Run the bots' reactions to this tick (handlers, timers, command
@@ -641,6 +701,12 @@ export default class Environment {
     for (let i = 0; i < 250 && this.looping; i++) {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
+
+    // Bank the finished match's stats before the rebuild below disposes every
+    // Process and takes its bots (and their counters) with it. Must be after the
+    // drain wait above, so a final in-flight tick is included, and it costs nothing
+    // if game-over already flushed — that's the idempotence earning its keep.
+    this.flushStats();
 
     // A new match begins now: reset the tick clock to 0. Otherwise it would run
     // monotonically across restarts, so a second match in an arena whose first
@@ -797,6 +863,12 @@ export default class Environment {
   }
 
   removeApp(appId: AppId) {
+    // Bank everything before the Process is spliced out and disposed below.
+    // Flushing the whole arena (not just this app) is fine and simpler: the other
+    // apps just settle their deltas early, which is harmless for a cumulative
+    // counter and leaves their snapshots consistent.
+    this.flushStats();
+
     // Emit removed app event
     this.emitter.emit('event', {
       type: 'arenaRemoveApp',

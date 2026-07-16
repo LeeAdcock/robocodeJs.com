@@ -514,8 +514,9 @@ describe('applyEliminations — kill credit', () => {
     bots.forEach((bot) => {
       (bot as unknown as { process: unknown }).process = process;
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return process as any;
+    return process as unknown as Parameters<
+      typeof applyEliminations
+    >[0][number];
   };
 
   it('credits the enemy who landed the last hit, and records the death tick', () => {

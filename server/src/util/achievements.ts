@@ -21,6 +21,12 @@ export type AchievementScope = 'ladder' | 'sandbox' | 'account';
 // mirror BotStats field names 1:1, so the sandbox flush can select them with a
 // filter instead of a translation table. The two ladder-only keys have no BotStats
 // equivalent — they count matches, not in-match events.
+//
+// `ladderMatchesPlayed` and `ladderWins` are what make a COUNTER-based ladder badge
+// (Contender, Champion) un-farmable: they are not BotStats fields, so the sandbox
+// flush cannot reach them, and awardAchievements only writes them from a RATED
+// ladder match. The un-farmability lives in who may WRITE the counter — not in who
+// may evaluate the badge.
 export type CounterKey =
   | 'shotsFired'
   | 'shotsHit'

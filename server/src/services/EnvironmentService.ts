@@ -2,6 +2,8 @@ import Arena from '../types/arena';
 import Environment, { ArenaId, Process } from '../types/environment';
 import arenaMemberService from './ArenaMemberService';
 import { logger } from '../util/logger';
+import { recordSandboxStats } from '../util/awardAchievements';
+import { DEMO_USER_ID } from '../types/user';
 
 export class EnvironmentService {
   // Keyed by arenaId. Accessed via bracket notation / Object.entries below, so
@@ -32,6 +34,30 @@ export class EnvironmentService {
 
     env = new Environment(arena);
     logger.debug({ arenaId: arena.getId() }, 'creating isolate');
+
+    // Route this arena's cumulative bot stats to the owner's lifetime achievement
+    // counters. This is the ONLY place a sink is installed, and it is the only
+    // place a real arena's Environment is constructed — LadderService builds its
+    // ephemeral one directly, so ranked matches flush nowhere and the ladder hook
+    // stays their sole counter owner. That's what makes a double-count structurally
+    // impossible instead of a rule to remember.
+    //
+    // The arena OWNER is credited for all combat in their arena, including bots
+    // added by reference (api/arena.ts) that they didn't write. Sandbox counters are
+    // explicitly grindable/cosmetic, so that's no worse than grinding your own bot —
+    // and the alternative (credit each app's owner) would cost a lookup per flush
+    // and let anyone farm counters inside someone else's arena.
+    //
+    // The shared demo account is excluded for the same reason it's excluded from
+    // ladder candidates (AppService.getLadderCandidates): it isn't a real player.
+    const ownerId = arena.getUserId();
+    if (ownerId !== DEMO_USER_ID) {
+      env.setStatsSink((deltas) => {
+        // Fire-and-forget: the flush points are lifecycle paths (game over, restart,
+        // dispose) and must not wait on, or fail because of, a database write.
+        void recordSandboxStats(ownerId, deltas);
+      });
+    }
 
     this.store[arena.getId()] = env;
     return arenaMemberService
