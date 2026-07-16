@@ -32,14 +32,12 @@ function makeWorld() {
   ): Bot => {
     const proc = new Process(appId);
     processes.push(proc);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bot = new Bot(env as any, proc);
     proc.bots.push(bot);
     bot.x = pose.x ?? 375;
     bot.y = pose.y ?? 375;
     bot.orientation = pose.orientation ?? 0;
     bot.orientationTarget = bot.orientation;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     compiler.init(env as any, proc, bot);
     // Running the source registers the bot's handlers/timers (synchronously).
     proc
