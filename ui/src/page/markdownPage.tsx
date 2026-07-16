@@ -15,7 +15,7 @@ import { useDocumentTitle, brandTitle } from '../util/useDocumentTitle';
 // navigate away from the app; in-app doc links (e.g. /learn/docs, /samples/:name)
 // are left alone so they route in place.
 const opensInNewTab = (href: string) =>
-  /^https?:\/\//.test(href) || href.startsWith('/ts/');
+  /^https?:\/\//.test(href) || href.startsWith('/docs/ts/');
 
 const parseOptions: HTMLReactParserOptions = {
   replace: (node) => {

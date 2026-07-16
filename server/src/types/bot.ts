@@ -352,7 +352,10 @@ export default class Bot implements Point, Orientated {
   }
 
   setSpeed(d: number) {
-    const target = Math.min(d, this.speedMax);
+    // Clamp symmetrically: the physics caps actual speed at ±speedMax, so an
+    // unclamped negative target (e.g. -10) would be unreachable and leave the
+    // returned promise pending forever.
+    const target = Math.max(-this.speedMax, Math.min(d, this.speedMax));
     if (target === this.speedTarget) {
       return Promise.resolve();
     }
@@ -375,10 +378,10 @@ export default class Bot implements Point, Orientated {
     });
     return waitUntil(
       this.env,
-      () => this.speed === Math.min(d, this.speedMax),
+      () => this.speed === target,
       () =>
         !this.env.isRunning() ||
-        this.speedTarget !== Math.min(d, this.speedMax) ||
+        this.speedTarget !== target ||
         this.health <= 0,
       'Speed change cancelled'
     );
