@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 
 import Arena from '../../types/arena';
+import { getMotionSnap, subscribeMotionSnap } from '../../util/motionSnap';
 
 import CraterSvg from './arenaCrater';
 import TerrainSvg from './arenaTerrain';
@@ -96,6 +97,11 @@ interface ArenaSvgProps {
 
 export default function ArenaSvg(props: ArenaSvgProps) {
   const apps = props.arena.apps;
+  // True while arena state is being replaced from a snapshot (tab-visible
+  // resync, reconnect, restart) rather than advanced tick by tick. The
+  // `motion-snap` class (index.css) suppresses the sprite CSS transitions so
+  // the discontinuous jump doesn't animate as a physics-defying glide.
+  const snapping = useSyncExternalStore(subscribeMotionSnap, getMotionSnap);
   return (
     <svg
       width="100%"
@@ -103,6 +109,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
       viewBox="-10 -10 770 770"
       preserveAspectRatio="xMidYMid meet"
       xmlns="http://www.w3.org/2000/svg"
+      className={snapping ? 'motion-snap' : undefined}
       style={{
         border: props.hideBorder ? undefined : '2px solid rgb(33,37,41)',
         // Contain the night-mode blend overlay so it multiplies only the arena,

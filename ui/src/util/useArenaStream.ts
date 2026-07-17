@@ -6,6 +6,7 @@ import PointInTime from '../types/pointInTime';
 import applyArenaEvent from './arenaReducer';
 import PlaybackBuffer from './playbackBuffer';
 import { setPlaybackTime } from './playbackClock';
+import { beginMotionSnap } from './motionSnap';
 import { Emitter } from './emitter';
 
 // High-frequency simulation events are played back through the jitter buffer on
@@ -91,10 +92,17 @@ export default function useArenaStream({
     console.log('reloading arena');
     // Any buffered motion belongs to the pre-reload arena; discard it.
     buffer.current.flush();
+    // A reload replaces arena state discontinuously — suppress the sprite CSS
+    // transitions so bots snap to their new spots instead of gliding there.
+    // Opened here (events applied while the snapshot is in flight shouldn't
+    // animate either) and re-opened below so the window is sure to cover the
+    // snapped render even if the fetch is slow.
+    beginMotionSnap();
     return new Promise((resolve) => {
       axios
         .get(snapshotUrl)
         .then((res) => {
+          beginMotionSnap();
           setNotFound(false);
           setTime(res.data.clock.time);
           setPlaybackTime(res.data.clock.time);
