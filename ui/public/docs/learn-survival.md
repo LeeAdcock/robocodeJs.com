@@ -51,7 +51,7 @@ bot.on(Event.DETECTED, () => {
 });
 ```
 
-Press **Save**. Rusty cruises normally, dashes and weaves when hurt, veers when shot, and
+Press **Deploy**. Rusty cruises normally, dashes and weaves when hurt, veers when shot, and
 speeds up when an enemy's radar finds it.
 
 The threshold is the line `if (bot.getHealth() < 40)`. Above `40` it plays normal; below

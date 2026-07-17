@@ -43,7 +43,7 @@ bot.on(Event.START, () => {
 });
 ```
 
-Press **Save**. Rusty moves in a steady, rhythmic pattern — turning constantly and
+Press **Deploy**. Rusty moves in a steady, rhythmic pattern — turning constantly and
 dashing forward every so often.
 
 ## Stopping a timer

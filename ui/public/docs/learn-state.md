@@ -12,7 +12,7 @@
 A `let` box from Lesson 8 is forgotten the moment its handler finishes. But a robot needs
 memory that **lasts** between events — like its current mood. For that we use **`this`**:
 a shared notebook that all your handlers can read and write, and that even survives a
-code Save.
+code Deploy.
 
 A great use of lasting memory is a **state machine**: your robot is always in one
 **mode** (a state), and it behaves differently depending on which. We'll use two modes:
@@ -57,7 +57,7 @@ function aimAndFire(target) {
 }
 ```
 
-Press **Save**. Rusty wanders in `SEARCH`, and the moment it spots an enemy it flips to
+Press **Deploy**. Rusty wanders in `SEARCH`, and the moment it spots an enemy it flips to
 `ATTACK` and fires.
 
 New pieces:
@@ -82,7 +82,7 @@ New pieces:
 **Why `this.mode` instead of `let mode`?**
 A `let` inside a handler is forgotten when that handler ends. `this.mode` lives on your
 robot's shared notebook, so every handler sees the same value — and it even survives a
-code Save, so editing mid-match won't wipe your robot's memory.
+code Deploy, so editing mid-match won't wipe your robot's memory.
 
 **Do my five robots share this memory?**
 No — each robot gets its **own** private notebook. When one bot sets `this.mode`, the

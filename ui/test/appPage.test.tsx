@@ -185,7 +185,7 @@ describe('AppPage (bot editor)', () => {
       renderPage();
       await vi.advanceTimersByTimeAsync(0);
       // The just-loaded source is what the arena is running.
-      expect(screen.getByRole('status').textContent).toBe('Saved');
+      expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
 
       fireEvent.change(screen.getByTestId('editor'), {
         target: { value: 'bot.turn(90)' },
@@ -194,7 +194,7 @@ describe('AppPage (bot editor)', () => {
 
       // act() so React flushes the re-render the resolved PUT triggers.
       await act(() => vi.advanceTimersByTimeAsync(30000));
-      expect(screen.getByRole('status').textContent).toBe('Saved');
+      expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
       expect(screen.getByText('Saved automatically.')).toBeTruthy();
     } finally {
       vi.useRealTimers();
@@ -219,7 +219,7 @@ describe('AppPage (bot editor)', () => {
       { headers: { 'content-type': 'application/octet-stream' } }
     );
     expect(axios.post).toHaveBeenCalledWith('/api/user/u1/app/a1/compile');
-    expect(screen.getByRole('status').textContent).toBe('Saved');
+    expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
   });
 
   it('a failed save keeps the editor honest — still "Unsaved changes", with an error', async () => {

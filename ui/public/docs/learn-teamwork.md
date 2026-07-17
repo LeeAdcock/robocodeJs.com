@@ -56,7 +56,7 @@ bot.on(Event.RECEIVED, (heading) => {
 });
 ```
 
-Press **Save**. Now the whole team swings their turrets toward an enemy the moment _any_
+Press **Deploy**. Now the whole team swings their turrets toward an enemy the moment _any_
 one of them sees it. (`Math.round` just sends a tidy whole number.)
 
 **Sharing a position instead of a direction.** A direction is only right from where

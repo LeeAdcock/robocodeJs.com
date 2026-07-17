@@ -31,7 +31,7 @@ Type (or paste) this single line into the editor:
 bot.setName('Rusty');
 ```
 
-Now press the **Save** button (the 💾 icon), or `Ctrl-S`. Look at the arena on the
+Now press the **Deploy** button, or `Ctrl-S`. Look at the arena on the
 right — your robot is now named **Rusty**!
 
 Let's read that line like a sentence:
@@ -46,20 +46,22 @@ sentence.
 
 ## Experiment
 
-- Change `'Rusty'` to your own robot's name and press Save again. Watch the name update.
-- What happens if you remove the quotes and just write `bot.setName(Rusty);`? Save and
+- Change `'Rusty'` to your own robot's name and press Deploy again. Watch the name update.
+- What happens if you remove the quotes and just write `bot.setName(Rusty);`? Deploy and
   peek at the **log panel** — you'll likely see an error. Quotes matter! Put them back.
 
 ## Common questions
 
-**Nothing changed when I saved.**
-Make sure you pressed Save (💾) and that your bot was added to the arena. New bots are
+**Nothing changed when I deployed.**
+Look at the indicator next to your bot's name. If it says **Unsaved changes**, your code
+hasn't reached the arena yet — press **Deploy**. If it says **Saved and Deployed**, your
+bots are running this code, so check that your bot was added to the arena. New bots are
 added automatically when you create them.
 
-**What's the difference between Save and Reboot?**
-**Save** loads your new code while your robot keeps doing what it was doing. **Reboot**
-(the ⏻ button) reloads your code _and_ restarts your robot from the beginning. For now,
-Save is all you need.
+**What's the difference between Deploy and Reboot?**
+**Deploy** loads your new code while your robot keeps doing what it was doing. **Reboot**
+reloads your code _and_ restarts your robot from the beginning. For now, Deploy is all
+you need.
 
 **Do I have to call it `bot`?**
 Yes — `bot` is the name the game gives your robot. It's always there for you to use.

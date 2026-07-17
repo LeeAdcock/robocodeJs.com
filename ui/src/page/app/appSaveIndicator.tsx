@@ -27,12 +27,17 @@ export default function SaveIndicator({ saveState }: { saveState: SaveState }) {
             icon: <FaCircle style={{ fontSize: '0.6em' }} />,
             label: 'Unsaved changes',
             tooltip:
-              'Your bots are still running the last saved code. Deploy (Ctrl-S) to update them — otherwise this saves automatically 30 seconds after you stop typing.',
+              'Your bots are still running the last deployed code. Press Deploy (Ctrl-S) to update them now — otherwise this happens automatically 30 seconds after you stop typing.',
             color: 'var(--link)',
           }
         : {
+            // Saving is what deploys: propagateSource re-executes the source in
+            // every arena the app is in, so by the time this reads "Saved and
+            // Deployed" the bots really are running it — including after a
+            // silent autosave. "Saved" alone would undersell that, and whether
+            // the arena has your code is the whole question lesson 1's FAQ asks.
             icon: <FaCheck />,
-            label: 'Saved',
+            label: 'Saved and Deployed',
             tooltip: 'Your bots are running this code.',
             color: 'var(--code)',
           };

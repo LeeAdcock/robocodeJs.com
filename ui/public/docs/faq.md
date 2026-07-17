@@ -28,7 +28,7 @@ See [messages & your five bots](/rules#messages--your-five-bots).
 
 Saving reloads your handlers live but deliberately does **not** re-run
 `START`, so a running bot keeps the state it set up. Use the editor's
-**reboot** button (or `Ctrl-Shift-S`) to re-run `START` for a fresh
+**Reboot** button (or `Ctrl-Shift-S`) to re-run `START` for a fresh
 initialization. See
 [state and the START event](/learn/docs#state-and-the-start-event).
 

@@ -59,7 +59,7 @@ bot.on(Event.SCANNED, (targets) => {
 });
 ```
 
-Press **Save**. Rusty tracks the nearest enemy with its turret and fires when loaded.
+Press **Deploy**. Rusty tracks the nearest enemy with its turret and fires when loaded.
 
 Reading the tricky line:
 `closest === null || target.distance < closest.distance`

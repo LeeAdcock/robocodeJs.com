@@ -43,7 +43,7 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Save**. Rusty drives in circles!
+Press **Deploy**. Rusty drives in circles!
 
 The new pieces:
 

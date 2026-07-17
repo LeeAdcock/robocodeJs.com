@@ -8,7 +8,7 @@ afterEach(cleanup);
 describe('SaveIndicator', () => {
   it('names each save state', () => {
     render(<SaveIndicator saveState="saved" />);
-    expect(screen.getByRole('status').textContent).toBe('Saved');
+    expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
     cleanup();
 
     render(<SaveIndicator saveState="unsaved" />);
