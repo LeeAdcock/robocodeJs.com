@@ -323,6 +323,21 @@ export const createSeoResolver = (deps: SeoDeps) => {
       };
     }
 
+    // The signed-in user's own badges (/profile, GitHub #121). Private — there is
+    // no public profile — so it must stay out of the index. Listed explicitly for
+    // the same reason as /watch below: unknown routes already default to noindex,
+    // but they also default to the "Page not found" title, which is wrong on a
+    // real page and would flash in the tab before the SPA sets its own.
+    if (path === '/profile') {
+      return {
+        title: `${SITE} | Your badges`,
+        description: 'Achievements you have earned in RobocodeJs.',
+        canonical,
+        ogType: 'website',
+        noindex: true,
+      };
+    }
+
     // Public "watch" spectator page (/watch/:arenaId). A per-arena, ephemeral
     // view — give it a friendly brand title for the browser tab / link preview,
     // but keep it out of the index (it's transient and has no stable content).

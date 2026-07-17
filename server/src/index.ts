@@ -34,6 +34,7 @@ import helpEndpoints from './api/help';
 import demoEndpoints from './api/demo';
 import watchArenaEndpoints from './api/watchArena';
 import leaderboardEndpoints from './api/leaderboard';
+import profileEndpoints from './api/profile';
 
 const app = express();
 
@@ -119,6 +120,9 @@ app.use('/api/app', auth(true));
 
 app.use(healthEndpoints);
 app.use(leaderboardEndpoints);
+// Own-profile achievements (GitHub #121). Sits outside the /api/user tree so the
+// /api/user/:userId route can't capture it; it gates itself with auth(true).
+app.use(profileEndpoints);
 app.use(sessionEndpoints);
 // OAuth 2.1 authorization-server endpoints (/.well-known/*, /authorize, /token,
 // /register, /revoke) live at the app root — must be mounted before the SPA
