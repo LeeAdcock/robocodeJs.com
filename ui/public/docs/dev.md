@@ -97,7 +97,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 ## Bot events
 
 - `bot.on(Event.FIRED, () => {})` Registers a callback that is executed when the turret is fired.
-- `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each bot detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading; `health` is the detected bot's current health (0–100).
+- `bot.on(Event.SCANNED, (contact[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of [contacts](#contacts) — the same objects `bot.radar.scan()` resolves with — representing each bot detected by the scan. Each carries the raw readings `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }` plus the marker and intercept methods. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading; `health` is the detected bot's current health (0–100).
 - `bot.on(Event.COLLIDED, (object) => {})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to your heading (a wall ahead is 0). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall. Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
 
 ## Environment events
@@ -190,7 +190,24 @@ The radar provides the ability to detect other bots. Its detection area is a lon
 
 - `bot.radar.onReady(): Promise` Returns a promise that resolves when the radar is ready to scan. If the radar scans through another thread while this promise is pending, the promise will be rejected.
 - `bot.radar.isReady(): boolean` Returns a boolean indicating whether the radar is ready to scan.
-- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`. Note the two direction fields answer different questions: `angle` is where the detected bot **is** — the bearing from you to it, relative to your heading (so `bot.turret.setOrientation(angle)` aims at it) — while `orientation` is which way that bot itself is **facing**, as an absolute compass heading (0 = north); combine `orientation` with `speed` to predict where it is going. The other fields are described under the `SCANNED` event in [Bot events](#bot-events).
+- `bot.radar.scan(): Promise<contact[]>` Performs a radar scan, returning a promise that resolves with an array of contacts — one per bot detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. Each contact carries the raw readings `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }` plus the convenience methods described under [Contacts](#contacts). Note the two direction fields answer different questions: `angle` is where the detected bot **was** at the moment of the scan — the bearing from you to it, relative to your heading (so `bot.turret.setOrientation(angle)` aims at it) — while `orientation` is which way that bot itself is **facing**, as an absolute compass heading (0 = north); combine `orientation` with `speed` to predict where it is going. The other fields are described under the `SCANNED` event in [Bot events](#bot-events).
+
+### Contacts
+
+Every scan result is a **contact**: a [marker](#arena) pinned at the detected bot's position, carrying the raw scan readings above. Because a contact is a marker, all the marker methods work on it — `getX()`/`getY()` give the detected bot's arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured **live** from wherever you are now, while the `distance`/`angle` properties keep their values from the moment of the scan.
+
+One extra method turns the scan's motion readings into an aiming answer:
+
+- `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `25` (the bullet speed) to lead a shot — `bot.turret.turnTowards(m.getX(), m.getY())` aims it — or pass your own speed to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
+
+```
+bot.on(Event.SCANNED, (contacts) => {
+  const enemy = contacts.find((c) => !c.friendly);
+  if (!enemy) return;
+  const aim = enemy.getIntercept(25);
+  if (aim) bot.turret.turnTowards(aim.getX(), aim.getY());
+});
+```
 
 # Coding Tips
 
@@ -292,7 +309,7 @@ Because the game runs in "simulated time" instead of real-world time, the `Date`
 
 # Type definitions
 
-If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/docs/ts/robocode.d.ts`](/docs/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
+If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/docs/ts/robocode.d.ts`](/docs/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and contacts, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
 
 Reference them from a bot file with a triple-slash directive:
 

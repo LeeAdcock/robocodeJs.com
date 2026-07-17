@@ -43,12 +43,11 @@ bot.on(Event.SCANNED, (targets) => {
   const enemies = targets.filter((t) => !t.friendly);
   if (enemies.length === 0) return;
 
-  // Nearest enemy — turn its (body-relative) bearing + distance into an ABSOLUTE
-  // arena position, which any teammate can aim at no matter where they stand.
+  // Nearest enemy — a scan contact already knows its ABSOLUTE arena position
+  // (getX/getY), which any teammate can aim at no matter where they stand.
   const enemy = enemies.sort((a, b) => a.distance - b.distance)[0];
-  const bearing = ((bot.getOrientation() + enemy.angle) * Math.PI) / 180;
-  const x = bot.getX() + enemy.distance * Math.sin(bearing);
-  const y = bot.getY() - enemy.distance * Math.cos(bearing);
+  const x = enemy.getX();
+  const y = enemy.getY();
 
   this.enemyAt = { x: x, y: y, time: clock.getTime() };
   bot.send({ secret: SECRET, x: x, y: y }); // rally the squad onto it

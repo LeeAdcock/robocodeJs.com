@@ -59,6 +59,14 @@ bot.on(Event.RECEIVED, (heading) => {
 Press **Save**. Now the whole team swings their turrets toward an enemy the moment _any_
 one of them sees it. (`Math.round` just sends a tidy whole number.)
 
+**Sharing a position instead of a direction.** A direction is only right from where
+_you_ stand — a teammate across the arena pointing the same way looks at a different
+spot. Every scan result is a **contact** (a marker pinned at the enemy's location), so
+you can broadcast its actual coordinates instead:
+`bot.send({ x: enemies[0].getX(), y: enemies[0].getY() })`, and each teammate aims with
+`bot.turret.turnTowards(message.x, message.y)` — the same point for everyone. The
+**Squad** example bot builds this out, team secret and all.
+
 ## Debugging like a pro
 
 When a bot misbehaves, these are your tools:
