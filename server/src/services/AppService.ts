@@ -12,56 +12,6 @@ import rankedMatchService from './RankedMatchService';
 // sprites at ui/public/sprites/tank_<color>.png). The leaderboard derives each
 // row's color from its app id and returns only the color, so the wire value is
 // a self-evident sprite color, never an identifier.
-// How many of one owner's apps may occupy the board. A single prolific player
-// can't fill it — which is also what keeps a rank badge (GitHub #121) winnable by
-// someone whose rival owns the whole top of the ratings.
-const MAX_APPS_PER_OWNER_ON_BOARD = 3;
-// The scan is deliberately wider than any board we display, so the owner cap has
-// enough rows to work over. Provably sufficient: with MAX_APPS_PER_USER (20) and a
-// 3-per-owner cap, filling a 20-row board scans well under it.
-const LEADERBOARD_SCAN_LIMIT = 500;
-
-// The eligibility + ordering that DEFINE the global ladder board. Shared verbatim
-// by getLeaderboard and getRanks so a rank badge can never disagree with the board
-// a user is looking at (GitHub #121) — an app "reaches the top 10" exactly when the
-// rankings page would show it there.
-//
-// Only apps that have actually played a ranked game appear (ratingGames > 0), so
-// never-played 1500 defaults and untouched starters don't clutter it; broken and
-// deleted apps are excluded, as is the demo user.
-const LEADERBOARD_CANDIDATE_SQL = `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
-                app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
-         FROM app JOIN account ON account.id = app.userId
-         WHERE NOT app.deleted
-           AND NOT COALESCE(app.broken, false)
-           AND COALESCE(app.ratingGames, 0) > 0
-           AND app.userId <> $2
-         ORDER BY app.rating DESC, app.ratingGames DESC
-         LIMIT $1`;
-
-// Assign board ranks to an ALREADY-ORDERED candidate list, applying the per-owner
-// cap. The one place a rank is defined: getLeaderboard uses it for both the live
-// board and the rewound 24h-ago board, and getRanks uses it for rank badges, so
-// the three cannot drift apart.
-//
-// Ranks the full ordering rather than truncating to a visible limit, so an app
-// below the fold still has a real rank (the movement arrows need it, and so does a
-// badge for an app sitting at #34).
-export const rankWithOwnerCap = (
-  ordered: { appId: string; ownerId: string }[]
-): Map<string, number> => {
-  const ranks = new Map<string, number>();
-  const perOwner = new Map<string, number>();
-  for (const row of ordered) {
-    const count = perOwner.get(row.ownerId) ?? 0;
-    // Skip an owner's 4th+ bot so a single player can't dominate.
-    if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
-    perOwner.set(row.ownerId, count + 1);
-    ranks.set(row.appId, ranks.size + 1);
-  }
-  return ranks;
-};
-
 const LEADERBOARD_PALETTE = ['sand', 'blue', 'red', 'dark', 'green'] as const;
 
 // Deterministic char-rolling hash so a given app id always maps to the same
@@ -190,13 +140,23 @@ export class AppService {
     limit = 20,
     viewerUserId?: UserId
   ): Promise<LeaderboardEntry[]> => {
+    const MAX_APPS_PER_OWNER_ON_BOARD = 3;
+    const LEADERBOARD_SCAN_LIMIT = 500;
     // How far back "movement" looks: the up/down arrow compares each app's
     // current rank to where it stood this long ago. A rolling day is stable
     // enough to be meaningful (vs. per-match jitter) yet fresh for daily movers.
     const MOVEMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
     const res = await pool.query({
-      text: LEADERBOARD_CANDIDATE_SQL,
+      text: `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
+                    app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
+             FROM app JOIN account ON account.id = app.userId
+             WHERE NOT app.deleted
+               AND NOT COALESCE(app.broken, false)
+               AND COALESCE(app.ratingGames, 0) > 0
+               AND app.userId <> $2
+             ORDER BY app.rating DESC, app.ratingGames DESC
+             LIMIT $1`,
       values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
     });
 
@@ -223,6 +183,7 @@ export class AppService {
     // Build the previous ordering from the same candidate rows, using each app's
     // rating/games as of the cutoff. Apps that hadn't yet played a ranked game
     // then (prevGames <= 0) simply don't appear — they get no previousRank.
+    const previousRankByApp = new Map<string, number>();
     const prevOrdered = res.rows
       .map((row) => {
         const w = rewind.get(row.appId as string);
@@ -241,27 +202,25 @@ export class AppService {
           ? b.prevRating - a.prevRating
           : b.prevGames - a.prevGames
       );
-    // Rank across the full ordering (not truncated to `limit`) so a bot that
-    // climbed from, say, #34 into the visible board still shows real movement.
-    const previousRankByApp = rankWithOwnerCap(prevOrdered);
+    const prevPerOwner = new Map<string, number>();
+    for (const r of prevOrdered) {
+      const count = prevPerOwner.get(r.ownerId) ?? 0;
+      if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
+      prevPerOwner.set(r.ownerId, count + 1);
+      // Rank across the full ordering (not truncated to `limit`) so a bot that
+      // climbed from, say, #34 into the visible board still shows real movement.
+      previousRankByApp.set(r.appId, previousRankByApp.size + 1);
+    }
 
-    // The live board, ranked by the same rule — then truncated to `limit` for
-    // display. Rank comes from the shared map, so a row's rank is what it would be
-    // on any other view of the board.
-    const rankByApp = rankWithOwnerCap(
-      res.rows.map((row) => ({
-        appId: row.appId as string,
-        ownerId: row.ownerUserId as string,
-      }))
-    );
-
+    const perOwner = new Map<string, number>();
     const entries: LeaderboardEntry[] = [];
     for (const row of res.rows) {
       if (entries.length >= limit) break;
       const ownerId = row.ownerUserId as string;
-      const rank = rankByApp.get(row.appId as string);
-      // Undefined = the owner cap skipped this row.
-      if (rank === undefined) continue;
+      const count = perOwner.get(ownerId) ?? 0;
+      // Skip an owner's 4th+ bot so a single player can't dominate.
+      if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
+      perOwner.set(ownerId, count + 1);
 
       const games = (row.ratingGames as number | null) ?? 0;
       const wins = (row.ratingWins as number | null) ?? 0;
@@ -271,7 +230,7 @@ export class AppService {
       // (their real name is untouched elsewhere, e.g. their own avatar).
       const owner = sanitizeBotName(row.ownerName as string | null);
       entries.push({
-        rank,
+        rank: entries.length + 1,
         // Sprite color for every row, derived from the app id (the id itself
         // never leaves the server).
         color: colorForAppId(row.appId as string),
@@ -291,40 +250,6 @@ export class AppService {
       });
     }
     return entries;
-  };
-
-  // Current board rank for each of `appIds` (GitHub #121, the rank badges). Uses
-  // the same candidate SQL and the same rankWithOwnerCap as getLeaderboard, so a
-  // rank here is BY CONSTRUCTION the rank the rankings page shows — including the
-  // per-owner cap, which matters: without it an owner holding the top three
-  // ratings would push everyone else's rank down by three and quietly move the
-  // goalposts on a badge.
-  //
-  // An app missing from the result isn't on the board at all (never played a
-  // ranked game, broken, or capped out by its own owner's better bots) and simply
-  // has no rank.
-  //
-  // One scan of at most LEADERBOARD_SCAN_LIMIT rows, no movement rewind — the
-  // rewind is how previousRank is computed, not how rank is, so a badge doesn't
-  // pay for it.
-  getRanks = async (appIds: AppId[]): Promise<Map<AppId, number>> => {
-    if (appIds.length === 0) return new Map();
-    const res = await pool.query({
-      text: LEADERBOARD_CANDIDATE_SQL,
-      values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
-    });
-    const ranks = rankWithOwnerCap(
-      res.rows.map((row) => ({
-        appId: row.appId as string,
-        ownerId: row.ownerUserId as string,
-      }))
-    );
-    const wanted = new Map<AppId, number>();
-    for (const appId of appIds) {
-      const rank = ranks.get(appId);
-      if (rank !== undefined) wanted.set(appId, rank);
-    }
-    return wanted;
   };
 
   // Lightweight rows for global-ladder matchmaking (GitHub #151): every app

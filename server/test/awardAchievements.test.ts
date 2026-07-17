@@ -17,7 +17,6 @@ import {
   recordLadderResult,
   evaluateAccountAchievements,
   awardEdgeAchievement,
-  LadderResult,
 } from '../src/util/awardAchievements';
 
 const bump = vi.mocked(achievementService.bump);
@@ -275,87 +274,5 @@ describe('awardEdgeAchievement', () => {
     await expect(
       awardEdgeAchievement('user-1', 'account-mcp-token')
     ).resolves.toBeUndefined();
-  });
-});
-
-// The rank badges (GitHub #121). The rank itself comes from AppService.getRanks —
-// these cover the POLICY around it: the placement gate, best-of-two, and the rated
-// gate that keeps a rank badge un-farmable.
-describe('recordLadderResult — rank badges', () => {
-  const ranked = (over: Partial<LadderResult> = {}): LadderResult => ({
-    userId: 'user-1',
-    stats: {},
-    facts: facts(),
-    rated: true,
-    rankedApps: [{ appId: 'app-1', rank: 3, ratingGames: 50 }],
-    ...over,
-  });
-
-  it('awards the rank badges an app has reached', async () => {
-    await recordLadderResult(ranked());
-    expect(unlockedIds()).toContain('ladder-top-10');
-    expect(unlockedIds()).toContain('ladder-top-3');
-    expect(unlockedIds()).not.toContain('ladder-top-1');
-  });
-
-  it('records the app that got there as the earner', async () => {
-    await recordLadderResult(ranked());
-    expect(unlockedEntry('ladder-top-3')?.appId).toBe('app-1');
-  });
-
-  // Elo's placement K-boost swings a young app's rating hard, so an early spike
-  // must not mint a permanent badge.
-  it('ignores an app that has not played its placement games yet', async () => {
-    await recordLadderResult(
-      ranked({ rankedApps: [{ appId: 'app-1', rank: 1, ratingGames: 19 }] })
-    );
-    expect(unlockedIds()).not.toContain('ladder-top-1');
-  });
-
-  it('awards on the placement boundary game', async () => {
-    await recordLadderResult(
-      ranked({ rankedApps: [{ appId: 'app-1', rank: 1, ratingGames: 20 }] })
-    );
-    expect(unlockedIds()).toContain('ladder-top-1');
-  });
-
-  it('ignores an app that is not on the board', async () => {
-    await recordLadderResult(
-      ranked({ rankedApps: [{ appId: 'app-1', ratingGames: 50 }] })
-    );
-    expect(unlockedIds()).not.toContain('ladder-top-10');
-  });
-
-  // A same-owner matchup fields two apps; the badge is about the better one.
-  it('takes the best rank when a user fielded two apps', async () => {
-    await recordLadderResult(
-      ranked({
-        rankedApps: [
-          { appId: 'worse', rank: 9, ratingGames: 50 },
-          { appId: 'better', rank: 2, ratingGames: 50 },
-        ],
-      })
-    );
-    expect(unlockedIds()).toContain('ladder-top-3');
-    expect(unlockedEntry('ladder-top-3')?.appId).toBe('better');
-  });
-
-  // The entire reason a ladder badge is worth anything. Give the match some real
-  // combat so it still reaches unlock() — an unrated match's shots genuinely
-  // happened, so its counters count; only the ladder badges are withheld.
-  it('awards no rank badge for an unrated match', async () => {
-    bump.mockResolvedValue({ shotsFired: 10 });
-    await recordLadderResult(
-      ranked({ rated: false, stats: { shotsFired: 10 } })
-    );
-    expect(unlock).toHaveBeenCalled();
-    expect(unlockedIds()).not.toContain('ladder-top-3');
-  });
-
-  // Rank is where you stand, not how one match went — you can hold your top-10
-  // slot through a loss, and the badge says "reach", not "win while there".
-  it('awards on rank even when the user lost the match', async () => {
-    await recordLadderResult(ranked({ facts: facts({ won: false }) }));
-    expect(unlockedIds()).toContain('ladder-top-3');
   });
 });

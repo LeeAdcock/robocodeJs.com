@@ -82,22 +82,11 @@ export interface Achievement {
   //   accountTest — a predicate over an AccountState snapshot. Re-evaluated on
   //     every profile load, so it is self-healing: a badge whose hook was missed
   //     (or that has no event at all, like an anniversary) still lands.
-  //   rankThreshold — unlocks when one of the user's apps REACHES this board rank
-  //     or better. Ladder scope only, and not a `test` because a rank isn't a fact
-  //     about the match — it's a query against the whole board (AppService.getRanks).
   counter?: CounterKey;
   threshold?: number;
   test?: (facts: LadderFacts) => boolean;
   accountTest?: (state: AccountState) => boolean;
-  rankThreshold?: number;
 }
-
-// Ranked games an app must have before its rank can earn a badge. Elo applies a
-// placement K-boost (util/elo.ts), so a brand-new app's rating swings hard on a
-// couple of lucky results — without this gate a transient spike could mint a
-// permanent badge. 20 is where the rating starts to reflect the bot rather than
-// the draw (CLAUDE.md: effectiveness drifts the score over ~20-40 games).
-export const MIN_RANKED_GAMES_FOR_RANK = 20;
 
 // Rating gap that makes a win a genuine upset rather than a coin flip.
 const UPSET_MARGIN = 150;
@@ -169,38 +158,6 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '🎖️',
     counter: 'ladderMatchesPlayed',
     threshold: 100,
-  },
-  // Board-rank badges. "Reach" is deliberate: a rank is a moment, not a state, so
-  // these unlock the first time an app touches the threshold and are kept forever
-  // — exactly the ON CONFLICT DO NOTHING semantic. Falling back down the board
-  // never revokes one.
-  //
-  // Rank comes from AppService.getRanks, which shares the leaderboard's own
-  // candidate query and owner cap, so a badge means precisely what the rankings
-  // page shows — no second definition of "top 10" to drift or confuse.
-  {
-    id: 'ladder-top-10',
-    scope: 'ladder',
-    name: 'Top Ten',
-    description: 'Reach the top 10 of the global ladder.',
-    icon: '🔟',
-    rankThreshold: 10,
-  },
-  {
-    id: 'ladder-top-3',
-    scope: 'ladder',
-    name: 'Podium',
-    description: 'Reach the top 3 of the global ladder.',
-    icon: '🥉',
-    rankThreshold: 3,
-  },
-  {
-    id: 'ladder-top-1',
-    scope: 'ladder',
-    name: 'King of the Hill',
-    description: 'Reach number one on the global ladder.',
-    icon: '🏆',
-    rankThreshold: 1,
   },
 
   // ── sandbox: cumulative, grindable, cosmetic ────────────────────────────────
@@ -345,17 +302,6 @@ export const counterAchievements = (
     (a) =>
       a.counter !== undefined &&
       (counters[a.counter] ?? 0) >= (a.threshold ?? Infinity)
-  );
-
-// Every rank badge that a board rank of `rank` earns. Lower is better, so this is
-// a <= test — reaching #1 also earns Podium and Top Ten, which is intended: a user
-// who joins the ladder already dominant shouldn't be missing the rungs below.
-//
-// The caller is responsible for the MIN_RANKED_GAMES_FOR_RANK gate; this stays a
-// pure function of the rank so it's trivially testable at its boundary.
-export const rankAchievements = (rank: number): Achievement[] =>
-  ACHIEVEMENTS.filter(
-    (a) => a.rankThreshold !== undefined && rank <= a.rankThreshold
   );
 
 // Every `test` badge in `scope` that this match satisfies. Scope-pinned: a ladder
