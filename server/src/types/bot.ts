@@ -32,9 +32,9 @@ export const MAX_SENDS_PER_TICK = Number(process.env.MAX_SENDS_PER_TICK) || 50;
 // Mirrored into the sandbox as the bot.radius attribute (compiler.ts).
 export const BOT_RADIUS = 16;
 // Degrees the body turns per tick, units/tick² toward the speed target, and
-// the body's top speed. Seed the per-instance runtime fields below and are
-// mirrored into the sandbox as the bot.turnRate/acceleration/maxSpeed
-// attributes (compiler.ts).
+// the body's top speed. Mirrored into the sandbox as the
+// bot.turnRate/acceleration/maxSpeed attributes (compiler.ts); BOT_TURN_SPEED
+// also seeds the per-instance orientationVelocity runtime field below.
 export const BOT_TURN_SPEED = 10;
 export const BOT_ACCELERATION = 2;
 export const BOT_MAX_SPEED = 5;
@@ -77,7 +77,6 @@ export default class Bot implements Point, Orientated {
   public id: string = randomUUID();
   public speed = 0;
   public speedTarget = 0;
-  public speedAcceleration = BOT_ACCELERATION;
   // Dynamic event-dispatch table: populated across the isolated-vm boundary
   // (compiler.ts) and invoked positionally by Simulation, so the value type is
   // intentionally untyped.
@@ -404,7 +403,7 @@ export default class Bot implements Point, Orientated {
       y: this.y,
       speed: this.speed,
       speedTarget: this.speedTarget,
-      speedAcceleration: this.speedAcceleration,
+      speedAcceleration: BOT_ACCELERATION,
       speedMax: BOT_MAX_SPEED,
     });
     return waitUntil(

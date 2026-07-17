@@ -28,7 +28,6 @@ function makeBot(overrides: Record<string, unknown> = {}) {
     y: 375,
     speed: 0,
     speedTarget: 0,
-    speedAcceleration: 1,
     orientation: 0,
     orientationTarget: 0,
     orientationVelocity: 0,
@@ -85,7 +84,7 @@ describe('Simulation.run — movement', () => {
   });
 
   it('accelerates toward speedTarget using pre-acceleration speed for the step', () => {
-    const bot = makeBot({ speed: 0, speedTarget: 10, speedAcceleration: 2 });
+    const bot = makeBot({ speed: 0, speedTarget: 10 });
     run(makeEnv([makeProcess('a', [bot])]));
     // moved with speed 0 (no displacement), then accelerated by 2
     expect(bot.y).toBeCloseTo(375);
@@ -93,17 +92,13 @@ describe('Simulation.run — movement', () => {
   });
 
   it('snaps to speedTarget within one acceleration step', () => {
-    const bot = makeBot({ speed: 4, speedTarget: 5, speedAcceleration: 2 });
+    const bot = makeBot({ speed: 4, speedTarget: 5 });
     run(makeEnv([makeProcess('a', [bot])]));
     expect(bot.speed).toBe(5);
   });
 
   it('clamps speed to BOT_MAX_SPEED', () => {
-    const bot = makeBot({
-      speed: 4,
-      speedTarget: 100,
-      speedAcceleration: 5,
-    });
+    const bot = makeBot({ speed: 4, speedTarget: 100 });
     run(makeEnv([makeProcess('a', [bot])]));
     expect(bot.speed).toBe(BOT_MAX_SPEED);
   });

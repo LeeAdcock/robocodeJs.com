@@ -5,7 +5,7 @@ import Environment from '../types/environment';
 // `import type` is erased at compile time, so the cycle never exists at runtime.
 import type { Process } from '../types/environment';
 import type Bot from '../types/bot';
-import { BOT_RADIUS, BOT_MAX_SPEED } from '../types/bot';
+import { BOT_RADIUS, BOT_MAX_SPEED, BOT_ACCELERATION } from '../types/bot';
 import { TURRET_RELOAD_RATE } from '../types/botTurret';
 import { RADAR_CHARGE_RATE } from '../types/botRadar';
 import { BULLET_DAMAGE, BULLET_MISS_PENALTY } from '../types/bullet';
@@ -299,9 +299,9 @@ export default {
             bot.stats.distanceTraveled += bot.speed;
 
             // Manage acceleration / deceleration
-            if (bot.speed > bot.speedTarget) bot.speed -= bot.speedAcceleration;
-            if (bot.speed < bot.speedTarget) bot.speed += bot.speedAcceleration;
-            if (Math.abs(bot.speed - bot.speedTarget) < bot.speedAcceleration)
+            if (bot.speed > bot.speedTarget) bot.speed -= BOT_ACCELERATION;
+            if (bot.speed < bot.speedTarget) bot.speed += BOT_ACCELERATION;
+            if (Math.abs(bot.speed - bot.speedTarget) < BOT_ACCELERATION)
               bot.speed = bot.speedTarget;
             bot.speed = Math.max(
               -BOT_MAX_SPEED,
