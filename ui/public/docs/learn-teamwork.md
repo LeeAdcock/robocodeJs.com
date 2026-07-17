@@ -75,7 +75,8 @@ a full contact from that data with `arena.createContact(message)` — its method
 from **their** position, so `getBearing()` points _them_ at the enemy, and
 `getIntercept(bot.turret.bulletSpeed)` even leads the shot for them (see
 [Lesson 12](/learn/leading)). Markers work the same way: a sent marker arrives as its
-`x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it.
+`x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it — so
+`bot.send(bot.dropMarker())` is the one-liner for telling teammates where **you** are.
 
 ## Debugging like a pro
 

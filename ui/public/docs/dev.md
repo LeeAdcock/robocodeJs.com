@@ -36,7 +36,7 @@ The `marker` object returned has several convenience methods:
 - `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading — `bot.turn(marker.getBearing())` faces it.
 - `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena — the same check as `arena.contains(marker.getX(), marker.getY())`.
 
-A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable — it can be passed to `bot.send` (or through JSON), transmitting as its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`.
+A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable — it can be passed to `bot.send` (or through JSON), transmitting as its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`. In particular, `bot.send(bot.dropMarker())` is the recommended way to broadcast your own position to teammates.
 
 # Events Overview
 
@@ -95,7 +95,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 - `bot.setName(string)` Sets the bot's display name. Names are sanitized and length-capped; an empty or disallowed name is silently ignored and the bot keeps its current name.
 - `bot.getId() : string` Returns a unique identifier (a UUID string).
 - `bot.getHealth() : number` Returns the bot's health from 100 (full) down to 0 (unfortunately dead).
-- `bot.dropMarker() : marker` Returns a marker object for the bot's current location.
+- `bot.dropMarker() : marker` Returns a marker object for the bot's current location. Markers are serializable, so `bot.send(bot.dropMarker())` is the easy way to broadcast your position.
 - `bot.radius : number` The bot's collision radius (half its width). A wall is hit when the bot's center comes within one radius of an arena edge, and bots or bullets connect within two radii — useful for planning how much room a turn or a stop needs.
 
 ## Bot events

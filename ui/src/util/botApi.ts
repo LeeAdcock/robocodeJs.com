@@ -592,7 +592,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'dropMarker',
         kind: 'method',
         type: 'Marker',
-        doc: "Returns a marker at the bot's current location.",
+        doc: "Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position — a receiver rebuilds it with arena.createMarker(message.x, message.y).",
       },
     ],
   },
