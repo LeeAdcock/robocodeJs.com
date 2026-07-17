@@ -83,6 +83,13 @@ const STATIC_PAGES: Record<string, { title: string; description: string }> = {
       'The numbers behind RobocodeJs: directions, speeds, reload and radar ' +
       'timing, damage, and how combat resolves.',
   },
+  '/faq': {
+    title: 'RobocodeJs | FAQ',
+    description:
+      'Quick answers to common RobocodeJs questions: the sandbox and its ' +
+      'limits, aiming and radar behavior, health drains, rankings ' +
+      'eligibility, source privacy, and replaying matches.',
+  },
   '/examples': {
     title: 'RobocodeJs | Example Bots',
     description:
@@ -190,6 +197,32 @@ export const describeMarkdown = (md: string): string | null => {
     return flat;
   }
   return null;
+};
+
+// Parse a FAQ markdown body into question/answer pairs for FAQPage JSON-LD.
+// A question is an H2 ("## …"); its answer is the flattened prose that follows
+// until the next heading or horizontal rule. Exported for tests.
+export const extractFaqEntries = (
+  md: string
+): Array<{ question: string; answer: string }> => {
+  const entries: Array<{ question: string; answer: string }> = [];
+  let current: { question: string; answer: string } | null = null;
+  for (const line of md.split('\n')) {
+    const h2 = line.match(/^##\s+(.+)$/);
+    if (h2) {
+      current = { question: flattenMarkdown(h2[1]), answer: '' };
+      entries.push(current);
+      continue;
+    }
+    if (/^#\s/.test(line) || /^---/.test(line)) {
+      current = null;
+      continue;
+    }
+    if (current) current.answer += ' ' + line;
+  }
+  return entries
+    .map((e) => ({ question: e.question, answer: flattenMarkdown(e.answer) }))
+    .filter((e) => e.question && e.answer);
 };
 
 const titleOf = (md: string): string | null => {
@@ -303,6 +336,33 @@ export const createSeoResolver = (deps: SeoDeps) => {
         ogType: 'website',
         noindex: true,
       };
+    }
+
+    // FAQ: attach FAQPage JSON-LD built from the page's own H2 question/answer
+    // pairs (search engines can show rich results). The markdown remains the
+    // single source of truth — nothing is duplicated here.
+    if (path === '/faq') {
+      const faq = STATIC_PAGES['/faq'];
+      const md = readDoc('faq');
+      const entries = md ? extractFaqEntries(md) : [];
+      const meta: PageMeta = {
+        title: faq.title,
+        description: clamp(faq.description),
+        canonical,
+        ogType: 'website',
+      };
+      if (entries.length) {
+        meta.jsonLd = {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: entries.map((e) => ({
+            '@type': 'Question',
+            name: e.question,
+            acceptedAnswer: { '@type': 'Answer', text: e.answer },
+          })),
+        };
+      }
+      return meta;
     }
 
     const stat = STATIC_PAGES[path];

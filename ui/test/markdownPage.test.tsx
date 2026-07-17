@@ -8,9 +8,11 @@ import axios from 'axios';
 import MarkdownPage from '../src/page/markdownPage';
 
 const md = [
+  '## Bot events',
+  '## Combat & health',
   '[sample](/samples/lighthouse)',
   '[external](https://example.com/x)',
-  '[types](/ts/robocode.d.ts)',
+  '[types](/docs/ts/robocode.d.ts)',
   '[internal](/dev)',
 ].join('\n\n');
 
@@ -49,6 +51,21 @@ describe('MarkdownPage', () => {
     expect(sample.getAttribute('target')).toBeNull();
     expect(sample.getAttribute('href')).toBe('/samples/lighthouse');
     expect(internal.getAttribute('target')).toBeNull();
+  });
+
+  it('gives headings GitHub-style hyphenated ids so anchor links resolve', async () => {
+    render(
+      <MemoryRouter>
+        <MarkdownPage path="examples" />
+      </MemoryRouter>
+    );
+    await screen.findByText('Bot events');
+    // Multi-word heading: spaces become hyphens (default showdown would
+    // produce "botevents", silently breaking every #bot-events style link).
+    expect(document.getElementById('bot-events')).not.toBeNull();
+    // Punctuation is dropped where it stands, GitHub-style: "&" leaves a
+    // double hyphen.
+    expect(document.getElementById('combat--health')).not.toBeNull();
   });
 
   it('navigates in-app links through the router (no full reload)', async () => {

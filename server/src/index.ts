@@ -99,6 +99,14 @@ app.use(
       if (filePath.endsWith('.md') || filePath.endsWith('blog-index.json')) {
         res.setHeader('X-Robots-Tag', 'noindex');
       }
+      // The mime registry maps .ts to video/mp2t (MPEG transport stream), so
+      // the published robocode.d.ts would download instead of rendering as
+      // text in the browser. text/typescript is unregistered but descriptive,
+      // and browsers treat an unknown text/* subtype as displayable text.
+      // Pre-set the type; send() won't override it.
+      if (filePath.endsWith('.d.ts')) {
+        res.setHeader('Content-Type', 'text/typescript; charset=utf-8');
+      }
     },
   })
 );

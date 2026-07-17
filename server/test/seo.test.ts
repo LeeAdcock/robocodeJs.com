@@ -3,6 +3,7 @@ import {
   createSeoResolver,
   renderHeadTags,
   describeMarkdown,
+  extractFaqEntries,
   SEO_REGION,
   type BlogEntry,
 } from '../src/util/seo';
@@ -35,10 +36,31 @@ a bot moving in a straight line and stop where you want.
 ## Next
 `;
 
+const FAQ_MD = `# Frequently asked questions
+
+Intro paragraph.
+
+# Writing bots
+
+## Can I use \`fetch\` in my bot?
+
+No. The sandbox has [no network access](/learn/docs).
+
+## Do my five bots share variables?
+
+No. Each bot runs its own copy.
+Messages are the only channel.
+
+---
+
+See also: the [API reference](/learn/docs).
+`;
+
 const resolver = () =>
   createSeoResolver({
     blogIndex: BLOG,
-    readDoc: (name) => (name === 'learn-move' ? LESSON_MD : null),
+    readDoc: (name) =>
+      name === 'learn-move' ? LESSON_MD : name === 'faq' ? FAQ_MD : null,
     now: () => new Date('2025-06-15T00:00:00Z'),
     origin: 'https://example.test',
   });
@@ -97,6 +119,58 @@ describe('seo resolver', () => {
     expect(resolver().resolve('/about/').canonical).toBe(
       'https://example.test/about'
     );
+  });
+});
+
+describe('faq page', () => {
+  it('gets curated metadata plus FAQPage JSON-LD from the markdown', () => {
+    const m = resolver().resolve('/faq');
+    expect(m.title).toBe('RobocodeJs | FAQ');
+    expect(m.canonical).toBe('https://example.test/faq');
+    expect(m.noindex).toBeFalsy();
+    expect(m.jsonLd?.['@type']).toBe('FAQPage');
+    const entities = m.jsonLd?.mainEntity as Array<Record<string, unknown>>;
+    expect(entities).toHaveLength(2);
+    expect(entities[0].name).toBe('Can I use fetch in my bot?');
+  });
+
+  it('omits JSON-LD when the FAQ markdown is unavailable', () => {
+    const r = createSeoResolver({
+      blogIndex: BLOG,
+      readDoc: () => null,
+      now: () => new Date('2025-06-15T00:00:00Z'),
+      origin: 'https://example.test',
+    });
+    const m = r.resolve('/faq');
+    expect(m.title).toBe('RobocodeJs | FAQ');
+    expect(m.jsonLd).toBeUndefined();
+  });
+});
+
+describe('extractFaqEntries', () => {
+  it('pairs each H2 question with its flattened prose answer', () => {
+    const entries = extractFaqEntries(FAQ_MD);
+    expect(entries).toEqual([
+      {
+        question: 'Can I use fetch in my bot?',
+        answer: 'No. The sandbox has no network access.',
+      },
+      {
+        question: 'Do my five bots share variables?',
+        answer:
+          'No. Each bot runs its own copy. Messages are the only channel.',
+      },
+    ]);
+  });
+
+  it('ends an answer at the next heading or horizontal rule', () => {
+    const entries = extractFaqEntries(
+      '## Q1\n\nAnswer one.\n\n# Section\n\nnot an answer\n\n## Q2\n\nAnswer two.\n\n---\n\nfooter text\n'
+    );
+    expect(entries).toEqual([
+      { question: 'Q1', answer: 'Answer one.' },
+      { question: 'Q2', answer: 'Answer two.' },
+    ]);
   });
 });
 

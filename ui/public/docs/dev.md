@@ -4,7 +4,7 @@ Each bot's logic is defined in JavaScript that is initialized at the beginning o
 
 The in-browser code editor offers **autocomplete** for the whole bot API: type `bot.`, `arena.`, `clock.`, or `Event.` to see the available members, each with its signature and a short description.
 
-See also the [game rules & physics](/rules) for exact speeds, turn rates, reload times, and damage values, and — if you've used the classic Java Robocode — [Coming from classic Robocode](/classic). Brand new to coding? Try the [Learn course](/learn).
+See also the [game rules & physics](/rules) for exact speeds, turn rates, reload times, and damage values, the [FAQ](/faq) for quick answers to common questions, and — if you've used the classic Java Robocode — [Coming from classic Robocode](/classic). Brand new to coding? Try the [Learn course](/learn).
 
 - [Arena](#arena)
 - [Clock](#clock)
@@ -18,19 +18,19 @@ See also the [game rules & physics](/rules) for exact speeds, turn rates, reload
 
 The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
 
-- `arena.getWidth() : number`
-- `arena.getHeight() : number`
+- `arena.getWidth() : number` Returns the arena's width in units.
+- `arena.getHeight() : number` Returns the arena's height in units.
 
 Virtual markers can be created in the arena that provide simplified calculations for angles and distance. These markers are either dropped at the current bot location, or at a specified coordinate.
 
-- `arena.createMarker(x, y) : marker`
+- `arena.createMarker(x, y) : marker` Creates a marker at the provided arena coordinates.
 
 The `marker` object returned has several convenience methods:
 
-- `marker.getX() : number`
-- `marker.getY() : number`
-- `marker.getDistance() : number`
-- `marker.getBearing() : number`
+- `marker.getX() : number` Returns the marker's x coordinate.
+- `marker.getY() : number` Returns the marker's y coordinate.
+- `marker.getDistance() : number` Returns the distance from the bot to the marker, rounded down to a whole number.
+- `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading — `bot.turn(marker.getBearing())` faces it.
 
 # Events Overview
 
@@ -75,10 +75,10 @@ clock.on(Event.TICK, async () => {
 
 # Clock
 
-You can access the current "simulation time" using the 'clock' object. Registering a handler for clock ticks enables providing logic that executes at a set frequency. For logic that executes on different frequencies, details on the JavaScript timers are below. A click tick is the smallest increment of time within the simulation.
+You can access the current "simulation time" using the 'clock' object. Registering a handler for clock ticks enables providing logic that executes at a set frequency. For logic that executes on different frequencies, details on the JavaScript timers are below. A clock tick is the smallest increment of time within the simulation.
 
-- `clock.getTime() : number` Number of clock ticks in the current game
-- `clock.on(Event.TICK, () => {} )`
+- `clock.getTime() : number` Returns the number of clock ticks elapsed in the current match.
+- `clock.on(Event.TICK, () => {} )` Registers a callback that is executed every clock tick.
 
 # Bot
 
@@ -86,22 +86,22 @@ The `bot` object provides the programmatic ability to control the various capabi
 
 A few basic methods exist for setting and retrieving information about the bot.
 
-- `bot.setName(string)` Sets the bot's display name.
+- `bot.setName(string)` Sets the bot's display name. Names are sanitized and length-capped; an empty or disallowed name is silently ignored and the bot keeps its current name.
 - `bot.getId() : string` Returns a unique identifier (a UUID string).
 - `bot.getHealth() : number` Returns the bot's health from 100 (full) down to 0 (unfortunately dead).
 - `bot.dropMarker() : marker` Returns a marker object for the bot's current location.
 
 ## Bot events
 
-- `bot.on(Event.FIRED, () => {}))` Registers a callback that is executed when the turret is fired.
+- `bot.on(Event.FIRED, () => {})` Registers a callback that is executed when the turret is fired.
 - `bot.on(Event.SCANNED, (object[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of objects representing each bot detection by the scan. The objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading; `health` is the detected bot's current health (0–100).
-- `bot.on(Event.COLLIDED, () => {object})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to your heading (a wall ahead is 0). Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
+- `bot.on(Event.COLLIDED, (object) => {})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to your heading (a wall ahead is 0). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall. Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
 
 ## Environment events
 
 - `bot.on(Event.HIT, (object) => {})` Registers a callback that is executed when the bot is hit. An object is provided to the handler that is of the format `{angle:number}`, where the angle is the bearing the shot came from, relative to your heading.
 - `bot.on(Event.DETECTED, () => {})` Registers a callback that is executed when the bot is detected by another bot's radar.
-- `bot.on(Event.START, () => {})` Registers a callback that is executed when the bot is being started at the beginning of a match.
+- `bot.on(Event.START, () => {})` Registers a callback that is executed when the bot first starts, when the arena restarts, and when you reboot the app — an ordinary save does not re-fire it (see [State and the START event](#state-and-the-start-event)).
 
 ## Communications events
 
@@ -109,7 +109,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 ## Movement
 
-The bot can turn left or right, and move straight ahead at a desired speed. The turn rate is limited, so a measurable amount of time will pass between setting the desired orientation and the bot achieving that orientation. Similarly there is a limited acceleration and deceleration. Methods that set these values will return a Promise object that is resolved when the desired value is reached. If other logic changes the desired value before it is reached, the Promise will be rejected - optionally these rejections can be caught and handled. Leaving such a rejection unhandled is safe: it is logged to your bot's log panel but does **not** stop the bot, so you only need to `.catch()` them when you want to react to the cancellation (or to keep your logs quiet).
+The bot can turn left or right, and move straight ahead at a desired speed. The turn rate is limited, so a measurable amount of time will pass between setting the desired orientation and the bot achieving that orientation. Similarly there is a limited acceleration and deceleration. Turns always take the shortest path to the target angle — `bot.turn(350)` is executed as 10 degrees counter-clockwise, not 350 clockwise — so use signed values to control direction (positive clockwise, negative counter-clockwise). The same applies to the turret and radar. Methods that set these values will return a Promise object that is resolved when the desired value is reached. If other logic changes the desired value before it is reached, the Promise will be rejected - optionally these rejections can be caught and handled. (A pending command is also rejected if the bot is destroyed or the match stops before the value is reached.) Leaving such a rejection unhandled is safe: it is logged to your bot's log panel but does **not** stop the bot, so you only need to `.catch()` them when you want to react to the cancellation (or to keep your logs quiet).
 
 Asynchronously set a desired value and ignore any result:
 
@@ -130,7 +130,7 @@ bot.setOrientation(90).then(() => {
 ### Position
 
 - `bot.getX() : number` Returns the current x-axis position. The left is 0.
-- `bot.getY() : number` Returns the current y-axis position. the top is 0.
+- `bot.getY() : number` Returns the current y-axis position. The top is 0.
 
 ### Orientation
 
@@ -147,49 +147,53 @@ bot.setOrientation(90).then(() => {
 
 ### Communications
 
-- `bot.send(message)` Broadcasts a message that every other bot in the arena — teammates **and** enemies — can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them.
+- `bot.send(message)` Broadcasts a message that every other bot in the arena — teammates **and** enemies — can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them. A message that isn't JSON data, is larger than 4,096 characters once encoded, or nests more than 8 levels deep is rejected — `send` throws (code `E023`). A bot may also broadcast at most 50 messages per tick; sends past that budget are silently dropped (code `E024`). See the [error code reference](/error-codes).
 
 ## Turret
 
 The turret provides the ability to fire at other bots. The turret is attached to the top of the bot, so its orientation is relative to the bot's orientation.
 
-As the bot turns, the turret will also turn. The position of the turret is relative to the bot, not to the arena. An orientation of 0 degrees aligns the turret directly forward. The turret will take time to reload after being fired and methods exist to identify when it is available to fire.
+As the bot turns, the turret will also turn. The position of the turret is relative to the bot, not to the arena — so an aimed turret swings with the body, and if the body turns after you aim you'll need to re-aim (or aim just before firing). An orientation of 0 degrees aligns the turret directly forward. The turret will take time to reload after being fired and methods exist to identify when it is available to fire. Every shot is identical: there is no power, heat, or ammunition mechanic — the constraints are the reload timer and the miss penalty (see [game rules](/rules)).
 
 ### Orientation
 
-- `bot.turret.setOrientation(number) : Promise`
-- `bot.turret.getOrientation() : number`
-- `bot.turret.isTurning() : boolean`
-- `bot.turret.turn(number)`
-- `bot.turret.turnTowards(x, y) : Promise`
+- `bot.turret.setOrientation(number) : Promise` Sets the turret's target orientation in degrees, relative to the bot's body. Returns a promise that resolves when the orientation is reached, or that is rejected if the target is altered before being achieved.
+- `bot.turret.getOrientation() : number` Returns the turret's orientation in degrees, 0 to 359, relative to the bot's body.
+- `bot.turret.isTurning() : boolean` Returns if the turret is actively turning.
+- `bot.turret.turn(number) : Promise` Turns the turret the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
+- `bot.turret.turnTowards(x, y) : Promise` Turns the turret towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
 
 ### Firing
 
+At the start of every match there is a short **deployment window** (the first 100 ticks, about 10 seconds at default speed) during which the turret is held: `isReady()` returns `false` and `fire()` rejects while the bots deploy. Reloading still progresses, so `onReady()` resolves as soon as the window opens.
+
 - `bot.turret.onReady(): Promise` Returns a promise that resolves when the turret is ready to fire. If the turret fires through another thread while this promise is pending, the promise will be rejected.
 - `bot.turret.isReady(): boolean` Returns a boolean indicating whether the turret is ready to fire.
-- `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:number}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena — and the shooter loses **3 health** for the missed shot. If the turret is not ready to fire, the Promise is rejected.
+- `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:string}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena — and the shooter loses **3 health** for the missed shot. If the turret is not ready to fire, the Promise is rejected.
 
 ## Radar
 
-The radar provides the ability to detect other nearby bots. Only nearby bots in the direction the radar is pointed will be detectable. The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena. The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan.
+The radar provides the ability to detect other nearby bots. Only bots within **300 units**, in the direction the radar is pointed, are detectable — the beam narrows with distance, from about 25 degrees either side of the radar's heading up close down to 10 degrees at maximum range. The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena — the radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed. The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
 
 ### Orientation
 
-- `bot.radar.setOrientation(number) : Promise`
-- `bot.radar.getOrientation() : number`
-- `bot.radar.isTurning() : boolean`
-- `bot.radar.turn(number)`
-- `bot.radar.turnTowards(x, y) : Promise`
+- `bot.radar.setOrientation(number) : Promise` Sets the radar's target orientation in degrees, relative to the turret. Returns a promise that resolves when the orientation is reached, or that is rejected if the target is altered before being achieved.
+- `bot.radar.getOrientation() : number` Returns the radar's orientation in degrees, 0 to 359, relative to the turret.
+- `bot.radar.isTurning() : boolean` Returns if the radar is actively turning.
+- `bot.radar.turn(number) : Promise` Turns the radar the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
+- `bot.radar.turnTowards(x, y) : Promise` Turns the radar towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
 
 ### Scanning
 
 - `bot.radar.onReady(): Promise` Returns a promise that resolves when the radar is ready to scan. If the radar scans through another thread while this promise is pending, the promise will be rejected.
 - `bot.radar.isReady(): boolean` Returns a boolean indicating whether the radar is ready to scan.
-- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`
+- `bot.radar.scan(): Promise<object[]>` Performs a radar scan, returning a promise that resolves with an array of objects with details on each bot that is detected, or an empty array if nothing is detected. If the radar is not ready to scan, the Promise is rejected. The resolved objects are of the format `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }`. Note the two direction fields answer different questions: `angle` is where the detected bot **is** — the bearing from you to it, relative to your heading (so `bot.turret.setOrientation(angle)` aims at it) — while `orientation` is which way that bot itself is **facing**, as an absolute compass heading (0 = north); combine `orientation` with `speed` to predict where it is going. The other fields are described under the `SCANNED` event in [Bot events](#bot-events).
 
 # Coding Tips
 
 ## Code guard rails
+
+The sandbox is plain JavaScript plus the bot API — nothing else. There is no network access (`fetch`, `XMLHttpRequest`, WebSockets), no module system (`import`/`require`, no npm packages), and no browser or Node globals (`window`, `document`, `process`). Everything a bot can use is on this page: `bot`, `arena`, `clock`, `Event`, `console`, `logger`, the timers, `Math`, and `Promise`.
 
 All app code is executed in a sandbox environment which limits all bots running the same application to use 8 MB of memory. When multiple applications are running in the arena simultaneously, each application will have its own 8 MB of allocated memory. Exceeding this limit will cause all bots running the application to terminate.
 
@@ -203,7 +207,7 @@ Faults are written to your bot's log panel with a short code (like `E017`). See 
 
 ## State and the START event
 
-When a bot's code is loaded — when it first starts, and again every time you save a change — it is re-executed to pick up your new handlers, and the `START` event fires so your setup code runs again. Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
+When a bot's code is loaded — when it first starts, and again every time you save a change — it is re-executed to pick up your new handlers. The `START` event fires only on that first start (and again on an arena restart or a reboot), **not** on an ordinary save. Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
 
 ```
 // Reset to its initial value every time the code is (re)loaded.
@@ -240,7 +244,7 @@ You don't have to format everything into a string yourself. Pass **any mix of ar
 
 ```
 console.log('target', target)                 // -> target {"x":120,"y":40,"id":"t3"}
-console.log('health', bot.getHealth())         // -> health 0.75
+console.log('health', bot.getHealth())         // -> health 75
 console.log('scan results', results)           // -> scan results [{"angle":12,...}]
 ```
 
@@ -253,7 +257,7 @@ Objects and arrays are serialized to JSON, so you can dump whole state objects w
 
 ### Log levels
 
-A `logger` instance is also available for outputting messages with the various `debug`, `trace`, `info`, `warn`, and `error` levels. It accepts the same mix of arguments as `console.log`.
+A `logger` instance is also available for outputting messages with the various `debug`, `trace`, `info`, `warn`, and `error` levels (`logger.log` is an alias for `info`). It accepts the same mix of arguments as `console.log`.
 
 ```
 logger.warn('low health, retreating', bot.getHealth())
@@ -266,14 +270,16 @@ Any timers or intervals created in the bot logic will be automatically cleaned u
 
 ```
 bot.on(Event.START, () => {
-  // Turn every second
+  // Turn every 10 ticks (about once a second at default speed)
   this.turnIntervalTimer = setInterval(() =>
     bot.turn(15)
-  , 1000)
+  , 10)
 })
 ```
 
-Timers will operate in "simulated time" instead of real-world time. The interval provided to `setInterval` and `setTimeout` is the number of simulated clock ticks, this is in contrast to the traditional interval value being the number of milliseconds.
+Timers will operate in "simulated time" instead of real-world time. The interval provided to `setInterval` and `setTimeout` is the number of simulated clock ticks, this is in contrast to the traditional interval value being the number of milliseconds. At the default speed a tick is about 100 ms, so an interval of `10` fires roughly once a second.
+
+A bot may hold at most **64** active timers (`setInterval` and `setTimeout` combined). Registrations past the cap are ignored — the call returns `-1` and the callback never fires (code `E021`, non-fatal).
 
 If a registered `Event.TICK` event handler returns a promise, then although it is called again until the previous promise resolves, this does not impact the function of any active timers. For this reason, it is possible that the number of times the clock ticker handler is called might appear to have a discrepancy when compared to the firing rate of any timers.
 
@@ -283,7 +289,7 @@ Because the game runs in "simulated time" instead of real-world time, the `Date`
 
 # Type definitions
 
-If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/ts/robocode.d.ts`](/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
+If you prefer to write bots in your own editor, TypeScript definitions for the entire API are published at [`/docs/ts/robocode.d.ts`](/docs/ts/robocode.d.ts). They describe `bot`, `arena`, `clock`, the markers and scan results, and give each `Event` its correctly-typed handler — so a TypeScript-aware editor gives you the same autocomplete, hover docs, and type-checking locally.
 
 Reference them from a bot file with a triple-slash directive:
 

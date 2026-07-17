@@ -11,6 +11,9 @@ your tooling rather than written to a bot's console — and are noted as such be
 You can also validate a bot before deploying it with the editor's **Check** button,
 which reports the same codes for compile/load problems.
 
+Where it helps, an entry includes a small example that triggers the code and a
+fixed version for comparison.
+
 Tip: search a code (e.g. `E017`) in the search box at the top of the site to jump
 straight to its entry here.
 
@@ -21,12 +24,28 @@ almost always the **8 MB memory cap** from runaway allocation (e.g. an
 ever-growing array). All of the app's bots are killed. Fix: bound the memory your
 bot keeps — don't accumulate unbounded history or large data structures.
 
+```
+// Triggers E001: the history grows forever and eventually hits the 8 MB cap
+clock.on(Event.TICK, () => {
+  this.history.push({ x: bot.getX(), y: bot.getY() })
+})
+```
+
+```
+// Fixed: keep the history bounded
+clock.on(Event.TICK, () => {
+  this.history.push({ x: bot.getX(), y: bot.getY() })
+  if (this.history.length > 100) this.history.shift()
+})
+```
+
 ## E003
 
-**Event handler threw — non-fatal.** One of your event handlers (`clock.on`,
-`bot.on(...)`) threw an error _synchronously_ while running. The bot keeps playing,
-but that handler run did nothing useful. Fix: wrap risky logic in `try/catch`, and
-check the message printed alongside the code.
+**Event dispatch failed — non-fatal.** The game could not deliver an event to one
+of your handlers. This is rare and usually indicates a platform issue rather than a
+bug in your code; the bot keeps playing. (An error thrown _inside_ your handler
+surfaces as [E013](#e013); a rejected promise from an `async` handler as
+[E019](#e019).)
 
 ## E004
 
@@ -36,10 +55,27 @@ errors; the accompanying message names the cause.
 
 ## E013
 
-**Async handler failed — fatal.** An event handler that returns a promise
-(`async` handler) rejected or threw. Unlike E003 (synchronous), an unhandled async
-failure stops the bot. Fix: `await` your commands inside `try/catch`, or `.catch()`
-the promises you don't await.
+**Event handler failed — fatal.** An event handler threw an error _synchronously_
+(before its first `await`), or ran too long and hit the sandbox timeout. The bot is
+stopped. Note this is different from a promise that _rejects_ inside an `async`
+handler — that surfaces as [E019](#e019) and is non-fatal. Fix: wrap risky logic in
+`try/catch`, and keep per-event work well under the 5-second sandbox limit; the
+message printed alongside the code names the cause.
+
+```
+// Triggers E013: an empty scan makes targets[0] undefined, so .angle throws
+bot.on(Event.SCANNED, (targets) => {
+  bot.turret.setOrientation(targets[0].angle)
+})
+```
+
+```
+// Fixed: guard against the empty scan
+bot.on(Event.SCANNED, (targets) => {
+  if (targets.length === 0) return
+  bot.turret.setOrientation(targets[0].angle)
+})
+```
 
 ## E017
 
@@ -55,6 +91,20 @@ Fix: use **Check** (or format with the code button) to locate the syntax error;
 keep top-level code minimal — do work inside `clock.on(Event.TICK, ...)` and the
 other event handlers rather than at the top level.
 
+```
+// Triggers E017: the handler's closing brace is missing
+clock.on(Event.TICK, () => {
+  bot.setSpeed(5)
+)
+```
+
+```
+// Fixed: balanced braces
+clock.on(Event.TICK, () => {
+  bot.setSpeed(5)
+})
+```
+
 ## E018
 
 **Sandbox init failed — fatal.** An internal error occurred while setting up the
@@ -68,13 +118,42 @@ bug in your code. Fix: try rebooting the bot; if it persists, report it.
 finished — typically because a later handler issued a new command (for example a
 `HIT` handler retargets the body mid-turn). The bot keeps playing. This is often
 expected; if you want to handle it, `.catch()` the command or wrap the `await` in
-`try/catch`.
+`try/catch`. Any other unhandled promise rejection that escapes a handler surfaces
+the same way — logged with this code, and never fatal.
+
+```
+// Logs E019: if another handler retargets the body mid-turn, this await rejects
+bot.on(Event.HIT, async () => {
+  await bot.turn(180)
+})
+```
+
+```
+// Fixed: a superseded turn is fine here — swallow the cancellation
+bot.on(Event.HIT, async () => {
+  await bot.turn(180).catch(() => {})
+})
+```
 
 ## E020
 
 **Timer callback failed — fatal.** A `setTimeout` / `setInterval` callback threw,
 rejected, or ran too long and hit the sandbox timeout. Fix: keep timer callbacks
 short and guard them with `try/catch`.
+
+```
+// Triggers E020: the busy-wait never yields, so the callback hits the 5s timeout
+setInterval(() => {
+  while (bot.getSpeed() > 0) {}
+}, 10)
+```
+
+```
+// Fixed: check once per firing instead of looping
+setInterval(() => {
+  if (bot.getSpeed() > 0) bot.setSpeed(0)
+}, 10)
+```
 
 ## E021
 
@@ -87,6 +166,20 @@ handler that runs every tick. Fix: create timers once (at the top level or in a
 `START` handler), keep references to them, and `clearInterval` / `clearTimeout`
 the ones you no longer need. Timers count per bot, and each app fields five
 bots. See the timer limit under [Game rules](/rules).
+
+```
+// Triggers E021: a NEW interval every tick — the 64-timer cap is hit in seconds
+clock.on(Event.TICK, () => {
+  setInterval(() => bot.turn(15), 10)
+})
+```
+
+```
+// Fixed: create the interval once, in START
+bot.on(Event.START, () => {
+  this.spin = setInterval(() => bot.turn(15), 10)
+})
+```
 
 ## E022
 
@@ -110,6 +203,16 @@ instances, and other non-JSON values can't be sent, and there are caps on size
 throws, so wrap it in a `try`/`catch` if you're sending data that might exceed a
 cap. Fix: send only plain data, and keep payloads small.
 
+```
+// Triggers E023: functions aren't JSON, so this throws
+bot.send({ target: this.target, attack: () => true })
+```
+
+```
+// Fixed: send plain data only
+bot.send({ target: { x: this.target.x, y: this.target.y } })
+```
+
 ## E024
 
 **Send limit reached — non-fatal.** Your bot called `bot.send(...)` more than the
@@ -121,6 +224,20 @@ message ([E023](#e023)). This almost always means `bot.send` is being called in 
 tight loop. Fix: send at most a handful of messages per tick — coordinate with a
 compact payload rather than a stream of them, and avoid calling `send` inside an
 unbounded loop. The budget resets every tick.
+
+```
+// Triggers E024: one send per queued item can exceed 50 in a single tick
+clock.on(Event.TICK, () => {
+  while (this.queue.length) bot.send(this.queue.shift())
+})
+```
+
+```
+// Fixed: batch the queue into one message
+clock.on(Event.TICK, () => {
+  if (this.queue.length) bot.send(this.queue.splice(0))
+})
+```
 
 ## E025
 

@@ -44,7 +44,8 @@ when prompted. Clients handle token storage and refresh for you.
 
 # What the AI can do
 
-Once connected, these tools are available (all scoped to your account):
+Once connected, these tools are available (all scoped to your account, except the
+global `leaderboard`):
 
 **Apps**
 
@@ -74,6 +75,12 @@ Once connected, these tools are available (all scoped to your account):
   yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
 - `add_app_to_arena` / `remove_app_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
+- `set_arena_speed` — set the simulation speed: a multiplier (1 = the default
+  ~10 ticks/second), or `0`/`"max"` to run unbounded. The simulation stays
+  deterministic at any speed
+- `set_arena_seed` — fix the arena's random seed so bot placement and starting
+  orientations are reproducible; restart the arena after setting it to lay out
+  an identical match
 - `run_match` — run one match to a decision (optional `seed`) and return the
   winner + leaderboard; a blocking convenience for the restart → resume → poll
   `match_summary` loop. Spawns are outcome-deciding, so for a trustworthy ranking
@@ -88,6 +95,9 @@ Once connected, these tools are available (all scoped to your account):
 - `platform_status` — the server's health and live gauges (deployed version,
   uptime, arena/isolate counts, memory) — the same data as the public `/health`
   endpoint. Platform-wide, not scoped to your account
+- `leaderboard` — the global bot ladder: the top-rated apps across all users by
+  Elo (name, owner, rating, games, win rate). Public ranking data — the one tool
+  that isn't scoped to your account
 
 Arena tools take an optional `arenaId`; omit it to act on your default arena.
 
@@ -100,6 +110,10 @@ The server also exposes read-only reference material the AI can pull in:
 - `robocodejs://types/robocode.d.ts` — the bot API type definitions
 - `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,
   for interpreting `recent_logs` and `check_app_source` output
+
+For clients that can't read MCP resources, the same material is available through
+two tools: `list_docs` (a catalog of `{ id, kind, title }` entries) and `read_doc`
+(fetch one entry by its id, e.g. `docs/dev` or `types/robocode.d.ts`).
 
 # Troubleshooting
 

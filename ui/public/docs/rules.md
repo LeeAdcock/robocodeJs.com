@@ -47,6 +47,9 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 (So `0°`/north means moving toward smaller `y`.)
 
+Bot centers keep a **16-unit margin** from every wall — a bot touching a wall sits at
+`16` (or `734`), not `0`. Bots also spawn at least **50 units** apart.
+
 # Movement
 
 | Thing          | Value            | In context                                |
@@ -58,13 +61,15 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 
 # Turret & radar
 
-| Thing            | Value             | In context                                            |
-| ---------------- | ----------------- | ----------------------------------------------------- |
-| Turret turn rate | **4°/tick**       | ≈40°/sec (turret turns relative to the body)          |
-| Radar turn rate  | **4°/tick**       | radar turns relative to the turret                    |
-| Turret reload    | **40 ticks**      | ~4s between shots; `isReady()` / `onReady()` track it |
-| Radar recharge   | **10 ticks**      | ~1s between scans                                     |
-| Bullet speed     | **25** units/tick | ≈250 units/sec                                        |
+| Thing            | Value             | In context                                                                                                                     |
+| ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Turret turn rate | **4°/tick**       | ≈40°/sec (turret turns relative to the body)                                                                                   |
+| Radar turn rate  | **4°/tick**       | radar turns relative to the turret                                                                                             |
+| Turret reload    | **40 ticks**      | ~4s between shots; `isReady()` / `onReady()` track it                                                                          |
+| Radar recharge   | **10 ticks**      | ~1s between scans                                                                                                              |
+| Radar range      | **300 units**     | the beam narrows with distance: ±25° up close, ±10° at max range                                                               |
+| Bullet speed     | **25** units/tick | ≈250 units/sec                                                                                                                 |
+| Deployment hold  | **100 ticks**     | ~10s at match start with turrets held: `isReady()` is `false` and `fire()` rejects while bots deploy (reload still progresses) |
 
 # Combat & health
 
@@ -73,6 +78,7 @@ The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
 | Health            | **100 → 0**     | `bot.getHealth()`; `100` is full, `0` is dead                                    |
 | Bullet damage     | **−25**         | a clean hit removes a quarter of full health                                     |
 | Bullet hit radius | **32 units**    | a bullet hits any bot whose center is within 32 units                            |
+| Bot collision     | **32 units**    | two bots collide when their centers are within 32 units                          |
 | Collision         | **−1 per tick** | bumping a wall/bot also stops you (speed → 0)                                    |
 | Missed shot       | **−3**          | a bullet that leaves the field without hitting anyone costs the shooter 3 health |
 
@@ -120,7 +126,8 @@ messages.
 
 - A match runs until one team remains.
 - To prevent stalemates, after a long match a **sudden-death** phase begins (around
-  **7,500 ticks**, ~12.5 minutes) during which health slowly decays, forcing a finish.
+  **7,500 ticks**, ~12.5 minutes) during which health slowly decays — every bot loses
+  **1 health every 50 ticks** (~5s) — forcing a finish.
 
 # Limits
 
@@ -160,6 +167,7 @@ See [Error codes](/error-codes) for **E021** and **E022**.
 
 ---
 
-See also: the [API reference](/learn/docs) for every method and event, and the
+See also: the [API reference](/learn/docs) for every method and event, the
+[FAQ](/faq) for quick answers to common questions, and the
 [example bots](/examples). New here? The [Learn course](/learn) teaches all of this
 step by step.
