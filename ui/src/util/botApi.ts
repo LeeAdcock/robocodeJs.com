@@ -236,6 +236,12 @@ export const INTERFACES: ApiInterface[] = [
         type: 'number',
         doc: 'Bearing from the bot to this marker, relative to your heading (bot.turn(getBearing()) faces it).',
       },
+      {
+        name: 'isInBounds',
+        kind: 'method',
+        type: 'boolean',
+        doc: 'Whether this marker lies inside the arena (arena.contains of its coordinates).',
+      },
     ],
   },
   {
@@ -313,6 +319,22 @@ export const INTERFACES: ApiInterface[] = [
         ],
         type: 'Marker',
         doc: 'Creates a marker at the arena coordinate (x, y) for distance/bearing math.',
+      },
+      {
+        name: 'contains',
+        kind: 'method',
+        params: [
+          { name: 'x', type: 'number' },
+          { name: 'y', type: 'number' },
+        ],
+        type: 'boolean',
+        doc: 'Whether (x, y) lies inside the arena (0..width, 0..height, edges inclusive).',
+      },
+      {
+        name: 'getNearestWall',
+        kind: 'method',
+        type: 'Marker',
+        doc: 'A marker at the nearest point on the arena boundary — getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself.',
       },
     ],
   },

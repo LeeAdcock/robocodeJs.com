@@ -57,6 +57,9 @@ What's happening:
 - Change the `else` turn from `180` to `150` so it doesn't retrace its exact path.
 - Delete the `bot.setSpeed(3)` line and Save. Rusty gets stuck after the first bump —
   that's why we re-start it!
+- See the wall coming **before** you hit it: add
+  `console.log('wall in', arena.getNearestWall().getDistance());` inside the COLLIDED
+  handler and watch how close "close" is. (Robots stop a little before the wall itself.)
 
 ## Common questions
 

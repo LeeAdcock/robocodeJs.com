@@ -721,20 +721,39 @@ const init = (env: Environment, process: Process, bot: Bot) => {
         arena.getWidth = () => _arena_getWidth().copy();
         arena.getHeight = () => _arena_getHeight().copy();
 
-        arena.createMarker = (x, y) => {
-          return {
-            getX: () => x,
-            getY: () => y,
-            getDistance: () => Math.floor(Math.sqrt(
-                Math.pow(bot.getX() - x, 2) +
-                  Math.pow(bot.getY() - y, 2)
-              )),
-            getBearing: () => {
-              const heading =
-                Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
-              return (((heading - bot.getOrientation()) % 360) + 360) % 360
-            }
-          }
+        // Single factory behind every positional helper (createMarker,
+        // dropMarker, getNearestWall), so all markers share one shape.
+        const __makeMarker = (x, y) => ({
+          getX: () => x,
+          getY: () => y,
+          getDistance: () => {
+            const bx = bot.getX(), by = bot.getY()
+            return Math.floor(Math.sqrt((bx - x) * (bx - x) + (by - y) * (by - y)))
+          },
+          getBearing: () => {
+            const heading =
+              Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
+            return (((heading - bot.getOrientation()) % 360) + 360) % 360
+          },
+          isInBounds: () => arena.contains(x, y),
+        })
+
+        arena.createMarker = (x, y) => __makeMarker(x, y)
+
+        arena.contains = (x, y) =>
+          x >= 0 && x <= arena.getWidth() && y >= 0 && y <= arena.getHeight()
+
+        // Nearest point on the arena boundary — a Marker, so getDistance()
+        // ("how far to the wall") and getBearing() ("which way") come free.
+        // Note bots collide 16 units before the wall itself.
+        arena.getNearestWall = () => {
+          const x = bot.getX(), y = bot.getY()
+          const w = arena.getWidth(), h = arena.getHeight()
+          const d = [y, h - y, x, w - x]
+          const p = [[x, 0], [x, h], [0, y], [w, y]]
+          let i = 0
+          for (let j = 1; j < 4; j++) if (d[j] < d[i]) i = j
+          return __makeMarker(p[i][0], p[i][1])
         }
       `
       )
