@@ -236,6 +236,10 @@ svg.motion-snap * {
    isn't signalled twice. box-decoration-break keeps the rounded inline chip
    whole when a snippet wraps across a line. */
 .markdown code {
+  /* Override Bootstrap Reboot's pink inline-code default (`code { color:
+     #d63384 }`); block `pre code` is already `color: inherit`, so this makes
+     both use the body colour. */
+  color: inherit;
   background: var(--code-bg);
   border: 1px solid var(--code-border);
   border-radius: 4px;
@@ -249,15 +253,15 @@ svg.motion-snap * {
   list-style-type: square;
 }
 
-/* Block code: the same tinted, 1px-bordered, rounded treatment as the inline
-   chip — just scaled up to a panel with room to breathe. Matching the border,
-   radius and (via the code font-size below) the text size keeps inline and
-   block reading as one component; long lines scroll rather than wrap. */
+/* Block code: the same tint and (via the code font-size below) the same text
+   size and body colour as the inline chip, so the two read consistently — with
+   a bronze accent stripe down the left as the panel's signature flourish. Long
+   lines scroll rather than wrap. */
 .markdown pre {
   margin-left: 20px;
   background: var(--code-bg);
-  border: 1px solid var(--code-border);
-  border-radius: 4px;
+  border-left: 3px solid var(--rule);
+  border-radius: 0 4px 4px 0;
   padding: 10px 12px;
   font-size: 0.9em;
   overflow-x: auto;
