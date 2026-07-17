@@ -80,9 +80,9 @@ positive turns clockwise, negative counter-clockwise. See
 
 ## Why does my scan come back empty when an enemy is right there?
 
-Two usual causes. The radar detects exactly what's inside the beam drawn
-under it in the arena — a narrow wedge reaching **600 units**, as wide as the
-radar dish at your bot and about 244 units across at its tip — so it sees far but
+Two usual causes. The radar detects what's inside its beam — a narrow wedge
+reaching **600 units**, one tank-width across at your bot and about 244 units
+across at its tip, drawn under the radar in the arena — so it sees far but
 only where it's pointed, and a distant enemy still needs a reasonably precise
 sweep. And the radar points where **body + turret + radar** angles add up,
 since it's mounted on the turret: if the body or turret has turned since you

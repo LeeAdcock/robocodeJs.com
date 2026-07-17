@@ -123,10 +123,11 @@ const BotRadarSvg = (props: BotRadarProps) => {
       )}
     >
       {props.radarOn && (
-        // This polygon IS the detection contract: the server detects any bot
-        // whose center is inside this exact shape (server botRadar.ts —
-        // RADAR_RANGE / RADAR_BASE_HALF_WIDTH / RADAR_TIP_HALF_WIDTH). Keep
-        // the two in sync.
+        // Drawn dish-width (±8) at the base for looks; the server's detection
+        // area (botRadar.ts RADAR_* constants) is a full tank-width (±16) at
+        // the base, meeting the same ±122 tip at 600 — so this polygon sits
+        // everywhere at-or-inside the detection shape, and anything the beam
+        // visibly touches is guaranteed detected. Keep tip/range in sync.
         <polygon
           points="-8,0,8,0,122,600,-122,600"
           fill="url(#radar)"

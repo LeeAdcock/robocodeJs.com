@@ -7,14 +7,18 @@ import {
   toRelativeBearing,
 } from '../util/geometry';
 
-// The radar's detection area IS the beam drawn under the radar dish in the
-// arena (ui arenaBot.tsx): a quadrilateral exactly as wide as the dish sprite
-// (±8) at the bot, whose sides flare to ±122 units at its 600-unit reach. A
-// bot is detected when its center is inside that shape. Long and narrow on
-// purpose — like classic Robocode, vision is directional: you can see far,
-// but only where you choose to look. Keep in sync with the UI polygon.
+// The radar's detection area: a quadrilateral one tank-width (±16) across at
+// the bot, whose sides flare to ±122 units at its 600-unit reach. A bot is
+// detected when its center is inside that shape. Long and narrow on purpose —
+// like classic Robocode, vision is directional: you can see far, but only
+// where you choose to look. The full-tank-width base keeps adjacent bots
+// detectable at point blank.
+//
+// The UI (arenaBot.tsx) draws the beam dish-width (±8) at its base for looks,
+// meeting the same ±122 tip — everywhere at-or-inside this detection shape,
+// so anything the drawn beam visibly touches is guaranteed detected.
 export const RADAR_RANGE = 600;
-export const RADAR_BASE_HALF_WIDTH = 8;
+export const RADAR_BASE_HALF_WIDTH = 16;
 export const RADAR_TIP_HALF_WIDTH = 122;
 
 export class BotRadar implements Orientated {
