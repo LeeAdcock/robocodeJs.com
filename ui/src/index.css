@@ -6,6 +6,10 @@
   --link: #aa6c39;
   --code: #1a7f37;
   --rule: #aa6c39;
+  /* The one brand accent (the wordmark gold), used consistently for the
+     wordmark, the avatar ring, and nav hover/active states. Kept identical in
+     both themes because it only ever sits on the always-dark navbar. */
+  --accent: gold;
   /* Red glow behind a bot that just took damage (see arenaBot.tsx BotSvg). */
   --damage-glow-color: #ff2d2d;
 }
@@ -62,11 +66,37 @@ svg.motion-snap * {
   transition: none !important;
 }
 
+/* Space the primary nav items with a flex gap instead of literal `|` dividers.
+   The gap collapses to vertical spacing when the menu stacks in the hamburger,
+   so no separate mobile handling is needed. */
+.topNavBar .nav-primary {
+  align-items: center;
+  gap: 1.35rem;
+}
+
+.topNavBar .nav-brand span {
+  color: var(--accent);
+}
+
 .topNavBar .nav-link {
-  color: white !important;
-  text-decoration: underline;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
   padding-left: 0px !important;
   padding-right: 0px !important;
+  transition: color 0.15s ease;
+}
+
+/* The underline is gone in favour of a colour shift; the active page and any
+   hovered/keyboard-focused link light up in the brand accent. */
+.topNavBar .nav-link:hover,
+.topNavBar .nav-link:focus-visible {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.topNavBar .nav-link.active {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* Items that belong only in the collapsed hamburger menu. On wider screens the
@@ -76,15 +106,9 @@ svg.motion-snap * {
   display: none;
 }
 
-/* Below the navbar's `expand="sm"` breakpoint the menu collapses and its items
-   stack vertically, so the inline `|` dividers land on their own lines and just
-   pad out the hamburger. Hide them (and their side margins) on phones. */
 @media (max-width: 575.98px) {
   .topNavBar .nav-mobile-only {
     display: block;
-  }
-  .topNavBar .nav-sep {
-    display: none;
   }
   /* The search box and light/dark toggle add clutter to the collapsed menu on
      phones; hide them there (the theme still follows the OS preference). */
@@ -109,8 +133,13 @@ svg.motion-snap * {
   padding-left: 40px;
 }
 
+/* Deliberate heading scale for the doc/lesson/blog markdown. The h1 keeps its
+   grass-tile + tank signature; h2–h4 step down on a consistent ~1.2 ratio with
+   their own vertical rhythm so the section hierarchy reads at a glance (h3 and
+   h4 used to be the same size, flattening two levels into one). */
 .markdown h1 {
-  font-size: 1.4em;
+  font-size: 1.5em;
+  line-height: 1.3;
   background: url('/sprites/tileGrass1.png');
   padding-left: 5px;
 }
@@ -124,21 +153,28 @@ svg.motion-snap * {
 }
 
 .markdown h2 {
-  font-size: 1.2em;
+  font-size: 1.25em;
   font-weight: bold;
   padding-left: 20px;
+  margin-top: 1.4em;
 }
 
 .markdown h3 {
-  font-size: 1em;
+  font-size: 1.05em;
   font-weight: bold;
   padding-left: 20px;
+  margin-top: 1.2em;
 }
 
+/* The fourth level de-emphasises to a small uppercase label so it stays
+   distinct from h3 rather than reading as another equal-weight heading. */
 .markdown h4 {
-  font-size: 1em;
+  font-size: 0.85em;
   font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   padding-left: 20px;
+  margin-top: 1.1em;
 }
 
 .markdown code {

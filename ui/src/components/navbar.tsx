@@ -17,7 +17,7 @@ import {
 } from 'react-icons/fa';
 import { colors } from '../util/colors';
 import { useDarkMode, toggleDarkMode } from '../util/theme';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import App from '../types/app';
 import User from '../types/user';
 import Arena from '../types/arena';
@@ -105,12 +105,11 @@ export default function NavBar(props: NavBarProps) {
         style={{ padding: '10px' }}
         className="topNavBar"
       >
-        <Navbar.Brand as={Link} to="/" className="nav-item">
+        <Navbar.Brand as={Link} to="/" className="nav-item nav-brand">
           <span
             style={{
               fontWeight: '700',
               fontSize: '1.25em',
-              color: 'gold',
               fontFamily: 'Megrim',
               textDecoration: 'none!important',
             }}
@@ -120,63 +119,53 @@ export default function NavBar(props: NavBarProps) {
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
-          <Nav>
+          <Nav className="nav-primary">
             <Navbar.Text className="nav-mobile-only">
-              <Link to="/" className="nav-link" style={{ padding: '0px' }}>
+              <NavLink
+                to="/"
+                end
+                className="nav-link"
+                style={{ padding: '0px' }}
+              >
                 Home
-              </Link>
+              </NavLink>
             </Navbar.Text>
             <Navbar.Text>
-              <Link to="/learn" className="nav-link" style={{ padding: '0px' }}>
+              <NavLink
+                to="/learn"
+                end
+                className="nav-link"
+                style={{ padding: '0px' }}
+              >
                 Learn
-              </Link>
-            </Navbar.Text>
-            <Navbar.Text
-              className="nav-sep"
-              style={{ margin: '0 10px 0 10px' }}
-            >
-              |
+              </NavLink>
             </Navbar.Text>
             <Navbar.Text>
-              <Link
+              <NavLink
                 to="/learn/docs"
                 className="nav-link"
                 style={{ padding: '0px' }}
               >
                 Docs
-              </Link>
-            </Navbar.Text>
-            <Navbar.Text
-              className="nav-sep"
-              style={{ margin: '0 10px 0 10px' }}
-            >
-              |
+              </NavLink>
             </Navbar.Text>
             <Navbar.Text>
-              <Link
+              <NavLink
                 to="/leaderboard"
                 className="nav-link"
                 style={{ padding: '0px' }}
               >
                 Rankings
-              </Link>
-            </Navbar.Text>
-            <Navbar.Text
-              className="nav-sep"
-              style={{ margin: '0 10px 0 10px' }}
-            >
-              |
+              </NavLink>
             </Navbar.Text>
             <Navbar.Text>
-              <Link to="/blog" className="nav-link" style={{ padding: '0px' }}>
+              <NavLink
+                to="/blog"
+                className="nav-link"
+                style={{ padding: '0px' }}
+              >
                 Blog
-              </Link>
-            </Navbar.Text>
-            <Navbar.Text
-              className="nav-sep"
-              style={{ margin: '0 10px 0 10px' }}
-            >
-              |
+              </NavLink>
             </Navbar.Text>
 
             {props.user && (
@@ -207,12 +196,6 @@ export default function NavBar(props: NavBarProps) {
                     View example applications
                   </NavDropdown.Item>
                 </NavDropdown>
-                <Navbar.Text
-                  className="nav-sep"
-                  style={{ margin: '0 10px 0 10px' }}
-                >
-                  |
-                </Navbar.Text>
                 <NavDropdown title="Arena" id="basic-nav-dropdown">
                   <NavDropdown.Item onClick={() => setShowRoster(true)}>
                     Manage apps
@@ -238,12 +221,6 @@ export default function NavBar(props: NavBarProps) {
                     </NavDropdown.Item>
                   )}
                 </NavDropdown>
-                <Navbar.Text
-                  className="nav-sep"
-                  style={{ margin: '0 10px 0 10px' }}
-                >
-                  |
-                </Navbar.Text>
               </>
             )}
           </Nav>
@@ -313,7 +290,7 @@ export default function NavBar(props: NavBarProps) {
                       borderRadius: '24px',
                       height: '24px',
                       width: '24px',
-                      border: '3px solid gold',
+                      border: '3px solid var(--accent)',
                       boxSizing: 'border-box',
                     }}
                   />
