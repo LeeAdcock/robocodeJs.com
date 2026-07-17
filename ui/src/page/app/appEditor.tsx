@@ -197,6 +197,9 @@ export default function CodeEditor(props: CodeEditorProps) {
         showLineNumbers: true,
         tabSize: 2,
         printMargin: false,
+        // Match the site's code face (index.css --font-mono) so the editor and
+        // rendered code read as the same Source Code Pro.
+        fontFamily: "'Source Code Pro', monospace",
         // Ace loads its syntax-check worker via a same-origin URL resolved
         // against the current route (…/app/worker-javascript.js), which doesn't
         // exist under our Vite build/tunnel and throws an importScripts

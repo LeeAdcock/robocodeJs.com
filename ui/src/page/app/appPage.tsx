@@ -263,7 +263,25 @@ export default function AppPage(props: AppPageProps) {
             }}
           >
             {app && props.arena && (
-              <>
+              // The app name is this page's title, so give it the heading
+              // treatment the rest of the site uses (a semantic h1, sized up)
+              // rather than plain body text — kept compact and inline so it
+              // shares the toolbar row, and keeping the live team-color tank
+              // (more meaningful here than the generic markdown-h1 tank).
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: '1.25em',
+                  // Match the site's other headings (Bootstrap's default h1
+                  // weight, 500) — the grass-tile markdown h1 uses the same.
+                  fontWeight: 500,
+                  lineHeight: '31px',
+                  // Optical nudge: cap-height text centered in the line box
+                  // reads slightly high next to the toolbar buttons.
+                  position: 'relative',
+                  top: '2px',
+                }}
+              >
                 {props.arena.apps.map((a) => a.id).includes(app.id) && (
                   <img
                     src={
@@ -277,12 +295,13 @@ export default function AppPage(props: AppPageProps) {
                     }
                     style={{
                       height: '1em',
-                      marginRight: '5px',
+                      marginRight: '6px',
+                      verticalAlign: 'middle',
                     }}
                   />
                 )}
                 {titleCase(app?.name)}
-              </>
+              </h1>
             )}
           </Col>
           <Col style={{ paddingRight: '0' }}>
