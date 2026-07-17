@@ -36,6 +36,18 @@ export const GLOSSARY: GlossaryEntry[] = [
       'The simulation’s discrete time step, about 100 ms at default speed; speeds, turn rates, and reload times are all per-tick.',
   },
   {
+    term: 'asynchronous',
+    aliases: ['asynchronously', 'async'],
+    definition:
+      'Starting an action and returning immediately, delivering the result later — bot commands are asynchronous, handing back a Promise you can await.',
+  },
+  {
+    term: 'synchronous',
+    aliases: ['synchronously'],
+    definition:
+      'Completing before the next line runs. Bot commands are not synchronous: they start physical actions that take ticks to finish.',
+  },
+  {
     term: 'promise',
     aliases: ['promises'],
     definition:
