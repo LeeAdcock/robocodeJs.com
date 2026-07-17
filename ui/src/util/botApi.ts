@@ -145,6 +145,12 @@ const turnable = (subject: string): ApiMember[] => [
     type: 'boolean',
     doc: `Returns whether the ${subject} is currently turning.`,
   },
+  {
+    name: 'turnRate',
+    kind: 'property',
+    type: 'number',
+    doc: `How many degrees the ${subject} turns per tick — plan how long a turn will take before committing to it.`,
+  },
 ];
 
 export const INTERFACES: ApiInterface[] = [
@@ -291,6 +297,18 @@ export const INTERFACES: ApiInterface[] = [
         kind: 'method',
         type: 'boolean',
         doc: 'Returns whether the turret is ready to fire (false while reloading, and during the opening deployment hold).',
+      },
+      {
+        name: 'bulletSpeed',
+        kind: 'property',
+        type: 'number',
+        doc: 'How far a bullet travels per tick — divide a target’s distance by this to know the flight time when leading a shot.',
+      },
+      {
+        name: 'bulletDamage',
+        kind: 'property',
+        type: 'number',
+        doc: 'Health an enemy loses when your bullet hits.',
       },
     ],
   },
@@ -450,6 +468,12 @@ export const INTERFACES: ApiInterface[] = [
         doc: 'Returns whether the body is currently turning.',
       },
       {
+        name: 'turnRate',
+        kind: 'property',
+        type: 'number',
+        doc: 'How many degrees the body turns per tick.',
+      },
+      {
         name: 'getSpeed',
         kind: 'method',
         type: 'number',
@@ -461,6 +485,24 @@ export const INTERFACES: ApiInterface[] = [
         params: [{ name: 'speed', type: 'number' }],
         type: 'Promise<void>',
         doc: 'Sets the target speed, an integer from -5 to 5. Resolves when reached; rejects if overridden.',
+      },
+      {
+        name: 'maxSpeed',
+        kind: 'property',
+        type: 'number',
+        doc: 'The fastest the bot can travel, in units per tick.',
+      },
+      {
+        name: 'acceleration',
+        kind: 'property',
+        type: 'number',
+        doc: 'How much the speed changes per tick while moving toward the target speed — needed to judge braking distance.',
+      },
+      {
+        name: 'radius',
+        kind: 'property',
+        type: 'number',
+        doc: 'The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, and bots or bullets connect within two.',
       },
       {
         name: 'setName',

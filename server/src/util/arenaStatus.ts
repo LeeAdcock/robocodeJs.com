@@ -1,4 +1,5 @@
 import Environment, { DEPLOY_TICKS } from '../types/environment';
+import { BOT_MAX_SPEED, BOT_ACCELERATION } from '../types/bot';
 import ArenaMember from '../types/arenaMember';
 import appService from '../services/AppService';
 
@@ -60,8 +61,8 @@ export const buildArenaStatus = async (
           y: bot.y,
           speed: bot.speed,
           speedTarget: bot.speedTarget,
-          speedAcceleration: bot.speedAcceleration,
-          speedMax: bot.speedMax,
+          speedAcceleration: BOT_ACCELERATION,
+          speedMax: BOT_MAX_SPEED,
           bodyOrientation: bot.orientation,
           bodyOrientationTarget: bot.orientationTarget,
           bodyOrientationVelocity: bot.orientationVelocity,

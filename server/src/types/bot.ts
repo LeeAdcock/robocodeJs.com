@@ -27,6 +27,18 @@ import { logger, LogEvent } from '../util/logger';
 // send is not a crash). Tunable via env so it can be tightened in prod.
 export const MAX_SENDS_PER_TICK = Number(process.env.MAX_SENDS_PER_TICK) || 50;
 
+// A tank's collision radius (half its width): bots contact a wall when their
+// center comes within one radius of it, and contact bots/bullets within two.
+// Mirrored into the sandbox as the bot.radius attribute (compiler.ts).
+export const BOT_RADIUS = 16;
+// Degrees the body turns per tick, units/tick² toward the speed target, and
+// the body's top speed. Mirrored into the sandbox as the
+// bot.turnRate/acceleration/maxSpeed attributes (compiler.ts); BOT_TURN_SPEED
+// also seeds the per-instance orientationVelocity runtime field below.
+export const BOT_TURN_SPEED = 10;
+export const BOT_ACCELERATION = 2;
+export const BOT_MAX_SPEED = 5;
+
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
 // methods are all we need — and all that scheduleFactory's Timer shares.
@@ -57,7 +69,7 @@ export default class Bot implements Point, Orientated {
 
   public orientation = 0;
   public orientationTarget = 0;
-  public orientationVelocity = 10;
+  public orientationVelocity = BOT_TURN_SPEED;
 
   public x: number;
   public y: number;
@@ -65,8 +77,6 @@ export default class Bot implements Point, Orientated {
   public id: string = randomUUID();
   public speed = 0;
   public speedTarget = 0;
-  public speedAcceleration = 2;
-  public speedMax = 5;
   // Dynamic event-dispatch table: populated across the isolated-vm boundary
   // (compiler.ts) and invoked positionally by Simulation, so the value type is
   // intentionally untyped.
@@ -124,8 +134,12 @@ export default class Bot implements Point, Orientated {
 
     let overallClosestBot: number | null;
     do {
-      this.x = 16 + (env.getArena().getWidth() - 32) * env.random();
-      this.y = 16 + (env.getArena().getHeight() - 32) * env.random();
+      this.x =
+        BOT_RADIUS +
+        (env.getArena().getWidth() - BOT_RADIUS * 2) * env.random();
+      this.y =
+        BOT_RADIUS +
+        (env.getArena().getHeight() - BOT_RADIUS * 2) * env.random();
 
       // Keep iterating if we placed this bot too close to another
       overallClosestBot = env
@@ -368,10 +382,10 @@ export default class Bot implements Point, Orientated {
   }
 
   setSpeed(d: number) {
-    // Clamp symmetrically: the physics caps actual speed at ±speedMax, so an
-    // unclamped negative target (e.g. -10) would be unreachable and leave the
-    // returned promise pending forever.
-    const target = Math.max(-this.speedMax, Math.min(d, this.speedMax));
+    // Clamp symmetrically: the physics caps actual speed at ±BOT_MAX_SPEED, so
+    // an unclamped negative target (e.g. -10) would be unreachable and leave
+    // the returned promise pending forever.
+    const target = Math.max(-BOT_MAX_SPEED, Math.min(d, BOT_MAX_SPEED));
     if (target === this.speedTarget) {
       return Promise.resolve();
     }
@@ -389,8 +403,8 @@ export default class Bot implements Point, Orientated {
       y: this.y,
       speed: this.speed,
       speedTarget: this.speedTarget,
-      speedAcceleration: this.speedAcceleration,
-      speedMax: this.speedMax,
+      speedAcceleration: BOT_ACCELERATION,
+      speedMax: BOT_MAX_SPEED,
     });
     return waitUntil(
       this.env,

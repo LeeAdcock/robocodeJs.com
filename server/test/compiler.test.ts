@@ -7,7 +7,7 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import compiler from '../src/util/compiler';
-import Bot from '../src/types/bot';
+import Bot, { BOT_MAX_SPEED } from '../src/types/bot';
 import { Process } from '../src/types/environment';
 import { Event } from '../src/types/event';
 import { timerTick } from '../src/util/scheduleFactory';
@@ -102,6 +102,19 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('clock.getTime()')).toBe(42);
   });
 
+  it('mirrors the physics constants as plain data properties with the engine values', () => {
+    // Interpolated at init via compiler's num(), so these assert the sandbox
+    // copies match the real engine values.
+    expect(ctx.read('bot.radius')).toBe(16);
+    expect(ctx.read('bot.maxSpeed')).toBe(5);
+    expect(ctx.read('bot.acceleration')).toBe(2);
+    expect(ctx.read('bot.turnRate')).toBe(10);
+    expect(ctx.read('bot.turret.turnRate')).toBe(4);
+    expect(ctx.read('bot.turret.bulletSpeed')).toBe(25);
+    expect(ctx.read('bot.turret.bulletDamage')).toBe(25);
+    expect(ctx.read('bot.radar.turnRate')).toBe(4);
+  });
+
   // The fixture arena is deliberately non-square (750×600) so these fail
   // loudly if any helper assumes width === height.
   it('arena.contains tests raw arena bounds, edges inclusive', () => {
@@ -189,9 +202,9 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.bot.turret.radar.orientationTarget).toBe(10);
   });
 
-  it('clamps setSpeed to the bot speedMax', () => {
+  it('clamps setSpeed to BOT_MAX_SPEED', () => {
     ctx.run('bot.setSpeed(1000).catch(() => {})');
-    expect(ctx.bot.speedTarget).toBe(ctx.bot.speedMax);
+    expect(ctx.bot.speedTarget).toBe(BOT_MAX_SPEED);
   });
 
   it('registers event handlers and runs them through the Reference bridge', async () => {

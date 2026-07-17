@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { computeSpawns } from '../src/util/placement';
 import { mulberry32 } from '../src/util/random';
+
+// placement now imports BOT_RADIUS from types/bot, whose module graph reaches
+// AppService's CREATE TABLE query at import; stub the pool so these pure
+// geometry tests never reach for a real Postgres.
+vi.mock('../src/util/db', () => ({
+  default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
+}));
 
 const W = 750;
 const H = 750;

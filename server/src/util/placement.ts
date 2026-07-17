@@ -24,8 +24,10 @@
 // draw count here changes which reproducible match a given seed maps to — not
 // reproducibility itself.
 //
-// Pure and dependency-free (takes width/height and a [0,1) rng) so it is trivially
-// unit-testable and reproducible.
+// Pure (takes width/height and a [0,1) rng, plus one shared geometry constant)
+// so it is trivially unit-testable and reproducible.
+
+import { BOT_RADIUS } from '../types/bot';
 
 export interface Spawn {
   x: number;
@@ -33,8 +35,6 @@ export interface Spawn {
   orientation: number; // absolute compass heading, 0 = north, clockwise
 }
 
-// Keep bots off the walls, matching the 16u inset the old placement used.
-const MARGIN = 16;
 // Minimum spacing between a team's own bots, and the retry budget the rejection
 // sampler gets before it falls back to the best-spaced candidate it has seen.
 const MIN_SEP = 40;
@@ -65,8 +65,12 @@ export function computeSpawns(
 
   const cx = width / 2;
   const cy = height / 2;
-  // Max distance from center a bot may occupy while staying off the walls.
-  const usable = Math.min(width, height) / 2 - MARGIN;
+  // Max distance from center a bot may occupy while staying off the walls (a
+  // bot's center must stay one radius from the edge). BOT_RADIUS is read only
+  // inside this function, never at module scope: bot.ts reaches this module
+  // through environment.ts, so a module-scope read would run mid-cycle while
+  // bot.ts is still initializing.
+  const usable = Math.min(width, height) / 2 - BOT_RADIUS;
 
   // Radius a team's bots scatter within, and how far each team's center sits from
   // the arena center. Sized (as the old formation was) so clusters stay inside the
@@ -134,10 +138,13 @@ export function computeSpawns(
     const bots: Spawn[] = offsets.map((o) => {
       // Safety clamp (a no-op for the square arena, where the radii above keep
       // every bot in bounds); guards odd width/height in the common case.
-      const x = Math.max(MARGIN, Math.min(width - MARGIN, center.x + o.x - mx));
+      const x = Math.max(
+        BOT_RADIUS,
+        Math.min(width - BOT_RADIUS, center.x + o.x - mx)
+      );
       const y = Math.max(
-        MARGIN,
-        Math.min(height - MARGIN, center.y + o.y - my)
+        BOT_RADIUS,
+        Math.min(height - BOT_RADIUS, center.y + o.y - my)
       );
       return { x, y, orientation: headingToward(x, y, cx, cy) };
     });

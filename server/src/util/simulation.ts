@@ -5,6 +5,10 @@ import Environment from '../types/environment';
 // `import type` is erased at compile time, so the cycle never exists at runtime.
 import type { Process } from '../types/environment';
 import type Bot from '../types/bot';
+import { BOT_RADIUS, BOT_MAX_SPEED, BOT_ACCELERATION } from '../types/bot';
+import { TURRET_RELOAD_RATE } from '../types/botTurret';
+import { RADAR_CHARGE_RATE } from '../types/botRadar';
+import { BULLET_DAMAGE, BULLET_MISS_PENALTY } from '../types/bullet';
 import { normalizeAngle, toRelativeBearing } from './geometry';
 
 /*
@@ -128,8 +132,9 @@ export default {
             bot.handlers[Event.TICK]();
           }
 
-          if (bot.turret.loaded < 100) bot.turret.loaded += 2.5;
-          if (bot.turret.radar.charged < 100) bot.turret.radar.charged += 10;
+          if (bot.turret.loaded < 100) bot.turret.loaded += TURRET_RELOAD_RATE;
+          if (bot.turret.radar.charged < 100)
+            bot.turret.radar.charged += RADAR_CHARGE_RATE;
         });
     });
 
@@ -157,7 +162,7 @@ export default {
                     90
                 );
 
-                if (distance < 32) {
+                if (distance < BOT_RADIUS * 2) {
                   collided = true;
                   bot.stats.timesCollided += 1;
                   otherBot.stats.timesCollided += 1;
@@ -203,7 +208,9 @@ export default {
                         90
                     );
 
-                    if (distance < 32) {
+                    // A bullet lands anywhere within one tank width (two
+                    // radii) of the target's center.
+                    if (distance < BOT_RADIUS * 2) {
                       // We have a hit
                       if (bot.handlers[Event.HIT]) {
                         bot.handlers[Event.HIT]({
@@ -218,7 +225,7 @@ export default {
                       // for the kill if the bot doesn't recover. Friendly fire is
                       // recorded here too — it really happened — but applyEliminations
                       // refuses to credit it as a kill.
-                      const dealt = damage(bot, 25, otherBot);
+                      const dealt = damage(bot, BULLET_DAMAGE, otherBot);
                       bot.stats.timesHit += 1;
                       otherBot.stats.shotsHit += 1;
                       otherBot.stats.damageDealt += dealt;
@@ -250,10 +257,10 @@ export default {
           const arenaWidth = env.getArena().getWidth();
           const arenaHeight = env.getArena().getHeight();
           if (
-            newX < 16 ||
-            newX > arenaWidth - 16 ||
-            newY < 16 ||
-            newY > arenaHeight - 16
+            newX < BOT_RADIUS ||
+            newX > arenaWidth - BOT_RADIUS ||
+            newY < BOT_RADIUS ||
+            newY > arenaHeight - BOT_RADIUS
           ) {
             collided = true;
             bot.stats.timesCollided += 1;
@@ -266,8 +273,14 @@ export default {
               // yields 0 (dead ahead); a glancing or corner hit is now meaningful.
               // `friendly` is intentionally omitted for a wall (undefined — the
               // thing we hit isn't a bot, so it's neither a teammate nor an enemy).
-              const wallX = newX < 16 ? -1 : newX > arenaWidth - 16 ? 1 : 0;
-              const wallY = newY < 16 ? -1 : newY > arenaHeight - 16 ? 1 : 0;
+              const wallX =
+                newX < BOT_RADIUS ? -1 : newX > arenaWidth - BOT_RADIUS ? 1 : 0;
+              const wallY =
+                newY < BOT_RADIUS
+                  ? -1
+                  : newY > arenaHeight - BOT_RADIUS
+                    ? 1
+                    : 0;
               const wallAngle = normalizeAngle(
                 Math.atan2(wallY, wallX) * (180 / Math.PI) - 90
               );
@@ -286,13 +299,13 @@ export default {
             bot.stats.distanceTraveled += bot.speed;
 
             // Manage acceleration / deceleration
-            if (bot.speed > bot.speedTarget) bot.speed -= bot.speedAcceleration;
-            if (bot.speed < bot.speedTarget) bot.speed += bot.speedAcceleration;
-            if (Math.abs(bot.speed - bot.speedTarget) < bot.speedAcceleration)
+            if (bot.speed > bot.speedTarget) bot.speed -= BOT_ACCELERATION;
+            if (bot.speed < bot.speedTarget) bot.speed += BOT_ACCELERATION;
+            if (Math.abs(bot.speed - bot.speedTarget) < BOT_ACCELERATION)
               bot.speed = bot.speedTarget;
             bot.speed = Math.max(
-              -bot.speedMax,
-              Math.min(bot.speedMax, bot.speed)
+              -BOT_MAX_SPEED,
+              Math.min(BOT_MAX_SPEED, bot.speed)
             );
           } else {
             bot.speedTarget = 0;
@@ -379,7 +392,7 @@ export default {
               // Self-inflicted, so nobody is credited. This runs for dead bots too
               // — their bullets stay in flight — but `damage` freezes a dead bot's
               // attribution, so a corpse's stray miss can't rob its killer.
-              damage(bot, 3, null);
+              damage(bot, BULLET_MISS_PENALTY, null);
               env.emit('event', {
                 type: 'bulletRemoved',
                 time: env.getTime(),
