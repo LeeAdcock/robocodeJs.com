@@ -62,6 +62,11 @@ latest bearing and distance. The `< 30` is an "are we close enough?" check.
   - In START: `this.home = bot.dropMarker();`
   - In a HIT handler: `bot.turn(this.home.getBearing()).catch(() => {}); bot.setSpeed(5);`
 - Log the distance as you travel: `console.log('distance to target', this.target.getDistance());`
+- Before pinning a spot, check it's actually in the arena:
+  `if (arena.contains(x, y)) { this.target = arena.createMarker(x, y); }`
+- `arena.getNearestWall()` gives you a **ready-made marker** on the closest wall — log
+  `arena.getNearestWall().getDistance()` in the TICK handler and watch it shrink as you
+  approach a wall. (You'll stop a little short of 0 — you collide before the wall itself.)
 
 ## Common questions
 

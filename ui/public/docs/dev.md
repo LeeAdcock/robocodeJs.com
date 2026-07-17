@@ -20,6 +20,8 @@ The arena where bots live is a square. Headings are specified in degrees on a co
 
 - `arena.getWidth() : number` Returns the arena's width in units.
 - `arena.getHeight() : number` Returns the arena's height in units.
+- `arena.contains(x, y) : boolean` Returns whether the coordinate lies inside the arena (between 0 and the width/height, edges inclusive).
+- `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary — `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 units before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
 
 Virtual markers can be created in the arena that provide simplified calculations for angles and distance. These markers are either dropped at the current bot location, or at a specified coordinate.
 
@@ -31,6 +33,7 @@ The `marker` object returned has several convenience methods:
 - `marker.getY() : number` Returns the marker's y coordinate.
 - `marker.getDistance() : number` Returns the distance from the bot to the marker, rounded down to a whole number.
 - `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading — `bot.turn(marker.getBearing())` faces it.
+- `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena — the same check as `arena.contains(marker.getX(), marker.getY())`.
 
 # Events Overview
 
