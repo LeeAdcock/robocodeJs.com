@@ -53,6 +53,15 @@ code {
     source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
+/* While arena state is being replaced from a REST snapshot (tab-visible resync,
+   SSE reconnect, restart — see util/motionSnap.ts), suppress the sprite CSS
+   transitions so bots/turrets/bullets snap to their new spots instead of
+   gliding there in defiance of the arena physics. The sprites set their
+   transitions as inline styles, so `!important` is required to win. */
+svg.motion-snap * {
+  transition: none !important;
+}
+
 .topNavBar .nav-link {
   color: white !important;
   text-decoration: underline;
