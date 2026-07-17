@@ -9,6 +9,13 @@
      The dark-mode --link (#d9a066 on #282c34) already passes. */
   --link: #96591f;
   --code: #1a7f37;
+  /* Faint warm tint behind inline code chips and block code panels. */
+  --code-bg: #f5f3ed;
+  --code-border: rgba(0, 0, 0, 0.08);
+  /* Code text: a muted warm ink, a touch softer than the near-black body text,
+     so code settles into the tint without a pure-black harshness or a hue that
+     would compete with the bronze links / gold brand. */
+  --code-fg: #423e37;
   --rule: #aa6c39;
   /* The one brand accent (the wordmark gold), used consistently for the
      wordmark, the avatar ring, and nav hover/active states. Kept identical in
@@ -32,6 +39,12 @@ body.dark {
   --fg: #d6d6d6;
   --link: #d9a066;
   --code: #6ab04c;
+  /* Elevated surface — lighter than --bg (#282c34) so code reads as raised, not
+     a hole punched in the page (the dark-mode convention). */
+  --code-bg: #31353f;
+  --code-border: rgba(255, 255, 255, 0.1);
+  /* Warm light-grey, slightly dimmer/warmer than the body text. */
+  --code-fg: #c6c1b6;
   --rule: #6b4a2b;
   /* Warmer/brighter so it still reads over the night-mode tint. */
   --damage-glow-color: #ff5a3c;
@@ -222,18 +235,54 @@ svg.motion-snap * {
   margin-top: 1.1em;
 }
 
+/* Code samples read as literal via a subtle background tint alone; the text
+   stays in the body colour in both inline and block contexts, so the only
+   accent colours in prose are links (bronze) and the brand (gold), and code
+   isn't signalled twice. box-decoration-break keeps the rounded inline chip
+   whole when a snippet wraps across a line. */
 .markdown code {
-  color: var(--code);
+  /* Muted warm ink for code text (also overrides Bootstrap Reboot's pink
+     inline-code default, `code { color: #d63384 }`). Block `pre code` doesn't
+     set its own colour, so it inherits this same token — inline and block match. */
+  color: var(--code-fg);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .markdown ul {
   list-style-type: square;
 }
 
+/* Block code: the same tint and (via the code font-size below) the same text
+   size and body colour as the inline chip, so the two read consistently — with
+   a bronze accent stripe down the left as the panel's signature flourish. Long
+   lines scroll rather than wrap. */
 .markdown pre {
   margin-left: 20px;
+  background: var(--code-bg);
   border-left: 3px solid var(--rule);
-  padding-left: 10px;
+  border-radius: 0 4px 4px 0;
+  padding: 10px 12px;
+  font-size: 0.9em;
+  overflow-x: auto;
+}
+
+/* The nested <code> in a block drops the inline chip treatment (no double
+   background/border) — the panel already carries the tint — and inherits the
+   body text colour like inline code. font-size:1em resets the 0.9em from the
+   `.markdown code` rule above so it isn't multiplied by the panel's own 0.9em
+   (which would render block code smaller than inline); the panel sets the size. */
+.markdown pre code {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: 1em;
 }
 
 .markdown a {
