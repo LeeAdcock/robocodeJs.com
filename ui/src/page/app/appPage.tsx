@@ -5,8 +5,9 @@ import Editor, {
 } from './appEditor';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Toolbar from './appEditorToolbar';
+import SaveIndicator, { SaveState } from './appSaveIndicator';
 import * as prettier from 'prettier/standalone';
 import babel from 'prettier/plugins/babel';
 import estree from 'prettier/plugins/estree';
@@ -41,14 +42,25 @@ export default function AppPage(props: AppPageProps) {
   // recompile), regardless of whether a fault annotation was set.
   const [clearMarkers, setClearMarkers] = useState(0);
   const { userId, appId } = useParams();
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined
-  );
   // The last source we know is persisted on the server (from the initial load
   // or an explicit/auto save). Used to skip redundant no-op saves — most
   // importantly the just-loaded source, which the debounced effect would
-  // otherwise PUT straight back unchanged on every editor open.
-  const lastSavedRef = useRef<string | undefined>(undefined);
+  // otherwise PUT straight back unchanged on every editor open. It's state
+  // rather than a ref because the toolbar's saved/unsaved indicator is derived
+  // from it, so a save has to re-render.
+  const [savedCode, setSavedCode] = useState<string | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
+
+  // What the arena is running versus what's in the buffer. Undefined savedCode
+  // means the initial load hasn't landed yet, so there is nothing to compare
+  // and nothing worth telling the user.
+  const saveState: SaveState = saving
+    ? 'saving'
+    : savedCode === undefined
+      ? 'loading'
+      : code === savedCode
+        ? 'saved'
+        : 'unsaved';
 
   // Editor font size, persisted so the preference survives reloads.
   const [fontSize, setFontSize] = useState(() => {
@@ -108,7 +120,7 @@ export default function AppPage(props: AppPageProps) {
   useEffect(() => {
     axios.get(`/api/user/${userId}/app/${appId}/source`).then((res) => {
       // The freshly loaded source is already what's on the server.
-      lastSavedRef.current = res.data;
+      setSavedCode(res.data);
       setCode(res.data);
     });
     axios
@@ -116,39 +128,67 @@ export default function AppPage(props: AppPageProps) {
       .then((res) => setApp(res.data));
   }, [userId, appId]);
 
-  // Debounced auto-save of the current code (30s after the last edit).
-  useEffect(() => {
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      // Nothing changed since the last save/load — skip the pointless PUT.
-      if (code === lastSavedRef.current) return;
-      lastSavedRef.current = code;
-      axios.put(`/api/user/${userId}/app/${appId}/source`, code, {
-        headers: { 'content-type': 'application/octet-stream' },
-      });
-    }, 30000);
-    return () => clearTimeout(saveTimer.current);
-  }, [code, userId, appId]);
-
-  const doExecute = () => {
-    lastSavedRef.current = code;
-    axios
-      .put(`/api/user/${userId}/app/${appId}/source`, code, {
+  // The one path that persists source. `savedCode` only advances once the PUT
+  // resolves, so a failed save leaves the indicator reading "Unsaved changes"
+  // — the point of the indicator is that it never claims the arena has code it
+  // doesn't have.
+  const saveSource = (source: string) => {
+    setSaving(true);
+    return axios
+      .put(`/api/user/${userId}/app/${appId}/source`, source, {
         headers: { 'content-type': 'application/octet-stream' },
       })
-      .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`));
+      .then(() => {
+        setSavedCode(source);
+      })
+      .catch(() => {
+        setNotice('');
+        setError('Could not save your changes. Check your connection.');
+        setTimeout(() => setError(''), 15000);
+        throw new Error('save failed');
+      })
+      .finally(() => setSaving(false));
+  };
+
+  // Debounced auto-save of the current code (30s after the last edit).
+  useEffect(() => {
+    // Nothing changed since the last save/load, or the load hasn't landed yet
+    // — skip the pointless PUT.
+    if (savedCode === undefined || code === savedCode) return;
+    const timer = setTimeout(() => {
+      saveSource(code)
+        .then(() => {
+          setNotice('Saved automatically.');
+          setTimeout(() => setNotice(''), 4000);
+        })
+        // saveSource already surfaced the failure in the error banner.
+        .catch(() => undefined);
+    }, 30000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, savedCode, userId, appId]);
+
+  const doExecute = () => {
+    saveSource(code)
+      .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`))
+      .then(() => {
+        setNotice('Saved — the arena is running your latest code.');
+        setTimeout(() => setNotice(''), 4000);
+      })
+      .catch(() => undefined);
   };
 
   // Reboot: save the current code, then re-run the bot's START handler. Plain
   // saving updates the logic without re-initializing, so this is the explicit
   // way to re-run startup setup.
   const doReboot = () => {
-    lastSavedRef.current = code;
-    axios
-      .put(`/api/user/${userId}/app/${appId}/source`, code, {
-        headers: { 'content-type': 'application/octet-stream' },
+    saveSource(code)
+      .then(() => axios.post(`/api/user/${userId}/app/${appId}/reboot`))
+      .then(() => {
+        setNotice('Saved — your bots restarted with your latest code.');
+        setTimeout(() => setNotice(''), 4000);
       })
-      .then(() => axios.post(`/api/user/${userId}/app/${appId}/reboot`));
+      .catch(() => undefined);
   };
 
   const doDelete = () => {
@@ -236,6 +276,8 @@ export default function AppPage(props: AppPageProps) {
   };
 
   const doClean = async () => {
+    setError('');
+    setNotice('');
     try {
       // Prettier 3's format() returns a Promise — await it before setting the
       // code, otherwise the editor would be filled with "[object Promise]".
@@ -246,8 +288,18 @@ export default function AppPage(props: AppPageProps) {
         plugins: [babel, estree],
       });
       setCode(prettyCode);
+      setNotice(
+        prettyCode === code ? 'Code is already tidy.' : 'Code reformatted.'
+      );
+      setTimeout(() => setNotice(''), 4000);
     } catch {
-      // Leave the code unchanged if it can't be parsed/formatted.
+      // Leave the code unchanged if it can't be parsed/formatted. Prettier only
+      // fails here on a syntax error, so point at Check rather than repeating
+      // its parse message in different words.
+      setError(
+        'Could not reformat — the code has a syntax error. Use Check for errors (Ctrl-Enter) to find it.'
+      );
+      setTimeout(() => setError(''), 15000);
     }
   };
 
@@ -284,6 +336,7 @@ export default function AppPage(props: AppPageProps) {
                 {titleCase(app?.name)}
               </>
             )}
+            <SaveIndicator saveState={saveState} />
           </Col>
           <Col style={{ paddingRight: '0' }}>
             <Toolbar
