@@ -29,15 +29,8 @@ export const MAX_SENDS_PER_TICK = Number(process.env.MAX_SENDS_PER_TICK) || 50;
 
 // A tank's collision radius (half its width): bots contact a wall when their
 // center comes within one radius of it, and contact bots/bullets within two.
+// Mirrored into the sandbox as the bot.radius attribute (compiler.ts).
 export const BOT_RADIUS = 16;
-// Degrees the body turns per tick, units/tick² toward the speed target, and the
-// body's top speed. These seed the per-instance fields below (runtime state the
-// simulation and UI events read); the constants are the single source of the
-// engine values. Each is mirrored into the sandbox as a bot-visible attribute
-// (bot.radius, bot.turnRate, …) in compiler.ts.
-export const BOT_TURN_SPEED = 10;
-export const BOT_ACCELERATION = 2;
-export const BOT_MAX_SPEED = 5;
 
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
@@ -69,7 +62,7 @@ export default class Bot implements Point, Orientated {
 
   public orientation = 0;
   public orientationTarget = 0;
-  public orientationVelocity = BOT_TURN_SPEED;
+  public orientationVelocity = 10;
 
   public x: number;
   public y: number;
@@ -77,8 +70,8 @@ export default class Bot implements Point, Orientated {
   public id: string = randomUUID();
   public speed = 0;
   public speedTarget = 0;
-  public speedAcceleration = BOT_ACCELERATION;
-  public speedMax = BOT_MAX_SPEED;
+  public speedAcceleration = 2;
+  public speedMax = 5;
   // Dynamic event-dispatch table: populated across the isolated-vm boundary
   // (compiler.ts) and invoked positionally by Simulation, so the value type is
   // intentionally untyped.

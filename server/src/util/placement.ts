@@ -60,18 +60,17 @@ export function computeSpawns(
   height: number,
   rng: () => number
 ): Spawn[][] {
-  // Keep bots off the walls: a bot's center must stay one radius from the edge.
-  // Read lazily (inside the function, not at module scope): bot.ts reaches this
-  // module through environment.ts, so a module-scope read of BOT_RADIUS would
-  // run mid-cycle while bot.ts is still initializing.
-  const MARGIN = BOT_RADIUS;
   const teams: Spawn[][] = [];
   if (teamCount <= 0 || botsPerTeam <= 0) return teams;
 
   const cx = width / 2;
   const cy = height / 2;
-  // Max distance from center a bot may occupy while staying off the walls.
-  const usable = Math.min(width, height) / 2 - MARGIN;
+  // Max distance from center a bot may occupy while staying off the walls (a
+  // bot's center must stay one radius from the edge). BOT_RADIUS is read only
+  // inside this function, never at module scope: bot.ts reaches this module
+  // through environment.ts, so a module-scope read would run mid-cycle while
+  // bot.ts is still initializing.
+  const usable = Math.min(width, height) / 2 - BOT_RADIUS;
 
   // Radius a team's bots scatter within, and how far each team's center sits from
   // the arena center. Sized (as the old formation was) so clusters stay inside the
@@ -139,10 +138,13 @@ export function computeSpawns(
     const bots: Spawn[] = offsets.map((o) => {
       // Safety clamp (a no-op for the square arena, where the radii above keep
       // every bot in bounds); guards odd width/height in the common case.
-      const x = Math.max(MARGIN, Math.min(width - MARGIN, center.x + o.x - mx));
+      const x = Math.max(
+        BOT_RADIUS,
+        Math.min(width - BOT_RADIUS, center.x + o.x - mx)
+      );
       const y = Math.max(
-        MARGIN,
-        Math.min(height - MARGIN, center.y + o.y - my)
+        BOT_RADIUS,
+        Math.min(height - BOT_RADIUS, center.y + o.y - my)
       );
       return { x, y, orientation: headingToward(x, y, cx, cy) };
     });
