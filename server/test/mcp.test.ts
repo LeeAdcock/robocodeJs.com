@@ -808,12 +808,16 @@ describe('mcp tools', () => {
 
     const filled = await client.getPrompt({
       name: 'write_app',
-      arguments: { goal: 'circle and snipe', arenaId: 'ar1' },
+      arguments: { goal: 'circle and snipe' },
     });
     const text = (filled.messages[0].content as { text: string }).text;
     expect(text).toContain('circle and snipe');
     // It should steer the model to the API docs resource.
     expect(text).toContain('robocodejs://docs/dev');
+    // write_app is authoring-only: it stops after create_app and does not drive
+    // any arena, so it never mentions the arena deploy/run tools.
+    expect(text).not.toContain('add_app_to_arena');
+    expect(text).not.toContain('restart_arena');
   });
 });
 

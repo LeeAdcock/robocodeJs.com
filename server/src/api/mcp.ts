@@ -1339,10 +1339,9 @@ const registerPrompts = (server: McpServer): void => {
         goal: z
           .string()
           .describe('What the bot should do, e.g. "circle and snipe"'),
-        arenaId: z.string().describe('Arena to drop it into'),
       },
     },
-    ({ goal, arenaId }) => ({
+    ({ goal }) => ({
       messages: [
         {
           role: 'user',
@@ -1359,13 +1358,11 @@ const registerPrompts = (server: McpServer): void => {
               `and follow it: open with a header comment stating the strategy, ` +
               `name the tuning constants, pull tricky math into named helpers, and ` +
               `comment the "why" — write it so a human can get up to speed fast. ` +
-              `Then:\n` +
-              `1. format_app_source on your code, then create_app (descriptive name + ` +
-              `the formatted source).\n` +
-              `2. add_app_to_arena (arenaId ${arenaId}) and restart_arena.\n` +
-              `3. Check arena_status and recent_logs; iterate with set_app_source ` +
-              `+ reboot_app until it behaves (run format_app_source before each save). ` +
-              `Keep the code idiomatic to the docs and readable per docs/code-style.`,
+              `Then run format_app_source on your code and create_app with a ` +
+              `descriptive name and the formatted source. Stop there and report ` +
+              `the new appId — this prompt only writes the app. To try it in a ` +
+              `battle, run the play_match prompt; to diagnose one that misbehaves, ` +
+              `run debug_app.`,
           },
         },
       ],
