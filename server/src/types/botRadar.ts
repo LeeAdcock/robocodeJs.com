@@ -7,6 +7,16 @@ import {
   toRelativeBearing,
 } from '../util/geometry';
 
+// The radar's detection area IS the beam drawn under the radar dish in the
+// arena (ui arenaBot.tsx): a quadrilateral one tank-width (±16) across at the
+// bot, whose sides flare at ~10° to ±122 units at its 600-unit reach. A bot is
+// detected when its center is inside that shape. Long and narrow on purpose —
+// like classic Robocode, vision is directional: you can see far, but only
+// where you choose to look. Keep these numbers in sync with the UI polygon.
+export const RADAR_RANGE = 600;
+export const RADAR_BASE_HALF_WIDTH = 16;
+export const RADAR_TIP_HALF_WIDTH = 122;
+
 export class BotRadar implements Orientated {
   public orientation: number;
   public orientationTarget: number;
@@ -143,10 +153,21 @@ export class BotRadar implements Orientated {
               this.bot.turret.getOrientation() +
               this.getOrientation()
           );
+          // Project the target into the radar's frame: how far ahead along the
+          // beam, and how far off its centerline. Inside the beam = within the
+          // quadrilateral's linearly widening half-width at that depth.
+          const offAxis =
+            (normalizeAngle(angle - radarAngle + 180) - 180) * (Math.PI / 180);
+          const forward = distance * Math.cos(offAxis);
+          const lateral = Math.abs(distance * Math.sin(offAxis));
+          const halfWidthAtDepth =
+            RADAR_BASE_HALF_WIDTH +
+            ((RADAR_TIP_HALF_WIDTH - RADAR_BASE_HALF_WIDTH) * forward) /
+              RADAR_RANGE;
           if (
-            distance < 300 &&
-            Math.abs(normalizeAngle(angle - radarAngle + 180) - 180) <
-              (500 - distance) * (0.5 / 10)
+            forward > 0 &&
+            forward <= RADAR_RANGE &&
+            lateral <= halfWidthAtDepth
           ) {
             if (otherBot.handlers[Event.DETECTED]) {
               otherBot.handlers[Event.DETECTED]();

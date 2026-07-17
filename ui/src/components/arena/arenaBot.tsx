@@ -123,7 +123,14 @@ const BotRadarSvg = (props: BotRadarProps) => {
       )}
     >
       {props.radarOn && (
-        <polygon points="-4,0,4,0,60,300,-60,300" fill="url(#radar)"></polygon>
+        // This polygon IS the detection contract: the server detects any bot
+        // whose center is inside this exact shape (server botRadar.ts —
+        // RADAR_RANGE / RADAR_BASE_HALF_WIDTH / RADAR_TIP_HALF_WIDTH). Keep
+        // the two in sync.
+        <polygon
+          points="-16,0,16,0,122,600,-122,600"
+          fill="url(#radar)"
+        ></polygon>
       )}
       <image
         href={'/sprites/barrelRust_top.png'}

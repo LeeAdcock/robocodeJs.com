@@ -376,7 +376,7 @@ describe('BotRadar.scan', () => {
   it('ignores an enemy out of range', async () => {
     const { bot, env } = makeRealBot();
     bot.turret.radar.charged = 100;
-    withEnemies(env, [enemy({ x: 100, y: 700 })]); // distance 600 > 300
+    withEnemies(env, [enemy({ x: 100, y: 750 })]); // distance 650 > 600
     await expect(bot.turret.radar.scan()).resolves.toHaveLength(0);
   });
 
@@ -384,6 +384,42 @@ describe('BotRadar.scan', () => {
     const { bot, env } = makeRealBot();
     bot.turret.radar.charged = 100;
     withEnemies(env, [enemy({ x: 100, y: 0 })]); // behind (180° off)
+    await expect(bot.turret.radar.scan()).resolves.toHaveLength(0);
+  });
+
+  // The beam is the quadrilateral drawn in the arena: ±16 at the bot flaring
+  // to ±122 at 600 units. These pin its edges. The scanning bot sits at
+  // (100, 100) facing 0° (internally +y), so "forward" is +y and "lateral" ±x.
+  it('detects a point-blank enemy within the one-tank-wide beam base', async () => {
+    const { bot, env } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    // forward 10, lateral 14 — inside the ±16 base (the old angular cone
+    // would have missed a 54°-off adjacent bot entirely).
+    withEnemies(env, [enemy({ x: 114, y: 110 })]);
+    await expect(bot.turret.radar.scan()).resolves.toHaveLength(1);
+  });
+
+  it('ignores a point-blank enemy just outside the beam base', async () => {
+    const { bot, env } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    // forward 10, lateral 24 — outside the ~±17.8 half-width at that depth.
+    withEnemies(env, [enemy({ x: 124, y: 110 })]);
+    await expect(bot.turret.radar.scan()).resolves.toHaveLength(0);
+  });
+
+  it('detects a distant enemy inside the widened beam tip', async () => {
+    const { bot, env } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    // forward 500, lateral 100 — inside the ~±104 half-width at that depth.
+    withEnemies(env, [enemy({ x: 200, y: 600 })]);
+    await expect(bot.turret.radar.scan()).resolves.toHaveLength(1);
+  });
+
+  it('ignores a distant enemy outside the beam sides', async () => {
+    const { bot, env } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    // forward 500, lateral 160 — outside the ~±104 half-width at that depth.
+    withEnemies(env, [enemy({ x: 260, y: 600 })]);
     await expect(bot.turret.radar.scan()).resolves.toHaveLength(0);
   });
 
