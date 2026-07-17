@@ -7,6 +7,8 @@ import Form from 'react-bootstrap/Form';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 import { FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
+import { colors } from '../../util/colors';
+import { titleCase } from '../../util/titleCase';
 
 // Log console font-size bounds (mirrors the editor's zoom controls). Kept local
 // rather than imported from appEditor so this page doesn't pull in Ace.
@@ -195,6 +197,37 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       warn: 'yellow',
       debug: 'blue',
       info: 'green',
+    };
+
+    // Team chip for a log line: the app's arena color swatch (the same mini tank
+    // sprite the navbar/roster use) plus its name, so a line reads as its team at
+    // a glance rather than only from the internal `<id>` — which is kept after it
+    // to disambiguate a team's five bots (GitHub #253). An app with no live arena
+    // index (logged then removed mid-match) gets a muted neutral swatch and no
+    // name (its only "name" would be the raw id, already implied by `<id>`).
+    const teamChip = (appId: string) => {
+      const app = appMap.get(appId);
+      const index = app?.index;
+      const src =
+        index !== undefined
+          ? `/sprites/tank_${colors[index]}.png`
+          : '/sprites/tank_dark.png';
+      const name = app && app.name !== appId ? titleCase(app.name) : '';
+      return (
+        <span className="team" style={{ marginRight: '5px' }}>
+          <img
+            src={src}
+            alt=""
+            style={{
+              height: '1em',
+              marginRight: name ? '4px' : 0,
+              verticalAlign: '-0.15em',
+              opacity: index !== undefined ? 1 : 0.4,
+            }}
+          />
+          {name}
+        </span>
+      );
     };
 
     return (
@@ -415,6 +448,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                         </span>
                         ]
                       </span>
+                      {teamChip(record.appId)}
                       <span
                         className="name"
                         style={{

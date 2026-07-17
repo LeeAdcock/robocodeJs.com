@@ -107,6 +107,45 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('Bot 61')).toBeNull();
   });
 
+  it('prefixes each line with the app’s color swatch and name, keeping the bot id', () => {
+    const { container } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [entry({ appId: 'a2', name: '<21>', msg: 'from B' })],
+          index: 1,
+        }}
+      />
+    );
+    // The team chip names the app (Bot B) and the internal id (<21>) is kept
+    // after it; the swatch is the app's arena-index hue (a2 = index 1 → 'dark').
+    expect(screen.getByText('Bot B')).toBeTruthy();
+    expect(screen.getByText('<21>')).toBeTruthy();
+    const swatch = container.querySelector('.team img') as HTMLImageElement;
+    expect(swatch.getAttribute('src')).toContain('tank_dark.png');
+  });
+
+  it('shows a muted neutral swatch and no name for an app no longer in the arena', () => {
+    const { container } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          // 'gone' isn't in `bots` (logged then removed mid-match), so it has no
+          // live arena color — a neutral swatch, and no name (its only "name"
+          // would be the raw id, already implied by <71>).
+          logs: [entry({ appId: 'gone', name: '<71>', msg: 'orphan' })],
+          index: 1,
+        }}
+      />
+    );
+    expect(screen.getByText('orphan')).toBeTruthy();
+    const swatch = container.querySelector('.team img') as HTMLImageElement;
+    expect(swatch.getAttribute('src')).toContain('tank_dark.png');
+    expect(swatch.style.opacity).toBe('0.4');
+  });
+
   it('zooms the log font in and out and persists the size', () => {
     localStorage.clear();
     render(
