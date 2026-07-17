@@ -89,6 +89,13 @@ export default class Bot implements Point, Orientated {
   // A restart builds fresh Bot instances, so it resets automatically.
   public lastDamagedBy: Bot | null = null;
   public stats: BotStats = new BotStats();
+  // Snapshot of `stats` as of the last cumulative-counter flush. Environment.flushStats
+  // persists (stats - flushedStats) and then re-snapshots, which is what makes the
+  // flush idempotent: calling it twice with no ticks in between computes all zeros.
+  // That in turn lets it run at every point where these stats are about to be
+  // destroyed (restart, dispose) without either losing a match's totals or
+  // double-counting them.
+  public flushedStats: BotStats = new BotStats();
   public timers: TimersContainer = new TimersContainer();
   // Per-tick send budget bookkeeping (see MAX_SENDS_PER_TICK / send below). The
   // window is the simulation tick the count belongs to; it resets whenever the

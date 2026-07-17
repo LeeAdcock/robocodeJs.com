@@ -10,6 +10,9 @@ import { runMatchToDecision, DEFAULT_MATCH_TIMEOUT_MS } from '../util/runMatch';
 import { updateRatings, Outcome } from '../util/elo';
 import { isUntouchedStarter } from '../util/starterBots';
 import { logger, LogEvent } from '../util/logger';
+import { recordLadderResult, LadderResult } from '../util/awardAchievements';
+import { UserId } from '../types/user';
+import { BotStats } from '../types/botStats';
 
 // A synthetic owner id for the throwaway arena a ladder match runs in. The arena
 // is never persisted; buildMatchSummary reads the real app owners for the
@@ -197,6 +200,72 @@ class LadderService {
   // timeout), apply the Elo update, flag a fully-crashed app as broken, and
   // record the match. Constructs an ephemeral, non-persisted Environment so it
   // never touches user arenas or the EnvironmentService registry — the caller
+  // Fold a finished match's summary into one achievement award per USER (GitHub
+  // #121). Grouped by userId rather than by app for two reasons: badges are
+  // user-level, and pickPair allows same-owner matchups — without grouping, such a
+  // match would bump one user twice and could hand them both a win and a loss.
+  //
+  // Every input is already in `summary`, so this costs no extra queries. Failures
+  // are swallowed: a badge is never worth failing a ranked match over.
+  // `opts` carries the pre-match ratings rather than reading them from instance
+  // state: workers run concurrently (LADDER_CONCURRENCY), so per-match data must
+  // stay on the call stack.
+  private awardAchievements = async (
+    summary: Awaited<ReturnType<typeof runMatchToDecision>>,
+    opts: {
+      rated: boolean;
+      winnerId: AppId | null;
+      appIdA: AppId;
+      before: { a: number; b: number };
+    }
+  ): Promise<void> => {
+    try {
+      const winnerUserId = summary.match.winner?.userId;
+      const byUser = new Map<UserId, LadderResult>();
+
+      for (const entry of summary.leaderboard) {
+        const userId = entry.userId;
+        if (!userId) continue;
+
+        const existing = byUser.get(userId);
+        if (existing) {
+          // Same owner on both sides: sum the two sides into the single result.
+          for (const [key, value] of Object.entries(entry.stats)) {
+            if (typeof value !== 'number') continue;
+            const k = key as keyof BotStats;
+            existing.stats[k] = (existing.stats[k] ?? 0) + value;
+          }
+          existing.facts.timesHit += entry.stats.timesHit;
+          existing.facts.botsAlive += entry.botsAlive;
+          existing.facts.botsTotal += entry.botsTotal;
+          continue;
+        }
+
+        // The opponent's pre-match rating, for the upset check. Two apps per ladder
+        // match, so "the other one" is unambiguous.
+        const isA = entry.id === opts.appIdA;
+        byUser.set(userId, {
+          userId,
+          stats: { ...entry.stats },
+          facts: {
+            won: !!winnerUserId && winnerUserId === userId,
+            myRatingBefore: isA ? opts.before.a : opts.before.b,
+            opponentRatingBefore: isA ? opts.before.b : opts.before.a,
+            timesHit: entry.stats.timesHit,
+            botsAlive: entry.botsAlive,
+            botsTotal: entry.botsTotal,
+          },
+          winningAppId: opts.winnerId,
+          rated: opts.rated,
+        });
+      }
+
+      await Promise.all([...byUser.values()].map(recordLadderResult));
+    } catch (err) {
+      logger.warn({ err }, 'ladder achievement award failed');
+    }
+  };
+
   // owns teardown, which always happens in the finally.
   runOneMatch = async (
     appIdA: AppId,
@@ -309,6 +378,21 @@ class LadderService {
         deltaA: delta.a,
         deltaB: delta.b,
         seed,
+      });
+
+      // Achievements (GitHub #121). Ladder badges are only worth something because
+      // they can ONLY be earned here, so this is their sole award point — and the
+      // ephemeral env above never gets a stats sink (EnvironmentService installs
+      // those, and this Environment was built directly), so its dispose() in the
+      // finally can't double-count what we record now.
+      //
+      // Awaited inside the try so a failure is caught and logged rather than
+      // rejecting runOneMatch — a badge must never fail or slow a ranked match.
+      await this.awardAchievements(summary, {
+        rated: rate,
+        winnerId: rate ? winnerId : null,
+        appIdA,
+        before,
       });
 
       logger.info(

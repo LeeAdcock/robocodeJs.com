@@ -18,12 +18,20 @@ vi.mock('../src/services/RankedMatchService', () => ({
 vi.mock('../src/services/EnvironmentService', () => ({
   default: { metrics: vi.fn(() => ({ isolates: 0 })) },
 }));
+// LadderService now awards achievements (GitHub #121). Mock the award layer so
+// these tests assert what the ladder HANDS it, and mock the pool so the
+// transitive AchievementService import never reaches for a real Postgres.
+vi.mock('../src/util/db', () => ({ default: { query: vi.fn() } }));
+vi.mock('../src/util/awardAchievements', () => ({
+  recordLadderResult: vi.fn().mockResolvedValue(undefined),
+}));
 
 import appService from '../src/services/AppService';
 import rankedMatchService from '../src/services/RankedMatchService';
 import environmentService from '../src/services/EnvironmentService';
 import { runMatchToDecision } from '../src/util/runMatch';
 import ladderService from '../src/services/LadderService';
+import { recordLadderResult } from '../src/util/awardAchievements';
 import { STARTER_BOTS } from '../src/util/starterBots';
 
 const metrics = vi.mocked(environmentService.metrics);
@@ -325,5 +333,167 @@ describe('LadderService background loop', () => {
 
     ladderService.stop();
     spy.mockRestore();
+  });
+});
+
+// ── Achievements (GitHub #121) ───────────────────────────────────────────────
+// The ladder is the ONLY place a prestige badge can be earned, so these lock down
+// what it hands the award layer. The award layer's own behavior is covered by
+// awardAchievements.test.ts.
+describe('LadderService — achievement awards', () => {
+  const award = vi.mocked(recordLadderResult);
+
+  // A fuller summary than the fixture above: awardAchievements reads per-app
+  // userId and stats, which the Elo/history tests don't need.
+  const richSummary = (
+    winnerId: string | null,
+    opts: {
+      decided?: boolean;
+      ownerA?: string;
+      ownerB?: string;
+      statsA?: Record<string, number>;
+      statsB?: Record<string, number>;
+      crashed?: Record<string, number>;
+    } = {}
+  ) => {
+    const {
+      decided = true,
+      ownerA = 'owner-A',
+      ownerB = 'owner-B',
+      statsA = {},
+      statsB = {},
+      crashed = {},
+    } = opts;
+    const entry = (
+      id: string,
+      userId: string,
+      stats: Record<string, number>
+    ) => ({
+      id,
+      userId,
+      crashedCount: crashed[id] ?? 0,
+      botsTotal: 5,
+      botsAlive: 5,
+      stats: { shotsFired: 0, kills: 0, timesHit: 0, ...stats },
+    });
+    const winnerUser = winnerId === 'A' ? ownerA : ownerB;
+    return {
+      match: {
+        decided,
+        winner: winnerId ? { id: winnerId, userId: winnerUser } : null,
+      },
+      leaderboard: [entry('A', ownerA, statsA), entry('B', ownerB, statsB)],
+    } as never;
+  };
+
+  const twoApps = (ratingA = 1500, ratingB = 1500) => {
+    const a = makeApp('A', ratingA, 20);
+    const b = makeApp('B', ratingB, 20);
+    getApp.mockImplementation((id) =>
+      Promise.resolve((id === 'A' ? a : b) as never)
+    );
+  };
+
+  const resultFor = (userId: string) =>
+    award.mock.calls.map((c) => c[0]).find((r) => r.userId === userId)!;
+
+  it('awards both players, marking the winner won and the loser not', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(
+      richSummary('A', { statsA: { kills: 3, shotsFired: 40 } })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(award).toHaveBeenCalledTimes(2);
+    expect(resultFor('owner-A')).toMatchObject({
+      rated: true,
+      winningAppId: 'A',
+      stats: { kills: 3, shotsFired: 40 },
+      facts: { won: true },
+    });
+    expect(resultFor('owner-B').facts.won).toBe(false);
+  });
+
+  it('tells each side which rating was theirs and which was the opponent’s', async () => {
+    // Giant Slayer depends on getting this the right way round.
+    twoApps(1400, 1700);
+    runMatch.mockResolvedValue(richSummary('A'));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(resultFor('owner-A').facts).toMatchObject({
+      myRatingBefore: 1400,
+      opponentRatingBefore: 1700,
+    });
+    expect(resultFor('owner-B').facts).toMatchObject({
+      myRatingBefore: 1700,
+      opponentRatingBefore: 1400,
+    });
+  });
+
+  // pickPair deliberately allows same-owner matchups, so this is a real case: one
+  // award, both sides summed — never two awards handing one user a win AND a loss.
+  it('awards a same-owner matchup once, with both sides summed', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(
+      richSummary('A', {
+        ownerA: 'solo',
+        ownerB: 'solo',
+        statsA: { kills: 2, shotsFired: 10 },
+        statsB: { kills: 1, shotsFired: 5 },
+      })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(award).toHaveBeenCalledTimes(1);
+    expect(resultFor('solo')).toMatchObject({
+      stats: { kills: 3, shotsFired: 15 },
+      facts: { won: true, botsAlive: 10, botsTotal: 10 },
+    });
+  });
+
+  it('marks an undecided (timed-out) match unrated', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(richSummary(null, { decided: false }));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    // Still awarded — the shots really were fired — but not as a ranked result,
+    // so no ladderWins/ladderMatchesPlayed and no ladder badge.
+    expect(award).toHaveBeenCalledTimes(2);
+    for (const call of award.mock.calls) expect(call[0].rated).toBe(false);
+  });
+
+  it('marks a double-crash match unrated', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(richSummary('A', { crashed: { A: 5, B: 5 } }));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    for (const call of award.mock.calls) expect(call[0].rated).toBe(false);
+  });
+
+  it('still rates a one-sided crash — the crasher legitimately lost', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(richSummary('A', { crashed: { B: 5 } }));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    for (const call of award.mock.calls) expect(call[0].rated).toBe(true);
+  });
+
+  it('completes the match even if awarding throws', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(richSummary('A'));
+    award.mockRejectedValueOnce(new Error('db down'));
+
+    const res = await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    // A badge is never worth failing a ranked match over: Elo and history stand.
+    expect(res.ran).toBe(true);
+    expect(res.winnerId).toBe('A');
+    expect(record).toHaveBeenCalledOnce();
   });
 });
