@@ -363,10 +363,12 @@ describe('LadderService — achievement awards', () => {
       statsA?: Record<string, number>;
       statsB?: Record<string, number>;
       crashed?: Record<string, number>;
+      suddenDeath?: boolean;
     } = {}
   ) => {
     const {
       decided = true,
+      suddenDeath = false,
       ownerA = 'owner-A',
       ownerB = 'owner-B',
       statsA = {},
@@ -383,12 +385,13 @@ describe('LadderService — achievement awards', () => {
       crashedCount: crashed[id] ?? 0,
       botsTotal: 5,
       botsAlive: 5,
-      stats: { shotsFired: 0, kills: 0, timesHit: 0, ...stats },
+      stats: { shotsFired: 0, shotsHit: 0, kills: 0, timesHit: 0, ...stats },
     });
     const winnerUser = winnerId === 'A' ? ownerA : ownerB;
     return {
       match: {
         decided,
+        suddenDeath,
         winner: winnerId ? { id: winnerId, userId: winnerUser } : null,
       },
       leaderboard: [entry('A', ownerA, statsA), entry('B', ownerB, statsB)],
@@ -460,6 +463,48 @@ describe('LadderService — achievement awards', () => {
     expect(resultFor('solo')).toMatchObject({
       stats: { kills: 3, shotsFired: 15 },
       facts: { won: true, botsAlive: 10, botsTotal: 10 },
+    });
+  });
+
+  // The feat badges need facts the summary already has, but that the ladder has to
+  // actually pass along — and a widened LadderFacts can't fail a test on its own,
+  // since tsc only covers src/. So assert they arrive.
+  it('passes the accuracy and sudden-death facts to the award layer', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(
+      richSummary('A', {
+        statsA: { shotsFired: 30, shotsHit: 20 },
+        suddenDeath: true,
+      })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(resultFor('owner-A').facts).toMatchObject({
+      shotsFired: 30,
+      shotsHit: 20,
+      suddenDeath: true,
+    });
+    // Match-level, so the loser sees it too.
+    expect(resultFor('owner-B').facts.suddenDeath).toBe(true);
+  });
+
+  it('sums both sides of a same-owner matchup for the accuracy facts', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(
+      richSummary('A', {
+        ownerA: 'solo',
+        ownerB: 'solo',
+        statsA: { shotsFired: 10, shotsHit: 6 },
+        statsB: { shotsFired: 10, shotsHit: 2 },
+      })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(resultFor('solo').facts).toMatchObject({
+      shotsFired: 20,
+      shotsHit: 8,
     });
   });
 

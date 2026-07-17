@@ -267,6 +267,9 @@ class LadderService {
           existing.facts.timesHit += entry.stats.timesHit;
           existing.facts.botsAlive += entry.botsAlive;
           existing.facts.botsTotal += entry.botsTotal;
+          existing.facts.shotsFired += entry.stats.shotsFired;
+          existing.facts.shotsHit += entry.stats.shotsHit;
+          // suddenDeath is match-level: both sides already agree on it.
           // Both apps are candidates for the rank badge; awardAchievements takes
           // the better of them.
           existing.rankedApps?.push(rankedAppOf(entry.id));
@@ -286,6 +289,9 @@ class LadderService {
             timesHit: entry.stats.timesHit,
             botsAlive: entry.botsAlive,
             botsTotal: entry.botsTotal,
+            shotsFired: entry.stats.shotsFired,
+            shotsHit: entry.stats.shotsHit,
+            suddenDeath: summary.match.suddenDeath,
           },
           winningAppId: opts.winnerId,
           rankedApps: [rankedAppOf(entry.id)],
