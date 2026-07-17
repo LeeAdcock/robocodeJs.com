@@ -102,6 +102,48 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('clock.getTime()')).toBe(42);
   });
 
+  // The fixture arena is deliberately non-square (750×600) so these fail
+  // loudly if any helper assumes width === height.
+  it('arena.contains tests raw arena bounds, edges inclusive', () => {
+    expect(ctx.read('arena.contains(16, 16)')).toBe(true);
+    expect(ctx.read('arena.contains(0, 0)')).toBe(true);
+    expect(ctx.read('arena.contains(750, 600)')).toBe(true);
+    expect(ctx.read('arena.contains(-5, -5)')).toBe(false);
+    expect(ctx.read('arena.contains(751, 300)')).toBe(false);
+    // In x-range but past the (shorter) height — the square-assumption canary.
+    expect(ctx.read('arena.contains(400, 620)')).toBe(false);
+  });
+
+  it('arena.getNearestWall returns a marker on the nearest boundary', () => {
+    // Bot at (100, 200): west wall (x = 0) is nearest at distance 100. The
+    // internal orientation 0 is API heading 180 (south), so due-west is a
+    // relative bearing of 90.
+    expect(ctx.read('arena.getNearestWall().getX()')).toBe(0);
+    expect(ctx.read('arena.getNearestWall().getY()')).toBe(200);
+    expect(ctx.read('arena.getNearestWall().getDistance()')).toBe(100);
+    expect(ctx.read('arena.getNearestWall().getBearing()')).toBe(90);
+    expect(ctx.read('arena.getNearestWall().isInBounds()')).toBe(true);
+
+    // Move near the top edge: north wall (y = 0) wins, directly behind (180).
+    ctx.bot.x = 400;
+    ctx.bot.y = 50;
+    expect(ctx.read('arena.getNearestWall().getX()')).toBe(400);
+    expect(ctx.read('arena.getNearestWall().getY()')).toBe(0);
+    expect(ctx.read('arena.getNearestWall().getDistance()')).toBe(50);
+    expect(ctx.read('arena.getNearestWall().getBearing()')).toBe(180);
+  });
+
+  it('markers expose isInBounds', () => {
+    expect(ctx.read('bot.dropMarker().isInBounds()')).toBe(true);
+    expect(ctx.read('arena.createMarker(-5, -5).isInBounds()')).toBe(false);
+    expect(ctx.read('arena.createMarker(750, 600).isInBounds()')).toBe(true);
+  });
+
+  it('createMarker distance still floors to a whole number', () => {
+    // Regression lock on the marker-factory refactor: √5 ≈ 2.236 floors to 2.
+    expect(ctx.read('arena.createMarker(101, 202).getDistance()')).toBe(2);
+  });
+
   it('removes Date and does not leak Node globals into the sandbox', () => {
     // Date is deliberately set to undefined so bots stay deterministic.
     expect(ctx.read('typeof Date')).toBe('undefined');
