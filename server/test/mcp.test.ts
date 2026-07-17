@@ -402,19 +402,17 @@ describe('mcp tools', () => {
     expect(res.isError).toBe(true);
   });
 
-  it('arena_status resolves the default arena and returns the snapshot', async () => {
-    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
-    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
-    vi.mocked(buildArenaStatus).mockResolvedValue({ running: true } as never);
+  it('arena_status requires an explicit arenaId (no default-arena fallback)', async () => {
+    // arenaId is a required input, so omitting it is an invalid-arguments error
+    // rather than a silent fall-through to some default arena.
     const client = await connect();
     const res = (await client.callTool({
       name: 'arena_status',
       arguments: {},
-    })) as never;
+    })) as { isError?: boolean };
 
-    expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
-    expect(JSON.parse(textOf(res))).toEqual({ running: true });
+    expect(res.isError).toBe(true);
+    expect(arenaService.getDefaultForUser).not.toHaveBeenCalled();
   });
 
   it('arena_status spectates an arena owned by someone else (read-only, by id)', async () => {
@@ -446,9 +444,9 @@ describe('mcp tools', () => {
     expect(res.isError).toBe(true);
   });
 
-  it('match_summary resolves the default arena and returns the summary', async () => {
+  it('match_summary resolves the arena by id and returns the summary', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
     vi.mocked(buildMatchSummary).mockResolvedValue({
       match: { decided: true, winner: { id: 'a1' } },
@@ -456,18 +454,18 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'match_summary',
-      arguments: {},
+      arguments: { arenaId: 'ar1' },
     })) as never;
 
-    expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
+    expect(arenaService.get).toHaveBeenCalledWith('ar1');
     expect(JSON.parse(textOf(res))).toEqual({
       match: { decided: true, winner: { id: 'a1' } },
     });
   });
 
-  it('match_status resolves the default arena and returns the status', async () => {
+  it('match_status resolves the arena by id and returns the status', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
     vi.mocked(buildMatchStatus).mockResolvedValue({
       match: { decided: false, winner: null },
@@ -476,10 +474,10 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'match_status',
-      arguments: {},
+      arguments: { arenaId: 'ar1' },
     })) as never;
 
-    expect(arenaService.getDefaultForUser).toHaveBeenCalledWith('u1');
+    expect(arenaService.get).toHaveBeenCalledWith('ar1');
     expect(JSON.parse(textOf(res))).toEqual({
       match: { decided: false, winner: null },
       standings: [],
@@ -488,7 +486,7 @@ describe('mcp tools', () => {
 
   it('restart_arena restarts, resumes, and reports the seed the match runs on', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     const env = {
       restart: vi.fn().mockResolvedValue(undefined),
       resume: vi.fn(),
@@ -498,7 +496,7 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = await client.callTool({
       name: 'restart_arena',
-      arguments: {},
+      arguments: { arenaId: 'ar1' },
     });
     expect(env.restart).toHaveBeenCalled();
     expect(env.resume).toHaveBeenCalled();
@@ -508,7 +506,7 @@ describe('mcp tools', () => {
 
   it('run_match reseeds, restarts+resumes, runs to a decision, and returns the winner', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       {},
       {},
@@ -536,7 +534,7 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'run_match',
-      arguments: { seed: 42 },
+      arguments: { arenaId: 'ar1', seed: 42 },
     })) as never;
 
     expect(env.setSeed).toHaveBeenCalledWith(42);
@@ -550,7 +548,7 @@ describe('mcp tools', () => {
 
   it('run_match refuses cleanly when a match is already running in the arena', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       {},
       {},
@@ -566,7 +564,7 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'run_match',
-      arguments: {},
+      arguments: { arenaId: 'ar1' },
     })) as { content: { text?: string }[]; isError?: boolean };
 
     expect(res.isError).toBe(true);
@@ -576,7 +574,7 @@ describe('mcp tools', () => {
 
   it('run_match requires at least two apps', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([{}] as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       getProcesses: () => [{}],
@@ -584,14 +582,14 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'run_match',
-      arguments: {},
+      arguments: { arenaId: 'ar1' },
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
   });
 
   it('recent_logs filters by level, bot, instance, and text', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     const logs = [
       { level: 30, appId: 'a1', botIndex: 1, msg: 'hello info' },
       { level: 50, appId: 'a1', botIndex: 2, msg: 'E017: boom' },
@@ -606,7 +604,7 @@ describe('mcp tools', () => {
         textOf(
           (await client.callTool({
             name: 'recent_logs',
-            arguments: args,
+            arguments: { arenaId: 'ar1', ...args },
           })) as never
         )
       );
@@ -627,7 +625,7 @@ describe('mcp tools', () => {
 
   it('recent_faults returns structured crash records', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     const faults = [
       {
         appId: 'a1',
@@ -648,7 +646,7 @@ describe('mcp tools', () => {
     const client = await connect();
     const res = (await client.callTool({
       name: 'recent_faults',
-      arguments: { appId: 'a1', limit: 10 },
+      arguments: { arenaId: 'ar1', appId: 'a1', limit: 10 },
     })) as { structuredContent?: unknown };
 
     expect(getRecentFaults).toHaveBeenCalledWith(10, 'a1');
@@ -672,13 +670,13 @@ describe('mcp tools', () => {
 
   it('set_arena_speed sets the speed on the resolved arena env', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     const env = { setSpeed: vi.fn(), getSpeed: () => 4, getTickMs: () => 25 };
     vi.mocked(environmentService.get).mockResolvedValue(env as never);
     const client = await connect();
     const res = (await client.callTool({
       name: 'set_arena_speed',
-      arguments: { speed: 4 },
+      arguments: { arenaId: 'ar1', speed: 4 },
     })) as never;
 
     expect(env.setSpeed).toHaveBeenCalledWith(4);
@@ -691,13 +689,13 @@ describe('mcp tools', () => {
 
   it('set_arena_speed maps "max" to unbounded (0)', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     const env = { setSpeed: vi.fn(), getSpeed: () => 0, getTickMs: () => 0 };
     vi.mocked(environmentService.get).mockResolvedValue(env as never);
     const client = await connect();
     await client.callTool({
       name: 'set_arena_speed',
-      arguments: { speed: 'max' },
+      arguments: { arenaId: 'ar1', speed: 'max' },
     });
 
     expect(env.setSpeed).toHaveBeenCalledWith(0);
@@ -705,13 +703,13 @@ describe('mcp tools', () => {
 
   it('set_arena_seed sets the seed on the resolved arena env', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     const env = { setSeed: vi.fn(), getSeed: () => 99 };
     vi.mocked(environmentService.get).mockResolvedValue(env as never);
     const client = await connect();
     const res = (await client.callTool({
       name: 'set_arena_seed',
-      arguments: { seed: 99 },
+      arguments: { arenaId: 'ar1', seed: 99 },
     })) as never;
 
     expect(env.setSeed).toHaveBeenCalledWith(99);
@@ -810,7 +808,7 @@ describe('mcp tools', () => {
 
     const filled = await client.getPrompt({
       name: 'write_app',
-      arguments: { goal: 'circle and snipe' },
+      arguments: { goal: 'circle and snipe', arenaId: 'ar1' },
     });
     const text = (filled.messages[0].content as { text: string }).text;
     expect(text).toContain('circle and snipe');
@@ -894,7 +892,7 @@ describe('mcp completion logging (mcp.tool.result)', () => {
   it('logs ok=false with the reason when a tool returns an error result', async () => {
     // run_match with a single active bot returns an isError result (fail()).
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([{}] as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       getProcesses: () => [{}],
@@ -902,7 +900,7 @@ describe('mcp completion logging (mcp.tool.result)', () => {
     const spy = vi.spyOn(logger, 'info');
 
     const client = await connect();
-    await client.callTool({ name: 'run_match', arguments: {} });
+    await client.callTool({ name: 'run_match', arguments: { arenaId: 'ar1' } });
 
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -920,7 +918,7 @@ describe('mcp completion logging (mcp.tool.result)', () => {
 describe('mcp per-match logging (mcp.match)', () => {
   it('logs a decided match for run_match with the winner and seed', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
-    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue(arena as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       {},
       {},
@@ -944,7 +942,10 @@ describe('mcp per-match logging (mcp.match)', () => {
     const spy = vi.spyOn(logger, 'info');
 
     const client = await connect();
-    await client.callTool({ name: 'run_match', arguments: { seed: 42 } });
+    await client.callTool({
+      name: 'run_match',
+      arguments: { arenaId: 'ar1', seed: 42 },
+    });
 
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
