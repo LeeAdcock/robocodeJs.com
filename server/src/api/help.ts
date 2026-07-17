@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import Classifier from 'ml-classify-text';
 import auth, { AuthenticatedRequest } from '../middleware/auth';
 import cookieParser from 'cookie-parser';
+import { logger, LogEvent } from '../util/logger';
 
 // The navbar search box (`/api/ask`) maps a free-text query to the most relevant
 // docs page. Matching happens in three tiers, most specific first:
@@ -440,7 +441,21 @@ app.get('/api/ask', [
           return res.send({ answer: CLASSIFIER_ANSWERS[label] });
       }
     }
-    return res.send({ answer: '/help' });
+    // Nothing matched. Say so explicitly (`answer: null`) rather than sending a
+    // route: the old `/help` fallback isn't a UI route, so a miss navigated the
+    // player to the 404 page. The navbar renders inline "no answer" feedback.
+    //
+    // Log the miss under a stable event so the unanswered questions can be mined
+    // later — each one is either a keyword the map should cover or a topic the
+    // docs don't answer yet. Truncated: this is a routing signal, not a
+    // transcript, and the box is free text.
+    if (question) {
+      logger.info(
+        { event: LogEvent.HELP_UNANSWERED, question: question.slice(0, 200) },
+        'help search matched no answer'
+      );
+    }
+    return res.send({ answer: null });
   },
 ]);
 

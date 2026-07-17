@@ -134,6 +134,83 @@ describe('NavBar search', () => {
     await waitFor(() => expect(search.value).toBe(''));
     expect(document.activeElement).not.toBe(search);
   });
+
+  // GitHub #255: every Enter press must produce a visible outcome. These paths
+  // used to do nothing at all — the axios call had no .catch, and the server's
+  // no-match fallback pointed at /help, which isn't a route (so it 404'd).
+  const search = async (value: string) => {
+    render(
+      <MemoryRouter>
+        <NavBar {...baseProps} />
+      </MemoryRouter>
+    );
+    const box = screen.getByLabelText('Search') as HTMLInputElement;
+    fireEvent.change(box, { target: { value } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    return box;
+  };
+
+  it('explains a miss instead of sitting silent', async () => {
+    vi.mocked(axios.get).mockResolvedValueOnce({
+      data: { answer: null },
+    } as never);
+    const box = await search('xyzzy');
+
+    expect(await screen.findByText(/No answer found/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'FAQ' }).getAttribute('href')).toBe(
+      '/faq'
+    );
+    // The question stays put so it can be reworded rather than retyped.
+    expect(box.value).toBe('xyzzy');
+  });
+
+  it('names a rate limit, which waiting actually fixes', async () => {
+    vi.mocked(axios.get).mockRejectedValueOnce({
+      response: { status: 429 },
+    } as never);
+    await search('how do I fire');
+
+    expect(await screen.findByText(/Too many searches/)).toBeTruthy();
+  });
+
+  it('reports a server error rather than swallowing it', async () => {
+    vi.mocked(axios.get).mockRejectedValueOnce(new Error('network') as never);
+    await search('how do I fire');
+
+    expect(await screen.findByText(/Search is unavailable/)).toBeTruthy();
+  });
+
+  it('shows a pending indicator while the request is in flight', async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    vi.mocked(axios.get).mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }) as never
+    );
+    await search('how do I fire');
+
+    expect(
+      await screen.findByRole('status', { name: 'Searching' })
+    ).toBeTruthy();
+
+    resolve({ data: { answer: '/examples' } });
+    await waitFor(() =>
+      expect(screen.queryByRole('status', { name: 'Searching' })).toBeNull()
+    );
+  });
+
+  it('drops a stale outcome once the question changes', async () => {
+    vi.mocked(axios.get).mockResolvedValueOnce({
+      data: { answer: null },
+    } as never);
+    const box = await search('xyzzy');
+    await screen.findByText(/No answer found/);
+
+    fireEvent.change(box, { target: { value: 'xyzzy2' } });
+    await waitFor(() =>
+      expect(screen.queryByText(/No answer found/)).toBeNull()
+    );
+  });
 });
 
 describe('NavBar badges link', () => {
