@@ -9,10 +9,13 @@
      The dark-mode --link (#d9a066 on #282c34) already passes. */
   --link: #96591f;
   --code: #1a7f37;
-  /* Faint warm tint behind inline code chips and block code panels; the code
-     text sits in the body colour, which is far above AA on this. */
+  /* Faint warm tint behind inline code chips and block code panels. */
   --code-bg: #f5f3ed;
   --code-border: rgba(0, 0, 0, 0.08);
+  /* Code text: a muted warm ink, a touch softer than the near-black body text,
+     so code settles into the tint without a pure-black harshness or a hue that
+     would compete with the bronze links / gold brand. */
+  --code-fg: #423e37;
   --rule: #aa6c39;
   /* The one brand accent (the wordmark gold), used consistently for the
      wordmark, the avatar ring, and nav hover/active states. Kept identical in
@@ -40,6 +43,8 @@ body.dark {
      a hole punched in the page (the dark-mode convention). */
   --code-bg: #31353f;
   --code-border: rgba(255, 255, 255, 0.1);
+  /* Warm light-grey, slightly dimmer/warmer than the body text. */
+  --code-fg: #c6c1b6;
   --rule: #6b4a2b;
   /* Warmer/brighter so it still reads over the night-mode tint. */
   --damage-glow-color: #ff5a3c;
@@ -236,10 +241,10 @@ svg.motion-snap * {
    isn't signalled twice. box-decoration-break keeps the rounded inline chip
    whole when a snippet wraps across a line. */
 .markdown code {
-  /* Override Bootstrap Reboot's pink inline-code default (`code { color:
-     #d63384 }`); block `pre code` is already `color: inherit`, so this makes
-     both use the body colour. */
-  color: inherit;
+  /* Muted warm ink for code text (also overrides Bootstrap Reboot's pink
+     inline-code default, `code { color: #d63384 }`). Block `pre code` doesn't
+     set its own colour, so it inherits this same token — inline and block match. */
+  color: var(--code-fg);
   background: var(--code-bg);
   border: 1px solid var(--code-border);
   border-radius: 4px;
