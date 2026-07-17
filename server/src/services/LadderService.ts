@@ -10,7 +10,12 @@ import { runMatchToDecision, DEFAULT_MATCH_TIMEOUT_MS } from '../util/runMatch';
 import { updateRatings, Outcome } from '../util/elo';
 import { isUntouchedStarter } from '../util/starterBots';
 import { logger, LogEvent } from '../util/logger';
-import { recordLadderResult, LadderResult } from '../util/awardAchievements';
+import {
+  recordLadderResult,
+  LadderResult,
+  RankedApp,
+} from '../util/awardAchievements';
+import { MIN_RANKED_GAMES_FOR_RANK } from '../util/achievements';
 import { UserId } from '../types/user';
 import { BotStats } from '../types/botStats';
 
@@ -216,12 +221,36 @@ class LadderService {
       rated: boolean;
       winnerId: AppId | null;
       appIdA: AppId;
+      appIdB: AppId;
       before: { a: number; b: number };
+      games: { a: number; b: number };
     }
   ): Promise<void> => {
     try {
       const winnerUserId = summary.match.winner?.userId;
       const byUser = new Map<UserId, LadderResult>();
+
+      const gamesOf = (appId: AppId): number =>
+        appId === opts.appIdA ? opts.games.a : opts.games.b;
+
+      // Board ranks for the rank badges (GitHub #121). Unlike every other ladder
+      // fact, a rank isn't in the summary — it's a property of the whole board — so
+      // this is the one extra query, and it's skipped unless it could matter:
+      // an unrated match moved no rating (so no rank changed), and an app short of
+      // the placement gate can't earn on its rank however high it sits.
+      const ranks =
+        opts.rated &&
+        [opts.appIdA, opts.appIdB].some(
+          (id) => gamesOf(id) >= MIN_RANKED_GAMES_FOR_RANK
+        )
+          ? await appService.getRanks([opts.appIdA, opts.appIdB])
+          : new Map<AppId, number>();
+
+      const rankedAppOf = (appId: AppId): RankedApp => ({
+        appId,
+        rank: ranks.get(appId),
+        ratingGames: gamesOf(appId),
+      });
 
       for (const entry of summary.leaderboard) {
         const userId = entry.userId;
@@ -238,6 +267,12 @@ class LadderService {
           existing.facts.timesHit += entry.stats.timesHit;
           existing.facts.botsAlive += entry.botsAlive;
           existing.facts.botsTotal += entry.botsTotal;
+          existing.facts.shotsFired += entry.stats.shotsFired;
+          existing.facts.shotsHit += entry.stats.shotsHit;
+          // suddenDeath is match-level: both sides already agree on it.
+          // Both apps are candidates for the rank badge; awardAchievements takes
+          // the better of them.
+          existing.rankedApps?.push(rankedAppOf(entry.id));
           continue;
         }
 
@@ -254,8 +289,12 @@ class LadderService {
             timesHit: entry.stats.timesHit,
             botsAlive: entry.botsAlive,
             botsTotal: entry.botsTotal,
+            shotsFired: entry.stats.shotsFired,
+            shotsHit: entry.stats.shotsHit,
+            suddenDeath: summary.match.suddenDeath,
           },
           winningAppId: opts.winnerId,
+          rankedApps: [rankedAppOf(entry.id)],
           rated: opts.rated,
         });
       }
@@ -392,7 +431,11 @@ class LadderService {
         rated: rate,
         winnerId: rate ? winnerId : null,
         appIdA,
+        appIdB,
         before,
+        // Post-match counts: setRating already bumped these in memory, so a rank
+        // badge is gated on games INCLUDING the match that just earned it.
+        games: { a: appA.getRatingGames(), b: appB.getRatingGames() },
       });
 
       logger.info(

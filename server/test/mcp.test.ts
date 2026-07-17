@@ -44,6 +44,9 @@ vi.mock('../src/services/EnvironmentService', () => ({
 }));
 vi.mock('../src/util/botActions', () => ({
   propagateSource: vi.fn().mockResolvedValue(undefined),
+  // The dry-run path check_app_source shares with the REST Check button. Stubbed
+  // here for the same reason as the rest: this suite is about the MCP glue.
+  checkSource: vi.fn().mockResolvedValue({ valid: true }),
   executeInUserArenas: vi.fn().mockResolvedValue(undefined),
   rebootInUserArenas: vi.fn().mockResolvedValue(undefined),
   deleteAppEverywhere: vi.fn().mockResolvedValue(undefined),
@@ -61,9 +64,6 @@ vi.mock('../src/util/matchSummary', () => ({
   // run_match's poll loop exits on the first pass in these tests.
   isMatchDecided: vi.fn(() => true),
 }));
-// Mock the compiler so check_app_source doesn't spin a real isolate in this suite
-// (the real dry-run behaviour is covered in compiler.test.ts).
-vi.mock('../src/util/compiler', () => ({ default: { check: vi.fn() } }));
 // Mock the formatter so format_app_source doesn't load Prettier here; the MCP glue
 // (arg handling, ownership, result shaping) is what's under test.
 vi.mock('../src/util/formatter', () => ({ default: { format: vi.fn() } }));
@@ -72,12 +72,11 @@ import request from 'supertest';
 import mcpApp, { buildServer, logMcpRequest } from '../src/api/mcp';
 import { logger, LogEvent } from '../src/util/logger';
 import appService from '../src/services/AppService';
-import compiler from '../src/util/compiler';
 import formatter from '../src/util/formatter';
 import arenaService from '../src/services/ArenaService';
 import arenaMemberService from '../src/services/ArenaMemberService';
 import environmentService from '../src/services/EnvironmentService';
-import { propagateSource } from '../src/util/botActions';
+import { propagateSource, checkSource } from '../src/util/botActions';
 import { buildArenaStatus } from '../src/util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../src/util/matchSummary';
 
@@ -260,21 +259,23 @@ describe('mcp tools', () => {
   });
 
   it('check_app_source dry-run compiles raw source', async () => {
-    vi.mocked(compiler.check).mockResolvedValue({ valid: true } as never);
+    vi.mocked(checkSource).mockResolvedValue({ valid: true } as never);
     const client = await connect();
     const res = (await client.callTool({
       name: 'check_app_source',
       arguments: { source: 'clock.on(Event.TICK, () => {})' },
     })) as never;
 
-    expect(compiler.check).toHaveBeenCalledWith(
+    // The acting user is passed through so the checker badge lands on them.
+    expect(checkSource).toHaveBeenCalledWith(
+      'u1',
       'clock.on(Event.TICK, () => {})'
     );
     expect(JSON.parse(textOf(res))).toEqual({ valid: true });
   });
 
   it('check_app_source reports an invalid bot (still a successful call)', async () => {
-    vi.mocked(compiler.check).mockResolvedValue({
+    vi.mocked(checkSource).mockResolvedValue({
       valid: false,
       stage: 'compile',
       errorCode: 'E017',
@@ -292,7 +293,7 @@ describe('mcp tools', () => {
   });
 
   it('check_app_source resolves a saved bot by appId and enforces ownership', async () => {
-    vi.mocked(compiler.check).mockResolvedValue({ valid: true } as never);
+    vi.mocked(checkSource).mockResolvedValue({ valid: true } as never);
     vi.mocked(appService.get).mockResolvedValue({
       getUserId: () => 'u1',
       getSource: () => 'SAVED',
@@ -302,10 +303,10 @@ describe('mcp tools', () => {
       name: 'check_app_source',
       arguments: { appId: 'a1' },
     });
-    expect(compiler.check).toHaveBeenCalledWith('SAVED');
+    expect(checkSource).toHaveBeenCalledWith('u1', 'SAVED');
 
     // A bot owned by someone else is rejected and never compiled.
-    vi.mocked(compiler.check).mockClear();
+    vi.mocked(checkSource).mockClear();
     vi.mocked(appService.get).mockResolvedValue({
       getUserId: () => 'someone-else',
       getSource: () => 'SECRET',
@@ -315,7 +316,7 @@ describe('mcp tools', () => {
       arguments: { appId: 'a1' },
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBe(true);
-    expect(compiler.check).not.toHaveBeenCalled();
+    expect(checkSource).not.toHaveBeenCalled();
   });
 
   it('check_app_source requires source or appId', async () => {

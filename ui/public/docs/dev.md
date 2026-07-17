@@ -20,6 +20,8 @@ The arena where bots live is a square. Headings are specified in degrees on a co
 
 - `arena.getWidth() : number` Returns the arena's width in units.
 - `arena.getHeight() : number` Returns the arena's height in units.
+- `arena.contains(x, y) : boolean` Returns whether the coordinate lies inside the arena (between 0 and the width/height, edges inclusive).
+- `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary — `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 units before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
 
 Virtual markers can be created in the arena that provide simplified calculations for angles and distance. These markers are either dropped at the current bot location, or at a specified coordinate.
 
@@ -31,6 +33,7 @@ The `marker` object returned has several convenience methods:
 - `marker.getY() : number` Returns the marker's y coordinate.
 - `marker.getDistance() : number` Returns the distance from the bot to the marker, rounded down to a whole number.
 - `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading — `bot.turn(marker.getBearing())` faces it.
+- `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena — the same check as `arena.contains(marker.getX(), marker.getY())`.
 
 # Events Overview
 
@@ -180,7 +183,7 @@ At the start of every match there is a short **deployment window** (the first 10
 
 ## Radar
 
-The radar provides the ability to detect other nearby bots. Only bots within **300 units**, in the direction the radar is pointed, are detectable — the beam narrows with distance, from about 25 degrees either side of the radar's heading up close down to 10 degrees at maximum range. The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena — the radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed. The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
+The radar provides the ability to detect other bots. Its detection area is a long, narrow wedge reaching **600 units** — one tank-width (32 units) across at your bot, widening to about 244 units across at its tip — and any bot whose center is inside it is detected. It's shown as the beam drawn under the radar in the arena; the drawing is slightly slimmer at its base than the detection area, so anything the beam visibly touches is detected. Vision is directional on purpose: you can see far, but only where you choose to look, so pointing the radar well matters more than being close. The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena — the radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed. The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
 
 ### Orientation
 

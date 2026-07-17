@@ -195,6 +195,13 @@ export default function ProfilePage() {
           <>
             <p style={{ color: '#888' }}>
               {earnedCount} of {totalCount} earned
+              {profile.user.memberSince &&
+                ` · member since ${new Date(
+                  profile.user.memberSince
+                ).toLocaleDateString(undefined, {
+                  month: 'long',
+                  year: 'numeric',
+                })}`}
             </p>
 
             {SCOPES.map(({ scope, title, blurb }) => {

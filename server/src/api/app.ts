@@ -1,9 +1,9 @@
 import express from 'express';
 
 import appService from '../services/AppService';
-import compiler from '../util/compiler';
 import {
   propagateSource,
+  checkSource,
   executeInUserArenas,
   rebootInUserArenas,
   deleteAppEverywhere,
@@ -128,7 +128,7 @@ app.post(
       res.status(413).json({ code: ErrorCodes.E025, error: tooLarge });
       return;
     }
-    const result = await compiler.check(source);
+    const result = await checkSource(scopedUser(req).getId(), source);
     res.status(200);
     res.send(result);
   }

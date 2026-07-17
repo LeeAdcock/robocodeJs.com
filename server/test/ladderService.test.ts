@@ -9,7 +9,12 @@ vi.mock('../src/util/runMatch', () => ({
   DEFAULT_MATCH_TIMEOUT_MS: 60000,
 }));
 vi.mock('../src/services/AppService', () => ({
-  default: { get: vi.fn(), getLadderCandidates: vi.fn() },
+  default: {
+    get: vi.fn(),
+    getLadderCandidates: vi.fn(),
+    // The rank badges (GitHub #121) look the board up after the rating update.
+    getRanks: vi.fn(async () => new Map<string, number>()),
+  },
 }));
 vi.mock('../src/services/RankedMatchService', () => ({
   default: { record: vi.fn().mockResolvedValue(undefined) },
@@ -38,6 +43,7 @@ const metrics = vi.mocked(environmentService.metrics);
 
 const getApp = vi.mocked(appService.get);
 const getCandidates = vi.mocked(appService.getLadderCandidates);
+const getRanks = vi.mocked(appService.getRanks);
 const record = vi.mocked(rankedMatchService.record);
 const runMatch = vi.mocked(runMatchToDecision);
 
@@ -90,6 +96,9 @@ const summary = (
 beforeEach(() => {
   vi.clearAllMocks();
   metrics.mockReturnValue({ isolates: 0 } as never);
+  // clearAllMocks resets calls but NOT implementations, so re-pin this: a rank
+  // map set by one test would otherwise leak into the next.
+  getRanks.mockResolvedValue(new Map());
 });
 
 // Never let a started background loop leak into the next test.
@@ -354,10 +363,12 @@ describe('LadderService — achievement awards', () => {
       statsA?: Record<string, number>;
       statsB?: Record<string, number>;
       crashed?: Record<string, number>;
+      suddenDeath?: boolean;
     } = {}
   ) => {
     const {
       decided = true,
+      suddenDeath = false,
       ownerA = 'owner-A',
       ownerB = 'owner-B',
       statsA = {},
@@ -374,12 +385,13 @@ describe('LadderService — achievement awards', () => {
       crashedCount: crashed[id] ?? 0,
       botsTotal: 5,
       botsAlive: 5,
-      stats: { shotsFired: 0, kills: 0, timesHit: 0, ...stats },
+      stats: { shotsFired: 0, shotsHit: 0, kills: 0, timesHit: 0, ...stats },
     });
     const winnerUser = winnerId === 'A' ? ownerA : ownerB;
     return {
       match: {
         decided,
+        suddenDeath,
         winner: winnerId ? { id: winnerId, userId: winnerUser } : null,
       },
       leaderboard: [entry('A', ownerA, statsA), entry('B', ownerB, statsB)],
@@ -452,6 +464,114 @@ describe('LadderService — achievement awards', () => {
       stats: { kills: 3, shotsFired: 15 },
       facts: { won: true, botsAlive: 10, botsTotal: 10 },
     });
+  });
+
+  // The feat badges need facts the summary already has, but that the ladder has to
+  // actually pass along — and a widened LadderFacts can't fail a test on its own,
+  // since tsc only covers src/. So assert they arrive.
+  it('passes the accuracy and sudden-death facts to the award layer', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(
+      richSummary('A', {
+        statsA: { shotsFired: 30, shotsHit: 20 },
+        suddenDeath: true,
+      })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(resultFor('owner-A').facts).toMatchObject({
+      shotsFired: 30,
+      shotsHit: 20,
+      suddenDeath: true,
+    });
+    // Match-level, so the loser sees it too.
+    expect(resultFor('owner-B').facts.suddenDeath).toBe(true);
+  });
+
+  it('sums both sides of a same-owner matchup for the accuracy facts', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(
+      richSummary('A', {
+        ownerA: 'solo',
+        ownerB: 'solo',
+        statsA: { shotsFired: 10, shotsHit: 6 },
+        statsB: { shotsFired: 10, shotsHit: 2 },
+      })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(resultFor('solo').facts).toMatchObject({
+      shotsFired: 20,
+      shotsHit: 8,
+    });
+  });
+
+  // The rank badges (GitHub #121). The ladder's job is to look the board up AFTER
+  // the rating update and hand each app's rank to the award layer, which owns the
+  // policy. These cover the wiring and — because a board scan isn't free — that it
+  // is skipped whenever it couldn't matter.
+  it('hands each app its board rank, looked up after the rating update', async () => {
+    twoApps();
+    getRanks.mockResolvedValue(
+      new Map([
+        ['A', 2],
+        ['B', 7],
+      ])
+    );
+    runMatch.mockResolvedValue(richSummary('A'));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(getRanks).toHaveBeenCalledWith(['A', 'B']);
+    // 21 games: the 20 the app arrived with, plus the match just played.
+    expect(resultFor('owner-A').rankedApps).toEqual([
+      { appId: 'A', rank: 2, ratingGames: 21 },
+    ]);
+    expect(resultFor('owner-B').rankedApps).toEqual([
+      { appId: 'B', rank: 7, ratingGames: 21 },
+    ]);
+  });
+
+  it('does not scan the board for an unrated match — no rating moved', async () => {
+    twoApps();
+    runMatch.mockResolvedValue(richSummary(null, { decided: false }));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(getRanks).not.toHaveBeenCalled();
+  });
+
+  it('does not scan the board when neither app has finished placement', async () => {
+    getApp.mockImplementation((id) =>
+      Promise.resolve(makeApp(id as string, 1500, 5) as never)
+    );
+    runMatch.mockResolvedValue(richSummary('A'));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(getRanks).not.toHaveBeenCalled();
+  });
+
+  it('gives a same-owner matchup both apps as rank candidates', async () => {
+    twoApps();
+    getRanks.mockResolvedValue(
+      new Map([
+        ['A', 4],
+        ['B', 1],
+      ])
+    );
+    runMatch.mockResolvedValue(
+      richSummary('A', { ownerA: 'solo', ownerB: 'solo' })
+    );
+
+    await ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+    expect(resultFor('solo').rankedApps).toEqual([
+      { appId: 'A', rank: 4, ratingGames: 21 },
+      { appId: 'B', rank: 1, ratingGames: 21 },
+    ]);
   });
 
   it('marks an undecided (timed-out) match unrated', async () => {

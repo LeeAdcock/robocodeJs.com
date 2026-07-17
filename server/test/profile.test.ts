@@ -6,12 +6,23 @@ import request from 'supertest';
 vi.mock('../src/services/AchievementService', () => ({
   default: { getForUser: vi.fn(), getCounters: vi.fn() },
 }));
+// The route re-derives account badges on load (the self-healing pass); mock it so
+// this test stays about the HTTP contract rather than the award logic, which
+// awardAchievements.test.ts covers.
+vi.mock('../src/util/awardAchievements', () => ({
+  evaluateAccountAchievements: vi.fn().mockResolvedValue([]),
+}));
 
 // auth(true) here, so the middleware must be able to REJECT as well as attach —
 // unlike the leaderboard's optional auth. Mirrors the real gate: 401 when there's
 // no session, otherwise req.user.
 let viewer:
-  | { getId: () => string; getName: () => string; getPicture: () => string }
+  | {
+      getId: () => string;
+      getName: () => string;
+      getPicture: () => string;
+      getCreatedTimestamp: () => Date | undefined;
+    }
   | undefined;
 vi.mock('../src/middleware/auth', () => ({
   default:
@@ -28,15 +39,18 @@ vi.mock('../src/middleware/auth', () => ({
 }));
 
 import achievementService from '../src/services/AchievementService';
+import { evaluateAccountAchievements } from '../src/util/awardAchievements';
 import profileRouter from '../src/api/profile';
 
 const getForUser = vi.mocked(achievementService.getForUser);
 const getCounters = vi.mocked(achievementService.getCounters);
 
+const MEMBER_SINCE = new Date('2025-03-04T00:00:00Z');
 const USER = {
   getId: () => 'user-1',
   getName: () => 'Ada L.',
   getPicture: () => 'https://example.test/a.png',
+  getCreatedTimestamp: () => MEMBER_SINCE,
 };
 
 beforeEach(() => {
@@ -70,6 +84,7 @@ describe('GET /api/profile', () => {
     expect(res.body.user).toEqual({
       name: 'Ada L.',
       picture: 'https://example.test/a.png',
+      memberSince: MEMBER_SINCE.toISOString(),
     });
     expect(res.body.counters).toEqual({ kills: 3, shotsFired: 812 });
     expect(res.body.unlocked).toEqual([
@@ -113,5 +128,25 @@ describe('GET /api/profile', () => {
     const res = await request(profileRouter).get('/api/profile');
     expect(res.status).toBe(500);
     expect(res.body.error).toBeTruthy();
+  });
+});
+
+describe('GET /api/profile — account badges are self-healing', () => {
+  it('re-derives account badges on load, before reading them back', async () => {
+    await request(profileRouter).get('/api/profile');
+    // account-veteran has no event to hang off — nothing happens when a year
+    // passes — so the page load is the only thing that can ever award it. It also
+    // heals a hook missed elsewhere.
+    expect(evaluateAccountAchievements).toHaveBeenCalledWith(
+      'user-1',
+      MEMBER_SINCE
+    );
+  });
+
+  it('still renders when the account evaluation fails', async () => {
+    // It swallows its own errors, so a bad day for badges is not a broken page.
+    vi.mocked(evaluateAccountAchievements).mockResolvedValueOnce([]);
+    const res = await request(profileRouter).get('/api/profile');
+    expect(res.status).toBe(200);
   });
 });

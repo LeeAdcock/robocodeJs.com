@@ -13,6 +13,20 @@ import {
 export const RADAR_TURN_SPEED = 4;
 export const RADAR_CHARGE_RATE = 10;
 
+// The radar's detection area: a quadrilateral one tank-width (±16) across at
+// the bot, whose sides flare to ±122 units at its 600-unit reach. A bot is
+// detected when its center is inside that shape. Long and narrow on purpose —
+// like classic Robocode, vision is directional: you can see far, but only
+// where you choose to look. The full-tank-width base keeps adjacent bots
+// detectable at point blank.
+//
+// The UI (arenaBot.tsx) draws the beam dish-width (±8) at its base for looks,
+// meeting the same ±122 tip — everywhere at-or-inside this detection shape,
+// so anything the drawn beam visibly touches is guaranteed detected.
+export const RADAR_RANGE = 600;
+export const RADAR_BASE_HALF_WIDTH = 16;
+export const RADAR_TIP_HALF_WIDTH = 122;
+
 export class BotRadar implements Orientated {
   public orientation: number;
   public orientationTarget: number;
@@ -149,10 +163,21 @@ export class BotRadar implements Orientated {
               this.bot.turret.getOrientation() +
               this.getOrientation()
           );
+          // Project the target into the radar's frame: how far ahead along the
+          // beam, and how far off its centerline. Inside the beam = within the
+          // quadrilateral's linearly widening half-width at that depth.
+          const offAxis =
+            (normalizeAngle(angle - radarAngle + 180) - 180) * (Math.PI / 180);
+          const forward = distance * Math.cos(offAxis);
+          const lateral = Math.abs(distance * Math.sin(offAxis));
+          const halfWidthAtDepth =
+            RADAR_BASE_HALF_WIDTH +
+            ((RADAR_TIP_HALF_WIDTH - RADAR_BASE_HALF_WIDTH) * forward) /
+              RADAR_RANGE;
           if (
-            distance < 300 &&
-            Math.abs(normalizeAngle(angle - radarAngle + 180) - 180) <
-              (500 - distance) * (0.5 / 10)
+            forward > 0 &&
+            forward <= RADAR_RANGE &&
+            lateral <= halfWidthAtDepth
           ) {
             if (otherBot.handlers[Event.DETECTED]) {
               otherBot.handlers[Event.DETECTED]();

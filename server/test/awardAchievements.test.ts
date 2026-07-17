@@ -3,16 +3,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../src/services/AchievementService', () => ({
   default: { bump: vi.fn(), unlock: vi.fn() },
 }));
+// evaluateAccountAchievements reads the user's apps to count what they've authored.
+vi.mock('../src/services/AppService', () => ({
+  default: { getForUser: vi.fn() },
+}));
 
 import achievementService from '../src/services/AchievementService';
+import appService from '../src/services/AppService';
+import { STARTER_BOTS } from '../src/util/starterBots';
 import {
   toCounterDeltas,
   recordSandboxStats,
   recordLadderResult,
+  evaluateAccountAchievements,
+  awardEdgeAchievement,
+  LadderResult,
 } from '../src/util/awardAchievements';
 
 const bump = vi.mocked(achievementService.bump);
 const unlock = vi.mocked(achievementService.unlock);
+const getForUser = vi.mocked(appService.getForUser);
 
 // What unlock() was asked to store, as plain ids.
 const unlockedIds = (): string[] =>
@@ -29,6 +39,9 @@ const facts = (over = {}) => ({
   timesHit: 5,
   botsAlive: 3,
   botsTotal: 5,
+  shotsFired: 40,
+  shotsHit: 4,
+  suddenDeath: false,
   ...over,
 });
 
@@ -36,7 +49,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   bump.mockResolvedValue({});
   unlock.mockResolvedValue([]);
+  getForUser.mockResolvedValue([]);
 });
+
+// A stand-in for App exposing only what the account pass reads.
+const app = (source: string) => ({ getSource: () => source }) as never;
+const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
 describe('toCounterDeltas', () => {
   it('keeps the counters that feed a badge and drops the rest', () => {
@@ -189,5 +207,158 @@ describe('recordLadderResult', () => {
     await expect(
       recordLadderResult({ ...base, facts: facts(), rated: true })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('evaluateAccountAchievements', () => {
+  it('counts an authored bot, but not an untouched starter', async () => {
+    // Being handed a bot isn't writing one — the same rule the ladder uses to
+    // bench starters.
+    getForUser.mockResolvedValue([
+      app(STARTER_BOTS[0].source),
+      app(STARTER_BOTS[1].source),
+    ]);
+    await evaluateAccountAchievements('user-1');
+    expect(unlock).not.toHaveBeenCalled();
+
+    getForUser.mockResolvedValue([
+      app(STARTER_BOTS[0].source),
+      app('bot.setName("Mine")'),
+    ]);
+    await evaluateAccountAchievements('user-1');
+    expect(unlockedIds()).toContain('account-first-bot');
+  });
+
+  it('ignores an empty bot', async () => {
+    getForUser.mockResolvedValue([app(''), app('   ')]);
+    await evaluateAccountAchievements('user-1');
+    expect(unlock).not.toHaveBeenCalled();
+  });
+
+  it('awards the anniversary from the account age', async () => {
+    getForUser.mockResolvedValue([app('bot.setName("Mine")')]);
+    await evaluateAccountAchievements('user-1', daysAgo(400));
+    expect(unlockedIds()).toContain('account-veteran');
+  });
+
+  it('does not award the anniversary early', async () => {
+    getForUser.mockResolvedValue([app('bot.setName("Mine")')]);
+    await evaluateAccountAchievements('user-1', daysAgo(100));
+    expect(unlockedIds()).not.toContain('account-veteran');
+  });
+
+  it('treats an unknown creation date as brand new rather than guessing', async () => {
+    getForUser.mockResolvedValue([app('bot.setName("Mine")')]);
+    await evaluateAccountAchievements('user-1');
+    expect(unlockedIds()).not.toContain('account-veteran');
+  });
+
+  it('stores no earning app — an account badge is about the user', async () => {
+    getForUser.mockResolvedValue([app('bot.setName("Mine")')]);
+    await evaluateAccountAchievements('user-1');
+    expect(unlockedEntry('account-first-bot')!.appId).toBeNull();
+  });
+
+  it('swallows a failure — it runs inside a page load and a save path', async () => {
+    getForUser.mockRejectedValue(new Error('db down'));
+    await expect(evaluateAccountAchievements('user-1')).resolves.toEqual([]);
+  });
+});
+
+describe('awardEdgeAchievement', () => {
+  it('unlocks the one badge, with no earning app', async () => {
+    await awardEdgeAchievement('user-1', 'account-repair');
+    expect(unlock).toHaveBeenCalledWith('user-1', [
+      { id: 'account-repair', appId: null },
+    ]);
+  });
+
+  it('swallows a failure — the moment is not worth failing its request over', async () => {
+    unlock.mockRejectedValue(new Error('db down'));
+    await expect(
+      awardEdgeAchievement('user-1', 'account-mcp-token')
+    ).resolves.toBeUndefined();
+  });
+});
+
+// The rank badges (GitHub #121). The rank itself comes from AppService.getRanks —
+// these cover the POLICY around it: the placement gate, best-of-two, and the rated
+// gate that keeps a rank badge un-farmable.
+describe('recordLadderResult — rank badges', () => {
+  const ranked = (over: Partial<LadderResult> = {}): LadderResult => ({
+    userId: 'user-1',
+    stats: {},
+    facts: facts(),
+    rated: true,
+    rankedApps: [{ appId: 'app-1', rank: 3, ratingGames: 50 }],
+    ...over,
+  });
+
+  it('awards the rank badges an app has reached', async () => {
+    await recordLadderResult(ranked());
+    expect(unlockedIds()).toContain('ladder-top-10');
+    expect(unlockedIds()).toContain('ladder-top-3');
+    expect(unlockedIds()).not.toContain('ladder-top-1');
+  });
+
+  it('records the app that got there as the earner', async () => {
+    await recordLadderResult(ranked());
+    expect(unlockedEntry('ladder-top-3')?.appId).toBe('app-1');
+  });
+
+  // Elo's placement K-boost swings a young app's rating hard, so an early spike
+  // must not mint a permanent badge.
+  it('ignores an app that has not played its placement games yet', async () => {
+    await recordLadderResult(
+      ranked({ rankedApps: [{ appId: 'app-1', rank: 1, ratingGames: 19 }] })
+    );
+    expect(unlockedIds()).not.toContain('ladder-top-1');
+  });
+
+  it('awards on the placement boundary game', async () => {
+    await recordLadderResult(
+      ranked({ rankedApps: [{ appId: 'app-1', rank: 1, ratingGames: 20 }] })
+    );
+    expect(unlockedIds()).toContain('ladder-top-1');
+  });
+
+  it('ignores an app that is not on the board', async () => {
+    await recordLadderResult(
+      ranked({ rankedApps: [{ appId: 'app-1', ratingGames: 50 }] })
+    );
+    expect(unlockedIds()).not.toContain('ladder-top-10');
+  });
+
+  // A same-owner matchup fields two apps; the badge is about the better one.
+  it('takes the best rank when a user fielded two apps', async () => {
+    await recordLadderResult(
+      ranked({
+        rankedApps: [
+          { appId: 'worse', rank: 9, ratingGames: 50 },
+          { appId: 'better', rank: 2, ratingGames: 50 },
+        ],
+      })
+    );
+    expect(unlockedIds()).toContain('ladder-top-3');
+    expect(unlockedEntry('ladder-top-3')?.appId).toBe('better');
+  });
+
+  // The entire reason a ladder badge is worth anything. Give the match some real
+  // combat so it still reaches unlock() — an unrated match's shots genuinely
+  // happened, so its counters count; only the ladder badges are withheld.
+  it('awards no rank badge for an unrated match', async () => {
+    bump.mockResolvedValue({ shotsFired: 10 });
+    await recordLadderResult(
+      ranked({ rated: false, stats: { shotsFired: 10 } })
+    );
+    expect(unlock).toHaveBeenCalled();
+    expect(unlockedIds()).not.toContain('ladder-top-3');
+  });
+
+  // Rank is where you stand, not how one match went — you can hold your top-10
+  // slot through a loss, and the badge says "reach", not "win while there".
+  it('awards on rank even when the user lost the match', async () => {
+    await recordLadderResult(ranked({ facts: facts({ won: false }) }));
+    expect(unlockedIds()).toContain('ladder-top-3');
   });
 });

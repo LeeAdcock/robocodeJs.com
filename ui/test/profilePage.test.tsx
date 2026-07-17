@@ -10,7 +10,11 @@ import ProfilePage from '../src/page/profile/profilePage';
 // The server ships the whole catalog, so the page holds no per-badge knowledge —
 // these fixtures stand in for it exactly as the API sends it.
 const profile = {
-  user: { name: 'Ada L.', picture: 'https://example.test/a.png' },
+  user: {
+    name: 'Ada L.',
+    picture: 'https://example.test/a.png',
+    memberSince: '2025-03-04T00:00:00.000Z',
+  },
   catalog: [
     {
       id: 'ladder-flawless',
@@ -77,7 +81,9 @@ describe('ProfilePage', () => {
     // Still out there — showing these is the point of the page.
     expect(screen.getByLabelText('Locked: Trigger Happy')).toBeTruthy();
     expect(screen.getByLabelText('Locked: Flawless Victory')).toBeTruthy();
-    expect(screen.getByText('1 of 3 earned')).toBeTruthy();
+    // Matched loosely: the summary line also carries the "member since" suffix,
+    // so the count is only part of its text.
+    expect(screen.getByText(/1 of 3 earned/)).toBeTruthy();
   });
 
   it('shows progress toward a locked counter badge', async () => {
@@ -95,11 +101,48 @@ describe('ProfilePage', () => {
   });
 
   it('omits a scope with no badges rather than rendering an empty heading', async () => {
-    // Account badges land in a later slice; until then the group shouldn't appear.
+    // This fixture carries no account badges, so that group must not render — the
+    // page shows only the scopes it actually has something for.
     vi.mocked(axios.get).mockResolvedValue({ data: profile });
     renderPage();
     await screen.findByText('Ranked');
     expect(screen.queryByText('Milestones')).toBeNull();
+  });
+
+  it('renders the account group when the catalog has one', async () => {
+    vi.mocked(axios.get).mockResolvedValue({
+      data: {
+        ...profile,
+        catalog: [
+          ...profile.catalog,
+          {
+            id: 'account-veteran',
+            scope: 'account',
+            name: 'Anniversary',
+            description: 'Be a member for a year.',
+            icon: '🎂',
+          },
+        ],
+      },
+    });
+    renderPage();
+    await screen.findByText('Milestones');
+    expect(screen.getByLabelText('Locked: Anniversary')).toBeTruthy();
+  });
+
+  it('shows how long you have been a member', async () => {
+    vi.mocked(axios.get).mockResolvedValue({ data: profile });
+    renderPage();
+    expect(await screen.findByText(/member since March 2025/)).toBeTruthy();
+  });
+
+  it('omits the member line for a legacy account with no creation date', async () => {
+    vi.mocked(axios.get).mockResolvedValue({
+      data: { ...profile, user: { name: 'Ada L.' } },
+    });
+    renderPage();
+    await screen.findByText('First Kill');
+    expect(screen.queryByText(/member since/)).toBeNull();
   });
 
   it('prompts a signed-out visitor to sign in rather than showing an error', async () => {

@@ -242,11 +242,17 @@ export const INTERFACES: ApiInterface[] = [
         type: 'number',
         doc: 'Bearing from the bot to this marker, relative to your heading (bot.turn(getBearing()) faces it).',
       },
+      {
+        name: 'isInBounds',
+        kind: 'method',
+        type: 'boolean',
+        doc: 'Whether this marker lies inside the arena (arena.contains of its coordinates).',
+      },
     ],
   },
   {
     name: 'Radar',
-    doc: 'Detects nearby bots in the direction it points. Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
+    doc: 'Detects bots inside its beam — the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
     members: [
       ...turnable('radar'),
       {
@@ -331,6 +337,22 @@ export const INTERFACES: ApiInterface[] = [
         ],
         type: 'Marker',
         doc: 'Creates a marker at the arena coordinate (x, y) for distance/bearing math.',
+      },
+      {
+        name: 'contains',
+        kind: 'method',
+        params: [
+          { name: 'x', type: 'number' },
+          { name: 'y', type: 'number' },
+        ],
+        type: 'boolean',
+        doc: 'Whether (x, y) lies inside the arena (0..width, 0..height, edges inclusive).',
+      },
+      {
+        name: 'getNearestWall',
+        kind: 'method',
+        type: 'Marker',
+        doc: 'A marker at the nearest point on the arena boundary — getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself.',
       },
     ],
   },

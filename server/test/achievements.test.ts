@@ -3,6 +3,8 @@ import {
   ACHIEVEMENTS,
   counterAchievements,
   testAchievements,
+  accountAchievements,
+  rankAchievements,
   LadderFacts,
 } from '../src/util/achievements';
 
@@ -17,6 +19,9 @@ const win = (over: Partial<LadderFacts> = {}): LadderFacts => ({
   timesHit: 5,
   botsAlive: 3,
   botsTotal: 5,
+  shotsFired: 40,
+  shotsHit: 4,
+  suddenDeath: false,
   ...over,
 });
 
@@ -36,15 +41,21 @@ describe('achievement catalog invariants', () => {
     }
   });
 
-  it('defines each badge as exactly one of counter+threshold or test', () => {
+  it('gives each badge at most one way to be earned', () => {
+    // Four predicate forms, plus "none" for the edge-triggered ones. More than
+    // one would make it ambiguous which path can award the badge.
     for (const a of ACHIEVEMENTS) {
-      const isCounter = a.counter !== undefined;
-      const isTest = a.test !== undefined;
+      const forms = [
+        a.counter !== undefined,
+        a.test !== undefined,
+        a.accountTest !== undefined,
+        a.rankThreshold !== undefined,
+      ].filter(Boolean).length;
       expect(
-        isCounter !== isTest,
-        `${a.id} must be exactly one of counter/test`
-      ).toBe(true);
-      if (isCounter) {
+        forms,
+        `${a.id} must have at most one predicate form`
+      ).toBeLessThan(2);
+      if (a.counter !== undefined) {
         expect(a.threshold, `${a.id} needs a threshold`).toBeTypeOf('number');
         expect(
           a.threshold!,
@@ -52,6 +63,40 @@ describe('achievement catalog invariants', () => {
         ).toBeGreaterThan(0);
       }
     }
+  });
+
+  // A badge with no predicate can only ever be awarded by a hand-written call at
+  // its event site, so it must be a deliberate choice — not a forgotten predicate.
+  // Only the account scope has moments that leave no state to re-derive.
+  it('allows a predicate-less (edge-triggered) badge only in the account scope', () => {
+    const edgeTriggered = ACHIEVEMENTS.filter(
+      (a) => !a.counter && !a.test && !a.accountTest && !a.rankThreshold
+    );
+    expect(edgeTriggered.map((a) => a.id).sort()).toEqual([
+      'account-borrowed',
+      'account-check',
+      'account-mcp-token',
+      'account-repair',
+      'account-shared',
+    ]);
+    for (const a of edgeTriggered) expect(a.scope).toBe('account');
+  });
+
+  it('scopes every accountTest badge to the account scope', () => {
+    const offenders = ACHIEVEMENTS.filter(
+      (a) => a.accountTest && a.scope !== 'account'
+    );
+    expect(offenders.map((a) => a.id)).toEqual([]);
+  });
+
+  // A rank is a position on the global ladder, so a rank badge is meaningless
+  // anywhere else — and it must never become farmable by leaking into a scope the
+  // user's own arena can feed.
+  it('scopes every rank badge to the ladder scope', () => {
+    const offenders = ACHIEVEMENTS.filter(
+      (a) => a.rankThreshold !== undefined && a.scope !== 'ladder'
+    );
+    expect(offenders.map((a) => a.id)).toEqual([]);
   });
 
   // Encodes the sink's limitation so it can't regress into a badge that silently
@@ -146,10 +191,122 @@ describe('testAchievements (ladder)', () => {
     );
   });
 
+  it('awards Sharpshooter for landing half your shots', () => {
+    const sharp = win({ shotsFired: 20, shotsHit: 10 });
+    expect(ids(testAchievements('ladder', sharp))).toContain(
+      'ladder-sharpshooter'
+    );
+    const nearly = win({ shotsFired: 20, shotsHit: 9 });
+    expect(ids(testAchievements('ladder', nearly))).not.toContain(
+      'ladder-sharpshooter'
+    );
+  });
+
+  // The floor is the whole point: a match settled by one lucky point-blank shot is
+  // 100% accuracy, and without this it would earn a marksmanship badge.
+  it('does not award Sharpshooter on a tiny sample, however perfect', () => {
+    const lucky = win({ shotsFired: 9, shotsHit: 9 });
+    expect(ids(testAchievements('ladder', lucky))).not.toContain(
+      'ladder-sharpshooter'
+    );
+    // One more shot and the same aim now counts.
+    const enough = win({ shotsFired: 10, shotsHit: 10 });
+    expect(ids(testAchievements('ladder', enough))).toContain(
+      'ladder-sharpshooter'
+    );
+  });
+
+  it('never awards Sharpshooter for a loss, however good the aim', () => {
+    const lost = win({ won: false, shotsFired: 50, shotsHit: 50 });
+    expect(ids(testAchievements('ladder', lost))).not.toContain(
+      'ladder-sharpshooter'
+    );
+  });
+
+  it('awards Sudden Death Survivor only for a win that ran into decay', () => {
+    expect(
+      ids(testAchievements('ladder', win({ suddenDeath: true })))
+    ).toContain('ladder-sudden-death');
+    expect(
+      ids(testAchievements('ladder', win({ suddenDeath: false })))
+    ).not.toContain('ladder-sudden-death');
+  });
+
+  it('awards Pyrrhic Victory for winning with exactly one bot left', () => {
+    expect(ids(testAchievements('ladder', win({ botsAlive: 1 })))).toContain(
+      'ladder-pyrrhic'
+    );
+    expect(
+      ids(testAchievements('ladder', win({ botsAlive: 2 })))
+    ).not.toContain('ladder-pyrrhic');
+    // Winning with none alive is possible — the last bot eliminated takes it —
+    // but that is not what this badge says.
+    expect(
+      ids(testAchievements('ladder', win({ botsAlive: 0 })))
+    ).not.toContain('ladder-pyrrhic');
+  });
+
   it('never awards a ladder badge when asked for another scope', () => {
     expect(
       testAchievements('sandbox', win({ timesHit: 0, botsAlive: 5 }))
     ).toEqual([]);
     expect(testAchievements('account', win())).toEqual([]);
+  });
+});
+
+describe('accountAchievements', () => {
+  const state = (over = {}) => ({
+    authoredApps: 0,
+    accountAgeDays: 0,
+    ...over,
+  });
+
+  it('awards Hello, World for the first authored bot', () => {
+    expect(ids(accountAchievements(state()))).not.toContain(
+      'account-first-bot'
+    );
+    expect(ids(accountAchievements(state({ authoredApps: 1 })))).toContain(
+      'account-first-bot'
+    );
+  });
+
+  it('awards Bot Factory at five, and every tier below it', () => {
+    const got = ids(accountAchievements(state({ authoredApps: 5 })));
+    expect(got).toContain('account-five-bots');
+    expect(got).toContain('account-first-bot');
+  });
+
+  it('awards Anniversary on the 365th day, not the 364th', () => {
+    expect(
+      ids(accountAchievements(state({ accountAgeDays: 364 })))
+    ).not.toContain('account-veteran');
+    expect(ids(accountAchievements(state({ accountAgeDays: 365 })))).toContain(
+      'account-veteran'
+    );
+  });
+
+  it('unlocks a rank badge at its exact boundary but not one rank short', () => {
+    expect(rankAchievements(10).map((a) => a.id)).toEqual(['ladder-top-10']);
+    expect(rankAchievements(11).map((a) => a.id)).toEqual([]);
+    expect(rankAchievements(3).map((a) => a.id)).toContain('ladder-top-3');
+    expect(rankAchievements(4).map((a) => a.id)).not.toContain('ladder-top-3');
+  });
+
+  // Reaching #1 should not leave the lesser rungs mysteriously locked — a user who
+  // arrives already dominant earned all three on the way past.
+  it('awards every lesser rank badge when a better rank is reached', () => {
+    expect(
+      rankAchievements(1)
+        .map((a) => a.id)
+        .sort()
+    ).toEqual(['ladder-top-1', 'ladder-top-10', 'ladder-top-3']);
+  });
+
+  it('never returns an edge-triggered badge — those have no predicate to satisfy', () => {
+    const got = ids(
+      accountAchievements(state({ authoredApps: 99, accountAgeDays: 9999 }))
+    );
+    expect(got).not.toContain('account-repair');
+    expect(got).not.toContain('account-mcp-token');
   });
 });

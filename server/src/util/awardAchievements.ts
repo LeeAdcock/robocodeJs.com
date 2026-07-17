@@ -5,9 +5,14 @@ import {
   AchievementScope,
   CounterKey,
   LadderFacts,
+  MIN_RANKED_GAMES_FOR_RANK,
   counterAchievements,
   testAchievements,
+  accountAchievements,
+  rankAchievements,
 } from './achievements';
+import appService from '../services/AppService';
+import { isUntouchedStarter } from './starterBots';
 import { BotStats } from '../types/botStats';
 import { UserId } from '../types/user';
 import { AppId } from '../types/app';
@@ -17,6 +22,8 @@ import { logger, LogEvent } from './logger';
 // bump the user's lifetime counters, work out what that unlocked, and store it.
 // AchievementService stays DB-only, mirroring RankedMatchService; the policy lives
 // here.
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // The BotStats counters that feed a lifetime total. Deliberately a subset — there
 // is no badge for being shot, and `damageTaken`/`timesHit` as a lifetime "score"
@@ -58,7 +65,12 @@ export const toCounterDeltas = (
 const award = async (
   userId: UserId,
   deltas: Partial<Record<CounterKey, number>>,
-  match?: { scope: AchievementScope; facts: LadderFacts; appId?: AppId | null }
+  match?: {
+    scope: AchievementScope;
+    facts: LadderFacts;
+    appId?: AppId | null;
+    rankedApps?: RankedApp[];
+  }
 ): Promise<string[]> => {
   const totals = await achievementService.bump(userId, deltas);
 
@@ -73,9 +85,45 @@ const award = async (
     for (const a of testAchievements(match.scope, match.facts)) {
       unlocks.push({ id: a.id, appId: match.appId ?? null });
     }
+    const best = bestRankedApp(match.rankedApps);
+    if (best) {
+      // The app that got there is the earner — this is exactly the "Robinhood
+      // reached the top 10" case the appId column exists for.
+      for (const a of rankAchievements(best.rank)) {
+        unlocks.push({ id: a.id, appId: best.appId });
+      }
+    }
   }
 
   return achievementService.unlock(userId, unlocks);
+};
+
+// One app the user fielded in a ladder match, as it stands on the board AFTER the
+// match's rating update.
+export interface RankedApp {
+  appId: AppId;
+  // Board rank, or undefined when the app isn't on the board at all.
+  rank?: number;
+  // Ranked games played, including the match just finished.
+  ratingGames: number;
+}
+
+// The best (lowest) board rank among the apps a user fielded, once the placement
+// gate is applied. A user can field several apps in one match (a same-owner
+// matchup), and a rank badge is about their best bot — awarding on the worse one
+// would be a strange reading of "reach the top 10".
+const bestRankedApp = (
+  apps: RankedApp[] | undefined
+): { appId: AppId; rank: number } | null => {
+  let best: { appId: AppId; rank: number } | null = null;
+  for (const app of apps ?? []) {
+    // An unranked app has no rank to earn with; a young one hasn't settled yet.
+    if (app.rank === undefined) continue;
+    if (app.ratingGames < MIN_RANKED_GAMES_FOR_RANK) continue;
+    if (best === null || app.rank < best.rank)
+      best = { appId: app.appId, rank: app.rank };
+  }
+  return best;
 };
 
 // Sandbox path: a user's own arena flushed some bot stats. Counter badges only —
@@ -118,6 +166,10 @@ export interface LadderResult {
   // The app that won it — recorded as the earner on ladder badges. Null when the
   // user didn't win, since nothing is awarded then anyway.
   winningAppId?: AppId | null;
+  // The user's apps in this match with their board rank AFTER the rating update,
+  // for the rank badges. Deliberately not gated on winning: "reach the top 10" is
+  // about where the bot stands, not how this one match went.
+  rankedApps?: RankedApp[];
   // Whether the match counted for rating (LadderService's `rate`: decided, and not
   // a double crash). An unrated match still fires shots, so its combat counters are
   // real, but it is NOT a ranked result: no ladderMatchesPlayed/ladderWins and no
@@ -148,6 +200,7 @@ export const recordLadderResult = async (
             scope: 'ladder',
             facts: result.facts,
             appId: result.facts.won ? (result.winningAppId ?? null) : null,
+            rankedApps: result.rankedApps,
           }
         : undefined
     );
@@ -167,5 +220,88 @@ export const recordLadderResult = async (
       { err, userId: result.userId },
       'ladder achievement award failed'
     );
+  }
+};
+
+// Award the account-scope badges (GitHub #121) that the user's current state
+// earns: bots written, time as a member. Costs one app query plus the account row
+// the caller already has, so it is cheap enough to run on every profile load —
+// which is what makes it SELF-HEALING. That matters more than it sounds:
+// account-veteran has no event at all (nothing happens when a year passes), and a
+// missed hook elsewhere heals on the user's next visit rather than losing a badge
+// forever.
+//
+// Edge-triggered account badges (the source-repair and MCP-token moments) leave no
+// state to re-derive, so they carry no predicate and are awarded at their event by
+// awardEdgeAchievement instead.
+//
+// Never throws: this runs inside a page load and a save path.
+export const evaluateAccountAchievements = async (
+  userId: UserId,
+  createdTimestamp?: Date
+): Promise<string[]> => {
+  try {
+    const apps = await appService.getForUser(userId);
+    // "Authored" excludes an untouched starter for the same reason the ladder
+    // benches them: being handed a bot isn't writing one.
+    const authoredApps = apps.filter((app) => {
+      const source = app.getSource();
+      return source.trim().length > 0 && !isUntouchedStarter(source);
+    }).length;
+
+    const accountAgeDays = createdTimestamp
+      ? Math.floor((Date.now() - createdTimestamp.getTime()) / MS_PER_DAY)
+      : 0;
+
+    const earned = accountAchievements({ authoredApps, accountAgeDays });
+    if (earned.length === 0) return [];
+
+    // appId stays null: an account badge is about the user, not any one bot.
+    const unlocked = await achievementService.unlock(
+      userId,
+      earned.map((a) => ({ id: a.id, appId: null }))
+    );
+    if (unlocked.length) {
+      logger.info(
+        {
+          event: LogEvent.ACHIEVEMENT_UNLOCKED,
+          userId,
+          unlocked,
+          scope: 'account',
+        },
+        'achievements unlocked'
+      );
+    }
+    return unlocked;
+  } catch (err) {
+    logger.warn({ err, userId }, 'account achievement evaluation failed');
+    return [];
+  }
+};
+
+// Award a single edge-triggered badge at the moment it happens. Idempotent via
+// ON CONFLICT DO NOTHING, so a caller never has to check whether it's already held.
+// Never throws: none of these moments is worth failing its request over.
+export const awardEdgeAchievement = async (
+  userId: UserId,
+  id: string
+): Promise<void> => {
+  try {
+    const unlocked = await achievementService.unlock(userId, [
+      { id, appId: null },
+    ]);
+    if (unlocked.length) {
+      logger.info(
+        {
+          event: LogEvent.ACHIEVEMENT_UNLOCKED,
+          userId,
+          unlocked,
+          scope: 'account',
+        },
+        'achievements unlocked'
+      );
+    }
+  } catch (err) {
+    logger.warn({ err, userId, id }, 'edge achievement award failed');
   }
 };
