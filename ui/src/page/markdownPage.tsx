@@ -5,11 +5,14 @@ import parse, {
   domToReact,
   attributesToProps,
   Element,
+  Text,
   DOMNode,
   HTMLReactParserOptions,
 } from 'html-react-parser';
 import { Link, useLocation } from 'react-router-dom';
 import { useDocumentTitle, brandTitle } from '../util/useDocumentTitle';
+import { splitGlossary } from '../util/glossary';
+import GlossaryTerm from '../components/glossaryTerm';
 
 // Open external and type-definition links in a new tab so following one doesn't
 // navigate away from the app; in-app doc links (e.g. /learn/docs, /samples/:name)
@@ -17,34 +20,87 @@ import { useDocumentTitle, brandTitle } from '../util/useDocumentTitle';
 const opensInNewTab = (href: string) =>
   /^https?:\/\//.test(href) || href.startsWith('/docs/ts/');
 
-const parseOptions: HTMLReactParserOptions = {
-  replace: (node) => {
-    // Duck-type the element (instanceof Element is unreliable across domhandler
-    // versions). Text nodes have no `attribs`, so the guard skips them.
-    const el = node as Element;
-    if (el.name === 'a' && el.attribs?.href) {
-      const href = el.attribs.href;
-      // External / sample / type-def links open in a new tab.
-      if (opensInNewTab(href)) {
+// Contexts where glossary terms are left alone: code (a term there is an
+// identifier, not prose), links (already interactive), and headings (styled as
+// tiles; an underline would fight them).
+const GLOSSARY_SKIP = new Set([
+  'code',
+  'pre',
+  'a',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+]);
+
+const insideSkipped = (node: DOMNode) => {
+  for (let p = node.parent; p; p = p.parent) {
+    if (GLOSSARY_SKIP.has((p as Element).name)) return true;
+  }
+  return false;
+};
+
+// Factory rather than a module constant: each parse gets a fresh `seen` set so
+// the first-occurrence-per-page rule resets with the page (parse runs
+// synchronously in the render body, so a StrictMode double render also gets
+// its own set and produces identical output).
+const makeParseOptions = (glossary: boolean): HTMLReactParserOptions => {
+  const seen = new Set<string>();
+  return {
+    replace: (node) => {
+      // Duck-type the element (instanceof Element is unreliable across domhandler
+      // versions). Text nodes have no `attribs`, so the guard skips them.
+      const el = node as Element;
+      if (el.name === 'a' && el.attribs?.href) {
+        const href = el.attribs.href;
+        // External / sample / type-def links open in a new tab.
+        if (opensInNewTab(href)) {
+          return (
+            <a
+              {...attributesToProps(el.attribs)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {domToReact(el.children as DOMNode[])}
+            </a>
+          );
+        }
+        // In-app routes (e.g. /learn/docs, /learn/aim, /learn/docs#movement): navigate with the
+        // router so the page content swaps in place instead of a full reload.
+        if (href.startsWith('/')) {
+          return <Link to={href}>{domToReact(el.children as DOMNode[])}</Link>;
+        }
+        // Otherwise (bare #section anchors) fall through to a normal <a> so the
+        // in-page hash-scroll behavior keeps working.
+      }
+      // Wrap the first mention of each glossary term in a definition tooltip.
+      // The skip check must run before splitGlossary, which consumes a term's
+      // one first-occurrence allowance — a mention inside a heading or code
+      // span must not use it up.
+      if (glossary && node.type === 'text' && !insideSkipped(node)) {
+        const segments = splitGlossary((node as Text).data, seen);
+        if (!segments) return;
+        // html-react-parser only honors a replace return that is a single
+        // valid element (a bare array is silently ignored) — wrap the
+        // segments in a Fragment.
         return (
-          <a
-            {...attributesToProps(el.attribs)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {domToReact(el.children as DOMNode[])}
-          </a>
+          <>
+            {segments.map((s, i) =>
+              typeof s === 'string' ? (
+                s
+              ) : (
+                <GlossaryTerm key={i} entry={s.entry}>
+                  {s.text}
+                </GlossaryTerm>
+              )
+            )}
+          </>
         );
       }
-      // In-app routes (e.g. /learn/docs, /learn/aim, /learn/docs#movement): navigate with the
-      // router so the page content swaps in place instead of a full reload.
-      if (href.startsWith('/')) {
-        return <Link to={href}>{domToReact(el.children as DOMNode[])}</Link>;
-      }
-      // Otherwise (bare #section anchors) fall through to a normal <a> so the
-      // in-page hash-scroll behavior keeps working.
-    }
-  },
+    },
+  };
 };
 
 interface MarkdownPageProps {
@@ -136,9 +192,14 @@ export default function MarkdownPage(props: MarkdownPageProps) {
   //      scripts as a backstop.
   // If this ever needs to render untrusted markdown, add an HTML sanitizer
   // (e.g. DOMPurify.sanitize(html)) between makeHtml() and parse().
+  // Glossary tooltips run on teaching surfaces (lessons + docs) but not blog
+  // posts (long-form prose, not concept teaching) or the privacy policy.
+  const glossaryEnabled =
+    !props.path.startsWith('blog/') && props.path !== 'privacy';
+
   return (
     <div ref={divRef} id="markdown" className="markdown">
-      {parse(html, parseOptions)}
+      {parse(html, makeParseOptions(glossaryEnabled))}
     </div>
   );
 }
