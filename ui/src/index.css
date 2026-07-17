@@ -202,6 +202,16 @@ body .tooltip {
   --bs-tooltip-color: #d6d6d6;
 }
 
+/* Glossary terms in markdown prose (components/glossaryTerm.tsx): a dotted
+   underline marks the first mention of a defined concept; the definition shows
+   in a tooltip on hover/focus. --link re-themes in night mode. */
+.markdown .glossary-term {
+  text-decoration: underline dotted var(--link);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
 /* Blog signature: the PNG is black ink on a white background. Multiply blends
    the white away against the light page; in night mode, invert the ink to
    light and screen-blend the (now black) background away against the dark
