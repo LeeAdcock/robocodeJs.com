@@ -14,22 +14,24 @@ type BotMessage =
   | BotMessage[]
   | { [key: string]: BotMessage };
 
-/** One bot detected by a radar scan. */
-interface ScanResult {
+/** One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the raw scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan. */
+interface Contact extends Marker {
   /** Unique id of the detected bot. */
   id: string;
   /** Its speed (-5 to 5). */
   speed: number;
   /** Its body heading in degrees (absolute compass, 0 = north). */
   orientation: number;
-  /** Distance from you to it. */
+  /** Distance from you to it at the moment of the scan (getDistance() is the live value). */
   distance: number;
-  /** Bearing to it, relative to your heading — so bot.turret.setOrientation(angle) aims at it. */
+  /** Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() is the live value). */
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
   /** Its current health (0–100) — target the weakest enemy or judge a threat. */
   health: number;
+  /** Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass 25 (bullet speed) to lead a shot, or your own speed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible. */
+  getIntercept(speed: number): Marker | null;
 }
 
 /** Details about the sender of a received message (the second RECEIVED argument). */
@@ -64,8 +66,8 @@ interface Radar {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the radar is currently turning. */
   isTurning(): boolean;
-  /** Performs a scan, resolving with the bots detected (empty array if none). Rejects if the radar is not ready. */
-  scan(): Promise<ScanResult[]>;
+  /** Performs a scan, resolving with the Contacts detected (empty array if none). Rejects if the radar is not ready. */
+  scan(): Promise<Contact[]>;
   /** Resolves when the radar is ready to scan again. Rejects if it scans (from elsewhere) while pending. */
   onReady(): Promise<void>;
   /** Returns whether the radar is ready to scan. */
@@ -122,8 +124,8 @@ interface Bot {
   turret: Turret;
   /** Fires when the bot first starts, when the arena restarts, and when you reboot the app — an ordinary save does NOT re-fire it. Set up state here on `this`. */
   on(event: 'START', handler: () => void | Promise<unknown>): void;
-  /** Fires after your radar scans. The handler receives the array of bots the scan detected. */
-  on(event: 'SCANNED', handler: (event: ScanResult[]) => void | Promise<unknown>): void;
+  /** Fires after your radar scans. The handler receives the array of Contacts the scan detected — the same objects bot.radar.scan() resolves with. */
+  on(event: 'SCANNED', handler: (event: Contact[]) => void | Promise<unknown>): void;
   /** Fires when another bot's radar sweeps over you — i.e. you have been spotted. */
   on(event: 'DETECTED', handler: () => void | Promise<unknown>): void;
   /** Fires when a bullet hits you. `angle` is the bearing the shot came from, relative to your heading. */
@@ -163,6 +165,9 @@ interface Bot {
   /** Returns a marker at the bot's current location. */
   dropMarker(): Marker;
 }
+
+/** Back-compat alias — radar scans now resolve Contacts. */
+type ScanResult = Contact;
 
 declare const bot: Bot;
 declare const arena: Arena;

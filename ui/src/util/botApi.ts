@@ -30,6 +30,8 @@ export interface ApiMember {
 export interface ApiInterface {
   name: string;
   doc: string;
+  // Base interface this one extends (rendered into the generated .d.ts).
+  extends?: string;
   members: ApiMember[];
 }
 
@@ -69,9 +71,9 @@ export const EVENTS: ApiEvent[] = [
   },
   {
     name: 'SCANNED',
-    payload: 'ScanResult[]',
+    payload: 'Contact[]',
     channel: 'bot',
-    doc: 'Fires after your radar scans. The handler receives the array of bots the scan detected.',
+    doc: 'Fires after your radar scans. The handler receives the array of Contacts the scan detected — the same objects bot.radar.scan() resolves with.',
   },
   {
     name: 'DETECTED',
@@ -149,8 +151,9 @@ const turnable = (subject: string): ApiMember[] => [
 
 export const INTERFACES: ApiInterface[] = [
   {
-    name: 'ScanResult',
-    doc: 'One bot detected by a radar scan.',
+    name: 'Contact',
+    doc: 'One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the raw scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan.',
+    extends: 'Marker',
     members: [
       {
         name: 'id',
@@ -174,13 +177,13 @@ export const INTERFACES: ApiInterface[] = [
         name: 'distance',
         kind: 'property',
         type: 'number',
-        doc: 'Distance from you to it.',
+        doc: 'Distance from you to it at the moment of the scan (getDistance() is the live value).',
       },
       {
         name: 'angle',
         kind: 'property',
         type: 'number',
-        doc: 'Bearing to it, relative to your heading — so bot.turret.setOrientation(angle) aims at it.',
+        doc: 'Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() is the live value).',
       },
       {
         name: 'friendly',
@@ -193,6 +196,13 @@ export const INTERFACES: ApiInterface[] = [
         kind: 'property',
         type: 'number',
         doc: 'Its current health (0–100) — target the weakest enemy or judge a threat.',
+      },
+      {
+        name: 'getIntercept',
+        kind: 'method',
+        params: [{ name: 'speed', type: 'number' }],
+        type: 'Marker | null',
+        doc: 'Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass 25 (bullet speed) to lead a shot, or your own speed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible.',
       },
     ],
   },
@@ -252,8 +262,8 @@ export const INTERFACES: ApiInterface[] = [
       {
         name: 'scan',
         kind: 'method',
-        type: 'Promise<ScanResult[]>',
-        doc: 'Performs a scan, resolving with the bots detected (empty array if none). Rejects if the radar is not ready.',
+        type: 'Promise<Contact[]>',
+        doc: 'Performs a scan, resolving with the Contacts detected (empty array if none). Rejects if the radar is not ready.',
       },
       {
         name: 'onReady',
@@ -713,13 +723,18 @@ export function generateDts(): string {
 
   for (const iface of INTERFACES) {
     lines.push(`/** ${iface.doc} */`);
-    lines.push(`interface ${iface.name} {`);
+    const heritage = iface.extends ? ` extends ${iface.extends}` : '';
+    lines.push(`interface ${iface.name}${heritage} {`);
     for (const m of iface.members) {
       for (const line of renderMemberDts(iface, m)) lines.push(`  ${line}`);
     }
     lines.push('}');
     lines.push('');
   }
+
+  lines.push('/** Back-compat alias — radar scans now resolve Contacts. */');
+  lines.push('type ScanResult = Contact;');
+  lines.push('');
 
   lines.push('declare const bot: Bot;');
   lines.push('declare const arena: Arena;');
