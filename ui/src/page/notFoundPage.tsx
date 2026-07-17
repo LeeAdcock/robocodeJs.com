@@ -19,18 +19,17 @@ export default function NotFoundPage() {
       <p>Here are some good places to go instead:</p>
       <ul>
         <li>
-          <Link to="/">Home</Link> — jump back to the arena.
+          <Link to="/">Home</Link>. Jump back to the arena.
         </li>
         <li>
-          <Link to="/learn">Learn course</Link> — go from zero to a thinking
-          bot.
+          <Link to="/learn">Learn course</Link>. Go from zero to a thinking bot.
         </li>
         <li>
-          <Link to="/examples">Example bots</Link> — read, run, and remix
+          <Link to="/examples">Example bots</Link>. Read, run, and remix
           complete strategies.
         </li>
         <li>
-          <Link to="/blog">Blog</Link> — notes from building RobocodeJs.
+          <Link to="/blog">Blog</Link>. Notes from building RobocodeJs.
         </li>
       </ul>
     </div>

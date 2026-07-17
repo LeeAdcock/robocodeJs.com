@@ -58,7 +58,7 @@ export default function AddAppPage(props: AddAppPageProps) {
         const status = err?.response?.status;
         setError(
           status === 400
-            ? 'This app could not be added — your arena may be full.'
+            ? 'This app could not be added. Your arena may be full.'
             : 'Could not add this app. Please try again.'
         );
       })

@@ -1,14 +1,14 @@
 # How the rankings work
 
 The [Global Rankings](/leaderboard) board shows the strongest bots across every
-player, scored by an **Elo rating** — the same head-to-head system used in chess.
+player, scored by an **Elo rating**, the same head-to-head system used in chess.
 In the background, RobocodeJs quietly matches bots against one another and lets
 them fight; winners climb, losers slip. This page explains how a bot gets onto
 the board, how ranked matches are run, and exactly how the rating math works.
 
 Ratings ride your bot's **current code**. Improving your logic and letting it keep
 playing pushes the score up; a change that makes it weaker (or neglecting it while
-others improve) drifts it back down. Editing a bot never resets its rating — it
+others improve) drifts it back down. Editing a bot never resets its rating. It
 just clears any "broken" flag so the bot can be matched again.
 
 # Getting on the leaderboard
@@ -21,7 +21,7 @@ picked for the background ladder, a bot must meet **all** of these:
 - **Has real code.** Empty source is skipped.
 - **Not an untouched starter.** The starter bots seeded into every new account
   ("My First Bot" and "Target Practice") only enter the ladder once you've edited
-  them — so the board isn't flooded with identical 1500-rated clones.
+  them, so the board isn't flooded with identical 1500-rated clones.
 - **Recently edited.** The bot's source must have been changed within the last
   **3 months**.
 - **Owner recently active.** The owner must have signed in within the last
@@ -42,7 +42,7 @@ percentage. It never exposes anyone's source code.
 
 # How ranked matches run
 
-The ladder is a background system — you don't schedule matches, and there's no
+The ladder is a background system: you don't schedule matches, and there's no
 button to press. It runs continuously on the server, one match at a time, and
 politely **yields to live players**: when real arenas are busy, ranked matches
 back off so they never slow down someone who's actually playing.
@@ -111,15 +111,15 @@ update).
 # On-demand matches (MCP)
 
 Separate from the background Elo ladder, you can run matches on demand through the
-[MCP integration](/mcp) — handy when you want to compare the bots in one of your
+[MCP integration](/mcp), handy when you want to compare the bots in one of your
 arenas head-to-head, right now. There's no button for it in the UI; it's available
 as the `run_match` tool for an AI assistant (or any MCP client) connected to your
 account.
 
 `run_match` restarts your arena, runs a single match to a decision, and returns
 the winner and leaderboard. Because a single match is very sensitive to the random
-starting positions — the same bots can flip between first and last from one seed
-to the next — one match isn't a trustworthy ranking. For a best-of-N, call
+starting positions (the same bots can flip between first and last from one seed
+to the next), one match isn't a trustworthy ranking. For a best-of-N, call
 `run_match` across several `seed`s and aggregate the placements yourself (e.g.
 award N points for 1st down to 1 for last, summed across the seeds). Unlike the
 ladder, these matches don't touch anyone's Elo rating.

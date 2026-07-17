@@ -5,20 +5,20 @@
 - Run actions on a schedule instead of every single tick
 - Start a timer, and stop it later
 
-**New idea:** _Scheduling with timers — measured in game ticks, not seconds._
+**New idea:** _Scheduling with timers, measured in game ticks, not seconds._
 
 ## The idea
 
-Sometimes you don't want something _every_ tick — you want a **rhythm**, like "turn a
+Sometimes you don't want something _every_ tick. You want a **rhythm**, like "turn a
 little every 10 ticks." Two tools do this:
 
-- `setInterval(fn, 10)` — run `fn` **every** 10 ticks, over and over.
-- `setTimeout(fn, 30)` — run `fn` **once**, 30 ticks from now.
+- `setInterval(fn, 10)` runs `fn` **every** 10 ticks, over and over.
+- `setTimeout(fn, 30)` runs `fn` **once**, 30 ticks from now.
 
 Two important notes:
 
 1. The number is in **game ticks** (the clock's heartbeat), **not** seconds. There's no
-   real-world clock here — the game runs on its own time. (If you ever want the current
+   real-world clock here. The game runs on its own time. (If you ever want the current
    tick number, ask `clock.getTime()`.)
 2. **Create timers inside START.** START runs once, so you set up your rhythms a single
    time. (If you made them in TICK, you'd start a brand-new timer every heartbeat!)
@@ -43,7 +43,7 @@ bot.on(Event.START, () => {
 });
 ```
 
-Press **Deploy**. Rusty moves in a steady, rhythmic pattern — turning constantly and
+Press **Deploy**. Rusty moves in a steady, rhythmic pattern, turning constantly and
 dashing forward every so often.
 
 ## Stopping a timer
@@ -67,7 +67,7 @@ bot.on(Event.HIT, () => {
 ## Experiment
 
 - Change the `10` in the first interval to `5` (turns more often) or `30` (lazier).
-- Add a one-shot to START: `setTimeout(() => bot.setName('Warmed up!'), 30);` — the name
+- Add a one-shot to START: `setTimeout(() => bot.setName('Warmed up!'), 30);` and the name
   changes after 30 ticks.
 - Combine with the spin example: stop the turret spin on HIT, and notice it stays put
   afterward.
@@ -75,7 +75,7 @@ bot.on(Event.HIT, () => {
 ## Common questions
 
 **Is `10` ten seconds?**
-No — ten **ticks**. The clock ticks many times a second. Timers count ticks so the game
+No, ten **ticks**. The clock ticks many times a second. Timers count ticks so the game
 can pause and resume cleanly. There is no `Date` here on purpose; use `clock.getTime()`
 for the tick count.
 
@@ -88,7 +88,7 @@ It's a handle to that specific timer so you can `clearInterval(id)` to stop it l
 
 ## You learned
 
-- `setInterval(fn, ticks)` repeats; `setTimeout(fn, ticks)` runs once — both in **ticks**.
+- `setInterval(fn, ticks)` repeats; `setTimeout(fn, ticks)` runs once, both in **ticks**.
 - Create timers in **START**; they return an **id** you can `clearInterval` / `clearTimeout`.
 - There's no real clock; `clock.getTime()` gives the current tick.
 

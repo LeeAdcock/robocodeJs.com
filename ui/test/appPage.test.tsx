@@ -211,7 +211,7 @@ describe('AppPage (bot editor)', () => {
     fireEvent.click(screen.getByLabelText('Deploy bot'));
 
     expect(
-      await screen.findByText('Saved — the arena is running your latest code.')
+      await screen.findByText('Saved. The arena is running your latest code.')
     ).toBeTruthy();
     expect(axios.put).toHaveBeenCalledWith(
       '/api/user/u1/app/a1/source',

@@ -10,7 +10,7 @@
 ## The idea
 
 A `let` box from Lesson 8 is forgotten the moment its handler finishes. But a robot needs
-memory that **lasts** between events — like its current mood. For that we use **`this`**:
+memory that **lasts** between events, like its current mood. For that we use **`this`**:
 a shared notebook that all your handlers can read and write, and that even survives a
 code Deploy.
 
@@ -19,7 +19,7 @@ A great use of lasting memory is a **state machine**: your robot is always in on
 `SEARCH` (wander and look) and `ATTACK` (shoot the enemy). The bot switches modes as
 things happen.
 
-We'll also tidy our code into a **named function** — a reusable bundle we can call by
+We'll also tidy our code into a **named function**, a reusable bundle we can call by
 name from anywhere.
 
 ## Try it
@@ -81,26 +81,26 @@ New pieces:
 
 **Why `this.mode` instead of `let mode`?**
 A `let` inside a handler is forgotten when that handler ends. `this.mode` lives on your
-robot's shared notebook, so every handler sees the same value — and it even survives a
+robot's shared notebook, so every handler sees the same value, and it even survives a
 code Deploy, so editing mid-match won't wipe your robot's memory.
 
 **Do my five robots share this memory?**
-No — each robot gets its **own** private notebook. When one bot sets `this.mode`, the
+No, each robot gets its **own** private notebook. When one bot sets `this.mode`, the
 other four don't see it, and a top-level `let` variable is private to a single bot too
 (they run the same code, but each keeps its own copy). To share something across your
-team, you **send a message** — that's [Lesson 15](/learn/teamwork).
+team, you **send a message**. That's [Lesson 15](/learn/teamwork).
 
 **What happens to my variables when I Save?**
-Saving **reloads your code** — it runs again from the top. So a top-level `let value = 123`
+Saving **reloads your code**: it runs again from the top. So a top-level `let value = 123`
 is set right back to `123` on every Save, losing whatever it had grown to. But `this.value`
 lives on the notebook that _survives_ a reload, so it keeps its value across Saves. That's
 the real reason to reach for `this` for anything your robot needs to remember while you keep
-tweaking its code mid-match. (A **Reboot** is the exception — it wipes the notebook too and
+tweaking its code mid-match. (A **Reboot** is the exception: it wipes the notebook too and
 re-runs `START` from scratch.)
 
 **What does `filter` do (vs `forEach`)?**
 `forEach` _visits_ every item. `filter` _builds a new shorter list_ of just the items that
-match — here, the enemies.
+match (here, the enemies).
 
 **Why make a function like `aimAndFire`?**
 So you can reuse it and keep your handlers short and readable. If you want to aim-and-fire

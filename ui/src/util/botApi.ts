@@ -61,7 +61,7 @@ export const EVENTS: ApiEvent[] = [
     name: 'START',
     payload: 'void',
     channel: 'bot',
-    doc: 'Fires when the bot first starts, when the arena restarts, and when you reboot the app — an ordinary save does NOT re-fire it. Set up state here on `this`.',
+    doc: 'Fires when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does NOT re-fire it. Set up state here on `this`.',
   },
   {
     name: 'TICK',
@@ -73,13 +73,13 @@ export const EVENTS: ApiEvent[] = [
     name: 'SCANNED',
     payload: 'Contact[]',
     channel: 'bot',
-    doc: 'Fires after your radar scans. The handler receives the array of Contacts the scan detected — the same objects bot.radar.scan() resolves with.',
+    doc: 'Fires after your radar scans. The handler receives the array of Contacts the scan detected, the same objects bot.radar.scan() resolves with.',
   },
   {
     name: 'DETECTED',
     payload: 'void',
     channel: 'bot',
-    doc: "Fires when another bot's radar sweeps over you — i.e. you have been spotted.",
+    doc: "Fires when another bot's radar sweeps over you: you have been spotted.",
   },
   {
     name: 'HIT',
@@ -104,7 +104,7 @@ export const EVENTS: ApiEvent[] = [
     payload: 'BotMessage',
     params: 'message: BotMessage, from: SenderInfo',
     channel: 'bot',
-    doc: 'Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. A broadcast Contact arrives as plain data — rebuild it with arena.createContact(message).',
+    doc: 'Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. A broadcast Contact arrives as plain data. Rebuild it with arena.createContact(message).',
   },
 ];
 
@@ -151,14 +151,14 @@ const turnable = (subject: string): ApiMember[] => [
     name: 'turnRate',
     kind: 'property',
     type: 'number',
-    doc: `How many degrees the ${subject} turns per tick — plan how long a turn will take before committing to it.`,
+    doc: `How many degrees the ${subject} turns per tick. Plan how long a turn will take before committing to it.`,
   },
 ];
 
 export const INTERFACES: ApiInterface[] = [
   {
     name: 'Contact',
-    doc: 'One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan — the pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message).',
+    doc: 'One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan. The pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property, and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message).',
     extends: 'Marker',
     members: [
       {
@@ -219,7 +219,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'angle',
         kind: 'property',
         type: 'number',
-        doc: 'Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() re-measures from wherever you are now to the pinned scan position).',
+        doc: 'Bearing to it at the moment of the scan, relative to your heading, so bot.turret.setOrientation(angle) aims at it (getBearing() re-measures from wherever you are now to the pinned scan position).',
       },
       {
         name: 'friendly',
@@ -231,7 +231,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'health',
         kind: 'property',
         type: 'number',
-        doc: 'Its current health (0–100) — target the weakest enemy or judge a threat.',
+        doc: 'Its current health (0–100). Target the weakest enemy or judge a threat.',
       },
       {
         name: 'time',
@@ -244,7 +244,7 @@ export const INTERFACES: ApiInterface[] = [
         kind: 'method',
         params: [{ name: 'speed', type: 'number' }],
         type: 'Marker | null',
-        doc: 'Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible.',
+        doc: 'Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed. Pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible.',
       },
     ],
   },
@@ -256,7 +256,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'distance',
         kind: 'property',
         type: 'number',
-        doc: 'How far away the sender was when it broadcast — a range, not a bearing. The same value is given to teammates and eavesdropping enemies.',
+        doc: 'How far away the sender was when it broadcast: a range, not a bearing. The same value is given to teammates and eavesdropping enemies.',
       },
     ],
   },
@@ -310,7 +310,7 @@ export const INTERFACES: ApiInterface[] = [
   },
   {
     name: 'Radar',
-    doc: 'Detects bots inside its beam — the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
+    doc: 'Detects bots inside its beam: the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
     members: [
       ...turnable('radar'),
       {
@@ -360,7 +360,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'bulletSpeed',
         kind: 'property',
         type: 'number',
-        doc: 'How far a bullet travels per tick — divide a target’s distance by this to know the flight time when leading a shot.',
+        doc: 'How far a bullet travels per tick. Divide a target’s distance by this to know the flight time when leading a shot.',
       },
       {
         name: 'bulletDamage',
@@ -406,7 +406,7 @@ export const INTERFACES: ApiInterface[] = [
           },
         ],
         type: 'Contact',
-        doc: 'Rebuilds a full Contact from its serialized data — typically a contact a teammate broadcast, since a Contact serializes as its plain data properties (methods are not serialized). The result has every Contact method, measured from YOUR position: getBearing()/getDistance() are live, and getIntercept accounts for ticks elapsed since the capture time. Extra fields (id, health, friendly, …) carry through as data. A missing time means "as of now"; non-numeric x/y/speed/orientation throw.',
+        doc: 'Rebuilds a full Contact from its serialized data, typically a contact a teammate broadcast, since a Contact serializes as its plain data properties (methods are not serialized). The result has every Contact method, measured from YOUR position: getBearing()/getDistance() are live, and getIntercept accounts for ticks elapsed since the capture time. Extra fields (id, health, friendly, …) carry through as data. A missing time means "as of now"; non-numeric x/y/speed/orientation throw.',
       },
       {
         name: 'contains',
@@ -422,7 +422,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'getNearestWall',
         kind: 'method',
         type: 'Marker',
-        doc: 'A marker at the nearest point on the arena boundary — getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself.',
+        doc: 'A marker at the nearest point on the arena boundary: getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself.',
       },
     ],
   },
@@ -566,7 +566,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'acceleration',
         kind: 'property',
         type: 'number',
-        doc: 'How much the speed changes per tick while moving toward the target speed — needed to judge braking distance.',
+        doc: 'How much the speed changes per tick while moving toward the target speed, needed to judge braking distance.',
       },
       {
         name: 'radius',
@@ -586,13 +586,13 @@ export const INTERFACES: ApiInterface[] = [
         kind: 'method',
         params: [{ name: 'message', type: 'BotMessage' }],
         type: 'void',
-        doc: 'Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y).',
+        doc: 'Broadcasts a message to every bot in the arena, enemies included, received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y).',
       },
       {
         name: 'dropMarker',
         kind: 'method',
         type: 'Marker',
-        doc: "Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position — a receiver rebuilds it with arena.createMarker(message.x, message.y).",
+        doc: "Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position. A receiver rebuilds it with arena.createMarker(message.x, message.y).",
       },
     ],
   },

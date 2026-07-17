@@ -228,8 +228,8 @@ export default function ArenaRoster(props: ArenaRosterProps) {
           style={{ fontSize: '0.85em', color: '#888', marginBottom: '12px' }}
         >
           Switch an app on to send its bots into the arena, or off to bench it
-          (it stays in the list). Unlinking removes an app from this arena only
-          — the app itself is never deleted.
+          (it stays in the list). Unlinking removes an app from this arena only.
+          The app itself is never deleted.
         </div>
 
         {error && (
@@ -287,8 +287,8 @@ export default function ArenaRoster(props: ArenaRosterProps) {
                     overlay={
                       <Tooltip id={`roster-toggle-tip-${member.appId}`}>
                         {member.enabled
-                          ? 'In the arena — switch off to bench this app'
-                          : 'Benched — switch on to send this app into the arena'}
+                          ? 'In the arena, switch off to bench this app'
+                          : 'Benched, switch on to send this app into the arena'}
                       </Tooltip>
                     }
                   >
@@ -375,7 +375,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
                     overlay={
                       <Tooltip id={`roster-add-tip-${app.id}`}>
                         {atCapacity
-                          ? 'Arena is full — remove an app first'
+                          ? 'Arena is full. Remove an app first'
                           : 'Add this app to the arena'}
                       </Tooltip>
                     }

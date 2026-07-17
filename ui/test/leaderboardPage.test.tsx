@@ -128,7 +128,7 @@ describe('LeaderboardPage', () => {
     ).toBe('▼');
     // New + above the starting rating gets a ▲ (already winning).
     expect(
-      screen.getByLabelText(/New — already above the 1500 starting rating/)
+      screen.getByLabelText(/New, already above the 1500 starting rating/)
         .textContent
     ).toBe('▲');
     // Unchanged and new-but-not-winning rows get no marker: exactly 2 ▲, 1 ▼.

@@ -127,7 +127,7 @@ export default function SamplePage(props: SamplePageProps) {
   const cloneReason = !props.user
     ? 'Sign in (top right) to clone this bot into your arena.'
     : rosterCount !== null && rosterCount >= MAX_APPS_PER_ARENA
-      ? `Arena full (${MAX_APPS_PER_ARENA} apps) — remove one to add more.`
+      ? `Arena full (${MAX_APPS_PER_ARENA} apps). Remove one to add more.`
       : '';
 
   const doClone = () => {
@@ -155,7 +155,7 @@ export default function SamplePage(props: SamplePageProps) {
         const status = err?.response?.status;
         setError(
           status === 400
-            ? 'Could not clone this bot — your app or arena limit may be reached.'
+            ? 'Could not clone this bot. Your app or arena limit may be reached.'
             : 'Could not clone this bot right now. Please try again.'
         );
         setCloning(false);

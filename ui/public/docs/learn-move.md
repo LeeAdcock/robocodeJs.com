@@ -12,7 +12,7 @@
 Last lesson we made the robot "think" every tick. Now let's make it _move_.
 
 To drive, we use `bot.setSpeed(...)`. The `...` is a **value** we hand to the
-instruction — programmers call it an **argument**. For speed, the argument is a number:
+instruction. Programmers call it an **argument**. For speed, the argument is a number:
 
 - `0` means stop.
 - `5` is full speed ahead.
@@ -50,7 +50,7 @@ Notice some instructions **do** something (`setSpeed`) and others **answer** som
 
 ## Experiment
 
-- Change `bot.setSpeed(3)` to `bot.setSpeed(5)` — full speed. Then try `0` (it stops)
+- Change `bot.setSpeed(3)` to `bot.setSpeed(5)`, full speed. Then try `0` (it stops)
   and `-3` (it backs up).
 - Add this line inside START to see the arena size:
   `console.log('arena is', arena.getWidth(), 'x', arena.getHeight());`
@@ -62,12 +62,12 @@ It bumped into the wall! Hitting something stops you. We'll learn to react to th
 the next lesson.
 
 **What's the difference between `setSpeed` and `getX`?**
-`setSpeed` is a command — it changes something. `getX` is a question — it gives you an
+`setSpeed` is a command: it changes something. `getX` is a question: it gives you an
 answer back. Commands often end in `set...`, questions often start with `get...`.
 
 **Why put `setSpeed` in START instead of TICK?**
 START runs once, which is perfect for "start driving." If you put it in TICK it would
-run every heartbeat — usually unnecessary, though not harmful here.
+run every heartbeat, usually unnecessary, though not harmful here.
 
 ## You learned
 
@@ -75,7 +75,7 @@ run every heartbeat — usually unnecessary, though not harmful here.
   `0` stops.
 - `bot.getX()` / `bot.getY()` tell you your position; `0, 0` is the top-left corner.
 - `arena.getWidth()` / `arena.getHeight()` give the arena size.
-- The **START** event runs once at the beginning — a good place to set things up.
+- The **START** event runs once at the beginning, a good place to set things up.
 
 ---
 

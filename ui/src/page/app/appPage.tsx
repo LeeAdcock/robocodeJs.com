@@ -172,7 +172,7 @@ export default function AppPage(props: AppPageProps) {
     saveSource(code)
       .then(() => axios.post(`/api/user/${userId}/app/${appId}/compile`))
       .then(() => {
-        setNotice('Saved — the arena is running your latest code.');
+        setNotice('Saved. The arena is running your latest code.');
         setTimeout(() => setNotice(''), 4000);
       })
       .catch(() => undefined);
@@ -185,7 +185,7 @@ export default function AppPage(props: AppPageProps) {
     saveSource(code)
       .then(() => axios.post(`/api/user/${userId}/app/${appId}/reboot`))
       .then(() => {
-        setNotice('Saved — your bots restarted with your latest code.');
+        setNotice('Saved. Your bots restarted with your latest code.');
         setTimeout(() => setNotice(''), 4000);
       })
       .catch(() => undefined);
@@ -297,7 +297,7 @@ export default function AppPage(props: AppPageProps) {
       // fails here on a syntax error, so point at Check rather than repeating
       // its parse message in different words.
       setError(
-        'Could not reformat — the code has a syntax error. Use Check for errors (Ctrl-Enter) to find it.'
+        'Could not reformat. The code has a syntax error. Use Check for errors (Ctrl-Enter) to find it.'
       );
       setTimeout(() => setError(''), 15000);
     }
