@@ -70,8 +70,10 @@ describe('achievement catalog invariants', () => {
       (a) => !a.counter && !a.test && !a.accountTest && !a.rankThreshold
     );
     expect(edgeTriggered.map((a) => a.id).sort()).toEqual([
+      'account-borrowed',
       'account-mcp-token',
       'account-repair',
+      'account-shared',
     ]);
     for (const a of edgeTriggered) expect(a.scope).toBe('account');
   });

@@ -17,6 +17,8 @@ import { writeRateLimit } from '../middleware/rateLimit';
 import { openSseStream } from '../util/sse';
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
+import { awardEdgeAchievement } from '../util/awardAchievements';
+import { ACCOUNT_SHARED, ACCOUNT_BORROWED } from '../util/achievements';
 
 const app = express();
 
@@ -183,6 +185,19 @@ const addApp = async (req: Request, res: Response) => {
   const env = await environmentService.get(arena);
   env.addApp(app);
   return arenaMemberService.create(arena.getId(), app.getId()).then(() => {
+    // Achievements (GitHub #121). The share link is the one moment in the app
+    // where two people meet, so both halves earn: the author whose bot got picked
+    // up, and the player who fielded someone else's.
+    //
+    // Only a genuine cross-user add counts — adding your own bot to your own arena
+    // is just using the app. The already-a-member check above means a re-add can't
+    // re-fire this, and unlock is idempotent regardless.
+    //
+    // Fire-and-forget: a badge must never fail or slow the add.
+    if (app.getUserId() !== arena.getUserId()) {
+      void awardEdgeAchievement(app.getUserId(), ACCOUNT_SHARED);
+      void awardEdgeAchievement(arena.getUserId(), ACCOUNT_BORROWED);
+    }
     res.status(201);
     res.send();
   });

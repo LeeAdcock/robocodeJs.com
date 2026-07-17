@@ -526,6 +526,7 @@ describe('arena endpoints', () => {
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     // already at the 5-app limit (distinct members, none matching a1 so the
     // idempotency short-circuit doesn't fire before the cap check)
@@ -548,6 +549,7 @@ describe('arena endpoints', () => {
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([]);
     vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never);
@@ -565,6 +567,7 @@ describe('arena endpoints', () => {
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       { getAppId: () => 'a1' },
@@ -589,6 +592,7 @@ describe('arena endpoints', () => {
     } as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([]);
     vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never);
@@ -610,6 +614,7 @@ describe('arena endpoints', () => {
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       { getAppId: () => 'a1', setEnabled },
@@ -636,6 +641,7 @@ describe('arena endpoints', () => {
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       { getAppId: () => 'a1', setEnabled },
@@ -659,6 +665,7 @@ describe('arena endpoints', () => {
     vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
 
     const res = await request(makeApp(arenaRouter, mockUser('u1')))
@@ -671,6 +678,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       { getAppId: () => 'a1', getEnabled: () => true, getTimestamp: () => 100 },
@@ -705,6 +713,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({ setSpeed } as never);
 
@@ -721,6 +730,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({ setSpeed } as never);
 
@@ -735,6 +745,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
 
     const res = await request(makeApp(arenaRouter, mockUser('u1')))
@@ -749,6 +760,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       setSeed,
@@ -767,6 +779,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
 
     const res = await request(makeApp(arenaRouter, mockUser('u1')))
@@ -780,6 +793,7 @@ describe('arena endpoints', () => {
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
       getId: () => 'ar1',
+      getUserId: () => 'u1',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({} as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);

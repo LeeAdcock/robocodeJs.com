@@ -106,6 +106,8 @@ const UPSET_MARGIN = 150;
 // so the award sites name them from the catalog instead of hardcoding a string.
 export const ACCOUNT_REPAIR = 'account-repair';
 export const ACCOUNT_MCP_TOKEN = 'account-mcp-token';
+export const ACCOUNT_SHARED = 'account-shared';
+export const ACCOUNT_BORROWED = 'account-borrowed';
 
 export const ACHIEVEMENTS: Achievement[] = [
   // ── ladder: prestige, un-farmable ───────────────────────────────────────────
@@ -324,6 +326,27 @@ export const ACHIEVEMENTS: Achievement[] = [
     name: 'Plugged In',
     description: 'Connect an AI assistant to your account.',
     icon: '🔌',
+  },
+  // The two halves of the share link (/add-app/:appId) — the one social moment in
+  // the app, and the only badges earned by two people at once.
+  //
+  // Edge-triggered like the pair above, though for a subtler reason: the
+  // membership row they're derived from is deletable. A bot that was picked up and
+  // later dropped was still picked up, and re-deriving from arena_member would
+  // silently revoke that. The moment is the truth; the row is only its residue.
+  {
+    id: ACCOUNT_SHARED,
+    scope: 'account',
+    name: 'Crowd Pleaser',
+    description: 'Someone else added one of your bots to their arena.',
+    icon: '👏',
+  },
+  {
+    id: ACCOUNT_BORROWED,
+    scope: 'account',
+    name: 'Sparring Partner',
+    description: "Add someone else's bot to your arena.",
+    icon: '🤝',
   },
 ];
 
