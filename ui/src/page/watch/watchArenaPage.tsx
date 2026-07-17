@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import ArenaSvg from '../../components/arena/arena';
+import ArenaLegend from '../../components/arena/arenaLegend';
 import useArenaStream from '../../util/useArenaStream';
 import { useDarkMode } from '../../util/theme';
 
@@ -44,7 +45,18 @@ export default function WatchArenaPage({ arenaId }: { arenaId: string }) {
           <p>This match has ended or the link is no longer valid.</p>
         </div>
       ) : (
-        <ArenaSvg darkMode={darkMode} arena={arena} time={time} hideBorder />
+        <>
+          {/* Roster legend, top-left (no toolbar to clear on the spectator view).
+              A share-link visitor has no Apps menu or logs, so an at-a-glance
+              color->app key matters most here (GitHub #253). Above the arena
+              SVG's own stacking context (isolation: isolate). */}
+          <div
+            style={{ position: 'fixed', top: '16px', left: '16px', zIndex: 1 }}
+          >
+            <ArenaLegend arena={arena} />
+          </div>
+          <ArenaSvg darkMode={darkMode} arena={arena} time={time} hideBorder />
+        </>
       )}
     </div>
   );
