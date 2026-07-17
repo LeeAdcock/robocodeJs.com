@@ -71,6 +71,7 @@ describe('achievement catalog invariants', () => {
     );
     expect(edgeTriggered.map((a) => a.id).sort()).toEqual([
       'account-borrowed',
+      'account-check',
       'account-mcp-token',
       'account-repair',
       'account-shared',
