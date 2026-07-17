@@ -1,7 +1,7 @@
 import Clock from './clock';
 import { EventEmitter } from 'node:events';
 import App, { AppId } from './app';
-import Bot from './bot';
+import Bot, { BOT_MAX_SPEED } from './bot';
 import ivm from 'isolated-vm';
 import Arena from './arena';
 import compiler from '../util/compiler';
@@ -343,7 +343,7 @@ export default class Environment {
                 radarOrientation: bot.turret.radar.orientation,
                 radarOrientationVelocity: bot.turret.radar.orientationVelocity,
                 speed: bot.speed,
-                speedMax: bot.speedMax,
+                speedMax: BOT_MAX_SPEED,
                 x: bot.x,
                 y: bot.y,
               });
@@ -806,7 +806,7 @@ export default class Environment {
                   radarOrientationVelocity:
                     bot.turret.radar.orientationVelocity,
                   speed: bot.speed,
-                  speedMax: bot.speedMax,
+                  speedMax: BOT_MAX_SPEED,
                   x: bot.x,
                   y: bot.y,
                 });
@@ -855,7 +855,7 @@ export default class Environment {
         radarOrientation: bot.turret.radar.orientation,
         radarOrientationVelocity: bot.turret.radar.orientationVelocity,
         speed: bot.speed,
-        speedMax: bot.speedMax,
+        speedMax: BOT_MAX_SPEED,
         x: bot.x,
         y: bot.y,
       });

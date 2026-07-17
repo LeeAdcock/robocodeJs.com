@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import Simulation, { applyEliminations } from '../src/util/simulation';
+import { BOT_MAX_SPEED } from '../src/types/bot';
 import { BotStats } from '../src/types/botStats';
 import { Event } from '../src/types/event';
 
@@ -28,7 +29,6 @@ function makeBot(overrides: Record<string, unknown> = {}) {
     speed: 0,
     speedTarget: 0,
     speedAcceleration: 1,
-    speedMax: 10,
     orientation: 0,
     orientationTarget: 0,
     orientationVelocity: 0,
@@ -77,11 +77,11 @@ const run = (env: ReturnType<typeof makeEnv>) => Simulation.run(env as any);
 
 describe('Simulation.run — movement', () => {
   it('advances a bot along its orientation (0° = +y)', () => {
-    const bot = makeBot({ speed: 10, speedTarget: 10, speedMax: 10 });
+    const bot = makeBot({ speed: 5, speedTarget: 5 });
     run(makeEnv([makeProcess('a', [bot])]));
     expect(bot.x).toBeCloseTo(375);
-    expect(bot.y).toBeCloseTo(385);
-    expect(bot.stats.distanceTraveled).toBe(10);
+    expect(bot.y).toBeCloseTo(380);
+    expect(bot.stats.distanceTraveled).toBe(5);
   });
 
   it('accelerates toward speedTarget using pre-acceleration speed for the step', () => {
@@ -93,20 +93,19 @@ describe('Simulation.run — movement', () => {
   });
 
   it('snaps to speedTarget within one acceleration step', () => {
-    const bot = makeBot({ speed: 9, speedTarget: 10, speedAcceleration: 2 });
+    const bot = makeBot({ speed: 4, speedTarget: 5, speedAcceleration: 2 });
     run(makeEnv([makeProcess('a', [bot])]));
-    expect(bot.speed).toBe(10);
+    expect(bot.speed).toBe(5);
   });
 
-  it('clamps speed to speedMax', () => {
+  it('clamps speed to BOT_MAX_SPEED', () => {
     const bot = makeBot({
-      speed: 9,
+      speed: 4,
       speedTarget: 100,
       speedAcceleration: 5,
-      speedMax: 10,
     });
     run(makeEnv([makeProcess('a', [bot])]));
-    expect(bot.speed).toBe(10);
+    expect(bot.speed).toBe(BOT_MAX_SPEED);
   });
 });
 
@@ -166,8 +165,8 @@ describe('Simulation.run — collisions', () => {
     // Driving south (orientation 0, +y) into the south wall — hit straight on.
     const bot = makeBot({
       y: 740,
-      speed: 10,
-      speedTarget: 10,
+      speed: 5,
+      speedTarget: 5,
       handlers: { [Event.COLLIDED]: collided },
     });
     run(makeEnv([makeProcess('a', [bot])]));

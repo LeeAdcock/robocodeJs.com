@@ -7,7 +7,7 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import compiler from '../src/util/compiler';
-import Bot from '../src/types/bot';
+import Bot, { BOT_MAX_SPEED } from '../src/types/bot';
 import { Process } from '../src/types/environment';
 import { Event } from '../src/types/event';
 import { timerTick } from '../src/util/scheduleFactory';
@@ -160,9 +160,9 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.bot.turret.radar.orientationTarget).toBe(10);
   });
 
-  it('clamps setSpeed to the bot speedMax', () => {
+  it('clamps setSpeed to BOT_MAX_SPEED', () => {
     ctx.run('bot.setSpeed(1000).catch(() => {})');
-    expect(ctx.bot.speedTarget).toBe(ctx.bot.speedMax);
+    expect(ctx.bot.speedTarget).toBe(BOT_MAX_SPEED);
   });
 
   it('registers event handlers and runs them through the Reference bridge', async () => {

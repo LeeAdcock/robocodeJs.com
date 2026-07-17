@@ -78,7 +78,6 @@ export default class Bot implements Point, Orientated {
   public speed = 0;
   public speedTarget = 0;
   public speedAcceleration = BOT_ACCELERATION;
-  public speedMax = BOT_MAX_SPEED;
   // Dynamic event-dispatch table: populated across the isolated-vm boundary
   // (compiler.ts) and invoked positionally by Simulation, so the value type is
   // intentionally untyped.
@@ -384,10 +383,10 @@ export default class Bot implements Point, Orientated {
   }
 
   setSpeed(d: number) {
-    // Clamp symmetrically: the physics caps actual speed at ±speedMax, so an
-    // unclamped negative target (e.g. -10) would be unreachable and leave the
-    // returned promise pending forever.
-    const target = Math.max(-this.speedMax, Math.min(d, this.speedMax));
+    // Clamp symmetrically: the physics caps actual speed at ±BOT_MAX_SPEED, so
+    // an unclamped negative target (e.g. -10) would be unreachable and leave
+    // the returned promise pending forever.
+    const target = Math.max(-BOT_MAX_SPEED, Math.min(d, BOT_MAX_SPEED));
     if (target === this.speedTarget) {
       return Promise.resolve();
     }
@@ -406,7 +405,7 @@ export default class Bot implements Point, Orientated {
       speed: this.speed,
       speedTarget: this.speedTarget,
       speedAcceleration: this.speedAcceleration,
-      speedMax: this.speedMax,
+      speedMax: BOT_MAX_SPEED,
     });
     return waitUntil(
       this.env,

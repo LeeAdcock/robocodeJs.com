@@ -5,7 +5,7 @@ import Environment from '../types/environment';
 // `import type` is erased at compile time, so the cycle never exists at runtime.
 import type { Process } from '../types/environment';
 import type Bot from '../types/bot';
-import { BOT_RADIUS } from '../types/bot';
+import { BOT_RADIUS, BOT_MAX_SPEED } from '../types/bot';
 import { TURRET_RELOAD_RATE } from '../types/botTurret';
 import { RADAR_CHARGE_RATE } from '../types/botRadar';
 import { BULLET_DAMAGE, BULLET_MISS_PENALTY } from '../types/bullet';
@@ -304,8 +304,8 @@ export default {
             if (Math.abs(bot.speed - bot.speedTarget) < bot.speedAcceleration)
               bot.speed = bot.speedTarget;
             bot.speed = Math.max(
-              -bot.speedMax,
-              Math.min(bot.speedMax, bot.speed)
+              -BOT_MAX_SPEED,
+              Math.min(BOT_MAX_SPEED, bot.speed)
             );
           } else {
             bot.speedTarget = 0;
