@@ -97,6 +97,9 @@ const mockApp = (id: string) => ({
   getUserId: () => 'u1',
   getSource: () => '// bot code',
   setSource: vi.fn().mockResolvedValue(undefined),
+  // propagateSource reads this before saving, to spot a ladder-benched app being
+  // put back in the running (the Field Repair badge, GitHub #121).
+  isBroken: () => false,
   delete: vi.fn().mockResolvedValue(undefined),
 });
 
@@ -471,6 +474,8 @@ describe('propagateSource (save + re-execute)', () => {
     let source = stored;
     return {
       getId: () => id,
+      getUserId: () => 'u1',
+      isBroken: () => false,
       getSource: () => source,
       setSource: vi.fn().mockImplementation((s: string) => {
         source = s;

@@ -6,6 +6,8 @@ import auth, { AuthenticatedRequest } from '../middleware/auth';
 import RobocodeOAuthProvider, { SCOPE } from '../util/oauthProvider';
 import oauthService from '../services/OAuthService';
 import { logger, LogEvent } from '../util/logger';
+import { awardEdgeAchievement } from '../util/awardAchievements';
+import { ACCOUNT_MCP_TOKEN } from '../util/achievements';
 
 // The public origin of this deployment, used as the OAuth issuer and to build the
 // browser login redirect. It must be a fixed value at startup because the SDK
@@ -91,6 +93,13 @@ app.post('/api/oauth/authorize', auth(true), async (req, res) => {
     codeChallenge: code_challenge,
     scopes: scope ? scope.split(' ').filter(Boolean) : [SCOPE],
   });
+
+  // Achievements (GitHub #121). This is the moment a user connects an AI client
+  // to their account, and it happens exactly once per authorization — unlike the
+  // token endpoint (handled by the SDK provider above), which also mints an access
+  // token every hour. It's session-gated, so the acting user is right here.
+  // Fire-and-forget: a badge must never fail an authorization.
+  void awardEdgeAchievement(user.getId(), ACCOUNT_MCP_TOKEN);
 
   const location = new URL(redirect_uri);
   location.searchParams.set('code', code);

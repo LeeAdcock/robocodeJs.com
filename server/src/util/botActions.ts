@@ -3,6 +3,11 @@ import { UserId } from '../types/user';
 import arenaService from '../services/ArenaService';
 import environmentService from '../services/EnvironmentService';
 import arenaMemberService from '../services/ArenaMemberService';
+import {
+  awardEdgeAchievement,
+  evaluateAccountAchievements,
+} from './awardAchievements';
+import { ACCOUNT_REPAIR } from './achievements';
 
 // Bot lifecycle operations shared by the REST API (api/app.ts) and the MCP tools
 // (api/mcp.ts). Each was originally inlined in a route handler; extracting them
@@ -38,6 +43,10 @@ export const propagateSource = async (
 ): Promise<void> => {
   // Capture this BEFORE setSource mutates the app's stored source.
   const changed = source !== app.getSource();
+  // Same reason, different field: setSource clears `broken` in the same UPDATE, so
+  // this is the only moment we can still tell that the ladder had benched this app
+  // for crashing. Editing it is what puts it back in the running (GitHub #121).
+  const wasBroken = app.isBroken();
   // Always persist: setSource also clears the ladder `broken` flag and bumps
   // updatedTimestamp, so re-saving identical source is how a user un-breaks a
   // ladder-broken app and marks it "actively edited" — never guard this.
@@ -53,6 +62,15 @@ export const propagateSource = async (
       })
     );
   }
+
+  // Achievements (GitHub #121). Hooked here rather than in the route because this
+  // is the shared save path — both the REST source write and the MCP
+  // set_app_source land on it, so neither can drift out of sync.
+  //
+  // Fire-and-forget: a badge must never fail or slow a save.
+  if (wasBroken) void awardEdgeAchievement(app.getUserId(), ACCOUNT_REPAIR);
+  // Writing a bot is itself an account milestone, so re-derive those too.
+  void evaluateAccountAchievements(app.getUserId());
 };
 
 // Re-run a bot's current source in each of the user's arenas that have a live

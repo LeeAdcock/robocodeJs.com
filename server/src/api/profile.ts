@@ -1,6 +1,7 @@
 import express from 'express';
 import achievementService from '../services/AchievementService';
 import { ACHIEVEMENTS } from '../util/achievements';
+import { evaluateAccountAchievements } from '../util/awardAchievements';
 import auth from '../middleware/auth';
 import { logger, LogEvent } from '../util/logger';
 import type { Request } from 'express';
@@ -31,13 +32,23 @@ app.get('/api/profile', auth(true), async (req, res) => {
     const user = (req as Request & { user: User }).user;
     const userId = user.getId();
 
+    // Re-derive the account badges BEFORE reading, so the page is never stale on
+    // its own load. This is the only way account-veteran can ever land — nothing
+    // happens when a year passes — and it heals any missed hook elsewhere. It
+    // swallows its own errors, so a failure here just means no new badge today.
+    await evaluateAccountAchievements(userId, user.getCreatedTimestamp());
+
     const [unlocked, counters] = await Promise.all([
       achievementService.getForUser(userId),
       achievementService.getCounters(userId),
     ]);
 
     res.json({
-      user: { name: user.getName(), picture: user.getPicture() },
+      user: {
+        name: user.getName(),
+        picture: user.getPicture(),
+        memberSince: user.getCreatedTimestamp(),
+      },
       catalog: ACHIEVEMENTS.map((a) => ({
         id: a.id,
         scope: a.scope,
