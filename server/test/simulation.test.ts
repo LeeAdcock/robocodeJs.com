@@ -203,6 +203,66 @@ describe('Simulation.run — collisions', () => {
     expect(c2).toHaveBeenCalled();
     expect(t1.stats.timesCollided).toBeGreaterThan(0);
   });
+
+  it('pushes two overlapping bots apart instead of freezing them', () => {
+    // 16 units apart on x — deep inside the 32-unit contact distance. Neither is
+    // moving, so there's no closing speed and no damage; they should just resolve
+    // to (at least) touching distance.
+    const t1 = makeBot({ id: '1', x: 375, y: 375 });
+    const t2 = makeBot({ id: '2', x: 391, y: 375 });
+    const env = makeEnv([makeProcess('a', [t1, t2])]);
+    run(env);
+    expect(Math.hypot(t1.x - t2.x, t1.y - t2.y)).toBeGreaterThanOrEqual(31.9);
+    // A gentle touch (no closing speed) costs no health.
+    expect(t1.health).toBe(100);
+    expect(t2.health).toBe(100);
+    // The push is broadcast so the client can re-sync the bumped position.
+    expect(env.emit).toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'botAccelerate', id: '1' })
+    );
+  });
+
+  it('preserves a bot’s speed target through a collision (no deadlock)', () => {
+    // Two bots driving straight at each other. The old behavior zeroed
+    // speedTarget on contact, welding them in place until one died; now the
+    // intent survives so they can drive themselves free.
+    const t1 = makeBot({ id: '1', x: 375, y: 370, speed: 5, speedTarget: 5 });
+    const t2 = makeBot({
+      id: '2',
+      x: 375,
+      y: 400,
+      orientation: 180,
+      speed: 5,
+      speedTarget: 5,
+    });
+    run(makeEnv([makeProcess('a', [t1, t2])]));
+    expect(t1.speedTarget).toBe(5);
+    expect(t2.speedTarget).toBe(5);
+  });
+
+  it('applies impact damage once per contact, scaled by closing speed', () => {
+    // Head-on at ±5 → closing speed 10 → 10 * 0.75 = 7.5 damage, once.
+    const t1 = makeBot({ id: '1', x: 375, y: 370, speed: 5, speedTarget: 5 });
+    const t2 = makeBot({
+      id: '2',
+      x: 375,
+      y: 400,
+      orientation: 180,
+      speed: 5,
+      speedTarget: 5,
+    });
+    const processes = [makeProcess('a', [t1, t2])];
+    run(makeEnv(processes));
+    expect(t1.health).toBeCloseTo(92.5, 5);
+    expect(t2.health).toBeCloseTo(92.5, 5);
+
+    // Still pressed together next tick — the contact is not fresh, so no further
+    // impact damage lands (a sustained shove is not a grind).
+    run(makeEnv(processes));
+    expect(t1.health).toBeCloseTo(92.5, 5);
+    expect(t2.health).toBeCloseTo(92.5, 5);
+  });
 });
 
 describe('Simulation.run — bullets', () => {

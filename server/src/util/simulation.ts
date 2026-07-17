@@ -5,7 +5,13 @@ import Environment from '../types/environment';
 // `import type` is erased at compile time, so the cycle never exists at runtime.
 import type { Process } from '../types/environment';
 import type Bot from '../types/bot';
-import { BOT_RADIUS, BOT_MAX_SPEED, BOT_ACCELERATION } from '../types/bot';
+import {
+  BOT_RADIUS,
+  BOT_MAX_SPEED,
+  BOT_ACCELERATION,
+  COLLISION_MIN_CLOSING_SPEED,
+  COLLISION_DAMAGE_FACTOR,
+} from '../types/bot';
 import { TURRET_RELOAD_RATE } from '../types/botTurret';
 import { RADAR_CHARGE_RATE } from '../types/botRadar';
 import { BULLET_DAMAGE, BULLET_MISS_PENALTY } from '../types/bullet';
@@ -142,13 +148,32 @@ export default {
     env.getProcesses().forEach((process) => {
       process.bots.forEach((bot) => {
         if (bot.health > 0) {
+          const startX = bot.x;
+          const startY = bot.y;
           const newX =
             bot.x + bot.speed * Math.sin(-bot.orientation * (Math.PI / 180));
           const newY =
             bot.y + bot.speed * Math.cos(-bot.orientation * (Math.PI / 180));
-          let collided = false;
 
-          // Detect if we have collided with another bot
+          // Detect if we have collided with another bot. Rather than freezing on
+          // contact (which used to lock two bots together until one died), we push
+          // apart from the deepest overlap along the line joining the two centers
+          // and keep our speed/intent — so a glancing hit slides past instead of
+          // deadlocking. `contacts` records who we overlap this tick so impact
+          // damage only lands on the tick a contact begins (see `bot.contacts`).
+          const contacts = new Set<string>();
+          // `null as ...` (rather than a plain annotation) keeps the type wide:
+          // separation is only reassigned inside the forEach callback below, which
+          // control-flow analysis ignores, so a plain `= null` would narrow it to
+          // `null` and break the `if (separation)` checks further down.
+          let separation = null as {
+            x: number;
+            y: number;
+            closingSpeed: number;
+            fresh: boolean;
+          } | null;
+          let deepestOverlap = BOT_RADIUS * 2;
+
           env.getProcesses().forEach((otherProcess) =>
             otherProcess.bots.forEach((otherBot) => {
               if (otherBot.health > 0 && otherBot.id !== bot.id) {
@@ -163,7 +188,7 @@ export default {
                 );
 
                 if (distance < BOT_RADIUS * 2) {
-                  collided = true;
+                  contacts.add(otherBot.id);
                   bot.stats.timesCollided += 1;
                   otherBot.stats.timesCollided += 1;
                   bot.logger.trace('Collided with bot');
@@ -182,6 +207,62 @@ export default {
                       ),
                       friendly: otherProcess.getAppId() === process.getAppId(),
                     });
+                  }
+
+                  // Resolve against the deepest overlap this tick.
+                  if (distance < deepestOverlap) {
+                    deepestOverlap = distance;
+
+                    // Unit normal pointing from the other bot toward us, falling
+                    // back to our pre-move position, then a fixed axis, if the two
+                    // centers coincide exactly (degenerate, but keeps the push
+                    // finite).
+                    let normalX = newX - otherBot.x;
+                    let normalY = newY - otherBot.y;
+                    let normalLength = Math.sqrt(
+                      normalX * normalX + normalY * normalY
+                    );
+                    if (normalLength === 0) {
+                      normalX = startX - otherBot.x;
+                      normalY = startY - otherBot.y;
+                      normalLength = Math.sqrt(
+                        normalX * normalX + normalY * normalY
+                      );
+                    }
+                    if (normalLength === 0) {
+                      normalX = 1;
+                      normalY = 0;
+                      normalLength = 1;
+                    }
+                    const unitX = normalX / normalLength;
+                    const unitY = normalY / normalLength;
+
+                    // Closing speed = how fast the gap is shrinking = the pair's
+                    // relative velocity projected onto the separating axis.
+                    const velX =
+                      bot.speed * Math.sin(-bot.orientation * (Math.PI / 180));
+                    const velY =
+                      bot.speed * Math.cos(-bot.orientation * (Math.PI / 180));
+                    const otherVelX =
+                      otherBot.speed *
+                      Math.sin(-otherBot.orientation * (Math.PI / 180));
+                    const otherVelY =
+                      otherBot.speed *
+                      Math.cos(-otherBot.orientation * (Math.PI / 180));
+                    const closingSpeed = -(
+                      (velX - otherVelX) * unitX +
+                      (velY - otherVelY) * unitY
+                    );
+
+                    separation = {
+                      // Place us exactly at contact distance along the normal, out
+                      // of the overlap. The other bot resolves symmetrically on its
+                      // own turn in this same loop.
+                      x: otherBot.x + unitX * BOT_RADIUS * 2,
+                      y: otherBot.y + unitY * BOT_RADIUS * 2,
+                      closingSpeed,
+                      fresh: !bot.contacts?.has(otherBot.id),
+                    };
                   }
                 }
               }
@@ -256,13 +337,14 @@ export default {
           // Detect if we are at the edge of the arena
           const arenaWidth = env.getArena().getWidth();
           const arenaHeight = env.getArena().getHeight();
+          let hitWall = false;
           if (
             newX < BOT_RADIUS ||
             newX > arenaWidth - BOT_RADIUS ||
             newY < BOT_RADIUS ||
             newY > arenaHeight - BOT_RADIUS
           ) {
-            collided = true;
+            hitWall = true;
             bot.stats.timesCollided += 1;
             bot.logger.trace('Collided with arena boundary');
             if (bot.handlers[Event.COLLIDED]) {
@@ -290,33 +372,13 @@ export default {
             }
           }
 
-          // If there wasn't a collision, continue the movement
-          if (!collided) {
-            // Update the location
-            bot.x = newX;
-            bot.y = newY;
-
-            bot.stats.distanceTraveled += bot.speed;
-
-            // Manage acceleration / deceleration
-            if (bot.speed > bot.speedTarget) bot.speed -= BOT_ACCELERATION;
-            if (bot.speed < bot.speedTarget) bot.speed += BOT_ACCELERATION;
-            if (Math.abs(bot.speed - bot.speedTarget) < BOT_ACCELERATION)
-              bot.speed = bot.speedTarget;
-            bot.speed = Math.max(
-              -BOT_MAX_SPEED,
-              Math.min(BOT_MAX_SPEED, bot.speed)
-            );
-          } else {
+          if (hitWall) {
+            // A wall can't yield: stop dead where we are, as before. The
+            // unattributed 1 damage is applied once (a wall has no shooter, so
+            // passing null credits nobody for the collision death).
             bot.speedTarget = 0;
             bot.speed = 0;
-            // Collision damage is deliberately unattributed: `collided` is set by
-            // both the bot-bot branch above and the arena-boundary branch, and the
-            // penalty is applied once without knowing which — so there is no ram
-            // kill credit. Passing null (rather than leaving a stale shooter) is
-            // what makes a collision death credit nobody.
             damage(bot, 1, null);
-            // Handle a collision
             env.emit('event', {
               type: 'botStop',
               time: env.getTime(),
@@ -330,7 +392,84 @@ export default {
               id: bot.id,
               health: bot.health,
             });
+          } else {
+            // Move — to the separated position if we overlapped another bot,
+            // otherwise freely to the candidate position.
+            if (separation) {
+              // Clamp the push inside the arena so it can never shove us through a
+              // wall (any residual overlap resolves over the next tick or two).
+              bot.x = Math.max(
+                BOT_RADIUS,
+                Math.min(arenaWidth - BOT_RADIUS, separation.x)
+              );
+              bot.y = Math.max(
+                BOT_RADIUS,
+                Math.min(arenaHeight - BOT_RADIUS, separation.y)
+              );
+              bot.stats.distanceTraveled += Math.sqrt(
+                Math.pow(bot.x - startX, 2) + Math.pow(bot.y - startY, 2)
+              );
+            } else {
+              bot.x = newX;
+              bot.y = newY;
+              bot.stats.distanceTraveled += bot.speed;
+            }
+
+            // Manage acceleration / deceleration. Crucially we do NOT zero the
+            // speed target on a bot collision (as the wall does), so a bumped bot
+            // keeps driving and can work itself free instead of deadlocking.
+            if (bot.speed > bot.speedTarget) bot.speed -= BOT_ACCELERATION;
+            if (bot.speed < bot.speedTarget) bot.speed += BOT_ACCELERATION;
+            if (Math.abs(bot.speed - bot.speedTarget) < BOT_ACCELERATION)
+              bot.speed = bot.speedTarget;
+            bot.speed = Math.max(
+              -BOT_MAX_SPEED,
+              Math.min(BOT_MAX_SPEED, bot.speed)
+            );
+
+            if (separation) {
+              // Impact damage, once per contact, scaled by how fast we were
+              // closing — a gentle touch is free, a hard ram hurts. Unattributed
+              // like every other collision (no ram-kill credit; see `damage`).
+              if (
+                separation.fresh &&
+                separation.closingSpeed > COLLISION_MIN_CLOSING_SPEED
+              ) {
+                damage(
+                  bot,
+                  separation.closingSpeed * COLLISION_DAMAGE_FACTOR,
+                  null
+                );
+                env.emit('event', {
+                  type: 'botDamaged',
+                  time: env.getTime(),
+                  id: bot.id,
+                  health: bot.health,
+                });
+              }
+
+              // The UI dead-reckons bot positions between events and has no
+              // per-tick position update, so tell it where the push actually left
+              // us. We reuse botAccelerate (speed unchanged — unlike the wall's
+              // botStop) rather than snapping the bot to a halt on the client.
+              env.emit('event', {
+                type: 'botAccelerate',
+                time: env.getTime(),
+                id: bot.id,
+                x: bot.x,
+                y: bot.y,
+                speed: bot.speed,
+                speedTarget: bot.speedTarget,
+                speedAcceleration: BOT_ACCELERATION,
+                speedMax: BOT_MAX_SPEED,
+              });
+            }
           }
+
+          // Remember who we are touching this tick so impact damage lands only on
+          // the tick a contact begins, not every tick two bots stay pressed
+          // together.
+          bot.contacts = contacts;
 
           // Convenience method for manging rotating towards a target orientation
           // with a maximum rotational velocity.

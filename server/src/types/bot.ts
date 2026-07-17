@@ -39,6 +39,15 @@ export const BOT_TURN_SPEED = 10;
 export const BOT_ACCELERATION = 2;
 export const BOT_MAX_SPEED = 5;
 
+// Bot-vs-bot collisions no longer freeze the pair in place. On contact each bot
+// is pushed apart along the line joining their centers (so a glancing hit slides
+// past instead of deadlocking to death), keeping its speed and intent. Impact
+// damage is applied once per contact (the tick it begins), scaled by how fast the
+// two were closing: a gentle touch below COLLISION_MIN_CLOSING_SPEED does nothing,
+// a hard ram costs COLLISION_DAMAGE_FACTOR per unit of closing speed.
+export const COLLISION_MIN_CLOSING_SPEED = 1;
+export const COLLISION_DAMAGE_FACTOR = 0.75;
+
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
 // methods are all we need — and all that scheduleFactory's Timer shares.
@@ -98,6 +107,14 @@ export default class Bot implements Point, Orientated {
   // physics, so it can't affect determinism (same contract as eliminatedAt).
   // A restart builds fresh Bot instances, so it resets automatically.
   public lastDamagedBy: Bot | null = null;
+  // Ids of the other bots this bot was overlapping as of the previous tick.
+  // Rebuilt every tick from the actual overlaps, it lets Simulation apply
+  // collision impact damage only on the tick a contact *begins* (a rising edge)
+  // rather than every tick two bots stay pressed together — so a sustained shove
+  // isn't a grind. Written/read only by Simulation.run; never touched across the
+  // isolate boundary, so it can't affect determinism. A restart builds fresh Bot
+  // instances, so it resets automatically.
+  public contacts: Set<string> = new Set();
   public stats: BotStats = new BotStats();
   // Snapshot of `stats` as of the last cumulative-counter flush. Environment.flushStats
   // persists (stats - flushedStats) and then re-snapshots, which is what makes the
