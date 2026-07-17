@@ -158,7 +158,7 @@ const turnable = (subject: string): ApiMember[] => [
 export const INTERFACES: ApiInterface[] = [
   {
     name: 'Contact',
-    doc: 'One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message).',
+    doc: 'One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan — the pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message).',
     extends: 'Marker',
     members: [
       {
@@ -213,13 +213,13 @@ export const INTERFACES: ApiInterface[] = [
         name: 'distance',
         kind: 'property',
         type: 'number',
-        doc: 'Distance from you to it at the moment of the scan (getDistance() is the live value).',
+        doc: 'Distance from you to it at the moment of the scan (getDistance() re-measures from wherever you are now to the pinned scan position).',
       },
       {
         name: 'angle',
         kind: 'property',
         type: 'number',
-        doc: 'Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() is the live value).',
+        doc: 'Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() re-measures from wherever you are now to the pinned scan position).',
       },
       {
         name: 'friendly',

@@ -839,12 +839,14 @@ const init = (env: Environment, process: Process, bot: Bot) => {
       .getSandbox()
       .compileScriptSync(
         `
-        // A Contact IS a Marker at the scanned bot's position (recovered from
-        // the capture-time bearing + distance) that still carries every raw
+        // A Contact IS a Marker pinned where the scanned bot WAS at capture
+        // (recovered from the capture-time bearing + distance; the pin does
+        // not track the target afterwards) that still carries every raw
         // ScanResult field — so existing bots reading .distance/.angle, and
         // bot.send(contact), see exactly the data they always did — plus an
-        // intercept solver. Marker's getDistance()/getBearing() are live
-        // (measured from the bot NOW); .distance/.angle stay capture-time.
+        // intercept solver. Marker's getDistance()/getBearing() are measured
+        // from the bot's CURRENT position to that fixed pin (they change as
+        // WE move, not as the target moves); .distance/.angle stay capture-time.
         // Only data fields are enumerable (methods ride along invisibly), so
         // Object.keys / for...in / spread / JSON see the scan fields plus the
         // frame-independent x/y/time — everything a receiver needs to rebuild

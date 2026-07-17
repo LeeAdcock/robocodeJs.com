@@ -1119,8 +1119,10 @@ export const buildServer = (user: User): McpServer => {
         'Recent bot crashes for an arena (oldest first) as structured records: ' +
         'the error code, the fault kind, the message, and the failing line where ' +
         'the sandbox provided one. Richer and more reliable than grepping ' +
-        'recent_logs — look codes up in robocodejs://reference/error-codes. Omit ' +
-        'arenaId for your default arena.',
+        'recent_logs — look codes up in robocodejs://reference/error-codes. ' +
+        'Faults survive a match restart (each carries the tick `time` within ' +
+        'its own match), so the previous match stays analyzable after the next ' +
+        'one starts. Omit arenaId for your default arena.',
       inputSchema: {
         arenaId: z
           .string()

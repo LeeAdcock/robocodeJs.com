@@ -195,7 +195,7 @@ export default class Environment {
   // (~200 B typical, ~2.3 KB worst case per entry). Env-tunable (MAX_RECENT_LOGS)
   // like the other host-footprint caps so prod can dial it without a redeploy.
   private static readonly MAX_RECENT_LOGS =
-    Number(process.env.MAX_RECENT_LOGS) || 1000;
+    Number(process.env.MAX_RECENT_LOGS) || 1500;
   private recentLogs: unknown[] = [];
 
   // Bounded history of the most recent structured bot faults (crashes), the
@@ -718,10 +718,13 @@ export default class Environment {
 
     // The isolates are about to be disposed and rebuilt, so drop any commands or
     // in-flight operations bound to the old ones rather than settling them into a
-    // released context. Faults from the previous match are now stale too.
+    // released context. recentFaults (like recentLogs) deliberately survives the
+    // restart: a fault from the match that just ended is exactly what a caller —
+    // notably the MCP recent_faults tool after run_match — still needs to read,
+    // and the bounded buffer handles growth. Note the tick clock resets below, so
+    // a fault's `time` is relative to the match it occurred in.
     this.pendingCommands = [];
     this.botOps.clear();
-    this.recentFaults = [];
 
     // Rewind the PRNG so each match's setup is drawn from a known stream position
     // rather than wherever the previous match happened to leave it — otherwise the
