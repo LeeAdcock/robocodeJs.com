@@ -67,6 +67,16 @@ you can broadcast its actual coordinates instead:
 `bot.turret.turnTowards(message.x, message.y)` — the same point for everyone. The
 **Squad** example bot builds this out, team secret and all.
 
+**Sharing the whole contact.** You can even broadcast the contact itself:
+`bot.send(enemies[0])`. A contact is **serializable** — what actually transmits is its
+plain data (position, speed, heading, and so on; the methods aren't serialized, and
+its `angle`/`distance` readings are relative to the _sender_). Each teammate rebuilds
+a full contact from that data with `arena.createContact(message)` — its methods answer
+from **their** position, so `getBearing()` points _them_ at the enemy, and
+`getIntercept(bot.turret.bulletSpeed)` even leads the shot for them (see
+[Lesson 12](/learn/leading)). Markers work the same way: a sent marker arrives as its
+`x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it.
+
 ## Debugging like a pro
 
 When a bot misbehaves, these are your tools:

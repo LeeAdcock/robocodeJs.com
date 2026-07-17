@@ -26,6 +26,7 @@ The arena where bots live is a square. Headings are specified in degrees on a co
 Virtual markers can be created in the arena that provide simplified calculations for angles and distance. These markers are either dropped at the current bot location, or at a specified coordinate.
 
 - `arena.createMarker(x, y) : marker` Creates a marker at the provided arena coordinates.
+- `arena.createContact(data) : contact` Rebuilds a full [contact](#contacts) from its serialized data — typically a contact a teammate broadcast, since a contact serializes as its plain data properties (methods are not serialized). `data` needs numeric `x`, `y`, `speed`, and `orientation`; a `time` (the capture tick) lets `getIntercept` account for staleness and defaults to now; any other fields (`id`, `health`, `friendly`, …) carry through as data. The rebuilt contact's methods are measured from **your** position.
 
 The `marker` object returned has several convenience methods:
 
@@ -34,6 +35,8 @@ The `marker` object returned has several convenience methods:
 - `marker.getDistance() : number` Returns the distance from the bot to the marker, rounded down to a whole number.
 - `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading — `bot.turn(marker.getBearing())` faces it.
 - `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena — the same check as `arena.contains(marker.getX(), marker.getY())`.
+
+A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable — it can be passed to `bot.send` (or through JSON), transmitting as its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`.
 
 # Events Overview
 
@@ -213,7 +216,25 @@ The scan's own readings are available as methods too, so the whole surface is co
 - `contact.getHealth() : number` Its health at the moment of the scan (0–100).
 - `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `bot.turret.bulletSpeed` to lead a shot — `bot.turret.turnTowards(m.getX(), m.getY())` aims it — or pass `bot.maxSpeed` to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
 
-The raw readings also remain as plain properties — `{ id, speed, orientation, distance, angle, friendly, health }`, exactly as scans have always reported them. The properties are a snapshot from the moment of the scan (`distance`/`angle` don't update as you move; that's what `getDistance()`/`getBearing()` are for), and they are the wire shape `bot.send(contact)` transmits to teammates.
+The raw readings also remain as plain properties — `{ id, speed, orientation, distance, angle, friendly, health }`, exactly as scans have always reported them — plus the frame-independent `x`, `y` (the detected bot's arena coordinates at the moment of the scan) and `time` (the clock tick of the capture). The properties are a snapshot from the moment of the scan (`distance`/`angle` don't update as you move; that's what `getDistance()`/`getBearing()` are for), and they are what makes a contact serializable — they're exactly what `bot.send(contact)` transmits.
+
+**Sharing a contact with teammates.** A contact is serializable, so it can be broadcast directly with `bot.send(contact)`: what's delivered is the plain data properties (methods are not serialized), and the received `angle`/`distance` are relative to the **sender**, not to whoever receives it. The receiver rebuilds the full contact with `arena.createContact(message)`: the result has every contact method measured from the receiver's own position, and `getIntercept` accounts for the ticks elapsed since the sender's scan.
+
+```javascript
+// Spotter: broadcast what you see.
+bot.on(Event.SCANNED, (contacts) => {
+  const enemy = contacts.find((c) => !c.isFriendly());
+  if (enemy) bot.send(enemy);
+});
+
+// Teammate: rebuild and lead the shot — from your own position.
+bot.on(Event.RECEIVED, (message) => {
+  if (typeof message?.x !== 'number') return; // not a contact broadcast
+  const target = arena.createContact(message);
+  const aim = target.getIntercept(bot.turret.bulletSpeed);
+  if (aim) bot.turret.turnTowards(aim.getX(), aim.getY());
+});
+```
 
 ```
 bot.on(Event.SCANNED, (contacts) => {
