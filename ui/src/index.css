@@ -3,7 +3,11 @@
 :root {
   --bg: #ffffff;
   --fg: #1a1a1a;
-  --link: #aa6c39;
+  /* Prose-link bronze. Darkened from #aa6c39 (~4.27:1 on white — just under
+     WCAG AA for body text) to clear the 4.5:1 threshold while keeping the warm
+     character; used for markdown links and glossary underlines (GitHub #260).
+     The dark-mode --link (#d9a066 on #282c34) already passes. */
+  --link: #96591f;
   --code: #1a7f37;
   --rule: #aa6c39;
   /* The one brand accent (the wordmark gold), used consistently for the
