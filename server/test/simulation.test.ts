@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import Simulation from '../src/util/simulation';
+import Simulation, { applyEliminations } from '../src/util/simulation';
+import { BotStats } from '../src/types/botStats';
 import { Event } from '../src/types/event';
 
 // Simulation → Environment → AppService runs a CREATE TABLE query at import; stub
@@ -31,12 +32,12 @@ function makeBot(overrides: Record<string, unknown> = {}) {
     orientation: 0,
     orientationTarget: 0,
     orientationVelocity: 0,
-    stats: {
-      timesCollided: 0,
-      timesHit: 0,
-      shotsHit: 0,
-      distanceTraveled: 0,
-    },
+    // A real BotStats rather than a hand-listed subset, so a counter added to the
+    // class can never leave the mock short a field (an absent one would silently
+    // turn `stats.x += n` into NaN here instead of failing).
+    stats: new BotStats(),
+    eliminatedAt: null as number | null,
+    lastDamagedBy: null as unknown,
     logger: { trace: vi.fn() },
     bullets: [] as Record<string, unknown>[],
     turret: {
@@ -141,12 +142,23 @@ describe('Simulation.run — collisions', () => {
     expect(collided).toHaveBeenCalledWith({ angle: 90 });
     expect(collided.mock.calls[0][0]).not.toHaveProperty('friendly');
     expect(bot.health).toBe(99);
+    expect(bot.stats.damageTaken).toBe(1);
     expect(bot.speed).toBe(0);
     expect(bot.x).toBe(10); // movement not applied on collision
     expect(env.emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'botStop' })
     );
+  });
+
+  it('leaves collision damage unattributed, clearing a prior shooter', () => {
+    // Shot down to 1 by an enemy on an earlier tick, then finished off by a wall.
+    // The wall is the last hit, so the enemy does not get the kill.
+    const bot = makeBot({ x: 10, health: 1 });
+    bot.lastDamagedBy = makeBot({ id: 'enemy' });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.health).toBe(0);
+    expect(bot.lastDamagedBy).toBeNull();
   });
 
   it('reports a head-on wall (dead ahead) as bearing 0', () => {
@@ -229,10 +241,42 @@ describe('Simulation.run — bullets', () => {
     expect(bullet.exploded).toBe(true);
     expect(target.stats.timesHit).toBe(1);
     expect(shooter.stats.shotsHit).toBe(1);
+    expect(target.stats.damageTaken).toBe(25);
+    expect(shooter.stats.damageDealt).toBe(25);
+    expect(target.lastDamagedBy).toBe(shooter);
     expect(env.emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'bulletExploded', id: 'b1' })
     );
+  });
+
+  it('counts only the health a bullet actually removed, not the nominal 25', () => {
+    // The enclosing health > 0 check runs once per tick, so both bullets land even
+    // though the first one is fatal. The second must not count 25 against a bot
+    // that only had 10 health left to give.
+    const target = makeBot({ id: 'a', x: 375, y: 375, health: 10 });
+    const mkBullet = (id: string) => ({
+      id,
+      x: 375,
+      y: 375,
+      speed: 5,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 365 },
+      callback: vi.fn(),
+    });
+    const shooter = makeBot({
+      id: 'b',
+      x: 375,
+      y: 300,
+      bullets: [mkBullet('b1'), mkBullet('b2')],
+    });
+    run(makeEnv([makeProcess('a', [target]), makeProcess('b', [shooter])]));
+    // Health itself is still allowed to go negative — that behavior is unchanged.
+    expect(target.health).toBe(-40);
+    expect(target.stats.timesHit).toBe(2);
+    expect(target.stats.damageTaken).toBe(10);
+    expect(shooter.stats.damageDealt).toBe(10);
   });
 
   it('moves a live bullet along its orientation', () => {
@@ -287,11 +331,73 @@ describe('Simulation.run — bullets', () => {
     const env = makeEnv([makeProcess('a', [bot])]);
     run(env);
     expect(bot.health).toBe(97);
+    expect(bot.stats.damageTaken).toBe(3);
     expect(bullet.callback).toHaveBeenCalledWith({});
     expect(env.emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'botDamaged', id: 'a', health: 97 })
     );
+  });
+
+  it('does not let a corpse’s own stray miss steal its killer’s credit', () => {
+    // A dead bot's bullets keep flying, and the miss penalty runs OUTSIDE the
+    // `health > 0` check — so in the same tick a bot can be shot dead and then
+    // "damage itself" by missing. That must not overwrite the attribution: the
+    // enemy landed the killing blow, and a bot already at <= 0 cannot be damaged
+    // further. (Found by driving a real match: every kill went uncredited.)
+    const outgoing = {
+      id: 'b-out',
+      x: 375,
+      y: 800, // already outside — will be scored a miss this tick
+      speed: 0,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 375 },
+      callback: vi.fn(),
+    };
+    const victim = makeBot({
+      id: 'v',
+      x: 375,
+      y: 375,
+      health: 10,
+      bullets: [outgoing],
+    });
+    const incoming = {
+      id: 'b-in',
+      x: 375,
+      y: 375,
+      speed: 5,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 365 },
+      callback: vi.fn(),
+    };
+    const killer = makeBot({ id: 'k', x: 375, y: 300, bullets: [incoming] });
+    run(makeEnv([makeProcess('a', [victim]), makeProcess('b', [killer])]));
+
+    expect(victim.health).toBeLessThanOrEqual(0);
+    expect(victim.lastDamagedBy).toBe(killer);
+    // The 10 health the bullet took, and nothing for the post-mortem miss.
+    expect(victim.stats.damageTaken).toBe(10);
+  });
+
+  it('leaves a self-inflicted missed shot unattributed, clearing a prior shooter', () => {
+    // Shot by an enemy earlier in the tick, then finished off by its own missed
+    // shot: the miss is the last hit, so the enemy loses the credit.
+    const bullet = {
+      id: 'b1',
+      x: 375,
+      y: 800,
+      speed: 0,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 375 },
+      callback: vi.fn(),
+    };
+    const bot = makeBot({ id: 'a', health: 100, bullets: [bullet] });
+    bot.lastDamagedBy = makeBot({ id: 'enemy' });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.lastDamagedBy).toBeNull();
   });
 });
 
@@ -305,6 +411,19 @@ describe('Simulation.run — lifecycle', () => {
       'event',
       expect.objectContaining({ type: 'botDamaged', health: 0 })
     );
+  });
+
+  it('treats a crash as a forfeit: no damage counted, prior shooter cleared', () => {
+    // Shot to 10 by an enemy, then crashes. The crash — not the enemy — is what
+    // killed it, so nobody is credited and the 90 lost health is not a 100th
+    // point of damage taken.
+    const bot = makeBot({ appCrashed: true, health: 10 });
+    bot.stats.damageTaken = 90;
+    bot.lastDamagedBy = makeBot({ id: 'enemy' });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.health).toBe(0);
+    expect(bot.stats.damageTaken).toBe(90);
+    expect(bot.lastDamagedBy).toBeNull();
   });
 
   it('runs the START handler exactly once', () => {
@@ -382,5 +501,84 @@ describe('Simulation.run — lifecycle', () => {
 
     run(env);
     expect(calls).toEqual(['start', 'tick']);
+  });
+});
+
+describe('applyEliminations — kill credit', () => {
+  // applyEliminations takes real Processes, so link each bot back to its process
+  // the way Bot's constructor does. The cast keeps the lightweight mock bots above
+  // usable here — the helper only touches health/eliminatedAt/lastDamagedBy/stats
+  // and process.getAppId().
+  const link = (appId: string, bots: ReturnType<typeof makeBot>[]) => {
+    const process = makeProcess(appId, bots);
+    bots.forEach((bot) => {
+      (bot as unknown as { process: unknown }).process = process;
+    });
+    return process as any;
+  };
+
+  it('credits the enemy who landed the last hit, and records the death tick', () => {
+    const killer = makeBot({ id: 'k' });
+    const victim = makeBot({ id: 'v', health: 0 });
+    victim.lastDamagedBy = killer;
+    applyEliminations([link('a', [victim]), link('b', [killer])], 42);
+    expect(victim.eliminatedAt).toBe(42);
+    expect(killer.stats.kills).toBe(1);
+  });
+
+  it('credits nobody for an unattributed death (collision, decay, crash, own miss)', () => {
+    // Every unattributed damage site clears lastDamagedBy, so they all arrive here
+    // looking identical — null attribution. The bystander proves the credit didn't
+    // simply land on whoever else happened to be in the arena.
+    const bystander = makeBot({ id: 'b' });
+    const victim = makeBot({ id: 'v', health: 0 });
+    victim.lastDamagedBy = null;
+    applyEliminations([link('a', [victim]), link('b', [bystander])], 7);
+    expect(victim.eliminatedAt).toBe(7);
+    expect(bystander.stats.kills).toBe(0);
+    expect(victim.stats.kills).toBe(0);
+  });
+
+  it('credits nobody for friendly fire', () => {
+    // Same app: the damage was real and is already recorded, but killing your own
+    // teammate is not an achievement.
+    const shooter = makeBot({ id: 's' });
+    const victim = makeBot({ id: 'v', health: 0 });
+    victim.lastDamagedBy = shooter;
+    applyEliminations([link('a', [victim, shooter])], 5);
+    expect(shooter.stats.kills).toBe(0);
+  });
+
+  it('credits nobody when a bot shoots itself to death', () => {
+    const victim = makeBot({ id: 'v', health: 0 });
+    victim.lastDamagedBy = victim;
+    applyEliminations([link('a', [victim])], 5);
+    expect(victim.stats.kills).toBe(0);
+  });
+
+  it('credits a shooter that is already dead itself (bullet still in flight)', () => {
+    const killer = makeBot({ id: 'k', health: 0, eliminatedAt: 3 });
+    const victim = makeBot({ id: 'v', health: 0 });
+    victim.lastDamagedBy = killer;
+    applyEliminations([link('a', [victim]), link('b', [killer])], 9);
+    expect(killer.stats.kills).toBe(1);
+  });
+
+  it('is a once-latch: repeated ticks never re-credit the same death', () => {
+    const killer = makeBot({ id: 'k' });
+    const victim = makeBot({ id: 'v', health: 0 });
+    victim.lastDamagedBy = killer;
+    const processes = [link('a', [victim]), link('b', [killer])];
+    applyEliminations(processes, 1);
+    applyEliminations(processes, 2);
+    applyEliminations(processes, 3);
+    expect(killer.stats.kills).toBe(1);
+    expect(victim.eliminatedAt).toBe(1); // the first tick it was found dead
+  });
+
+  it('leaves living bots untouched', () => {
+    const bot = makeBot({ id: 'v', health: 1 });
+    applyEliminations([link('a', [bot])], 4);
+    expect(bot.eliminatedAt).toBeNull();
   });
 });

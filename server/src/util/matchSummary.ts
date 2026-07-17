@@ -1,11 +1,7 @@
 import Environment, { SUDDEN_DEATH_TIME } from '../types/environment';
 import ArenaMember from '../types/arenaMember';
-import { BotStats } from '../types/botStats';
+import { BotStats, STAT_KEYS } from '../types/botStats';
 import appService from '../services/AppService';
-
-// The numeric per-bot counters we aggregate. Derived from a fresh BotStats so
-// the summary automatically picks up any field added to that class.
-const STAT_KEYS = Object.keys(new BotStats()) as (keyof BotStats)[];
 
 // ── Shared ranking / outcome contract ──────────────────────────────────────
 // buildMatchSummary (the full "who won and how" view) and buildMatchStatus (the
