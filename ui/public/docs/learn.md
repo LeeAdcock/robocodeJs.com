@@ -10,7 +10,7 @@ programmers use.
 
 ## How it works
 
-- Read the lesson, then **paste the code into your own bot** and press **Save** to watch
+- Read the lesson, then **paste the code into your own bot** and press **Deploy** to watch
   it run in the arena on the right.
 - Try the **Experiment** at the end of each lesson — that's where the learning sticks.
 - Stuck? Each lesson has a **Common questions** section for the usual surprises.

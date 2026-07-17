@@ -81,7 +81,7 @@ bot.on(Event.SCANNED, (targets) => {
 });
 ```
 
-Press **Save**. Put a moving bot (say **Pathfinder** from the examples) in the
+Press **Deploy**. Put a moving bot (say **Pathfinder** from the examples) in the
 arena and watch Deadeye lead it — its shots land where the target is _going_, not
 where it was.
 

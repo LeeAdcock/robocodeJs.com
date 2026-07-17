@@ -63,7 +63,7 @@ bot.on(Event.FIRED, () => {
 });
 ```
 
-Save in the editor and every bot on your team picks up the new logic instantly. That's the shape of a bot — react to events, and control the `bot` with each one.
+Deploy in the editor and every bot on your team picks up the new logic instantly. That's the shape of a bot — react to events, and control the `bot` with each one.
 
 # Next steps!
 

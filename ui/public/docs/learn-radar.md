@@ -46,7 +46,7 @@ bot.on(Event.SCANNED, (targets) => {
 });
 ```
 
-Press **Save** and watch the log. Whenever the radar sweeps over another robot, you'll
+Press **Deploy** and watch the log. Whenever the radar sweeps over another robot, you'll
 see a line about it. If nothing is in view, the list is empty and nothing prints.
 
 ## Experiment

@@ -40,7 +40,7 @@ bot.on(Event.COLLIDED, (info) => {
 });
 ```
 
-Press **Save**. Now when Rusty hits a wall it spins around and keeps going instead of
+Press **Deploy**. Now when Rusty hits a wall it spins around and keeps going instead of
 getting stuck.
 
 What's happening:
@@ -55,7 +55,7 @@ What's happening:
 - Add `console.log('bumped, friendly?', info.friendly);` as the first line of the handler,
   then watch the log when Rusty hits a wall (a wall is **not** friendly).
 - Change the `else` turn from `180` to `150` so it doesn't retrace its exact path.
-- Delete the `bot.setSpeed(3)` line and Save. Rusty gets stuck after the first bump —
+- Delete the `bot.setSpeed(3)` line and Deploy. Rusty gets stuck after the first bump —
   that's why we re-start it!
 - See the wall coming **before** you hit it: add
   `console.log('wall in', arena.getNearestWall().getDistance());` inside the COLLIDED

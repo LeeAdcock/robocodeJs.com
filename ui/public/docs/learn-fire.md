@@ -43,7 +43,7 @@ bot.on(Event.FIRED, () => {
 });
 ```
 
-Press **Save**. Rusty stands still and fires whenever the cannon is loaded. The log
+Press **Deploy**. Rusty stands still and fires whenever the cannon is loaded. The log
 prints `boom!` on every shot.
 
 ## Experiment

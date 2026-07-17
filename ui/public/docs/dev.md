@@ -1,6 +1,6 @@
 # Bot Development
 
-Each bot's logic is defined in JavaScript that is initialized at the beginning of a match to provide initial commands and register event handlers. Saving your code reloads it live — your event handlers are replaced immediately — but it does **not** re-run the `START` handler, so a running bot keeps the state it set up. Use the editor's **reboot** button (or `Ctrl-Shift-S`) to reload your code and re-run `START` when you want a fresh initialization.
+Each bot's logic is defined in JavaScript that is initialized at the beginning of a match to provide initial commands and register event handlers. Saving your code reloads it live — your event handlers are replaced immediately — but it does **not** re-run the `START` handler, so a running bot keeps the state it set up. Use the editor's **Reboot** button (or `Ctrl-Shift-S`) to reload your code and re-run `START` when you want a fresh initialization.
 
 The in-browser code editor offers **autocomplete** for the whole bot API: type `bot.`, `arena.`, `clock.`, or `Event.` to see the available members, each with its signature and a short description.
 
