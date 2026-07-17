@@ -62,14 +62,14 @@ describe('glossary tooltips in MarkdownPage', () => {
   });
 
   it('matches case-insensitively and through aliases', async () => {
-    const { container } = renderDoc('Variables remember things for you.');
-    await screen.findByText(/remember things/);
+    const { container } = renderDoc('Bearings are how targets are located.');
+    await screen.findByText(/are located/);
     const span = container.querySelector('.glossary-term');
-    expect(span?.textContent).toBe('Variables');
-    // The alias resolves to the canonical entry's tooltip id.
+    expect(span?.textContent).toBe('Bearings');
+    // The alias resolves to the canonical entry's definition.
     fireEvent.focus(span!);
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip.textContent).toContain('named box that stores a value');
+    expect(tooltip.textContent).toContain('relative to your bot');
   });
 
   it('shows the definition tooltip on keyboard focus', async () => {
@@ -79,15 +79,15 @@ describe('glossary tooltips in MarkdownPage', () => {
     expect(span.getAttribute('tabindex')).toBe('0');
     fireEvent.focus(span);
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip.textContent).toContain('scans for other robots');
+    expect(tooltip.textContent).toContain('mounted on the turret');
   });
 
   it('leaves blog posts untouched', async () => {
     const { container } = renderDoc(
-      'The radar and the arena and a variable.',
+      'The radar takes a bearing on each contact.',
       'blog/some-post'
     );
-    await screen.findByText(/a variable/);
+    await screen.findByText(/each contact/);
     expect(terms(container)).toEqual([]);
   });
 });
@@ -100,21 +100,21 @@ describe('splitGlossary', () => {
 
   it('splits around matches and records seen terms', () => {
     const seen = new Set<string>();
-    const segments = splitGlossary('Point the radar at the arena.', seen);
+    const segments = splitGlossary('Point the radar at the turret.', seen);
     expect(segments).toEqual([
       'Point the ',
       { entry: expect.objectContaining({ term: 'radar' }), text: 'radar' },
       ' at the ',
-      { entry: expect.objectContaining({ term: 'arena' }), text: 'arena' },
+      { entry: expect.objectContaining({ term: 'turret' }), text: 'turret' },
       '.',
     ]);
-    expect(seen).toEqual(new Set(['radar', 'arena']));
+    expect(seen).toEqual(new Set(['radar', 'turret']));
   });
 
   it('keys the seen set by canonical term across aliases', () => {
     const seen = new Set<string>();
-    splitGlossary('Many variables here.', seen);
-    expect(seen.has('variable')).toBe(true);
-    expect(splitGlossary('A variable again.', seen)).toBeNull();
+    splitGlossary('Taking bearings now.', seen);
+    expect(seen.has('bearing')).toBe(true);
+    expect(splitGlossary('A bearing again.', seen)).toBeNull();
   });
 });

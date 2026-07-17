@@ -1,5 +1,7 @@
-// Glossary of programming/math/game concepts used across the lessons and
-// docs. MarkdownPage auto-detects these terms in rendered prose and wraps the
+// Glossary of RobocodeJs domain concepts used across the lessons and docs,
+// aimed at readers who already program but are new to the game — so game
+// mechanics and simulation semantics, not general programming vocabulary.
+// MarkdownPage auto-detects these terms in rendered prose and wraps the
 // first occurrence per page in a definition tooltip (see components/
 // glossaryTerm.tsx). Matching is case-insensitive; plurals and synonyms are
 // listed as explicit aliases rather than inferred. If a term proves noisy in
@@ -16,127 +18,95 @@ export interface GlossaryEntry {
 
 export const GLOSSARY: GlossaryEntry[] = [
   {
-    term: 'program',
-    aliases: ['programs'],
-    definition: 'A list of instructions your robot follows from top to bottom.',
-  },
-  {
-    term: 'code',
-    definition: 'Instructions written for a computer to follow.',
-  },
-  {
-    term: 'string',
-    aliases: ['strings'],
-    definition: "A piece of text in quotes, like 'Rusty'.",
-  },
-  {
-    term: 'variable',
-    aliases: ['variables'],
-    definition:
-      'A named box that stores a value you can read and change later.',
-  },
-  {
-    term: 'function',
-    aliases: ['functions'],
-    definition: 'A named, reusable bundle of code you can call from anywhere.',
-  },
-  {
-    term: 'boolean',
-    aliases: ['booleans'],
-    definition: 'A yes-or-no value: true or false.',
-  },
-  {
-    term: 'list',
-    aliases: ['lists', 'array', 'arrays'],
-    definition: 'Several things in a row; each item can be visited in turn.',
-  },
-  {
-    term: 'object',
-    aliases: ['objects'],
-    definition:
-      "A value with named labels, like a target's distance and speed.",
-  },
-  {
     term: 'event',
     aliases: ['events'],
     definition:
-      'Something that happens in the game that your code can react to.',
+      'A game occurrence — a scan result, collision, or bullet hit — delivered to the handler your bot registers for it.',
   },
   {
     term: 'handler',
     aliases: ['handlers'],
-    definition: 'The code that runs when an event fires.',
+    definition:
+      'A callback registered for a game event; the simulation invokes it during the tick the event fires.',
   },
   {
     term: 'tick',
     aliases: ['ticks'],
-    definition: 'One beat of the game clock; bots think and act once per tick.',
+    definition:
+      'The simulation’s discrete time step, about 100 ms at default speed; speeds, turn rates, and reload times are all per-tick.',
   },
   {
     term: 'timer',
     aliases: ['timers'],
     definition:
-      'A countdown that fires an event after a chosen number of ticks.',
+      'A setTimeout or setInterval driven by simulation ticks rather than wall-clock time, so it pauses and resumes with the match.',
   },
   {
     term: 'state machine',
     aliases: ['state machines'],
     definition:
-      'A design where the bot is always in one named mode and behaves differently in each.',
-  },
-  {
-    term: 'mode',
-    aliases: ['modes'],
-    definition: 'The state your bot is currently in, like SEARCH or ATTACK.',
+      'A control pattern where the bot is in exactly one named state at a time, and events trigger the transitions between states.',
   },
   {
     term: 'bearing',
     aliases: ['bearings'],
     definition:
-      'A direction to something measured relative to where your bot is facing.',
+      'An angle measured relative to your bot’s current heading, in degrees — you turn by a bearing, not to it.',
   },
   {
     term: 'heading',
-    definition: 'The compass direction your bot is currently facing.',
+    definition:
+      'The absolute direction your bot’s body faces, in degrees; scan angles and marker bearings are relative to it.',
   },
   {
     term: 'orientation',
-    definition: "A target's absolute compass direction of travel.",
+    definition:
+      'An absolute direction in the arena’s frame, in degrees — your bot’s facing, or a contact’s direction of travel.',
   },
   {
     term: 'radar',
     definition:
-      'The sensor that scans for other robots in the direction it points.',
+      'The scan sensor, mounted on the turret and turning relative to it; each scan takes about 10 ticks to recharge.',
   },
   {
     term: 'turret',
     definition:
-      'The gun on top of your bot; it turns independently of the body.',
+      'The gun mount, turning relative to the body at 4° per tick; firing starts a 40-tick reload.',
   },
   {
     term: 'scan',
     aliases: ['scans', 'scanning'],
-    definition: 'Using the radar to look for other robots.',
+    definition:
+      'A radar pulse that returns the contacts in its beam, each with a body-relative angle, distance, and speed.',
+  },
+  {
+    term: 'contact',
+    aliases: ['contacts'],
+    definition:
+      'A scan result: a marker pinned where a bot was detected, carrying its distance, speed, and orientation readings.',
   },
   {
     term: 'marker',
     aliases: ['markers'],
     definition:
-      'A pin on the arena map that reports its bearing and distance from your bot.',
+      'A pin at a fixed arena position; every read recomputes its bearing and distance from your bot’s current position.',
   },
   {
     term: 'leading',
     aliases: ['lead'],
-    definition: 'Aiming where a moving target will be, not where it is now.',
-  },
-  {
-    term: 'threshold',
     definition:
-      'A cutoff number a value is compared against to trigger a decision.',
+      'Aiming at where a target will be when your bullet arrives, projected from its speed, orientation, and the bullet’s travel time.',
   },
   {
-    term: 'arena',
-    definition: 'The battlefield where bots drive, scan, and fight.',
+    term: 'sudden death',
+    definition:
+      'A late-match phase where every bot’s health decays each tick, forcing a decision when the remaining bots avoid fighting.',
+  },
+  {
+    term: 'elo rating',
+    aliases: ['elo'],
+    definition:
+      'A head-to-head skill score, as in chess: expected wins move ratings a little, upsets move them a lot. It rides your bot’s current code.',
   },
 ];
 
