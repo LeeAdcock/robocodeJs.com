@@ -147,39 +147,34 @@ const ownedApp = async (user: User, appId: string): Promise<App | null> => {
   return app && app.getUserId() === user.getId() ? app : null;
 };
 
-// Resolve the arena to act on: the given id (must belong to the user) or the
-// user's default arena when omitted — mirrors the REST resolveArena middleware.
+// Resolve the arena to act on: the given id must belong to the user. Every MCP
+// tool requires arenaId explicitly (no silent default-arena fallback — logs and
+// state are arena-specific, so the caller must name the arena deliberately);
+// this only enforces ownership.
 const ownedArena = async (
   user: User,
-  arenaId?: string
+  arenaId: string
 ): Promise<Arena | null> => {
-  if (arenaId) {
-    const arena = await arenaService.get(arenaId);
-    return arena && arena.getUserId() === user.getId() ? arena : null;
-  }
-  return arenaService.getDefaultForUser(user.getId());
+  const arena = await arenaService.get(arenaId);
+  return arena && arena.getUserId() === user.getId() ? arena : null;
 };
 
 // Read-only spectating: resolve an arena by id WITHOUT requiring ownership, so
 // the view tools (arena_status/match_summary/match_status) can watch any arena
 // whose id the caller has — the MCP counterpart of the public REST route
-// GET /api/arena/:arenaId and the /watch share link. Omitting arenaId still
-// targets the caller's own default arena. Write/control tools keep using
-// ownedArena, so only the owner can pause, restart, change speed/seed, or edit
-// the roster. A malformed id (which the DB rejects) resolves to null → a clean
-// "no such arena" rather than a thrown error.
+// GET /api/arena/:arenaId and the /watch share link. Write/control tools keep
+// using ownedArena, so only the owner can pause, restart, change speed/seed, or
+// edit the roster. A malformed id (which the DB rejects) resolves to null → a
+// clean "no such arena" rather than a thrown error.
 const readableArena = async (
   user: User,
-  arenaId?: string
+  arenaId: string
 ): Promise<Arena | null> => {
-  if (arenaId) {
-    try {
-      return (await arenaService.get(arenaId)) ?? null;
-    } catch {
-      return null;
-    }
+  try {
+    return (await arenaService.get(arenaId)) ?? null;
+  } catch {
+    return null;
   }
-  return arenaService.getDefaultForUser(user.getId());
 };
 
 // The run_match tool drives a match with the shared runMatchToDecision helper
@@ -605,14 +600,11 @@ export const buildServer = (user: User): McpServer => {
         'Snapshot of an arena: size, running state, clock, and every ' +
         "app's bots (position, orientation, health, bullets). Read-only, so it " +
         "works for ANY arena id you have (spectate someone else's match via a " +
-        'shared arena id), not just your own. Omit arenaId for your default arena.',
+        'shared arena id), not just your own.',
       inputSchema: {
         arenaId: z
           .string()
-          .optional()
-          .describe(
-            'Arena id — yours or any arena you want to watch; defaults to your default arena'
-          ),
+          .describe('Arena id — yours or any arena you want to watch'),
       },
       // The snapshot is large and evolving, so it's returned as structuredContent
       // without a formal outputSchema rather than pinning a brittle shape here.
@@ -639,15 +631,11 @@ export const buildServer = (user: User): McpServer => {
         'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
         'decided when at most one app still has living bots. Read-only, so it ' +
-        'works for ANY arena id you have, not just your own. Omit arenaId for ' +
-        'your default arena.',
+        'works for ANY arena id you have, not just your own.',
       inputSchema: {
         arenaId: z
           .string()
-          .optional()
-          .describe(
-            'Arena id — yours or any arena you want to watch; defaults to your default arena'
-          ),
+          .describe('Arena id — yours or any arena you want to watch'),
       },
       // Like arena_status: the shape is broad and evolving, so it is returned as
       // structuredContent without pinning a brittle outputSchema.
@@ -675,14 +663,11 @@ export const buildServer = (user: User): McpServer => {
         'who’s ahead?") without pulling the large payloads; once decided, call ' +
         'match_summary for the full outcome + stats, or arena_status for exact ' +
         'bot positions. Read-only, so it works for ANY arena id you have, not ' +
-        'just your own. Omit arenaId for your default arena.',
+        'just your own.',
       inputSchema: {
         arenaId: z
           .string()
-          .optional()
-          .describe(
-            'Arena id — yours or any arena you want to watch; defaults to your default arena'
-          ),
+          .describe('Arena id — yours or any arena you want to watch'),
       },
       annotations: READ_ONLY,
     },
@@ -699,13 +684,10 @@ export const buildServer = (user: User): McpServer => {
     'add_app_to_arena',
     {
       title: 'Add app to arena',
-      description: `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps). Omit arenaId for your default arena.`,
+      description: `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps).`,
       inputSchema: {
         appId: z.string().describe('The app id'),
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
       },
       outputSchema: {
         appId: z.string(),
@@ -741,14 +723,10 @@ export const buildServer = (user: User): McpServer => {
     'remove_app_from_arena',
     {
       title: 'Remove app from arena',
-      description:
-        'Remove an app from an arena. Omit arenaId for your default arena.',
+      description: 'Remove an app from an arena.',
       inputSchema: {
         appId: z.string().describe('The app id'),
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
       },
       outputSchema: {
         appId: z.string(),
@@ -790,10 +768,7 @@ export const buildServer = (user: User): McpServer => {
         title,
         description,
         inputSchema: {
-          arenaId: z
-            .string()
-            .optional()
-            .describe('Arena id; defaults to your default arena'),
+          arenaId: z.string().describe('The arena id'),
         },
         outputSchema: { arenaId: z.string(), [resultKey]: z.boolean() },
         annotations: { openWorldHint: false, ...annotations },
@@ -838,12 +813,9 @@ export const buildServer = (user: User): McpServer => {
         'Restart an arena: reset and re-run all of its bots, and start it ' +
         'running (a reset begins a fresh match, not a paused one). Returns the ' +
         'seed the new match runs on — pin it with set_arena_seed to reproduce ' +
-        'this exact match. Omit arenaId for your default arena.',
+        'this exact match.',
       inputSchema: {
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
       },
       outputSchema: {
         arenaId: z.string(),
@@ -875,15 +847,12 @@ export const buildServer = (user: User): McpServer => {
         'default ~10 ticks/second); higher values run proportionally faster. ' +
         'Pass 0 or "max" to run unbounded — as fast as the bots can be driven. ' +
         'The simulation stays deterministic (bots make the same decisions) at ' +
-        'any speed. Omit arenaId for your default arena.',
+        'any speed.',
       inputSchema: {
         speed: z
           .union([z.number().nonnegative(), z.literal('max')])
           .describe('Speed multiplier (1 = default); 0 or "max" = unbounded'),
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
       },
       outputSchema: {
         arenaId: z.string(),
@@ -914,13 +883,10 @@ export const buildServer = (user: User): McpServer => {
         'bot placement and starting orientations — reproducible: restart the ' +
         'arena after setting it to lay out an identical match. Combined with the ' +
         'deterministic simulation, this makes accelerated headless runs fully ' +
-        'repeatable. Omit arenaId for your default arena.',
+        'repeatable.',
       inputSchema: {
         seed: z.number().int().describe('Integer seed for the arena PRNG'),
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
       },
       outputSchema: { arenaId: z.string(), seed: z.number() },
       annotations: IDEMPOTENT,
@@ -946,12 +912,9 @@ export const buildServer = (user: User): McpServer => {
         'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
         'fast as possible until at most one app still has living bots ' +
         '(match.decided), then pauses and returns the match_summary. Needs at ' +
-        'least two apps in the arena. Omit arenaId for your default arena.',
+        'least two apps in the arena.',
       inputSchema: {
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
         seed: z
           .number()
           .int()
@@ -1045,13 +1008,10 @@ export const buildServer = (user: User): McpServer => {
       description:
         'Recent bot console output for an arena (oldest first). The live ' +
         'log stream is not replayable, so this returns a bounded buffer. Use the ' +
-        'filters to narrow to one bot, a severity, or a substring. Omit arenaId ' +
-        'for your default arena.',
+        'filters to narrow to one bot, a severity, or a substring. Logs are ' +
+        'arena-specific, so name the arena explicitly.',
       inputSchema: {
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
         limit: z
           .number()
           .int()
@@ -1122,12 +1082,9 @@ export const buildServer = (user: User): McpServer => {
         'recent_logs — look codes up in robocodejs://reference/error-codes. ' +
         'Faults survive a match restart (each carries the tick `time` within ' +
         'its own match), so the previous match stays analyzable after the next ' +
-        'one starts. Omit arenaId for your default arena.',
+        'one starts. Faults are arena-specific, so name the arena explicitly.',
       inputSchema: {
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena id; defaults to your default arena'),
+        arenaId: z.string().describe('The arena id'),
         appId: z.string().optional().describe('Only faults from this app'),
         limit: z
           .number()
@@ -1382,13 +1339,9 @@ const registerPrompts = (server: McpServer): void => {
         goal: z
           .string()
           .describe('What the bot should do, e.g. "circle and snipe"'),
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena to drop it into; defaults to your default arena'),
       },
     },
-    ({ goal, arenaId }) => ({
+    ({ goal }) => ({
       messages: [
         {
           role: 'user',
@@ -1405,14 +1358,11 @@ const registerPrompts = (server: McpServer): void => {
               `and follow it: open with a header comment stating the strategy, ` +
               `name the tuning constants, pull tricky math into named helpers, and ` +
               `comment the "why" — write it so a human can get up to speed fast. ` +
-              `Then:\n` +
-              `1. format_app_source on your code, then create_app (descriptive name + ` +
-              `the formatted source).\n` +
-              `2. add_app_to_arena${arenaId ? ` (arenaId ${arenaId})` : ''} and ` +
-              `restart_arena.\n` +
-              `3. Check arena_status and recent_logs; iterate with set_app_source ` +
-              `+ reboot_app until it behaves (run format_app_source before each save). ` +
-              `Keep the code idiomatic to the docs and readable per docs/code-style.`,
+              `Then run format_app_source on your code and create_app with a ` +
+              `descriptive name and the formatted source. Stop there and report ` +
+              `the new appId — this prompt only writes the app. To try it in a ` +
+              `battle, run the play_match prompt; to diagnose one that misbehaves, ` +
+              `run debug_app.`,
           },
         },
       ],
@@ -1427,10 +1377,7 @@ const registerPrompts = (server: McpServer): void => {
         'Diagnose why a bot misbehaves or crashes and propose a fix.',
       argsSchema: {
         appId: z.string().describe('The app id to debug'),
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena to inspect; defaults to your default arena'),
+        arenaId: z.string().describe('Arena to inspect'),
       },
     },
     ({ appId, arenaId }) => ({
@@ -1441,8 +1388,8 @@ const registerPrompts = (server: McpServer): void => {
             type: 'text',
             text:
               `Debug RobocodeJs bot ${appId}.\n\n` +
-              `Read its current source (get_app_source), then recent_faults` +
-              `${arenaId ? ` (arenaId ${arenaId})` : ''} for structured crash ` +
+              `Read its current source (get_app_source), then recent_faults ` +
+              `(arenaId ${arenaId}) for structured crash ` +
               `records (code, kind, message, line) — if it crashed, this is the ` +
               `fastest signal. Also read recent_logs and arena_status to see ` +
               `how it's behaving and any E0xx/W0xx error codes (look them up in ` +
@@ -1465,10 +1412,7 @@ const registerPrompts = (server: McpServer): void => {
       title: 'Play a match',
       description: 'Set up and run a battle, then report the outcome.',
       argsSchema: {
-        arenaId: z
-          .string()
-          .optional()
-          .describe('Arena to run in; defaults to your default arena'),
+        arenaId: z.string().describe('Arena to run in'),
       },
     },
     ({ arenaId }) => ({
@@ -1478,8 +1422,7 @@ const registerPrompts = (server: McpServer): void => {
           content: {
             type: 'text',
             text:
-              `Run a RobocodeJs match` +
-              `${arenaId ? ` in arena ${arenaId}` : ''}.\n\n` +
+              `Run a RobocodeJs match in arena ${arenaId}.\n\n` +
               `Use list_apps and arena_status to see what's available; make sure ` +
               `at least two bots are in the arena (add_app_to_arena as needed). ` +
               `restart_arena to begin, then poll arena_status to follow the ` +

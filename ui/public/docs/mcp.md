@@ -99,7 +99,9 @@ global `leaderboard`):
   Elo (name, owner, rating, games, win rate). Public ranking data, the one tool
   that isn't scoped to your account
 
-Arena tools take an optional `arenaId`; omit it to act on your default arena.
+Arena tools take a required `arenaId` — arena state, logs, and faults are all
+arena-specific, so you name the arena deliberately. Use `list_arenas` to look up
+your arena ids (or `create_arena` to make one).
 
 **Resources**
 
