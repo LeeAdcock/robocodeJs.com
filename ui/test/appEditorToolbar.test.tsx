@@ -19,12 +19,11 @@ vi.mock('../src/page/app/appEditor', () => ({
 import EditorToolbar from '../src/page/app/appEditorToolbar';
 
 const noop = () => undefined;
-const renderToolbar = (doDelete: () => void, saveState: any = 'saved') =>
+const renderToolbar = (doDelete: () => void) =>
   render(
     <EditorToolbar
       code="bot.setName('x')"
       appName="My Bot"
-      saveState={saveState}
       doDelete={doDelete}
       doShare={noop}
       doClean={noop}
@@ -39,26 +38,6 @@ const renderToolbar = (doDelete: () => void, saveState: any = 'saved') =>
   );
 
 afterEach(cleanup);
-
-describe('EditorToolbar save indicator', () => {
-  it('names each save state', () => {
-    renderToolbar(noop, 'saved');
-    expect(screen.getByRole('status').textContent).toBe('Saved');
-    cleanup();
-
-    renderToolbar(noop, 'unsaved');
-    expect(screen.getByRole('status').textContent).toBe('Unsaved changes');
-    cleanup();
-
-    renderToolbar(noop, 'saving');
-    expect(screen.getByRole('status').textContent).toBe('Saving…');
-  });
-
-  it('says nothing until the source has loaded — there is no state to report yet', () => {
-    renderToolbar(noop, 'loading');
-    expect(screen.queryByRole('status')).toBeNull();
-  });
-});
 
 describe('EditorToolbar delete confirmation', () => {
   it('does not delete on the first click — it opens a confirmation instead', () => {

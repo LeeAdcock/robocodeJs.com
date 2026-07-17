@@ -6,7 +6,8 @@ import Editor, {
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import Toolbar, { SaveState } from './appEditorToolbar';
+import Toolbar from './appEditorToolbar';
+import SaveIndicator, { SaveState } from './appSaveIndicator';
 import * as prettier from 'prettier/standalone';
 import babel from 'prettier/plugins/babel';
 import estree from 'prettier/plugins/estree';
@@ -275,6 +276,8 @@ export default function AppPage(props: AppPageProps) {
   };
 
   const doClean = async () => {
+    setError('');
+    setNotice('');
     try {
       // Prettier 3's format() returns a Promise — await it before setting the
       // code, otherwise the editor would be filled with "[object Promise]".
@@ -285,8 +288,18 @@ export default function AppPage(props: AppPageProps) {
         plugins: [babel, estree],
       });
       setCode(prettyCode);
+      setNotice(
+        prettyCode === code ? 'Code is already tidy.' : 'Code reformatted.'
+      );
+      setTimeout(() => setNotice(''), 4000);
     } catch {
-      // Leave the code unchanged if it can't be parsed/formatted.
+      // Leave the code unchanged if it can't be parsed/formatted. Prettier only
+      // fails here on a syntax error, so point at Check rather than repeating
+      // its parse message in different words.
+      setError(
+        'Could not reformat — the code has a syntax error. Use Check for errors (Ctrl-Enter) to find it.'
+      );
+      setTimeout(() => setError(''), 15000);
     }
   };
 
@@ -323,12 +336,12 @@ export default function AppPage(props: AppPageProps) {
                 {titleCase(app?.name)}
               </>
             )}
+            <SaveIndicator saveState={saveState} />
           </Col>
           <Col style={{ paddingRight: '0' }}>
             <Toolbar
               appName={app?.name ?? ''}
               code={code}
-              saveState={saveState}
               doDelete={doDelete}
               doShare={doShare}
               doExecute={doExecute}

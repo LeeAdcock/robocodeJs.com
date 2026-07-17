@@ -242,6 +242,34 @@ describe('AppPage (bot editor)', () => {
     expect(axios.post).not.toHaveBeenCalled();
   });
 
+  it('reformatting confirms what it did, and distinguishes a no-op tidy', async () => {
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.change(screen.getByTestId('editor'), {
+      target: { value: 'bot.turn( 90 )' },
+    });
+
+    fireEvent.click(screen.getByLabelText('Reformat code'));
+    expect(await screen.findByText('Code reformatted.')).toBeTruthy();
+
+    // Already-tidy code isn't a failure, but saying "reformatted" would be a
+    // lie — nothing changed.
+    fireEvent.click(screen.getByLabelText('Reformat code'));
+    expect(await screen.findByText('Code is already tidy.')).toBeTruthy();
+  });
+
+  it('reformatting unparseable code says so instead of silently doing nothing', async () => {
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.change(screen.getByTestId('editor'), {
+      target: { value: 'bot.turn(' },
+    });
+
+    fireEvent.click(screen.getByLabelText('Reformat code'));
+
+    expect(await screen.findByText(/Could not reformat/)).toBeTruthy();
+  });
+
   it('a clean recompile hides the previous error and clears editor markers', async () => {
     renderPage();
     const editor = (await screen.findByTestId('editor')) as HTMLTextAreaElement;
