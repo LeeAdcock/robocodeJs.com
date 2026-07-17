@@ -128,7 +128,7 @@ const BotRadarSvg = (props: BotRadarProps) => {
         // RADAR_RANGE / RADAR_BASE_HALF_WIDTH / RADAR_TIP_HALF_WIDTH). Keep
         // the two in sync.
         <polygon
-          points="-16,0,16,0,122,600,-122,600"
+          points="-8,0,8,0,122,600,-122,600"
           fill="url(#radar)"
         ></polygon>
       )}

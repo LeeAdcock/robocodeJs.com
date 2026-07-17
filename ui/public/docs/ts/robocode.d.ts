@@ -50,7 +50,7 @@ interface Marker {
   getBearing(): number;
 }
 
-/** Detects bots inside its beam — the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width across at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
+/** Detects bots inside its beam — the long, narrow wedge drawn under the radar in the arena (600 units far, dish-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
 interface Radar {
   /** Returns the radar's orientation in degrees (0–359). */
   getOrientation(): number;
