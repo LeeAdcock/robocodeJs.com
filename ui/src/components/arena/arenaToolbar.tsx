@@ -39,8 +39,9 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               <Button
                 variant="secondary"
                 size="sm"
+                aria-label="Resume"
                 onClick={props.doResume}
-                style={{ color: 'gold' }}
+                style={{ color: 'var(--accent)' }}
               >
                 <FaPlayCircle />
               </Button>
@@ -51,7 +52,12 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               placement={'bottom'}
               overlay={<Tooltip id={`pause`}>Pause</Tooltip>}
             >
-              <Button variant="secondary" size="sm" onClick={props.doPause}>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Pause"
+                onClick={props.doPause}
+              >
                 <FaPauseCircle />
               </Button>
             </OverlayTrigger>
@@ -61,7 +67,12 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={<Tooltip id={`reset`}>Reset</Tooltip>}
           >
-            <Button variant="secondary" size="sm" onClick={props.doRestart}>
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Reset"
+              onClick={props.doRestart}
+            >
               <FaSyncAlt />
             </Button>
           </OverlayTrigger>
@@ -76,6 +87,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               <Button
                 variant="secondary"
                 size="sm"
+                aria-label="Copy public watch link"
                 onClick={(e) => {
                   // Dismiss the tooltip so it doesn't overlap the "copied" toast;
                   // it reopens on the next hover.

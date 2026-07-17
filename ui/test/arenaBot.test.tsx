@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import BotSvg from '../src/components/arena/arenaBot';
+import BotSvg, { healthColor } from '../src/components/arena/arenaBot';
 
 const base = {
   appName: 'Bot',
@@ -29,22 +29,37 @@ describe('BotSvg health bar', () => {
 
   it('sizes and colors the bar from health', () => {
     const { container } = renderBot({ health: 50 });
-    const bar = container.querySelector('rect[fill^="hsl"]') as SVGRectElement;
+    const bar = container.querySelector('rect[fill^="rgb"]') as SVGRectElement;
     expect(bar).toBeTruthy();
     expect(bar.style.width).toBe('16px'); // 32 * 0.5
-    expect(bar.getAttribute('fill')).toContain('hsl(60'); // 50 * 1.2 (yellow-ish)
+    // Mid-health is a desaturated midpoint of the blue<->orange ramp.
+    expect(bar.getAttribute('fill')).toBe('rgb(146, 132, 146)');
   });
 
-  it('is full and green at 100 health', () => {
+  it('is full and blue at 100 health', () => {
     const { container } = renderBot({ health: 100 });
-    const bar = container.querySelector('rect[fill^="hsl"]') as SVGRectElement;
+    const bar = container.querySelector('rect[fill^="rgb"]') as SVGRectElement;
     expect(bar.style.width).toBe('32px');
-    expect(bar.getAttribute('fill')).toContain('hsl(120'); // green
+    expect(bar.getAttribute('fill')).toBe('rgb(59, 130, 232)'); // blue
   });
 
   it('hides the bar when the bot is dead', () => {
     const { container } = renderBot({ health: 0 });
-    expect(container.querySelector('rect[fill^="hsl"]')).toBeNull();
+    expect(container.querySelector('rect[fill^="rgb"]')).toBeNull();
+  });
+});
+
+describe('healthColor (color-blind-safe ramp, #132)', () => {
+  // Guard against a regression to a green->red (or any green-passing) ramp: the
+  // green channel must never dominate across the whole health range.
+  it('is blue at full, orange at empty, and never green in between', () => {
+    expect(healthColor(100)).toBe('rgb(59, 130, 232)'); // blue
+    expect(healthColor(0)).toBe('rgb(232, 134, 59)'); // orange
+    for (let h = 0; h <= 100; h += 5) {
+      const [r, g, b] = healthColor(h).match(/\d+/g)!.map(Number);
+      // "green" would mean g clearly the largest channel; it never is here.
+      expect(g).toBeLessThanOrEqual(Math.max(r, b));
+    }
   });
 });
 

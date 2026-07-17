@@ -3,11 +3,28 @@
 :root {
   --bg: #ffffff;
   --fg: #1a1a1a;
-  --link: #aa6c39;
+  /* Prose-link bronze. Darkened from #aa6c39 (~4.27:1 on white — just under
+     WCAG AA for body text) to clear the 4.5:1 threshold while keeping the warm
+     character; used for markdown links and glossary underlines (GitHub #260).
+     The dark-mode --link (#d9a066 on #282c34) already passes. */
+  --link: #96591f;
   --code: #1a7f37;
   --rule: #aa6c39;
+  /* The one brand accent (the wordmark gold), used consistently for the
+     wordmark, the avatar ring, and nav hover/active states. Kept identical in
+     both themes because it only ever sits on the always-dark navbar. */
+  --accent: gold;
   /* Red glow behind a bot that just took damage (see arenaBot.tsx BotSvg). */
   --damage-glow-color: #ff2d2d;
+  /* Type: Adobe's Source family — Source Sans 3 for UI, Source Code Pro for
+     code — a matched superfamily that reads as one system without calling
+     attention to itself (a quiet lift off the system stack). Loaded in
+     index.html; Megrim stays as the wordmark only. */
+  --font-sans:
+    'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Helvetica Neue', sans-serif;
+  --font-mono:
+    'Source Code Pro', Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 body.dark {
@@ -41,23 +58,68 @@ body {
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-sans);
+  /* Re-point Bootstrap's own font tokens (set on :root and imported after this
+     file) so its components inherit the same faces instead of the system stack.
+     Set on `body`, not `:root`, so our value out-scopes Bootstrap's :root one. */
+  --bs-body-font-family: var(--font-sans);
+  --bs-font-monospace: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family:
-    source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-family: var(--font-mono);
+}
+
+/* While arena state is being replaced from a REST snapshot (tab-visible resync,
+   SSE reconnect, restart — see util/motionSnap.ts), suppress the sprite CSS
+   transitions so bots/turrets/bullets snap to their new spots instead of
+   gliding there in defiance of the arena physics. The sprites set their
+   transitions as inline styles, so `!important` is required to win. */
+svg.motion-snap * {
+  transition: none !important;
+}
+
+/* Space the primary nav items with a flex gap instead of literal `|` dividers.
+   The gap collapses to vertical spacing when the menu stacks in the hamburger,
+   so no separate mobile handling is needed. */
+.topNavBar .nav-primary {
+  align-items: center;
+  gap: 1.35rem;
+}
+
+.topNavBar .nav-brand span {
+  color: var(--accent);
+}
+
+/* The search box + theme toggle are a separate Nav group from the primary
+   links, so the primary group's `gap` doesn't reach across to them. Space them
+   off the last primary item (the Arena/Apps dropdown) — this replaces the `|`
+   divider that used to sit between them. Hidden on phones, so no mobile guard. */
+.topNavBar .nav-tools {
+  margin-left: 1.35rem;
 }
 
 .topNavBar .nav-link {
-  color: white !important;
-  text-decoration: underline;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
   padding-left: 0px !important;
   padding-right: 0px !important;
+  transition: color 0.15s ease;
+}
+
+/* The underline is gone in favour of a colour shift; the active page and any
+   hovered/keyboard-focused link light up in the brand accent. */
+.topNavBar .nav-link:hover,
+.topNavBar .nav-link:focus-visible {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.topNavBar .nav-link.active {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* Feedback for a "How do I..." search that didn't navigate (no answer, rate
@@ -89,15 +151,9 @@ code {
   display: none;
 }
 
-/* Below the navbar's `expand="sm"` breakpoint the menu collapses and its items
-   stack vertically, so the inline `|` dividers land on their own lines and just
-   pad out the hamburger. Hide them (and their side margins) on phones. */
 @media (max-width: 575.98px) {
   .topNavBar .nav-mobile-only {
     display: block;
-  }
-  .topNavBar .nav-sep {
-    display: none;
   }
   /* The search box and light/dark toggle add clutter to the collapsed menu on
      phones; hide them there (the theme still follows the OS preference). */
@@ -122,8 +178,13 @@ code {
   padding-left: 40px;
 }
 
+/* Deliberate heading scale for the doc/lesson/blog markdown. The h1 keeps its
+   grass-tile + tank signature; h2–h4 step down on a consistent ~1.2 ratio with
+   their own vertical rhythm so the section hierarchy reads at a glance (h3 and
+   h4 used to be the same size, flattening two levels into one). */
 .markdown h1 {
-  font-size: 1.4em;
+  font-size: 1.3em;
+  line-height: 1.3;
   background: url('/sprites/tileGrass1.png');
   padding-left: 5px;
 }
@@ -137,21 +198,28 @@ code {
 }
 
 .markdown h2 {
-  font-size: 1.2em;
+  font-size: 1.12em;
   font-weight: bold;
   padding-left: 20px;
+  margin-top: 1.4em;
 }
 
 .markdown h3 {
   font-size: 1em;
   font-weight: bold;
   padding-left: 20px;
+  margin-top: 1.2em;
 }
 
+/* The fourth level de-emphasises to a small uppercase label so it stays
+   distinct from h3 rather than reading as another equal-weight heading. */
 .markdown h4 {
-  font-size: 1em;
+  font-size: 0.85em;
   font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   padding-left: 20px;
+  margin-top: 1.1em;
 }
 
 .markdown code {

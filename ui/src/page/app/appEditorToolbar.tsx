@@ -215,6 +215,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             <Button
               size="sm"
               variant="secondary"
+              aria-label="Download app"
               onClick={() => {
                 const link = document.createElement('a');
                 link.download =

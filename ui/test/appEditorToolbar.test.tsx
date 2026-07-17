@@ -103,3 +103,22 @@ describe('EditorToolbar delete confirmation', () => {
     );
   });
 });
+
+describe('EditorToolbar accessible names (#132)', () => {
+  // Every icon-only button needs an aria-label so screen-reader users get an
+  // accessible name (the icon alone exposes nothing). The Download button was
+  // the one missing it.
+  it('labels the Download button', () => {
+    renderToolbar(noop);
+    expect(screen.getByLabelText('Download app')).toBeTruthy();
+  });
+
+  it('leaves no icon button without an accessible name', () => {
+    renderToolbar(noop);
+    for (const button of screen.getAllByRole('button')) {
+      const name =
+        button.getAttribute('aria-label') || button.textContent?.trim();
+      expect(name).toBeTruthy();
+    }
+  });
+});
