@@ -45,7 +45,7 @@ clock.on(Event.TICK, () => {
 });
 
 bot.on(Event.SCANNED, (targets) => {
-  const enemies = targets.filter((t) => !t.friendly);
+  const enemies = targets.filter((t) => !t.isFriendly());
   if (enemies.length === 0) {
     // Nothing in view — sweep the turret (and the radar riding it) to search.
     this.targetId = null;
@@ -56,9 +56,12 @@ bot.on(Event.SCANNED, (targets) => {
   // Focus-fire: keep shooting our locked target while we can still see it,
   // otherwise pick the weakest enemy (lowest health), nearest as a tie-break.
   const target =
-    enemies.find((e) => e.id === this.targetId) ||
-    enemies.sort((a, b) => a.health - b.health || a.distance - b.distance)[0];
-  this.targetId = target.id;
+    enemies.find((e) => e.getId() === this.targetId) ||
+    enemies.sort(
+      (a, b) =>
+        a.getHealth() - b.getHealth() || a.getDistance() - b.getDistance()
+    )[0];
+  this.targetId = target.getId();
 
   // --- Lead the shot: aim where the target will be, not where it is. ---
   // Every scan result is a contact — a marker that also knows the target's
@@ -73,7 +76,7 @@ bot.on(Event.SCANNED, (targets) => {
   const linedUp =
     Math.abs(angleDelta(aimBearing, bot.turret.getOrientation())) <
     AIM_TOLERANCE;
-  if (target.distance < RANGE && linedUp && bot.turret.isReady()) {
+  if (target.getDistance() < RANGE && linedUp && bot.turret.isReady()) {
     bot.turret.fire().catch(() => {});
   }
 });

@@ -238,6 +238,13 @@ describe('compiler — bot API in a real isolate', () => {
           x: c.getX(), y: c.getY(),
           dProp: c.distance, live: c.getDistance(),
           friendly: c.friendly, inb: c.isInBounds(),
+          // Every raw reading is also a method; both forms must agree.
+          accessorsAgree:
+            c.getId() === c.id &&
+            c.getSpeed() === c.speed &&
+            c.getOrientation() === c.orientation &&
+            c.isFriendly() === c.friendly &&
+            c.getHealth() === c.health,
           json: JSON.parse(JSON.stringify(c)),
         }
       })
@@ -250,6 +257,7 @@ describe('compiler — bot API in a real isolate', () => {
       live: number;
       friendly: boolean;
       inb: boolean;
+      accessorsAgree: boolean;
       json: Record<string, unknown>;
     };
     expect(s.n).toBe(1);
@@ -259,6 +267,7 @@ describe('compiler — bot API in a real isolate', () => {
     expect(s.live).toBe(300); // Marker's live (floored) distance
     expect(s.friendly).toBe(true);
     expect(s.inb).toBe(true);
+    expect(s.accessorsAgree).toBe(true);
     // Backward compat: the wire shape is unchanged — bot.send(contact) still
     // serializes exactly the ScanResult data fields (methods drop out).
     expect(Object.keys(s.json).sort()).toEqual([

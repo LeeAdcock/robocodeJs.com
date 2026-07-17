@@ -138,7 +138,7 @@ bot's position — and it can solve this whole lesson in one call:
 
 ```
 bot.on(Event.SCANNED, (targets) => {
-  const enemy = targets.find((t) => !t.friendly);
+  const enemy = targets.find((t) => !t.isFriendly());
   if (!enemy) { bot.turn(15); return; }
 
   const aim = enemy.getIntercept(bot.turret.bulletSpeed); // = 25

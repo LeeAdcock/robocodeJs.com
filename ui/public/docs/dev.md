@@ -98,7 +98,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 ## Bot events
 
 - `bot.on(Event.FIRED, () => {})` Registers a callback that is executed when the turret is fired.
-- `bot.on(Event.SCANNED, (contact[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of [contacts](#contacts) — the same objects `bot.radar.scan()` resolves with — representing each bot detected by the scan. Each carries the raw readings `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }` plus the marker and intercept methods. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading; `health` is the detected bot's current health (0–100).
+- `bot.on(Event.SCANNED, (contact[]) => {})` Registers a callback that is executed when the radar performs a scan, the handler is provided an array of [contacts](#contacts) — the same objects `bot.radar.scan()` resolves with — representing each bot detected by the scan. Each carries the readings `{ id: string, speed: number, orientation: number, distance: number, angle: number, friendly: boolean, health: number }` (as both properties and accessor methods) plus the marker and intercept methods. The `angle` is a bearing relative to your heading (so `bot.turret.setOrientation(angle)` aims at it); `orientation` is the detected bot's own absolute heading; `health` is the detected bot's current health (0–100).
 - `bot.on(Event.COLLIDED, (object) => {})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. Bots will stop with a speed of zero after a collision. An object is provided to the handler that is of the format `{angle:number, friendly:boolean}` specifying the direction of the collided object or arena edge; the angle is relative to your heading (a wall ahead is 0). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall. Be careful returning a Promise from the `COLLIDED` event handler which may itself cause a collision. The handler will not be called for the second collision while the first Promise has not yet finished.
 
 ## Environment events
@@ -202,15 +202,22 @@ The radar provides the ability to detect other bots. Its detection area is a lon
 
 ### Contacts
 
-Every scan result is a **contact**: a [marker](#arena) pinned at the detected bot's position, carrying the raw scan readings above. Because a contact is a marker, all the marker methods work on it — `getX()`/`getY()` give the detected bot's arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured **live** from wherever you are now, while the `distance`/`angle` properties keep their values from the moment of the scan.
+Every scan result is a **contact**: a [marker](#arena) pinned at the detected bot's position. Because a contact is a marker, all the marker methods work on it — `getX()`/`getY()` give the detected bot's arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured **live** from wherever you are now.
 
-One extra method turns the scan's motion readings into an aiming answer:
+The scan's own readings are available as methods too, so the whole surface is consistent:
 
+- `contact.getId() : string` Unique id of the detected bot.
+- `contact.getSpeed() : number` Its speed (-5 to 5).
+- `contact.getOrientation() : number` Its body heading — absolute compass, 0 = north (which way **it** is facing, unlike `getBearing()`, which is the direction from you to it).
+- `contact.isFriendly() : boolean` Whether it is on your team.
+- `contact.getHealth() : number` Its health at the moment of the scan (0–100).
 - `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `bot.turret.bulletSpeed` to lead a shot — `bot.turret.turnTowards(m.getX(), m.getY())` aims it — or pass `bot.maxSpeed` to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
+
+The raw readings also remain as plain properties — `{ id, speed, orientation, distance, angle, friendly, health }`, exactly as scans have always reported them. The properties are a snapshot from the moment of the scan (`distance`/`angle` don't update as you move; that's what `getDistance()`/`getBearing()` are for), and they are the wire shape `bot.send(contact)` transmits to teammates.
 
 ```
 bot.on(Event.SCANNED, (contacts) => {
-  const enemy = contacts.find((c) => !c.friendly);
+  const enemy = contacts.find((c) => !c.isFriendly());
   if (!enemy) return;
   const aim = enemy.getIntercept(bot.turret.bulletSpeed);
   if (aim) bot.turret.turnTowards(aim.getX(), aim.getY());

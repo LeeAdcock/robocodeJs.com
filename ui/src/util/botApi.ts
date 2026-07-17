@@ -158,9 +158,39 @@ const turnable = (subject: string): ApiMember[] => [
 export const INTERFACES: ApiInterface[] = [
   {
     name: 'Contact',
-    doc: 'One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the raw scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan.',
+    doc: 'One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — the properties are the wire shape bot.send(contact) transmits.',
     extends: 'Marker',
     members: [
+      {
+        name: 'getId',
+        kind: 'method',
+        type: 'string',
+        doc: 'Unique id of the detected bot (same as the id property).',
+      },
+      {
+        name: 'getSpeed',
+        kind: 'method',
+        type: 'number',
+        doc: 'Its speed, -5 to 5 (same as the speed property).',
+      },
+      {
+        name: 'getOrientation',
+        kind: 'method',
+        type: 'number',
+        doc: 'Its body heading in degrees, absolute compass with 0 = north (same as the orientation property).',
+      },
+      {
+        name: 'isFriendly',
+        kind: 'method',
+        type: 'boolean',
+        doc: 'True if it is on your team (same as the friendly property).',
+      },
+      {
+        name: 'getHealth',
+        kind: 'method',
+        type: 'number',
+        doc: 'Its health at the moment of the scan, 0–100 (same as the health property).',
+      },
       {
         name: 'id',
         kind: 'property',

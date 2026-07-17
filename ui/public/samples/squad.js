@@ -40,12 +40,12 @@ clock.on(Event.TICK, () => {
 });
 
 bot.on(Event.SCANNED, (targets) => {
-  const enemies = targets.filter((t) => !t.friendly);
+  const enemies = targets.filter((t) => !t.isFriendly());
   if (enemies.length === 0) return;
 
   // Nearest enemy — a scan contact already knows its ABSOLUTE arena position
   // (getX/getY), which any teammate can aim at no matter where they stand.
-  const enemy = enemies.sort((a, b) => a.distance - b.distance)[0];
+  const enemy = enemies.sort((a, b) => a.getDistance() - b.getDistance())[0];
   const x = enemy.getX();
   const y = enemy.getY();
 

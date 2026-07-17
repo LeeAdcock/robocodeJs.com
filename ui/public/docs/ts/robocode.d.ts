@@ -14,8 +14,18 @@ type BotMessage =
   | BotMessage[]
   | { [key: string]: BotMessage };
 
-/** One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the raw scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan. */
+/** One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — the properties are the wire shape bot.send(contact) transmits. */
 interface Contact extends Marker {
+  /** Unique id of the detected bot (same as the id property). */
+  getId(): string;
+  /** Its speed, -5 to 5 (same as the speed property). */
+  getSpeed(): number;
+  /** Its body heading in degrees, absolute compass with 0 = north (same as the orientation property). */
+  getOrientation(): number;
+  /** True if it is on your team (same as the friendly property). */
+  isFriendly(): boolean;
+  /** Its health at the moment of the scan, 0–100 (same as the health property). */
+  getHealth(): number;
   /** Unique id of the detected bot. */
   id: string;
   /** Its speed (-5 to 5). */

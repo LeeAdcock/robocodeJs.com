@@ -837,6 +837,15 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           const vx = scan.speed * Math.sin(h)
           const vy = -scan.speed * Math.cos(h)
           return Object.assign(__makeMarker(x0, y0), scan, {
+            // Accessor forms of the raw scan readings, so the whole Contact
+            // surface is methods like every other bot API object. The plain
+            // properties stay for compatibility (and are the wire shape
+            // bot.send(contact) transmits).
+            getId: () => scan.id,
+            getSpeed: () => scan.speed,
+            getOrientation: () => scan.orientation,
+            isFriendly: () => scan.friendly,
+            getHealth: () => scan.health,
             // Where to aim (or drive) so something leaving our position at
             // the given speed meets this contact, assuming it holds its
             // heading and speed — pass bot.turret.bulletSpeed to lead a shot,

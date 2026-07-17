@@ -39,7 +39,7 @@ clock.on(Event.TICK, () => {
 });
 
 bot.on(Event.SCANNED, (targets) => {
-  const enemies = targets.filter((t) => !t.friendly);
+  const enemies = targets.filter((t) => !t.isFriendly());
   if (enemies.length > 0) {
     // A scan's angle is relative to *us*, so share the absolute compass
     // direction (our heading + the bearing) that any teammate can use.

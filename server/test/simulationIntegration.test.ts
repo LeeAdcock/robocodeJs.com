@@ -186,7 +186,7 @@ describe('sandbox + simulation integration', () => {
     // straight-at-the-target shot would trail behind it.
     const shooter = world.addBot(
       `bot.on(Event.SCANNED, (cs) => {
-         const enemy = cs.find((c) => !c.friendly)
+         const enemy = cs.find((c) => !c.isFriendly())
          if (enemy) this.target = enemy
        })
        clock.on(Event.TICK, () => {
