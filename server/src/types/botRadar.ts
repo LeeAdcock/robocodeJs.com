@@ -7,7 +7,10 @@ import {
   toRelativeBearing,
 } from '../util/geometry';
 
-// Charge added per tick toward the 100 full-charge threshold.
+// Degrees the radar turns per tick (seeds the per-instance runtime field and
+// is mirrored into the sandbox as the bot.radar.turnRate attribute), and
+// charge added per tick toward the 100 full-charge threshold.
+export const RADAR_TURN_SPEED = 4;
 export const RADAR_CHARGE_RATE = 10;
 
 export class BotRadar implements Orientated {
@@ -22,7 +25,7 @@ export class BotRadar implements Orientated {
     this.bot = bot;
     this.orientation = bot.env.random() * 360;
     this.orientationTarget = this.orientation;
-    this.orientationVelocity = 4;
+    this.orientationVelocity = RADAR_TURN_SPEED;
     this.charged = 0;
   }
 

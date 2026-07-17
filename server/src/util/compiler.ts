@@ -1,4 +1,11 @@
-import Bot, { BOT_RADIUS } from '../types/bot';
+import Bot, {
+  BOT_RADIUS,
+  BOT_TURN_SPEED,
+  BOT_ACCELERATION,
+  BOT_MAX_SPEED,
+} from '../types/bot';
+import { TURRET_TURN_SPEED } from '../types/botTurret';
+import { RADAR_TURN_SPEED } from '../types/botRadar';
 import { BULLET_SPEED, BULLET_DAMAGE } from '../types/bullet';
 import { Event } from '../types/event';
 import { scheduleFactory } from './scheduleFactory';
@@ -267,13 +274,12 @@ function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
     radar.isReady()
   );
 
-  // Physics constants, mirrored into the sandbox as plain data properties at
-  // init — from the engine's module constants, or from the instance fields
-  // those constants seed. None of these values mutate mid-match today; if one
-  // ever does, its property must become an exposeGetter method or the sandbox
-  // copy silently goes stale.
+  // Engine constants, mirrored into the sandbox as plain data properties at
+  // init. None of these values vary mid-match today; if one ever becomes
+  // per-instance or mutable, its property must instead read the live field via
+  // an exposeGetter method or the sandbox copy silently goes stale.
   isolate
-    .compileScriptSync(`bot.radar.turnRate = ${num(radar.orientationVelocity)}`)
+    .compileScriptSync(`bot.radar.turnRate = ${num(RADAR_TURN_SPEED)}`)
     .runSync(bot.getContext(), {});
 }
 
@@ -339,12 +345,12 @@ function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
     turret.isReady()
   );
 
-  // Physics constants, mirrored as plain data properties at init (see the
+  // Engine constants, mirrored as plain data properties at init (see the
   // note in exposeBotRadar).
   isolate
     .compileScriptSync(
       `
-      bot.turret.turnRate = ${num(turret.orientationVelocity)}
+      bot.turret.turnRate = ${num(TURRET_TURN_SPEED)}
       bot.turret.bulletSpeed = ${num(BULLET_SPEED)}
       bot.turret.bulletDamage = ${num(BULLET_DAMAGE)}
       `
@@ -489,15 +495,15 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
     )
     .runSync(bot.getContext(), {});
 
-  // Physics constants, mirrored as plain data properties at init (see the
+  // Engine constants, mirrored as plain data properties at init (see the
   // note in exposeBotRadar).
   isolate
     .compileScriptSync(
       `
       bot.radius = ${num(BOT_RADIUS)}
-      bot.maxSpeed = ${num(bot.speedMax)}
-      bot.acceleration = ${num(bot.speedAcceleration)}
-      bot.turnRate = ${num(bot.orientationVelocity)}
+      bot.maxSpeed = ${num(BOT_MAX_SPEED)}
+      bot.acceleration = ${num(BOT_ACCELERATION)}
+      bot.turnRate = ${num(BOT_TURN_SPEED)}
       `
     )
     .runSync(bot.getContext(), {});

@@ -7,7 +7,10 @@ import { normalizeAngle } from '../util/geometry';
 import { BotRadar } from './botRadar';
 import { DEPLOY_TICKS } from './environment';
 
-// Reload progress added per tick toward the 100 full-charge threshold.
+// Degrees the turret turns per tick (seeds the per-instance runtime field and
+// is mirrored into the sandbox as the bot.turret.turnRate attribute), and
+// reload progress added per tick toward the 100 full-charge threshold.
+export const TURRET_TURN_SPEED = 4;
 export const TURRET_RELOAD_RATE = 2.5;
 
 export class BotTurret implements Orientated {
@@ -22,7 +25,7 @@ export class BotTurret implements Orientated {
     this.bot = bot;
     this.orientation = bot.env.random() * 360;
     this.orientationTarget = this.orientation;
-    this.orientationVelocity = 4;
+    this.orientationVelocity = TURRET_TURN_SPEED;
     this.radar = new BotRadar(bot);
     this.loaded = 0;
   }
