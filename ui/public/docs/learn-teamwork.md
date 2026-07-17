@@ -39,7 +39,7 @@ clock.on(Event.TICK, () => {
 });
 
 bot.on(Event.SCANNED, (targets) => {
-  const enemies = targets.filter((t) => !t.friendly);
+  const enemies = targets.filter((t) => !t.isFriendly());
   if (enemies.length > 0) {
     // A scan's angle is relative to *us*, so share the absolute compass
     // direction (our heading + the bearing) that any teammate can use.
@@ -58,6 +58,14 @@ bot.on(Event.RECEIVED, (heading) => {
 
 Press **Save**. Now the whole team swings their turrets toward an enemy the moment _any_
 one of them sees it. (`Math.round` just sends a tidy whole number.)
+
+**Sharing a position instead of a direction.** A direction is only right from where
+_you_ stand — a teammate across the arena pointing the same way looks at a different
+spot. Every scan result is a **contact** (a marker pinned at the enemy's location), so
+you can broadcast its actual coordinates instead:
+`bot.send({ x: enemies[0].getX(), y: enemies[0].getY() })`, and each teammate aims with
+`bot.turret.turnTowards(message.x, message.y)` — the same point for everyone. The
+**Squad** example bot builds this out, team secret and all.
 
 ## Debugging like a pro
 

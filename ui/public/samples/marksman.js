@@ -1,10 +1,10 @@
 /*
   Marksman — a precision combat bot.
 
-  Teaches: LEADING a moving target (aiming where it will be, not where it is),
-  locking onto and focus-firing the WEAKEST enemy, and FIRE DISCIPLINE — holding
-  fire until the shot can actually land, instead of spraying reloads at hopeless
-  angles.
+  Teaches: LEADING a moving target with contact.getIntercept (aiming where it
+  will be, not where it is), locking onto and focus-firing the WEAKEST enemy,
+  and FIRE DISCIPLINE — holding fire until the shot can actually land, instead
+  of spraying reloads at hopeless angles.
   Difficulty: advanced. Pairs with the "Leading a moving target" (/learn/leading)
   and "Take aim" (/learn/aim) lessons.
 
@@ -45,7 +45,7 @@ clock.on(Event.TICK, () => {
 });
 
 bot.on(Event.SCANNED, (targets) => {
-  const enemies = targets.filter((t) => !t.friendly);
+  const enemies = targets.filter((t) => !t.isFriendly());
   if (enemies.length === 0) {
     // Nothing in view — sweep the turret (and the radar riding it) to search.
     this.targetId = null;
@@ -56,29 +56,27 @@ bot.on(Event.SCANNED, (targets) => {
   // Focus-fire: keep shooting our locked target while we can still see it,
   // otherwise pick the weakest enemy (lowest health), nearest as a tie-break.
   const target =
-    enemies.find((e) => e.id === this.targetId) ||
-    enemies.sort((a, b) => a.health - b.health || a.distance - b.distance)[0];
-  this.targetId = target.id;
+    enemies.find((e) => e.getId() === this.targetId) ||
+    enemies.sort(
+      (a, b) =>
+        a.getHealth() - b.getHealth() || a.getDistance() - b.getDistance()
+    )[0];
+  this.targetId = target.getId();
 
   // --- Lead the shot: aim where the target will be, not where it is. ---
-  // (The Leading lesson walks through this trig step by step.)
-  const ticks = target.speed === 0 ? 0 : target.distance / 25;
-  const bearing = ((bot.getOrientation() + target.angle) * Math.PI) / 180;
-  const enemyX = bot.getX() + target.distance * Math.sin(bearing);
-  const enemyY = bot.getY() - target.distance * Math.cos(bearing);
-  const heading = (target.orientation * Math.PI) / 180;
-  const futureX = enemyX + target.speed * ticks * Math.sin(heading);
-  const futureY = enemyY - target.speed * ticks * Math.cos(heading);
-  // Turn the predicted point back into a body-relative bearing for the turret.
-  const aim =
-    (Math.atan2(futureX - bot.getX(), bot.getY() - futureY) * 180) / Math.PI -
-    bot.getOrientation();
-  bot.turret.setOrientation(aim).catch(() => {});
+  // Every scan result is a contact — a marker that also knows the target's
+  // speed and heading — and getIntercept solves the lead exactly for our
+  // bullet speed. (The Leading lesson derives this answer by hand.)
+  const aim = target.getIntercept(bot.turret.bulletSpeed);
+  if (!aim) return; // nothing we fire can catch it — keep tracking instead
+  const aimBearing = aim.getBearing();
+  bot.turret.setOrientation(aimBearing).catch(() => {});
 
   // --- Fire discipline: only take a shot that can actually land. ---
   const linedUp =
-    Math.abs(angleDelta(aim, bot.turret.getOrientation())) < AIM_TOLERANCE;
-  if (target.distance < RANGE && linedUp && bot.turret.isReady()) {
+    Math.abs(angleDelta(aimBearing, bot.turret.getOrientation())) <
+    AIM_TOLERANCE;
+  if (target.getDistance() < RANGE && linedUp && bot.turret.isReady()) {
     bot.turret.fire().catch(() => {});
   }
 });

@@ -22,10 +22,13 @@ import { logger } from '../src/util/logger';
 function makeCompiledBot() {
   const emit = vi.fn();
   const proc = new Process('app1');
+  // Mutable so contact-staleness tests can advance the clock between a scan
+  // and the intercept computed from it.
+  let time = 42;
   const env = {
     getArena: () => ({ getWidth: () => 750, getHeight: () => 600 }),
     getProcesses: () => [proc],
-    getTime: () => 42,
+    getTime: () => time,
     isRunning: () => false, // command failure conditions settle immediately
     random: () => 0.5,
     emit,
@@ -56,6 +59,36 @@ function makeCompiledBot() {
 
   compiler.init(env as any, proc, bot);
 
+  // A second, uncompiled bot for the radar to detect — scan() only reads plain
+  // fields and (guardedly) host-side handlers, so it needs no isolate. Same
+  // process, so scans report it as friendly.
+  const addOtherBot = (
+    x: number,
+    y: number,
+    opts: { speed?: number; orientation?: number } = {}
+  ) => {
+    const other = new Bot(env as any, proc as any);
+    other.x = x;
+    other.y = y;
+    // Internal south-zero degrees (0 moves +y; the API heading is this +180).
+    other.orientation = opts.orientation ?? 0;
+    other.orientationTarget = other.orientation;
+    other.speed = opts.speed ?? 0;
+    other.speedTarget = other.speed;
+    proc.bots.push(other);
+    return other;
+  };
+
+  // Point the radar beam along an internal-compass angle and make it ready, so
+  // a scan detects whatever sits in that direction.
+  const aimRadar = (internalAngle: number) => {
+    bot.turret.orientation = 0;
+    bot.turret.orientationTarget = 0;
+    bot.turret.radar.orientation = internalAngle;
+    bot.turret.radar.orientationTarget = internalAngle;
+    bot.turret.radar.charged = 100;
+  };
+
   // Run bot code in the sandbox.
   const run = (code: string) =>
     proc.getSandbox().compileScriptSync(code).runSync(bot.getContext());
@@ -66,7 +99,19 @@ function makeCompiledBot() {
       .compileScriptSync(`(${expr})`)
       .runSync(bot.getContext(), { copy: true });
 
-  return { bot, proc, env, emit, run, read };
+  return {
+    bot,
+    proc,
+    env,
+    emit,
+    run,
+    read,
+    addOtherBot,
+    aimRadar,
+    setTime: (t: number) => {
+      time = t;
+    },
+  };
 }
 
 describe('compiler — bot API in a real isolate', () => {
@@ -155,6 +200,203 @@ describe('compiler — bot API in a real isolate', () => {
   it('createMarker distance still floors to a whole number', () => {
     // Regression lock on the marker-factory refactor: √5 ≈ 2.236 floors to 2.
     expect(ctx.read('arena.createMarker(101, 202).getDistance()')).toBe(2);
+  });
+
+  // ---- Contacts: scan results as Markers-with-motion ----
+  // The bot sits at (100, 200) in the 750×600 fixture arena.
+
+  // Meet-equation invariant: something leaving the bot at `speed` arrives at
+  // the returned point in exactly the time the target needs to reach it. This
+  // checks the solve itself rather than a hand-computed answer.
+  const expectMeets = (
+    intercept: { x: number; y: number },
+    targetNow: { x: number; y: number },
+    v: { x: number; y: number },
+    speed: number
+  ) => {
+    const t =
+      Math.abs(v.x) > 1e-12
+        ? (intercept.x - targetNow.x) / v.x
+        : (intercept.y - targetNow.y) / v.y;
+    expect(t).toBeGreaterThan(0);
+    expect(Math.hypot(intercept.x - 100, intercept.y - 200)).toBeCloseTo(
+      speed * t,
+      6
+    );
+  };
+
+  it('scan resolves Contacts that recover the scanned bot position', async () => {
+    // The highest-value check: the Contact's polar→cartesian inversion is run
+    // against the scan's own forward transform, not against hand arithmetic.
+    ctx.addOtherBot(100, 500);
+    ctx.aimRadar(0); // beam along +y, straight at the target 300 away
+    ctx.run(`
+      bot.radar.scan().then((cs) => {
+        const c = cs[0]
+        globalThis._scan = {
+          n: cs.length,
+          x: c.getX(), y: c.getY(),
+          dProp: c.distance, live: c.getDistance(),
+          friendly: c.friendly, inb: c.isInBounds(),
+          // Every raw reading is also a method; both forms must agree.
+          accessorsAgree:
+            c.getId() === c.id &&
+            c.getSpeed() === c.speed &&
+            c.getOrientation() === c.orientation &&
+            c.isFriendly() === c.friendly &&
+            c.getHealth() === c.health,
+          // Methods are non-enumerable, so enumeration-based bot code
+          // (Object.keys, for...in, {...spread}) sees exactly the plain
+          // object scans always returned.
+          keys: Object.keys(c),
+          spreadKeys: Object.keys({ ...c }),
+          json: JSON.parse(JSON.stringify(c)),
+        }
+      })
+    `);
+    const s = (await waitUntilRead('globalThis._scan', (v) => !!v)) as {
+      n: number;
+      x: number;
+      y: number;
+      dProp: number;
+      live: number;
+      friendly: boolean;
+      inb: boolean;
+      accessorsAgree: boolean;
+      keys: string[];
+      spreadKeys: string[];
+      json: Record<string, unknown>;
+    };
+    expect(s.n).toBe(1);
+    expect(s.x).toBeCloseTo(100, 6);
+    expect(s.y).toBeCloseTo(500, 6);
+    expect(s.dProp).toBeCloseTo(300, 6); // capture-time raw distance property
+    expect(s.live).toBe(300); // Marker's live (floored) distance
+    expect(s.friendly).toBe(true);
+    expect(s.inb).toBe(true);
+    expect(s.accessorsAgree).toBe(true);
+    // Backward compat: the wire shape is unchanged — bot.send(contact) still
+    // serializes exactly the ScanResult data fields (methods drop out).
+    const scanFields = [
+      'angle',
+      'distance',
+      'friendly',
+      'health',
+      'id',
+      'orientation',
+      'speed',
+    ];
+    expect(Object.keys(s.json).sort()).toEqual(scanFields);
+    // ...and so is the enumerable surface: enumeration-based bot code
+    // (Object.keys, for...in, {...spread}) sees only the scan fields.
+    expect(s.keys.sort()).toEqual(scanFields);
+    expect(s.spreadKeys.sort()).toEqual(scanFields);
+  });
+
+  it('getIntercept aims at a stationary target and rejects bad speeds', async () => {
+    ctx.addOtherBot(100, 500);
+    ctx.aimRadar(0);
+    ctx.run(`
+      bot.radar.scan().then((cs) => {
+        const m = cs[0].getIntercept(25)
+        globalThis._i = {
+          p: m && { x: m.getX(), y: m.getY() },
+          zero: cs[0].getIntercept(0),
+          neg: cs[0].getIntercept(-5),
+          none: cs[0].getIntercept(),
+        }
+      })
+    `);
+    const i = (await waitUntilRead('globalThis._i', (v) => !!v)) as {
+      p: { x: number; y: number };
+      zero: unknown;
+      neg: unknown;
+      none: unknown;
+    };
+    expect(i.p.x).toBeCloseTo(100, 6);
+    expect(i.p.y).toBeCloseTo(500, 6);
+    expect(i.zero).toBeNull();
+    expect(i.neg).toBeNull();
+    expect(i.none).toBeNull();
+  });
+
+  it('getIntercept leads a crossing target (meet-equation invariant)', async () => {
+    // Internal orientation 180 = API heading 0 (north): velocity (0, -5),
+    // crossing the +x line of sight at a right angle.
+    ctx.addOtherBot(400, 200, { speed: 5, orientation: 180 });
+    ctx.aimRadar(270); // beam along +x
+    ctx.run(`
+      bot.radar.scan().then((cs) => {
+        const m = cs[0].getIntercept(25)
+        globalThis._i = m && { x: m.getX(), y: m.getY() }
+      })
+    `);
+    const i = (await waitUntilRead('globalThis._i', (v) => !!v)) as {
+      x: number;
+      y: number;
+    };
+    expect(i.x).toBeCloseTo(400, 6); // no x velocity — x holds
+    expect(i.y).toBeLessThan(200); // led in the direction of travel
+    expectMeets(i, { x: 400, y: 200 }, { x: 0, y: -5 }, 25);
+  });
+
+  it('getIntercept folds in ticks elapsed since the scan', async () => {
+    ctx.addOtherBot(400, 200, { speed: 5, orientation: 180 });
+    ctx.aimRadar(270);
+    ctx.run(`bot.radar.scan().then((cs) => { globalThis._c = cs[0] })`);
+    await waitUntilRead('typeof globalThis._c', (v) => v === 'object');
+
+    // Three ticks pass; the target's true position is now (400, 185). The
+    // solve must start from there, not from the stale capture point.
+    ctx.setTime(45);
+    const i = ctx.read(`(() => {
+      const m = globalThis._c.getIntercept(25)
+      return m && { x: m.getX(), y: m.getY() }
+    })()`) as { x: number; y: number };
+    expect(i.x).toBeCloseTo(400, 6);
+    expectMeets(i, { x: 400, y: 185 }, { x: 0, y: -5 }, 25);
+  });
+
+  it('getIntercept returns null when the target outruns the given speed', async () => {
+    // Internal 270 = API 90 (east): fleeing straight down the line of sight
+    // at 30, faster than the 25 we can chase with.
+    ctx.addOtherBot(400, 200, { speed: 30, orientation: 270 });
+    ctx.aimRadar(270);
+    ctx.run(`
+      bot.radar.scan().then((cs) => {
+        globalThis._out = { i: cs[0].getIntercept(25) }
+      })
+    `);
+    const o = (await waitUntilRead('globalThis._out', (v) => !!v)) as {
+      i: unknown;
+    };
+    expect(o.i).toBeNull();
+  });
+
+  it('SCANNED handlers receive the same Contact objects', async () => {
+    ctx.addOtherBot(100, 500);
+    ctx.aimRadar(0);
+    ctx.run(`
+      bot.on(Event.SCANNED, (cs) => {
+        globalThis._ev = {
+          x: cs[0].getX(),
+          y: cs[0].getY(),
+          canIntercept: cs[0].getIntercept(25) !== null,
+          distance: cs[0].distance,
+        }
+      })
+      bot.radar.scan().catch(() => {})
+    `);
+    const e = (await waitUntilRead('globalThis._ev', (v) => !!v)) as {
+      x: number;
+      y: number;
+      canIntercept: boolean;
+      distance: number;
+    };
+    expect(e.x).toBeCloseTo(100, 6);
+    expect(e.y).toBeCloseTo(500, 6);
+    expect(e.canIntercept).toBe(true);
+    expect(e.distance).toBeCloseTo(300, 6);
   });
 
   it('removes Date and does not leak Node globals into the sandbox', () => {

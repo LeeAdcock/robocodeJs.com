@@ -178,6 +178,61 @@ describe('sandbox + simulation integration', () => {
     expect(shooter.stats.shotsFired).toBeGreaterThan(0);
   });
 
+  it('hits a crossing bot by aiming at contact.getIntercept(bulletSpeed)', async () => {
+    // End-to-end proof that the Contact intercept solver, the compass
+    // conventions, and the actual bullet physics agree: a stationary shooter
+    // scans, aims the turret at getIntercept(bot.turret.bulletSpeed), and
+    // fires only once lined up — at a runner crossing its front, so a
+    // straight-at-the-target shot would trail behind it.
+    const shooter = world.addBot(
+      `bot.on(Event.SCANNED, (cs) => {
+         const enemy = cs.find((c) => !c.isFriendly())
+         if (enemy) this.target = enemy
+       })
+       clock.on(Event.TICK, () => {
+         if (bot.radar.isReady()) bot.radar.scan().catch(() => {})
+         if (!this.target) return
+         // Keep the radar on the last known position for the next scan; the
+         // beam is wide enough to cover the drift between scans.
+         bot.radar.turnTowards(this.target.getX(), this.target.getY()).catch(() => {})
+         const aim = this.target.getIntercept(bot.turret.bulletSpeed)
+         if (!aim) return
+         bot.turret.turnTowards(aim.getX(), aim.getY()).catch(() => {})
+         if (!bot.turret.isTurning() && bot.turret.isReady())
+           bot.turret.fire().catch(() => {})
+       })`,
+      'interceptor',
+      { x: 200, y: 300, orientation: 0 }
+    );
+    // Start the turret (and the radar riding it) already pointing at where the
+    // runner begins, so the test exercises the lead solve, not a long initial
+    // turret swing.
+    shooter.turret.orientation = 239;
+    shooter.turret.orientationTarget = 239;
+    shooter.turret.radar.orientation = 0;
+    shooter.turret.radar.orientationTarget = 0;
+    shooter.turret.radar.charged = 100;
+    shooter.turret.loaded = 100;
+
+    // Internal orientation 0 drives +y: crosses the shooter's line of sight at
+    // a right angle, 250+ units away the whole time (never a collision), and
+    // stays clear of the south wall within the test window.
+    const runner = world.addBot(
+      `bot.on(Event.START, () => { bot.setSpeed(5) })`,
+      'runner',
+      { x: 450, y: 150, orientation: 0 }
+    );
+
+    const start = runner.health;
+    // Sudden death is far away and the bots never touch, so bullet damage is
+    // the only way the runner's health can drop. Stop as soon as one lands.
+    for (let i = 0; i < 11 && runner.health === start; i++) {
+      await world.tick(10);
+    }
+    expect(shooter.stats.shotsFired).toBeGreaterThan(0);
+    expect(runner.health).toBeLessThan(start);
+  });
+
   it('detects an enemy with the radar (SCANNED + DETECTED)', async () => {
     const scanner = world.addBot(
       `bot.on(Event.SCANNED, (targets) => {
