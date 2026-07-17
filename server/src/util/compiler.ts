@@ -793,7 +793,10 @@ const init = (env: Environment, process: Process, bot: Bot) => {
 
         // Single factory behind every positional helper (createMarker,
         // dropMarker, getNearestWall), so all markers share one shape.
-        const __makeMarker = (x, y) => __withMethods({}, {
+        // x/y are enumerable data (not just accessors) so a Marker survives
+        // serialization — bot.send(marker), spread, JSON — and the receiver
+        // can rebuild it with arena.createMarker(msg.x, msg.y).
+        const __makeMarker = (x, y) => __withMethods({ x, y }, {
           getX: () => x,
           getY: () => y,
           getDistance: () => {
@@ -842,27 +845,32 @@ const init = (env: Environment, process: Process, bot: Bot) => {
         // bot.send(contact), see exactly the data they always did — plus an
         // intercept solver. Marker's getDistance()/getBearing() are live
         // (measured from the bot NOW); .distance/.angle stay capture-time.
-        // Only the scan fields are enumerable (methods ride along invisibly),
-        // so Object.keys / for...in / spread / JSON all behave exactly as
-        // they did on the plain objects scans used to return.
-        const __makeContact = (scan) => {
-          const t0 = clock.getTime()
-          const b = ((bot.getOrientation() + scan.angle) * Math.PI) / 180
-          const x0 = bot.getX() + scan.distance * Math.sin(b)
-          const y0 = bot.getY() - scan.distance * Math.cos(b)
-          const h = (scan.orientation * Math.PI) / 180
-          const vx = scan.speed * Math.sin(h)
-          const vy = -scan.speed * Math.cos(h)
-          return __withMethods(Object.assign(__makeMarker(x0, y0), scan), {
+        // Only data fields are enumerable (methods ride along invisibly), so
+        // Object.keys / for...in / spread / JSON see the scan fields plus the
+        // frame-independent x/y/time — everything a receiver needs to rebuild
+        // the Contact with arena.createContact after a bot.send round-trip
+        // (the scan's angle/distance are relative to the SCANNER, so on their
+        // own they can't be re-anchored from anywhere else).
+        //
+        // Core factory over absolute kinematics ({x, y, speed, orientation,
+        // time} + any extra readings, all kept as data). Shared by the scan
+        // path and arena.createContact so a rehydrated Contact is built by
+        // literally the same code.
+        const __makeContactFrom = (data) => {
+          const x0 = data.x, y0 = data.y, t0 = data.time
+          const h = (data.orientation * Math.PI) / 180
+          const vx = data.speed * Math.sin(h)
+          const vy = -data.speed * Math.cos(h)
+          return __withMethods(Object.assign(__makeMarker(x0, y0), data), {
             // Accessor forms of the raw scan readings, so the whole Contact
             // surface is methods like every other bot API object. The plain
             // properties stay for compatibility (and are the wire shape
             // bot.send(contact) transmits).
-            getId: () => scan.id,
-            getSpeed: () => scan.speed,
-            getOrientation: () => scan.orientation,
-            isFriendly: () => scan.friendly,
-            getHealth: () => scan.health,
+            getId: () => data.id,
+            getSpeed: () => data.speed,
+            getOrientation: () => data.orientation,
+            isFriendly: () => data.friendly,
+            getHealth: () => data.health,
             // Where to aim (or drive) so something leaving our position at
             // the given speed meets this contact, assuming it holds its
             // heading and speed — pass bot.turret.bulletSpeed to lead a shot,
@@ -871,7 +879,10 @@ const init = (env: Environment, process: Process, bot: Bot) => {
             // or null when no interception is possible.
             getIntercept: (speed) => {
               if (!(speed > 0) || !isFinite(speed)) return null
-              const dt = clock.getTime() - t0
+              // Clamp: a rehydrated snapshot can carry a capture tick from
+              // before a match restart (the clock resets to 0) — treat a
+              // from-the-future time as "now" instead of projecting backward.
+              const dt = Math.max(0, clock.getTime() - t0)
               const px = x0 + vx * dt - bot.getX()
               const py = y0 + vy * dt - bot.getY()
               const a = vx * vx + vy * vy - speed * speed
@@ -894,6 +905,43 @@ const init = (env: Environment, process: Process, bot: Bot) => {
               return __makeMarker(x0 + vx * (dt + t), y0 + vy * (dt + t))
             },
           })
+        }
+
+        // Scan path: convert the scanner-relative capture (angle/distance
+        // from THIS bot, right now) into the absolute frame the factory
+        // wants. The raw readings ride along unchanged.
+        const __makeContact = (scan) => {
+          const b = ((bot.getOrientation() + scan.angle) * Math.PI) / 180
+          return __makeContactFrom(Object.assign({}, scan, {
+            x: bot.getX() + scan.distance * Math.sin(b),
+            y: bot.getY() - scan.distance * Math.cos(b),
+            time: clock.getTime(),
+          }))
+        }
+
+        // Rehydrate a Contact from its serialized data — typically a contact
+        // a teammate broadcast with bot.send (methods never survive the
+        // wire; the enumerable x/y/speed/orientation/time do). Extra fields
+        // (id, health, friendly, even the sender's capture-time
+        // angle/distance) pass through as data, so a Contact can be relayed
+        // across multiple hops losslessly. Mirrors arena.createMarker.
+        arena.createContact = (data) => {
+          if (data === null || typeof data !== 'object')
+            throw new Error(
+              'createContact expects an object with numeric x, y, speed, and orientation'
+            )
+          for (const k of ['x', 'y', 'speed', 'orientation'])
+            if (typeof data[k] !== 'number' || !isFinite(data[k]))
+              throw new Error(
+                'createContact requires a finite numeric "' + k + '"'
+              )
+          return __makeContactFrom(Object.assign({}, data, {
+            // A missing (or bad) capture tick means "as of now".
+            time:
+              typeof data.time === 'number' && isFinite(data.time)
+                ? data.time
+                : clock.getTime(),
+          }))
         }
 
         const __rawScan = bot.radar.scan
