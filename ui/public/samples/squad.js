@@ -1,12 +1,12 @@
 /*
-  Squad — teammates that gang up on one enemy.
+  Squad: teammates that gang up on one enemy.
 
   Teaches: real team COORDINATION over bot.send / Event.RECEIVED. When any squad
   member spots an enemy it broadcasts the whole scan contact (in an envelope
-  carrying a shared team secret, since enemies hear broadcasts too) — a contact
+  carrying a shared team secret, since enemies hear broadcasts too). A contact
   is serializable, so bot.send transmits its data and every teammate rebuilds it
   with arena.createContact. Each teammate then leads the shared target from its
-  OWN position with getIntercept — five bots focusing predictive fire on one
+  OWN position with getIntercept, five bots focusing predictive fire on one
   target instead of each fighting alone. Difficulty: intermediate. Pairs with
   the "Teamwork" (/learn/teamwork) lesson, and builds on the message-validation
   idea from the Magnetic example.
@@ -37,7 +37,7 @@ clock.on(Event.TICK, () => {
 
   if (this.targetContact) {
     // Lead the shot: getIntercept solves where to aim from OUR position so a
-    // bullet meets the target — falling back to its last known spot when no
+    // bullet meets the target, falling back to its last known spot when no
     // interception is possible.
     const aim = this.targetContact.getIntercept(bot.turret.bulletSpeed);
     const x = aim ? aim.getX() : this.targetContact.getX();
@@ -45,7 +45,7 @@ clock.on(Event.TICK, () => {
     bot.turret.turnTowards(x, y).catch(() => {});
     if (bot.turret.isReady()) bot.turret.fire().catch(() => {});
   } else if (!bot.isTurning()) {
-    bot.turn(15).catch(() => {}); // no target known — roam and look
+    bot.turn(15).catch(() => {}); // no target known, roam and look
   }
 });
 
@@ -55,14 +55,14 @@ bot.on(Event.SCANNED, (targets) => {
 
   // Nearest enemy. Broadcast the contact in an envelope with our team tag:
   // what transmits is the contact's serializable data (position, speed,
-  // heading, capture time — methods are not serialized).
+  // heading, capture time; methods are not serialized).
   const enemy = enemies.sort((a, b) => a.getDistance() - b.getDistance())[0];
   this.targetContact = enemy;
   bot.send({ secret: SECRET, contact: enemy }); // rally the squad onto it
 });
 
 bot.on(Event.RECEIVED, (message) => {
-  // Only trust well-formed messages carrying our team secret — enemies broadcast
+  // Only trust well-formed messages carrying our team secret. Enemies broadcast
   // too, so never act on a message you can't verify came from a teammate.
   if (!message || message.secret !== SECRET || !message.contact) return;
   // Rebuild the full contact from its serialized data; its methods now answer

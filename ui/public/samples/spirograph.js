@@ -21,7 +21,7 @@ clock.on(Event.TICK, () =>
     .then(bot.radar.scan)
     .then((targets) => {
       // The turret points straight ahead, so only fire when an enemy is actually
-      // in front of us and close enough to hit — otherwise the shot is wasted.
+      // in front of us and close enough to hit. Otherwise the shot is wasted.
       // A scan angle is 0..359, so "ahead" is near 0 or near 360.
       const enemy = targets[0];
       const ahead = enemy && (enemy.angle < 15 || enemy.angle > 345);

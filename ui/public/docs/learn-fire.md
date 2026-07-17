@@ -9,14 +9,14 @@
 
 ## The idea
 
-Your robot has a **turret** — the cannon on top. It's a _part_ of your robot, so you
+Your robot has a **turret**, the cannon on top. It's a _part_ of your robot, so you
 reach it through `bot.turret`, and it has its own actions:
 
-- `bot.turret.fire()` — shoot!
-- `bot.turret.isReady()` — is the cannon reloaded? (`true`/`false`)
+- `bot.turret.fire()`: shoot!
+- `bot.turret.isReady()`: is the cannon reloaded? (`true`/`false`)
 
 After each shot the turret needs time to **reload**. If you try to fire while it's
-reloading, nothing happens. So the polite thing is to **check first** with `isReady()` —
+reloading, nothing happens. So the polite thing is to **check first** with `isReady()`,
 exactly the kind of true/false check you met last lesson.
 
 There's also an event, **FIRED**, that happens the moment a shot goes off.
@@ -51,7 +51,7 @@ prints `boom!` on every shot.
 - Make the turret sweep while shooting: add `bot.turret.turn(30);` right after
   `bot.turret.fire();`. Now Rusty sprays shots in different directions.
 - Remove the `if (bot.turret.isReady())` check so it _tries_ to fire every tick. It still
-  only fires when loaded — the check just keeps things tidy.
+  only fires when loaded. The check just keeps things tidy.
 
 ## Common questions
 
@@ -64,8 +64,8 @@ Because of reload time. `isReady()` is `false` while reloading, so the `if` skip
 until it's loaded again.
 
 **Does firing hurt me or my teammates?**
-Firing itself is free — but a shot that _misses_ and flies off the field costs you **3 health**,
-so don't fire blindly into empty space. Your shots _can_ also hit teammates — soon we'll learn
+Firing itself is free, but a shot that _misses_ and flies off the field costs you **3 health**,
+so don't fire blindly into empty space. Your shots _can_ also hit teammates. Soon we'll learn
 to scan and only fire at enemies.
 
 ## You learned

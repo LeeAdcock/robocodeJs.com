@@ -17,9 +17,9 @@ When a scan finishes, the **SCANNED** event fires and hands you a **list** of ev
 it found. A list (programmers call it an **array**) is just several things in a row. Each
 item is a robot you spotted, and it's an object with useful labels:
 
-- `target.distance` — how far away it is
-- `target.angle` — the bearing to it, relative to your heading (you'll use this to aim)
-- `target.friendly` — `true` if it's a teammate
+- `target.distance`: how far away it is
+- `target.angle`: the bearing to it, relative to your heading (you'll use this to aim)
+- `target.friendly`: `true` if it's a teammate
 - (also `target.id`, `target.speed`, `target.orientation`)
 
 To look at every item in a list, we use **`forEach`**: "for each item, do this."
@@ -68,7 +68,7 @@ It runs your code once for every item in the list, handing you one item at a tim
 `target`). It's how you deal with "however many" robots there are.
 
 **Why use the SCANNED event instead of reading `scan()` directly?**
-A scan takes a moment to complete. The SCANNED event tells you the instant it's done —
+A scan takes a moment to complete. The SCANNED event tells you the instant it's done,
 the same "when this happens, do that" pattern you already know. (There's also a way to
 wait for the answer directly; that's the next lesson.)
 

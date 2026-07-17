@@ -21,7 +21,7 @@ const SCOPES: { scope: AchievementScope; title: string; blurb: string }[] = [
     scope: 'ladder',
     title: 'Ranked',
     blurb:
-      'Earned only in ranked ladder matches against real opponents — these can’t be farmed.',
+      'Earned only in ranked ladder matches against real opponents. These can’t be farmed.',
   },
   {
     scope: 'sandbox',
@@ -32,7 +32,7 @@ const SCOPES: { scope: AchievementScope; title: string; blurb: string }[] = [
   {
     scope: 'account',
     title: 'Milestones',
-    blurb: 'For getting stuck in — writing bots and making the platform yours.',
+    blurb: 'For getting stuck in: writing bots and making the platform yours.',
   },
 ];
 
@@ -176,7 +176,7 @@ export default function ProfilePage() {
       <div className="markdown">
         <h1>Your Badges</h1>
         <p>
-          Badges track what your bots have actually done — every ranked win,
+          Badges track what your bots have actually done: every ranked win,
           every shot fired. The ranked ones can only be earned on the{' '}
           <Link to="/leaderboard">global ladder</Link>, so they mean something.
         </p>

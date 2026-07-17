@@ -70,13 +70,13 @@ type SearchStatus = 'idle' | 'pending' | 'none' | 'limited' | 'error';
 const SEARCH_MESSAGES: Record<string, React.ReactNode> = {
   none: (
     <>
-      No answer found — try the <Link to="/faq">FAQ</Link>.
+      No answer found. Try the <Link to="/faq">FAQ</Link>.
     </>
   ),
-  limited: <>Too many searches — try again in a moment.</>,
+  limited: <>Too many searches. Try again in a moment.</>,
   error: (
     <>
-      Search is unavailable — try the <Link to="/faq">FAQ</Link>.
+      Search is unavailable. Try the <Link to="/faq">FAQ</Link>.
     </>
   ),
 };

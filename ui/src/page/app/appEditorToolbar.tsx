@@ -108,8 +108,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`check`}>
-                Check for errors — dry-run compile without deploying
-                (Ctrl-Enter)
+                Check for errors: dry-run compile without deploying (Ctrl-Enter)
               </Tooltip>
             }
           >
@@ -132,7 +131,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`deploy`}>
-                Deploy — save and update the running bots, keeping their current
+                Deploy: save and update the running bots, keeping their current
                 state (does not re-run START). Ctrl-S
               </Tooltip>
             }
@@ -150,7 +149,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`reboot`}>
-                Reboot — save and update the running bots, then re-run START for
+                Reboot: save and update the running bots, then re-run START for
                 a fresh start. Ctrl-Shift-S
               </Tooltip>
             }
@@ -171,7 +170,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`share-app`}>
-                Copy a share link — anyone who follows it can add this app to
+                Copy a share link. Anyone who follows it can add this app to
                 their own arena (your source stays private).
               </Tooltip>
             }

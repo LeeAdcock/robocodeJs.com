@@ -21,7 +21,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: 'event',
     aliases: ['events'],
     definition:
-      'A game occurrence — a scan result, collision, or bullet hit — delivered to the handler your bot registers for it.',
+      'A game occurrence (a scan result, collision, or bullet hit) delivered to the handler your bot registers for it.',
   },
   {
     term: 'handler',
@@ -39,7 +39,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: 'asynchronous',
     aliases: ['asynchronously', 'async'],
     definition:
-      'Starting an action and returning immediately, delivering the result later — bot commands are asynchronous, handing back a Promise you can await.',
+      'Starting an action and returning immediately, delivering the result later. Bot commands are asynchronous, handing back a Promise you can await.',
   },
   {
     term: 'synchronous',
@@ -86,7 +86,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: 'bearing',
     aliases: ['bearings'],
     definition:
-      'An angle measured relative to your bot’s current heading, in degrees — you turn by a bearing, not to it.',
+      'An angle measured relative to your bot’s current heading, in degrees. You turn by a bearing, not to it.',
   },
   {
     term: 'heading',
@@ -96,7 +96,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: 'orientation',
     definition:
-      'An absolute direction in the arena’s frame, in degrees — your bot’s facing, or a contact’s direction of travel.',
+      'An absolute direction in the arena’s frame, in degrees: your bot’s facing, or a contact’s direction of travel.',
   },
   {
     term: 'radar',

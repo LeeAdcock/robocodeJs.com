@@ -5,7 +5,7 @@
 - Point your turret at an enemy you spotted
 - Pick the **closest** target out of many
 
-**New idea:** _Variables — labeled boxes that remember a value._
+**New idea:** _Variables: labeled boxes that remember a value._
 
 ## The idea
 
@@ -23,7 +23,7 @@ the box's contents later is the whole point of a variable.
 To pick the closest enemy, we **compare** distances with `<` ("less than").
 
 To aim, point the turret at the target's `angle`. A scan's `angle` is a **bearing
-relative to your body**, and the turret also turns relative to the body — so it drops
+relative to your body**, and the turret also turns relative to the body, so it drops
 straight in: `bot.turret.setOrientation(target.angle)`.
 
 ## Try it

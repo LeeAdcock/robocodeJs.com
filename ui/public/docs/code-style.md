@@ -2,7 +2,7 @@
 
 > **A tip sheet for AI assistants generating RobocodeJs bots** over the MCP
 > connector. It is not part of the human-facing documentation and isn't linked
-> from it — it exists so that when a model writes a bot, the source it produces
+> from it. It exists so that when a model writes a bot, the source it produces
 > is easy for a _person_ to read, understand, and adjust quickly.
 
 When you generate a bot, treat the source as something a human will open next and
@@ -11,7 +11,7 @@ can read and adjust in seconds beats a clever one-liner every time. This page is
 the house style: how to lay a bot out, name things, and comment so a reader gets
 up to speed fast.
 
-Ground the code in the real API as you write it — the reference
+Ground the code in the real API as you write it: the reference
 (`robocodejs://docs/dev`), the exact signatures
 (`robocodejs://types/robocode.d.ts`), and the sample bots
 (`robocodejs://samples/`, which all follow this style). If your client can't read
@@ -21,14 +21,14 @@ MCP resources, the `read_doc` tool serves the same material by id (`docs/dev`,
 ## The one rule
 
 **Write for the next reader, not the compiler.** Anyone can make the machine
-understand the code. The job is to make a _person_ understand it quickly — the
+understand the code. The job is to make a _person_ understand it quickly: the
 strategy, the reasoning, and where to change it. Everything below serves that.
 
 ## Open with a header comment
 
 Start every bot with a short block comment that answers, before any code:
 
-- **What is this bot?** One line — its name and its idea.
+- **What is this bot?** One line: its name and its idea.
 - **What's the strategy?** Two or three sentences a reader can hold in their head.
 - **How do you see it work?** A hint like "add a moving bot and watch it lead."
 
@@ -51,13 +51,13 @@ reads the rest of the file as _confirmation_ instead of _investigation_.
 A bot has a natural top-to-bottom shape. Keep to it, so a reader can scan the
 file like an outline:
 
-1. **Header comment** — the strategy (above).
-2. **`bot.setName(...)`** — name it first.
-3. **Constants** — the tunable numbers, named (below).
-4. **Helper functions** — the reusable math/logic, defined before they're used.
-5. **`bot.on(Event.START, ...)`** — one-time setup: initial speed, radar lock,
+1. **Header comment**: the strategy (above).
+2. **`bot.setName(...)`**: name it first.
+3. **Constants**: the tunable numbers, named (below).
+4. **Helper functions**: the reusable math/logic, defined before they're used.
+5. **`bot.on(Event.START, ...)`**: one-time setup, meaning initial speed, radar lock,
    any state you stash on `this`.
-6. **Event handlers** — `TICK`, `SCANNED`, `HIT`, `COLLIDED`, … — the ongoing
+6. **Event handlers** (`TICK`, `SCANNED`, `HIT`, `COLLIDED`, …): the ongoing
    behaviour, the heart of the bot.
 
 Grouping by _lifecycle_ (setup, then reactions) rather than scattering handlers
@@ -67,7 +67,7 @@ glance.
 ## Name the magic numbers
 
 A bare `250` or `4` in the middle of a handler tells the reader nothing. A named
-constant tells them what it _means_ — and gives them one obvious place to tune.
+constant tells them what it _means_, and gives them one obvious place to tune.
 Put a comment on the ones whose value is a judgement call.
 
 ```js
@@ -83,8 +83,8 @@ tweaker knows exactly which knob to turn.
 
 ## Pull logic into small, named functions
 
-If a handler does something non-trivial — trigonometry, target selection, a
-decision — lift it into a function whose _name_ says what it does. The handler
+If a handler does something non-trivial (trigonometry, target selection, a
+decision), lift it into a function whose _name_ says what it does. The handler
 then reads as a sequence of intentions, and the tricky part is isolated,
 reusable, and testable in your head.
 
@@ -105,7 +105,7 @@ function weakestEnemy(enemies) {
 }
 ```
 
-`const target = weakestEnemy(enemies)` needs no comment — the name is the comment.
+`const target = weakestEnemy(enemies)` needs no comment. The name is the comment.
 
 ## Comment the _why_, not the _what_
 
@@ -135,12 +135,12 @@ Idioms that keep that readable:
   `SCANNED` does the aiming; `HIT` reacts to damage. Don't cram the whole bot
   into `TICK`.
 - **Return the Promise from an async handler** so the engine waits before
-  re-firing it — this prevents the same handler stacking up in parallel. See the
+  re-firing it. This prevents the same handler stacking up in parallel. See the
   events section of the API reference (`robocodejs://docs/dev`).
 - **Stash state on `this`**, set it in `START`, and give it a clear name
   (`this.targetId`, `this.mode`) so the reader knows what the bot remembers
   between ticks.
-- **Guard before you act** — `if (bot.turret.isReady())` before firing — and let
+- **Guard before you act** (`if (bot.turret.isReady())` before firing), and let
   the guard read as the precondition it is.
 
 ## Keep the formatting consistent
@@ -151,7 +151,7 @@ Consistent formatting removes a whole category of distraction. RobocodeJs uses
 hand-format: run the code through the formatter and paste the result back.
 
 AI assistants over MCP can call the **`format_app_source`** tool to pretty-print a bot
-to exactly this style before saving it — do that as the last step before
+to exactly this style before saving it. Do that as the last step before
 `set_app_source`, and use **`check_app_source`** to confirm it still compiles.
 
 ## A quick checklist
@@ -165,4 +165,4 @@ Before you save a bot, skim it as if you'd never seen it:
 - Is the tricky math tucked into a well-named helper?
 - Has it been through the formatter?
 
-If yes, the next reader — human or AI — is set up to get productive in minutes.
+If yes, the next reader, human or AI, is set up to get productive in minutes.

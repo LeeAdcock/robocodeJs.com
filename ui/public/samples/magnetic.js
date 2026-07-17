@@ -4,7 +4,7 @@
   structured message; teammates that see a matching secret steer toward the
   sender, causing the team to cluster together.
 
-  bot.send reaches every bot in the arena — enemies included — so the shared
+  bot.send reaches every bot in the arena (enemies included), so the shared
   `secret` acts as a team tag: messages without it are ignored. Never trust a
   broadcast you didn't send. (A received message also comes with the sender's
   distance, but not its direction, so we still share x/y to steer toward it.)
@@ -30,7 +30,7 @@ clock.on(Event.TICK, () => {
 
 bot.on(Event.RECEIVED, (message) => {
   // Ignore anything that isn't a well-formed message from a teammate (same
-  // secret) — enemies broadcast too, so validate before acting on it.
+  // secret). Enemies broadcast too, so validate before acting on it.
   if (!message || message.secret !== secret) return;
 
   // Steer toward the sender's reported position.

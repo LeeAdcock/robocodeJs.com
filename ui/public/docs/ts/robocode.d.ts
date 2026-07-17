@@ -14,7 +14,7 @@ type BotMessage =
   | BotMessage[]
   | { [key: string]: BotMessage };
 
-/** One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan — the pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message). */
+/** One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan. The pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property, and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message). */
 interface Contact extends Marker {
   /** Unique id of the detected bot (same as the id property). */
   getId(): string;
@@ -34,21 +34,21 @@ interface Contact extends Marker {
   orientation: number;
   /** Distance from you to it at the moment of the scan (getDistance() re-measures from wherever you are now to the pinned scan position). */
   distance: number;
-  /** Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() re-measures from wherever you are now to the pinned scan position). */
+  /** Bearing to it at the moment of the scan, relative to your heading, so bot.turret.setOrientation(angle) aims at it (getBearing() re-measures from wherever you are now to the pinned scan position). */
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
-  /** Its current health (0–100) — target the weakest enemy or judge a threat. */
+  /** Its current health (0–100). Target the weakest enemy or judge a threat. */
   health: number;
   /** The clock tick when this contact was captured. Lets getIntercept (and a teammate who receives this contact via bot.send) account for how stale the reading is. */
   time: number;
-  /** Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible. */
+  /** Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed. Pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible. */
   getIntercept(speed: number): Marker | null;
 }
 
 /** Details about the sender of a received message (the second RECEIVED argument). */
 interface SenderInfo {
-  /** How far away the sender was when it broadcast — a range, not a bearing. The same value is given to teammates and eavesdropping enemies. */
+  /** How far away the sender was when it broadcast: a range, not a bearing. The same value is given to teammates and eavesdropping enemies. */
   distance: number;
 }
 
@@ -70,7 +70,7 @@ interface Marker {
   isInBounds(): boolean;
 }
 
-/** Detects bots inside its beam — the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
+/** Detects bots inside its beam: the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
 interface Radar {
   /** Returns the radar's orientation in degrees (0–359). */
   getOrientation(): number;
@@ -82,7 +82,7 @@ interface Radar {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the radar is currently turning. */
   isTurning(): boolean;
-  /** How many degrees the radar turns per tick — plan how long a turn will take before committing to it. */
+  /** How many degrees the radar turns per tick. Plan how long a turn will take before committing to it. */
   turnRate: number;
   /** Performs a scan, resolving with the Contacts detected (empty array if none). Rejects if the radar is not ready. */
   scan(): Promise<Contact[]>;
@@ -104,7 +104,7 @@ interface Turret {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the turret is currently turning. */
   isTurning(): boolean;
-  /** How many degrees the turret turns per tick — plan how long a turn will take before committing to it. */
+  /** How many degrees the turret turns per tick. Plan how long a turn will take before committing to it. */
   turnRate: number;
   /** Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire (reloading, or during the opening deployment hold). */
   fire(): Promise<{ id?: string }>;
@@ -112,7 +112,7 @@ interface Turret {
   onReady(): Promise<void>;
   /** Returns whether the turret is ready to fire (false while reloading, and during the opening deployment hold). */
   isReady(): boolean;
-  /** How far a bullet travels per tick — divide a target’s distance by this to know the flight time when leading a shot. */
+  /** How far a bullet travels per tick. Divide a target’s distance by this to know the flight time when leading a shot. */
   bulletSpeed: number;
   /** Health an enemy loses when your bullet hits. */
   bulletDamage: number;
@@ -126,11 +126,11 @@ interface Arena {
   getHeight(): number;
   /** Creates a marker at the arena coordinate (x, y) for distance/bearing math. */
   createMarker(x: number, y: number): Marker;
-  /** Rebuilds a full Contact from its serialized data — typically a contact a teammate broadcast, since a Contact serializes as its plain data properties (methods are not serialized). The result has every Contact method, measured from YOUR position: getBearing()/getDistance() are live, and getIntercept accounts for ticks elapsed since the capture time. Extra fields (id, health, friendly, …) carry through as data. A missing time means "as of now"; non-numeric x/y/speed/orientation throw. */
+  /** Rebuilds a full Contact from its serialized data, typically a contact a teammate broadcast, since a Contact serializes as its plain data properties (methods are not serialized). The result has every Contact method, measured from YOUR position: getBearing()/getDistance() are live, and getIntercept accounts for ticks elapsed since the capture time. Extra fields (id, health, friendly, …) carry through as data. A missing time means "as of now"; non-numeric x/y/speed/orientation throw. */
   createContact(data: { x: number; y: number; speed: number; orientation: number; time?: number }): Contact;
   /** Whether (x, y) lies inside the arena (0..width, 0..height, edges inclusive). */
   contains(x: number, y: number): boolean;
-  /** A marker at the nearest point on the arena boundary — getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself. */
+  /** A marker at the nearest point on the arena boundary: getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself. */
   getNearestWall(): Marker;
 }
 
@@ -148,11 +148,11 @@ interface Bot {
   radar: Radar;
   /** The turret, for firing. */
   turret: Turret;
-  /** Fires when the bot first starts, when the arena restarts, and when you reboot the app — an ordinary save does NOT re-fire it. Set up state here on `this`. */
+  /** Fires when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does NOT re-fire it. Set up state here on `this`. */
   on(event: 'START', handler: () => void | Promise<unknown>): void;
-  /** Fires after your radar scans. The handler receives the array of Contacts the scan detected — the same objects bot.radar.scan() resolves with. */
+  /** Fires after your radar scans. The handler receives the array of Contacts the scan detected, the same objects bot.radar.scan() resolves with. */
   on(event: 'SCANNED', handler: (event: Contact[]) => void | Promise<unknown>): void;
-  /** Fires when another bot's radar sweeps over you — i.e. you have been spotted. */
+  /** Fires when another bot's radar sweeps over you: you have been spotted. */
   on(event: 'DETECTED', handler: () => void | Promise<unknown>): void;
   /** Fires when a bullet hits you. `angle` is the bearing the shot came from, relative to your heading. */
   on(event: 'HIT', handler: (event: { angle: number }) => void | Promise<unknown>): void;
@@ -160,7 +160,7 @@ interface Bot {
   on(event: 'COLLIDED', handler: (event: { angle: number; friendly?: boolean }) => void | Promise<unknown>): void;
   /** Fires when your turret fires a shot. */
   on(event: 'FIRED', handler: () => void | Promise<unknown>): void;
-  /** Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. A broadcast Contact arrives as plain data — rebuild it with arena.createContact(message). */
+  /** Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. A broadcast Contact arrives as plain data. Rebuild it with arena.createContact(message). */
   on(event: 'RECEIVED', handler: (message: BotMessage, from: SenderInfo) => void | Promise<unknown>): void;
   /** Returns this bot’s unique id. */
   getId(): string;
@@ -188,15 +188,15 @@ interface Bot {
   setSpeed(speed: number): Promise<void>;
   /** The fastest the bot can travel, in units per tick. */
   maxSpeed: number;
-  /** How much the speed changes per tick while moving toward the target speed — needed to judge braking distance. */
+  /** How much the speed changes per tick while moving toward the target speed, needed to judge braking distance. */
   acceleration: number;
   /** The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, and bots or bullets connect within two. */
   radius: number;
   /** Sets the bot's display name. */
   setName(name: string): void;
-  /** Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y). */
+  /** Broadcasts a message to every bot in the arena, enemies included, received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y). */
   send(message: BotMessage): void;
-  /** Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position — a receiver rebuilds it with arena.createMarker(message.x, message.y). */
+  /** Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position. A receiver rebuilds it with arena.createMarker(message.x, message.y). */
   dropMarker(): Marker;
 }
 

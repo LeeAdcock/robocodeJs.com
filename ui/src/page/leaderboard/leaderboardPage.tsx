@@ -43,7 +43,7 @@ const movement = (e: LeaderboardEntry): Move | null => {
       ? {
           symbol: '▲',
           color: MOVE_UP,
-          label: `New — already above the ${STARTING_RATING} starting rating`,
+          label: `New, already above the ${STARTING_RATING} starting rating`,
         }
       : null;
   const delta = e.previousRank - e.rank;
@@ -119,12 +119,12 @@ export default function LeaderboardPage() {
       <div className="markdown">
         <h1>Global Rankings</h1>
         <p>
-          These are the top bots across all players, ranked by an Elo rating —
+          These are the top bots across all players, ranked by an Elo rating,
           the same head-to-head scoring used in chess. In the background, each
           bot is matched one-on-one against another at random and they battle;
           the winner's rating goes up and the loser's goes down (an upset win
           counts for more). A bot's rating follows its current code, so
-          improving it climbs the board — and neglecting it drifts back down.
+          improving it climbs the board, and neglecting it drifts back down.
         </p>
         <p>
           <Link to="/rankings">How rankings work →</Link>
@@ -137,7 +137,7 @@ export default function LeaderboardPage() {
         {!error && entries === null && <p>Loading rankings…</p>}
 
         {!error && entries !== null && entries.length === 0 && (
-          <p>No ranked matches yet — check back once bots have battled.</p>
+          <p>No ranked matches yet. Check back once bots have battled.</p>
         )}
 
         {entries !== null && entries.length > 0 && (

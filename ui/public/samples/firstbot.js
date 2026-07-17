@@ -39,7 +39,7 @@ clock.on(Event.TICK, async () => {
   // is met before our logic executes.
   let targets = await bot.radar.onReady().then(bot.radar.scan);
 
-  // Only bother with an enemy that's close enough to actually hit — firing at a
+  // Only bother with an enemy that's close enough to actually hit: firing at a
   // far-off target just wastes the shot (and, with the missed-shot rule, health).
   if (targets.length > 0 && !targets[0].friendly && targets[0].distance < 250) {
     // Point the turret at the enemy first (the scan's angle is relative to our

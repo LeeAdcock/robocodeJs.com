@@ -1,5 +1,5 @@
 /*
-  Survivor — stays alive first, fights second.
+  Survivor: stays alive first, fights second.
 
   Teaches: reading your own health with bot.getHealth() and using THRESHOLDS to
   switch behavior, DODGING incoming fire on Event.HIT, and reacting to
@@ -30,7 +30,7 @@ clock.on(Event.TICK, async () => {
   }
 
   // Healthy enough to look for a fight. Scan, and only commit to a shot while
-  // our health is good — a hurt Survivor keeps moving instead.
+  // our health is good. A hurt Survivor keeps moving instead.
   const targets = await bot.radar
     .onReady()
     .then(bot.radar.scan)
@@ -42,7 +42,7 @@ clock.on(Event.TICK, async () => {
     if (bot.turret.isReady()) bot.turret.fire().catch(() => {});
     bot.setSpeed(3);
   } else {
-    // Hurt, or nothing to shoot at — keep roaming and searching.
+    // Hurt, or nothing to shoot at. Keep roaming and searching.
     bot.setSpeed(4);
     if (!bot.isTurning()) bot.turn(20).catch(() => {});
   }
@@ -57,7 +57,7 @@ bot.on(Event.HIT, (info) => {
 });
 
 bot.on(Event.DETECTED, () => {
-  // An enemy's radar found us — we're a target now. Break their aim by speeding
+  // An enemy's radar found us. We're a target now. Break their aim by speeding
   // up and changing course before their shot arrives.
   bot.setSpeed(5);
   if (!bot.isTurning()) bot.turn(45).catch(() => {});

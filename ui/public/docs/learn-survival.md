@@ -5,19 +5,19 @@
 - Check your robot's health and react when it's low
 - Respond to being shot or spotted
 
-**New idea:** _Thresholds — using a cutoff number to decide._
+**New idea:** _Thresholds: using a cutoff number to decide._
 
 ## The idea
 
 Your robot has health you can check with `bot.getHealth()`. It's a number from **`100`**
 (full health) down to **`0`** (destroyed). Watching it lets you play it safe when you're
-hurt — a decision based on a **threshold** (a cutoff like "below 40 = danger").
+hurt, a decision based on a **threshold** (a cutoff like "below 40 = danger").
 
 Two new events help you survive:
 
-- **HIT** — a bullet hit you. The handler gets `info.angle`: the bearing the shot came
+- **HIT**: a bullet hit you. The handler gets `info.angle`: the bearing the shot came
   from, **relative to your heading** (so you `turn` by it, not `setOrientation` to it).
-- **DETECTED** — an enemy's radar swept over you. You've been **spotted** (a good time to
+- **DETECTED**: an enemy's radar swept over you. You've been **spotted** (a good time to
   start moving so you're harder to hit).
 
 ## Try it
@@ -78,7 +78,7 @@ number like `40`.
 
 **Why `info.angle + 90`?**
 `info.angle` is the bearing back toward the shooter, relative to your heading. `bot.turn`
-turns you _by_ that amount, so `+ 90` turns you sideways to the shot — a quick dodge.
+turns you _by_ that amount, so `+ 90` turns you sideways to the shot, a quick dodge.
 `+ 180` would turn you straight away instead.
 
 ## You learned

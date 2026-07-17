@@ -2,11 +2,11 @@
 
 RobocodeJs exposes a [Model Context Protocol](https://modelcontextprotocol.io)
 server so an AI assistant (Claude, or any MCP-capable client) can write, run, and
-watch your bots directly — the same things you can do in the editor, driven by a
+watch your bots directly, the same things you can do in the editor, driven by a
 model.
 
 RobocodeJs is a full **OAuth 2.1** authorization server, so connecting is the
-normal "add a connector, click Connect, sign in" flow — there's **no token to
+normal "add a connector, click Connect, sign in" flow. There's **no token to
 copy**. The server speaks MCP over **streamable HTTP** at:
 
 ```
@@ -49,54 +49,54 @@ global `leaderboard`):
 
 **Apps**
 
-- `list_apps` — list your apps
-- `get_app_source` — read an app's source
-- `create_app` — create an app (optionally with a name and initial source)
-- `set_app_source` — replace an app's source (live arenas pick it up)
-- `compile_app` — re-run an app's current saved source in your live arenas (does
-  not change the source or re-fire `START` — use `set_app_source` / `reboot_app`)
-- `check_app_source` — dry-run compile source (pass `source`, or `appId` for a
-  saved app) and report any syntax/load error with its code — without deploying it
-- `format_app_source` — pretty-print bot code in the house style (pass `source`, or
+- `list_apps`: list your apps
+- `get_app_source`: read an app's source
+- `create_app`: create an app (optionally with a name and initial source)
+- `set_app_source`: replace an app's source (live arenas pick it up)
+- `compile_app`: re-run an app's current saved source in your live arenas (does
+  not change the source or re-fire `START`; use `set_app_source` / `reboot_app`)
+- `check_app_source`: dry-run compile source (pass `source`, or `appId` for a
+  saved app) and report any syntax/load error with its code, without deploying it
+- `format_app_source`: pretty-print bot code in the house style (pass `source`, or
   `appId` for a saved app); returns the formatted text without saving it
-- `reboot_app` — reload an app and re-fire its `START` handler
-- `delete_app` — remove an app from every arena and delete it
+- `reboot_app`: reload an app and re-fire its `START` handler
+- `delete_app`: remove an app from every arena and delete it
 
 **Arenas**
 
 - `list_arenas` / `create_arena` / `delete_arena`
-- `arena_status` — full snapshot (size, running state, clock, and every app's
+- `arena_status`: full snapshot (size, running state, clock, and every app's
   bots: position, orientation, health, bullets)
-- `match_summary` — outcome view: leaderboard, winner, per-bot accuracy/damage/
+- `match_summary`: outcome view with leaderboard, winner, per-bot accuracy/damage/
   survival, and elimination order (most useful once a match is decided)
-- `match_status` — the cheap-to-poll companion: just `decided`, the `winner`, and
-  a coarse standings list (rank, bots alive, total health) — no per-bot stat
-  blocks or per-bot positions. Use it to watch a running match ("is it decided
-  yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
+- `match_status`: the cheap-to-poll companion. It returns just `decided`, the
+  `winner`, and a coarse standings list (rank, bots alive, total health), with no
+  per-bot stat blocks or per-bot positions. Use it to watch a running match ("is it
+  decided yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
 - `add_app_to_arena` / `remove_app_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
-- `set_arena_speed` — set the simulation speed: a multiplier (1 = the default
+- `set_arena_speed`: set the simulation speed to a multiplier (1 = the default
   ~10 ticks/second), or `0`/`"max"` to run unbounded. The simulation stays
   deterministic at any speed
-- `set_arena_seed` — fix the arena's random seed so bot placement and starting
+- `set_arena_seed`: fix the arena's random seed so bot placement and starting
   orientations are reproducible; restart the arena after setting it to lay out
   an identical match
-- `run_match` — run one match to a decision (optional `seed`) and return the
+- `run_match`: run one match to a decision (optional `seed`) and return the
   winner + leaderboard; a blocking convenience for the restart → resume → poll
   `match_summary` loop. Spawns are outcome-deciding, so for a trustworthy ranking
   call it across several `seed`s and aggregate the results yourself
 
 **Observation**
 
-- `recent_logs` — recent bot console output for an arena, with optional filters
+- `recent_logs`: recent bot console output for an arena, with optional filters
   (`minLevel`, `appId`, `botIndex`, `contains`)
-- `recent_faults` — recent bot crashes as structured records (error code, kind,
-  message, failing line) — richer than grepping the logs
-- `platform_status` — the server's health and live gauges (deployed version,
-  uptime, arena/isolate counts, memory) — the same data as the public `/health`
+- `recent_faults`: recent bot crashes as structured records (error code, kind,
+  message, failing line), richer than grepping the logs
+- `platform_status`: the server's health and live gauges (deployed version,
+  uptime, arena/isolate counts, memory), the same data as the public `/health`
   endpoint. Platform-wide, not scoped to your account
-- `leaderboard` — the global bot ladder: the top-rated apps across all users by
-  Elo (name, owner, rating, games, win rate). Public ranking data — the one tool
+- `leaderboard`: the global bot ladder, the top-rated apps across all users by
+  Elo (name, owner, rating, games, win rate). Public ranking data, the one tool
   that isn't scoped to your account
 
 Arena tools take an optional `arenaId`; omit it to act on your default arena.
@@ -105,10 +105,10 @@ Arena tools take an optional `arenaId`; omit it to act on your default arena.
 
 The server also exposes read-only reference material the AI can pull in:
 
-- `robocodejs://docs/{slug}` — the bot documentation pages
-- `robocodejs://samples/{name}` — the sample bots
-- `robocodejs://types/robocode.d.ts` — the bot API type definitions
-- `robocodejs://reference/error-codes` — the `E0xx`/`W0xx` codes with descriptions,
+- `robocodejs://docs/{slug}`: the bot documentation pages
+- `robocodejs://samples/{name}`: the sample bots
+- `robocodejs://types/robocode.d.ts`: the bot API type definitions
+- `robocodejs://reference/error-codes`: the `E0xx`/`W0xx` codes with descriptions,
   for interpreting `recent_logs` and `check_app_source` output
 
 For clients that can't read MCP resources, the same material is available through
@@ -117,12 +117,12 @@ two tools: `list_docs` (a catalog of `{ id, kind, title }` entries) and `read_do
 
 # Troubleshooting
 
-- **The browser didn't open / connection stalls** — start the connection again
+- **The browser didn't open / connection stalls**: start the connection again
   from your client; it re-initiates the sign-in. Make sure pop-ups aren't blocked.
-- **"Please sign in" on the RobocodeJs authorize page** — you're not signed in in
+- **"Please sign in" on the RobocodeJs authorize page**: you're not signed in in
   that browser. Complete the Google sign-in (top right) and the connection
   finishes automatically.
-- **The AI can't see an app or arena** — tools only ever see _your_ account's
+- **The AI can't see an app or arena**: tools only ever see _your_ account's
   resources; make sure you authorized with the account that owns them.
-- **Disconnecting** — remove the connector in your client. To revoke server-side,
+- **Disconnecting**: remove the connector in your client. To revoke server-side,
   the connection's tokens expire on their own; reconnecting always re-authorizes.

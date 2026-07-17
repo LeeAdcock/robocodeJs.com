@@ -62,7 +62,7 @@ bot.on(Event.HIT, async (info) => {
   this.state = 'RETALIATE';
   try {
     await bot.setSpeed(-2);
-    // info.angle is relative to our body — turn BY it to face the attacker.
+    // info.angle is relative to our body. Turn BY it to face the attacker.
     await bot.turn(info.angle);
     await bot.turret.onReady();
     await bot.turret.fire();

@@ -1,9 +1,9 @@
 /*
-  Marksman — a precision combat bot.
+  Marksman: a precision combat bot.
 
   Teaches: LEADING a moving target with contact.getIntercept (aiming where it
   will be, not where it is), locking onto and focus-firing the WEAKEST enemy,
-  and FIRE DISCIPLINE — holding fire until the shot can actually land, instead
+  and FIRE DISCIPLINE, holding fire until the shot can actually land, instead
   of spraying reloads at hopeless angles.
   Difficulty: advanced. Pairs with the "Leading a moving target" (/learn/leading)
   and "Take aim" (/learn/aim) lessons.
@@ -47,7 +47,7 @@ clock.on(Event.TICK, () => {
 bot.on(Event.SCANNED, (targets) => {
   const enemies = targets.filter((t) => !t.isFriendly());
   if (enemies.length === 0) {
-    // Nothing in view — sweep the turret (and the radar riding it) to search.
+    // Nothing in view. Sweep the turret (and the radar riding it) to search.
     this.targetId = null;
     bot.turret.turn(15).catch(() => {});
     return;
@@ -64,11 +64,11 @@ bot.on(Event.SCANNED, (targets) => {
   this.targetId = target.getId();
 
   // --- Lead the shot: aim where the target will be, not where it is. ---
-  // Every scan result is a contact — a marker that also knows the target's
-  // speed and heading — and getIntercept solves the lead exactly for our
+  // Every scan result is a contact (a marker that also knows the target's
+  // speed and heading), and getIntercept solves the lead exactly for our
   // bullet speed. (The Leading lesson derives this answer by hand.)
   const aim = target.getIntercept(bot.turret.bulletSpeed);
-  if (!aim) return; // nothing we fire can catch it — keep tracking instead
+  if (!aim) return; // nothing we fire can catch it, keep tracking instead
   const aimBearing = aim.getBearing();
   bot.turret.setOrientation(aimBearing).catch(() => {});
 

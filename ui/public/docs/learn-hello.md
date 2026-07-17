@@ -9,7 +9,7 @@
 
 ## What is code?
 
-A **robot** in this game doesn't think on its own — it does exactly what you tell it.
+A **robot** in this game doesn't think on its own: it does exactly what you tell it.
 The way you tell it is by writing **code**: a list of instructions, one after another,
 that the robot follows from top to bottom. That list of instructions is called a
 **program**.
@@ -32,12 +32,12 @@ bot.setName('Rusty');
 ```
 
 Now press the **Deploy** button, or `Ctrl-S`. Look at the arena on the
-right — your robot is now named **Rusty**!
+right. Your robot is now named **Rusty**!
 
 Let's read that line like a sentence:
 
 - `bot` is **your robot**. You'll talk to it a lot.
-- `.setName(...)` is an **instruction** — "set your name."
+- `.setName(...)` is an **instruction**: "set your name."
 - `'Rusty'` is the name itself. The quotes `' '` mean it's **text** (programmers call
   text a _string_). You can put any name between the quotes.
 
@@ -48,13 +48,13 @@ sentence.
 
 - Change `'Rusty'` to your own robot's name and press Deploy again. Watch the name update.
 - What happens if you remove the quotes and just write `bot.setName(Rusty);`? Deploy and
-  peek at the **log panel** — you'll likely see an error. Quotes matter! Put them back.
+  peek at the **log panel**. You'll likely see an error. Quotes matter! Put them back.
 
 ## Common questions
 
 **Nothing changed when I deployed.**
 Look at the indicator next to your bot's name. If it says **Unsaved changes**, your code
-hasn't reached the arena yet — press **Deploy**. If it says **Saved and Deployed**, your
+hasn't reached the arena yet. Press **Deploy**. If it says **Saved and Deployed**, your
 bots are running this code, so check that your bot was added to the arena. New bots are
 added automatically when you create them.
 
@@ -64,7 +64,7 @@ reloads your code _and_ restarts your robot from the beginning. For now, Deploy 
 you need.
 
 **Do I have to call it `bot`?**
-Yes — `bot` is the name the game gives your robot. It's always there for you to use.
+Yes, `bot` is the name the game gives your robot. It's always there for you to use.
 
 ## You learned
 

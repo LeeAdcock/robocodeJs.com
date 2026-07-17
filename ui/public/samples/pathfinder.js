@@ -5,7 +5,7 @@
   Teaches: driving to an (x, y) point with trig (heading + distance) and
   cycling through a list of waypoints.
   Difficulty: intermediate. Pairs with the "Maps and math" (/learn/navigation)
-  lesson. (bot.turnTowards(x, y) can do the heading math for you — here we
+  lesson. (bot.turnTowards(x, y) can do the heading math for you; here we
   compute it by hand to show how it works.)
 */
 bot.setName('Pathfinder');
