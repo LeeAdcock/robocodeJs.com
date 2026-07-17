@@ -232,14 +232,19 @@ export default function ArenaSvg(props: ArenaSvgProps) {
       </g>
       {props.darkMode && (
         // Night mode: multiply the whole arena (terrain, padding, and bots) by a
-        // dark red, so it reads as a darker, warmer scene rather than a washed-out
-        // grey. pointerEvents none keeps the bots double-clickable underneath.
+        // cool, near-neutral blue-grey so it reads as a dim moonlit scene rather
+        // than a washed-out grey. The channels are kept balanced (blue only
+        // slightly leading) so the warm desert/sand biome darkens to muted sand
+        // instead of the alarm-red a red-dominant multiply produced (#259), while
+        // the green biome reads as darkened grass. Keeping the tint cool also lets
+        // the warm damage glow (--damage-glow-color) stand out against it.
+        // pointerEvents none keeps the bots double-clickable underneath.
         <rect
           x="-200%"
           y="-200%"
           height="500%"
           width="500%"
-          fill="rgb(150, 85, 85)"
+          fill="rgb(95, 103, 130)"
           style={{ mixBlendMode: 'multiply', pointerEvents: 'none' }}
         />
       )}
@@ -247,9 +252,9 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         // Deployment countdown: turrets are weapons-held until deployTick, so show
         // the seconds remaining (~10 ticks/s) centered over the arena. In night
         // mode use the theme's link accent (--link, the same warm tone as dark-mode
-        // anchor links) so it reads against the warm night tint; white in light
-        // mode. A dark outline keeps it legible over terrain either way, and
-        // pointerEvents none keeps bots clickable underneath.
+        // anchor links) so its warmth stands out against the cool night tint; white
+        // in light mode. A dark outline keeps it legible over terrain either way,
+        // and pointerEvents none keeps bots clickable underneath.
         <text
           x={(props.arena.width || 750) / 2}
           y={(props.arena.height || 750) / 2}
