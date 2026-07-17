@@ -39,6 +39,28 @@ const renderToolbar = (doDelete: () => void) =>
 
 afterEach(cleanup);
 
+describe('EditorToolbar labels', () => {
+  it('labels the two save actions in text, and leaves the rest icon-only', () => {
+    renderToolbar(noop);
+
+    // The lessons have to name these two in prose, so the buttons name
+    // themselves rather than relying on a tooltip.
+    // trim(): the icon and the label are separated by a text-node space.
+    expect(screen.getByLabelText('Deploy bot').textContent?.trim()).toBe(
+      'Deploy'
+    );
+    expect(screen.getByLabelText('Reboot bot').textContent?.trim()).toBe(
+      'Reboot'
+    );
+
+    // Secondary actions stay icon-only — tooltips are enough, and the toolbar
+    // is tight at narrow pane widths.
+    expect(screen.getByLabelText('Check for errors').textContent).toBe('');
+    expect(screen.getByLabelText('Reformat code').textContent).toBe('');
+    expect(screen.getByLabelText('Copy share link').textContent).toBe('');
+  });
+});
+
 describe('EditorToolbar delete confirmation', () => {
   it('does not delete on the first click — it opens a confirmation instead', () => {
     const doDelete = vi.fn();

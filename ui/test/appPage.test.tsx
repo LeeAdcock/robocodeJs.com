@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  act,
+} from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 vi.mock('axios', () => ({
@@ -38,6 +44,9 @@ const arena = { clock: { time: 0 }, apps: [] } as any;
 describe('AppPage (bot editor)', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
+    vi.mocked(axios.put).mockResolvedValue({ data: {} } as never);
+    vi.mocked(axios.post).mockResolvedValue({ data: {} } as never);
     vi.mocked(axios.get).mockImplementation((url: string) =>
       url.endsWith('/source')
         ? (Promise.resolve({ data: 'bot.setName("x")' }) as never)
@@ -168,6 +177,97 @@ describe('AppPage (bot editor)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('tracks the buffer against the server: saved → unsaved on edit → saved once the auto-save lands', async () => {
+    vi.useFakeTimers();
+    try {
+      renderPage();
+      await vi.advanceTimersByTimeAsync(0);
+      // The just-loaded source is what the arena is running.
+      expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
+
+      fireEvent.change(screen.getByTestId('editor'), {
+        target: { value: 'bot.turn(90)' },
+      });
+      expect(screen.getByRole('status').textContent).toBe('Unsaved changes');
+
+      // act() so React flushes the re-render the resolved PUT triggers.
+      await act(() => vi.advanceTimersByTimeAsync(30000));
+      expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
+      expect(screen.getByText('Saved automatically.')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('deploying saves, compiles, and confirms the arena has the new code', async () => {
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.change(screen.getByTestId('editor'), {
+      target: { value: 'bot.turn(90)' },
+    });
+
+    fireEvent.click(screen.getByLabelText('Deploy bot'));
+
+    expect(
+      await screen.findByText('Saved — the arena is running your latest code.')
+    ).toBeTruthy();
+    expect(axios.put).toHaveBeenCalledWith(
+      '/api/user/u1/app/a1/source',
+      'bot.turn(90)',
+      { headers: { 'content-type': 'application/octet-stream' } }
+    );
+    expect(axios.post).toHaveBeenCalledWith('/api/user/u1/app/a1/compile');
+    expect(screen.getByRole('status').textContent).toBe('Saved and Deployed');
+  });
+
+  it('a failed save keeps the editor honest — still "Unsaved changes", with an error', async () => {
+    vi.mocked(axios.put).mockRejectedValue(new Error('offline') as never);
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.change(screen.getByTestId('editor'), {
+      target: { value: 'bot.turn(90)' },
+    });
+
+    fireEvent.click(screen.getByLabelText('Deploy bot'));
+
+    expect(
+      await screen.findByText(
+        'Could not save your changes. Check your connection.'
+      )
+    ).toBeTruthy();
+    // The save failed, so the arena is NOT running this code — never claim it is.
+    expect(screen.getByRole('status').textContent).toBe('Unsaved changes');
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it('reformatting confirms what it did, and distinguishes a no-op tidy', async () => {
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.change(screen.getByTestId('editor'), {
+      target: { value: 'bot.turn( 90 )' },
+    });
+
+    fireEvent.click(screen.getByLabelText('Reformat code'));
+    expect(await screen.findByText('Code reformatted.')).toBeTruthy();
+
+    // Already-tidy code isn't a failure, but saying "reformatted" would be a
+    // lie — nothing changed.
+    fireEvent.click(screen.getByLabelText('Reformat code'));
+    expect(await screen.findByText('Code is already tidy.')).toBeTruthy();
+  });
+
+  it('reformatting unparseable code says so instead of silently doing nothing', async () => {
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.change(screen.getByTestId('editor'), {
+      target: { value: 'bot.turn(' },
+    });
+
+    fireEvent.click(screen.getByLabelText('Reformat code'));
+
+    expect(await screen.findByText(/Could not reformat/)).toBeTruthy();
   });
 
   it('a clean recompile hides the previous error and clears editor markers', async () => {

@@ -52,7 +52,7 @@ bot.on(Event.COLLIDED, () => {
 });
 ```
 
-Press **Save**. Rusty roams and fires cleanly. The `await`s make each step wait for the
+Press **Deploy**. Rusty roams and fires cleanly. The `await`s make each step wait for the
 one before it, so it fires _after_ the cannon is actually ready.
 
 New pieces:

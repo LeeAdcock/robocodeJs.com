@@ -118,6 +118,28 @@ svg.motion-snap * {
   font-weight: 600;
 }
 
+/* Feedback for a "How do I..." search that didn't navigate (no answer, rate
+   limited, server error). Positioned out of flow under the box so the message
+   never reflows the navbar; the navbar is always dark, hence the fixed colors. */
+.topNavBar .nav-search-feedback {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1030;
+  min-width: 100%;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  background-color: #343a40;
+  border: 1px solid #495057;
+  color: #dee2e6;
+}
+
+.topNavBar .nav-search-feedback a {
+  color: gold;
+}
+
 /* Items that belong only in the collapsed hamburger menu. On wider screens the
    brand logo is a visible, obvious way home, so a "Home" link there is just
    redundant clutter. */

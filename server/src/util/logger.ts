@@ -45,6 +45,7 @@ export const LogEvent = {
   METRICS: 'metrics', // periodic operational gauges heartbeat (time-series/alerting)
   LADDER_MATCH: 'ladder.match', // a global-ladder ranked match completed (GitHub #151)
   ACHIEVEMENT_UNLOCKED: 'achievement.unlocked', // a user earned one or more badges (GitHub #121)
+  HELP_UNANSWERED: 'help.unanswered', // a navbar search matched nothing (docs/routing gap)
 } as const;
 
 // Log a bot fault uniformly. `kind` says where it happened (compile/run/handler/

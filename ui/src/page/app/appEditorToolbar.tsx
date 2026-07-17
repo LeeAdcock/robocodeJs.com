@@ -89,7 +89,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           </OverlayTrigger>
         </ButtonGroup>
 
-        {/* Ordered by a typical edit workflow: tidy → check → deploy → restart. */}
+        {/* Ordered by a typical edit workflow: tidy → check → deploy → reboot. */}
         <ButtonGroup style={{ marginRight: '5px' }}>
           <OverlayTrigger
             placement={'bottom'}
@@ -122,6 +122,12 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               <FaCheck />
             </Button>
           </OverlayTrigger>
+          {/* Deploy and Reboot carry text labels while the rest of the toolbar
+              stays icon-only: they're the two actions the lessons have to name
+              in prose, and lesson 1 has to explain the difference between them.
+              An icon a beginner needs a parenthetical to identify has failed.
+              "Reboot" (not "Restart") matches the API and docs, and leaves
+              "restart" meaning the arena. */}
           <OverlayTrigger
             placement={'bottom'}
             overlay={
@@ -137,25 +143,25 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               aria-label="Deploy bot"
               onClick={() => props.doExecute()}
             >
-              <FaSave />
+              <FaSave /> Deploy
             </Button>
           </OverlayTrigger>
           <OverlayTrigger
             placement={'bottom'}
             overlay={
               <Tooltip id={`reboot`}>
-                Restart — save and update the running bots, then re-run START
-                for a fresh start. Ctrl-Shift-S
+                Reboot — save and update the running bots, then re-run START for
+                a fresh start. Ctrl-Shift-S
               </Tooltip>
             }
           >
             <Button
               variant="secondary"
               size="sm"
-              aria-label="Restart bot"
+              aria-label="Reboot bot"
               onClick={() => props.doReboot()}
             >
-              <FaPowerOff />
+              <FaPowerOff /> Reboot
             </Button>
           </OverlayTrigger>
         </ButtonGroup>

@@ -35,7 +35,7 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Save**. Rusty drives forward, and the log shows two numbers that keep changing.
+Press **Deploy**. Rusty drives forward, and the log shows two numbers that keep changing.
 
 Those numbers come from **questions you ask the robot**:
 

@@ -50,7 +50,7 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Save**. Rusty heads straight to the center and parks there.
+Press **Deploy**. Rusty heads straight to the center and parks there.
 
 We store the marker in `this.target` (lasting memory) so every tick can ask it for the
 latest bearing and distance. The `< 30` is an "are we close enough?" check.

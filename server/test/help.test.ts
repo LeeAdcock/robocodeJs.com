@@ -98,6 +98,18 @@ describe('GET /api/ask', () => {
     expect(await ask('how do I talk to my teammates?')).toBe('/learn/teamwork');
   });
 
+  it('answers null when nothing matches, rather than a dead /help route', async () => {
+    // No keyword and no vocabulary the classifier recognizes -> a real miss.
+    const res = await request(helpRouter).get(
+      '/api/ask?question=xyzzy%20plugh'
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ answer: null });
+
+    const empty = await request(helpRouter).get('/api/ask?question=');
+    expect(empty.body).toEqual({ answer: null });
+  });
+
   it('still prefers a specific topic over the generic learn route', async () => {
     // "learn to fire" names a topic (fire) — that should win over /learn.
     expect(await ask('I want to learn to fire')).toBe('/learn/docs#turret');
