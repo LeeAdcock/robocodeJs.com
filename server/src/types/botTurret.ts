@@ -13,6 +13,14 @@ export class BotTurret implements Orientated {
   public orientationVelocity: number;
   public radar: BotRadar;
   public loaded: number;
+  // Reload progress added per tick toward the 100 full-charge threshold.
+  public reloadRate = 2.5;
+  // Distance a fired bullet travels per tick.
+  public bulletSpeed = 25;
+  // Health removed from a bot this turret's bullet hits.
+  public bulletDamage = 25;
+  // Health the shooter loses when a shot leaves the arena without hitting.
+  public missPenalty = 3;
   private bot: Bot;
 
   constructor(bot: Bot) {
@@ -136,7 +144,7 @@ export class BotTurret implements Orientated {
         y: this.bot.y,
       },
       orientation: this.bot.getOrientation() + this.orientation,
-      speed: 25,
+      speed: this.bulletSpeed,
     };
     this.bot.bullets.push(bullet);
     this.loaded = 0;

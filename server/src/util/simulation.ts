@@ -128,8 +128,10 @@ export default {
             bot.handlers[Event.TICK]();
           }
 
-          if (bot.turret.loaded < 100) bot.turret.loaded += 2.5;
-          if (bot.turret.radar.charged < 100) bot.turret.radar.charged += 10;
+          if (bot.turret.loaded < 100)
+            bot.turret.loaded += bot.turret.reloadRate;
+          if (bot.turret.radar.charged < 100)
+            bot.turret.radar.charged += bot.turret.radar.chargeRate;
         });
     });
 
@@ -157,7 +159,7 @@ export default {
                     90
                 );
 
-                if (distance < 32) {
+                if (distance < bot.radius + otherBot.radius) {
                   collided = true;
                   bot.stats.timesCollided += 1;
                   otherBot.stats.timesCollided += 1;
@@ -203,7 +205,9 @@ export default {
                         90
                     );
 
-                    if (distance < 32) {
+                    // A bullet lands anywhere within one tank width (two
+                    // radii) of the target's center.
+                    if (distance < bot.radius * 2) {
                       // We have a hit
                       if (bot.handlers[Event.HIT]) {
                         bot.handlers[Event.HIT]({
@@ -218,7 +222,11 @@ export default {
                       // for the kill if the bot doesn't recover. Friendly fire is
                       // recorded here too — it really happened — but applyEliminations
                       // refuses to credit it as a kill.
-                      const dealt = damage(bot, 25, otherBot);
+                      const dealt = damage(
+                        bot,
+                        otherBot.turret.bulletDamage,
+                        otherBot
+                      );
                       bot.stats.timesHit += 1;
                       otherBot.stats.shotsHit += 1;
                       otherBot.stats.damageDealt += dealt;
@@ -250,10 +258,10 @@ export default {
           const arenaWidth = env.getArena().getWidth();
           const arenaHeight = env.getArena().getHeight();
           if (
-            newX < 16 ||
-            newX > arenaWidth - 16 ||
-            newY < 16 ||
-            newY > arenaHeight - 16
+            newX < bot.radius ||
+            newX > arenaWidth - bot.radius ||
+            newY < bot.radius ||
+            newY > arenaHeight - bot.radius
           ) {
             collided = true;
             bot.stats.timesCollided += 1;
@@ -266,8 +274,14 @@ export default {
               // yields 0 (dead ahead); a glancing or corner hit is now meaningful.
               // `friendly` is intentionally omitted for a wall (undefined — the
               // thing we hit isn't a bot, so it's neither a teammate nor an enemy).
-              const wallX = newX < 16 ? -1 : newX > arenaWidth - 16 ? 1 : 0;
-              const wallY = newY < 16 ? -1 : newY > arenaHeight - 16 ? 1 : 0;
+              const wallX =
+                newX < bot.radius ? -1 : newX > arenaWidth - bot.radius ? 1 : 0;
+              const wallY =
+                newY < bot.radius
+                  ? -1
+                  : newY > arenaHeight - bot.radius
+                    ? 1
+                    : 0;
               const wallAngle = normalizeAngle(
                 Math.atan2(wallY, wallX) * (180 / Math.PI) - 90
               );
@@ -379,7 +393,7 @@ export default {
               // Self-inflicted, so nobody is credited. This runs for dead bots too
               // — their bullets stay in flight — but `damage` freezes a dead bot's
               // attribution, so a corpse's stray miss can't rob its killer.
-              damage(bot, 3, null);
+              damage(bot, bot.turret.missPenalty, null);
               env.emit('event', {
                 type: 'bulletRemoved',
                 time: env.getTime(),

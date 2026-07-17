@@ -204,6 +204,15 @@ function exposeVoid(
     .runSync(bot.getContext(), {});
 }
 
+// Isolate helpers are compiled from source text, so any engine constant they use
+// must be interpolated from the real host value — never re-typed as a literal, or
+// the sandbox's math and the physics silently drift apart. `num` is both the
+// convention marker and a guard: a NaN/Infinity would paste as broken source.
+const num = (n: number): string => {
+  if (!Number.isFinite(n)) throw new Error(`Non-finite isolate constant: ${n}`);
+  return JSON.stringify(n);
+};
+
 function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
   const radar = bot.turret.radar;
   exposeGetter(
@@ -256,6 +265,14 @@ function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
   exposeGetter(bot, isolate, 'bot.radar.isReady', '_bot_radar_isReady', () =>
     radar.isReady()
   );
+
+  // Physics constants, mirrored as plain data properties from the host instance
+  // fields at init. None of these fields mutate mid-match today; if one ever
+  // does, its property must become an exposeGetter method or the sandbox copy
+  // silently goes stale.
+  isolate
+    .compileScriptSync(`bot.radar.turnRate = ${num(radar.orientationVelocity)}`)
+    .runSync(bot.getContext(), {});
 }
 
 function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
@@ -319,6 +336,18 @@ function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
   exposeGetter(bot, isolate, 'bot.turret.isReady', '_bot_turret_isReady', () =>
     turret.isReady()
   );
+
+  // Physics constants, mirrored as plain data properties from the host instance
+  // fields at init (see the note in exposeBotRadar).
+  isolate
+    .compileScriptSync(
+      `
+      bot.turret.turnRate = ${num(turret.orientationVelocity)}
+      bot.turret.bulletSpeed = ${num(turret.bulletSpeed)}
+      bot.turret.bulletDamage = ${num(turret.bulletDamage)}
+      `
+    )
+    .runSync(bot.getContext(), {});
 }
 
 function exposeBot(bot: Bot, isolate: ivm.Isolate) {
@@ -454,6 +483,19 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
         let bearing = Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
         return bot.setOrientation(bearing)
       }
+      `
+    )
+    .runSync(bot.getContext(), {});
+
+  // Physics constants, mirrored as plain data properties from the host instance
+  // fields at init (see the note in exposeBotRadar).
+  isolate
+    .compileScriptSync(
+      `
+      bot.radius = ${num(bot.radius)}
+      bot.maxSpeed = ${num(bot.speedMax)}
+      bot.acceleration = ${num(bot.speedAcceleration)}
+      bot.turnRate = ${num(bot.orientationVelocity)}
       `
     )
     .runSync(bot.getContext(), {});

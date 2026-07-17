@@ -13,6 +13,8 @@ export class BotRadar implements Orientated {
   public orientationVelocity: number;
 
   public charged: number;
+  // Charge added per tick toward the 100 full-charge threshold.
+  public chargeRate = 10;
   private bot: Bot;
 
   constructor(bot: Bot) {

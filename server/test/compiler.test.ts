@@ -102,6 +102,20 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('clock.getTime()')).toBe(42);
   });
 
+  it('mirrors the physics constants as plain data properties with the engine values', () => {
+    // Interpolated at init from the host instance fields (compiler's num()), so
+    // these assert the sandbox copies match the real engine values.
+    expect(ctx.read('bot.radius')).toBe(ctx.bot.radius);
+    expect(ctx.read('bot.radius')).toBe(16);
+    expect(ctx.read('bot.maxSpeed')).toBe(5);
+    expect(ctx.read('bot.acceleration')).toBe(2);
+    expect(ctx.read('bot.turnRate')).toBe(10);
+    expect(ctx.read('bot.turret.turnRate')).toBe(4);
+    expect(ctx.read('bot.turret.bulletSpeed')).toBe(25);
+    expect(ctx.read('bot.turret.bulletDamage')).toBe(25);
+    expect(ctx.read('bot.radar.turnRate')).toBe(4);
+  });
+
   it('removes Date and does not leak Node globals into the sandbox', () => {
     // Date is deliberately set to undefined so bots stay deterministic.
     expect(ctx.read('typeof Date')).toBe('undefined');

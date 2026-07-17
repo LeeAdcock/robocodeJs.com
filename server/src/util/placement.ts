@@ -24,8 +24,10 @@
 // draw count here changes which reproducible match a given seed maps to — not
 // reproducibility itself.
 //
-// Pure and dependency-free (takes width/height and a [0,1) rng) so it is trivially
-// unit-testable and reproducible.
+// Pure (takes width/height and a [0,1) rng, plus one shared geometry constant)
+// so it is trivially unit-testable and reproducible.
+
+import { BOT_RADIUS } from '../types/bot';
 
 export interface Spawn {
   x: number;
@@ -33,8 +35,6 @@ export interface Spawn {
   orientation: number; // absolute compass heading, 0 = north, clockwise
 }
 
-// Keep bots off the walls, matching the 16u inset the old placement used.
-const MARGIN = 16;
 // Minimum spacing between a team's own bots, and the retry budget the rejection
 // sampler gets before it falls back to the best-spaced candidate it has seen.
 const MIN_SEP = 40;
@@ -60,6 +60,11 @@ export function computeSpawns(
   height: number,
   rng: () => number
 ): Spawn[][] {
+  // Keep bots off the walls: a bot's center must stay one radius from the edge.
+  // Read lazily (inside the function, not at module scope): bot.ts reaches this
+  // module through environment.ts, so a module-scope read of BOT_RADIUS would
+  // run mid-cycle while bot.ts is still initializing.
+  const MARGIN = BOT_RADIUS;
   const teams: Spawn[][] = [];
   if (teamCount <= 0 || botsPerTeam <= 0) return teams;
 

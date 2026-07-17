@@ -27,6 +27,13 @@ import { logger, LogEvent } from '../util/logger';
 // send is not a crash). Tunable via env so it can be tightened in prod.
 export const MAX_SENDS_PER_TICK = Number(process.env.MAX_SENDS_PER_TICK) || 50;
 
+// A tank's collision radius (half its width): bots contact a wall when their
+// center comes within one radius of it, and contact bots/bullets within two.
+// Exists as a module constant only so util/placement.ts — which positions
+// spawns without a Bot instance — can share it; everything else reads the
+// per-instance `radius` field below.
+export const BOT_RADIUS = 16;
+
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
 // methods are all we need — and all that scheduleFactory's Timer shares.
@@ -67,6 +74,7 @@ export default class Bot implements Point, Orientated {
   public speedTarget = 0;
   public speedAcceleration = 2;
   public speedMax = 5;
+  public radius = BOT_RADIUS;
   // Dynamic event-dispatch table: populated across the isolated-vm boundary
   // (compiler.ts) and invoked positionally by Simulation, so the value type is
   // intentionally untyped.
@@ -124,8 +132,12 @@ export default class Bot implements Point, Orientated {
 
     let overallClosestBot: number | null;
     do {
-      this.x = 16 + (env.getArena().getWidth() - 32) * env.random();
-      this.y = 16 + (env.getArena().getHeight() - 32) * env.random();
+      this.x =
+        this.radius +
+        (env.getArena().getWidth() - this.radius * 2) * env.random();
+      this.y =
+        this.radius +
+        (env.getArena().getHeight() - this.radius * 2) * env.random();
 
       // Keep iterating if we placed this bot too close to another
       overallClosestBot = env
