@@ -36,6 +36,29 @@ export const GLOSSARY: GlossaryEntry[] = [
       'The simulation’s discrete time step, about 100 ms at default speed; speeds, turn rates, and reload times are all per-tick.',
   },
   {
+    term: 'promise',
+    aliases: ['promises'],
+    definition:
+      'A value representing an eventual result: bot commands return one that resolves when the physical action completes, and rejects if the target changes first.',
+  },
+  {
+    term: 'serialize',
+    aliases: ['serializes', 'serialized', 'serializing', 'serialization'],
+    definition:
+      'Convert an in-memory object into a plain data format, like a JSON string, so it can be stored or sent as a message.',
+  },
+  {
+    term: 'deserialize',
+    aliases: [
+      'deserializes',
+      'deserialized',
+      'deserializing',
+      'deserialization',
+    ],
+    definition:
+      'Rebuild a live object from its serialized form, such as parsing a received JSON string back into data you can use.',
+  },
+  {
     term: 'timer',
     aliases: ['timers'],
     definition:
