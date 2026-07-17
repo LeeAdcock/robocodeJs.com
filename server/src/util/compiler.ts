@@ -801,7 +801,7 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           getY: () => y,
           getDistance: () => {
             const bx = bot.getX(), by = bot.getY()
-            return Math.floor(Math.sqrt((bx - x) * (bx - x) + (by - y) * (by - y)))
+            return Math.sqrt((bx - x) * (bx - x) + (by - y) * (by - y))
           },
           getBearing: () => {
             const heading =
