@@ -1,4 +1,4 @@
-import Bullet from './bullet';
+import Bullet, { BULLET_SPEED } from './bullet';
 import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
@@ -7,27 +7,26 @@ import { normalizeAngle } from '../util/geometry';
 import { BotRadar } from './botRadar';
 import { DEPLOY_TICKS } from './environment';
 
+// Degrees the turret turns per tick, and reload progress added per tick toward
+// the 100 full-charge threshold. The turn speed seeds the per-instance
+// orientationVelocity field and both are mirrored into the sandbox as
+// bot.turret attributes in compiler.ts.
+export const TURRET_TURN_SPEED = 4;
+export const TURRET_RELOAD_RATE = 2.5;
+
 export class BotTurret implements Orientated {
   public orientation: number;
   public orientationTarget: number;
   public orientationVelocity: number;
   public radar: BotRadar;
   public loaded: number;
-  // Reload progress added per tick toward the 100 full-charge threshold.
-  public reloadRate = 2.5;
-  // Distance a fired bullet travels per tick.
-  public bulletSpeed = 25;
-  // Health removed from a bot this turret's bullet hits.
-  public bulletDamage = 25;
-  // Health the shooter loses when a shot leaves the arena without hitting.
-  public missPenalty = 3;
   private bot: Bot;
 
   constructor(bot: Bot) {
     this.bot = bot;
     this.orientation = bot.env.random() * 360;
     this.orientationTarget = this.orientation;
-    this.orientationVelocity = 4;
+    this.orientationVelocity = TURRET_TURN_SPEED;
     this.radar = new BotRadar(bot);
     this.loaded = 0;
   }
@@ -144,7 +143,7 @@ export class BotTurret implements Orientated {
         y: this.bot.y,
       },
       orientation: this.bot.getOrientation() + this.orientation,
-      speed: this.bulletSpeed,
+      speed: BULLET_SPEED,
     };
     this.bot.bullets.push(bullet);
     this.loaded = 0;

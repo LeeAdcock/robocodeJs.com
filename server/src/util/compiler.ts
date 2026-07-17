@@ -1,4 +1,5 @@
-import Bot from '../types/bot';
+import Bot, { BOT_RADIUS } from '../types/bot';
+import { BULLET_SPEED, BULLET_DAMAGE } from '../types/bullet';
 import { Event } from '../types/event';
 import { scheduleFactory } from './scheduleFactory';
 import ivm from 'isolated-vm';
@@ -266,10 +267,11 @@ function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
     radar.isReady()
   );
 
-  // Physics constants, mirrored as plain data properties from the host instance
-  // fields at init. None of these fields mutate mid-match today; if one ever
-  // does, its property must become an exposeGetter method or the sandbox copy
-  // silently goes stale.
+  // Physics constants, mirrored into the sandbox as plain data properties at
+  // init — from the engine's module constants, or from the instance fields
+  // those constants seed. None of these values mutate mid-match today; if one
+  // ever does, its property must become an exposeGetter method or the sandbox
+  // copy silently goes stale.
   isolate
     .compileScriptSync(`bot.radar.turnRate = ${num(radar.orientationVelocity)}`)
     .runSync(bot.getContext(), {});
@@ -337,14 +339,14 @@ function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
     turret.isReady()
   );
 
-  // Physics constants, mirrored as plain data properties from the host instance
-  // fields at init (see the note in exposeBotRadar).
+  // Physics constants, mirrored as plain data properties at init (see the
+  // note in exposeBotRadar).
   isolate
     .compileScriptSync(
       `
       bot.turret.turnRate = ${num(turret.orientationVelocity)}
-      bot.turret.bulletSpeed = ${num(turret.bulletSpeed)}
-      bot.turret.bulletDamage = ${num(turret.bulletDamage)}
+      bot.turret.bulletSpeed = ${num(BULLET_SPEED)}
+      bot.turret.bulletDamage = ${num(BULLET_DAMAGE)}
       `
     )
     .runSync(bot.getContext(), {});
@@ -487,12 +489,12 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
     )
     .runSync(bot.getContext(), {});
 
-  // Physics constants, mirrored as plain data properties from the host instance
-  // fields at init (see the note in exposeBotRadar).
+  // Physics constants, mirrored as plain data properties at init (see the
+  // note in exposeBotRadar).
   isolate
     .compileScriptSync(
       `
-      bot.radius = ${num(bot.radius)}
+      bot.radius = ${num(BOT_RADIUS)}
       bot.maxSpeed = ${num(bot.speedMax)}
       bot.acceleration = ${num(bot.speedAcceleration)}
       bot.turnRate = ${num(bot.orientationVelocity)}

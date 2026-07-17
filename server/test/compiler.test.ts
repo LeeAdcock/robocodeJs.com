@@ -103,9 +103,8 @@ describe('compiler — bot API in a real isolate', () => {
   });
 
   it('mirrors the physics constants as plain data properties with the engine values', () => {
-    // Interpolated at init from the host instance fields (compiler's num()), so
-    // these assert the sandbox copies match the real engine values.
-    expect(ctx.read('bot.radius')).toBe(ctx.bot.radius);
+    // Interpolated at init via compiler's num(), so these assert the sandbox
+    // copies match the real engine values.
     expect(ctx.read('bot.radius')).toBe(16);
     expect(ctx.read('bot.maxSpeed')).toBe(5);
     expect(ctx.read('bot.acceleration')).toBe(2);

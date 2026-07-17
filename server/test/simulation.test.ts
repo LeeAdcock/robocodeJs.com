@@ -29,7 +29,6 @@ function makeBot(overrides: Record<string, unknown> = {}) {
     speedTarget: 0,
     speedAcceleration: 1,
     speedMax: 10,
-    radius: 16,
     orientation: 0,
     orientationTarget: 0,
     orientationVelocity: 0,
@@ -43,15 +42,11 @@ function makeBot(overrides: Record<string, unknown> = {}) {
     bullets: [] as Record<string, unknown>[],
     turret: {
       loaded: 100,
-      reloadRate: 2.5,
-      bulletDamage: 25,
-      missPenalty: 3,
       orientation: 0,
       orientationTarget: 0,
       orientationVelocity: 0,
       radar: {
         charged: 100,
-        chargeRate: 10,
         orientation: 0,
         orientationTarget: 0,
         orientationVelocity: 0,
