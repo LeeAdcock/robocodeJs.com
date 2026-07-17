@@ -240,7 +240,7 @@ export const INTERFACES: ApiInterface[] = [
   },
   {
     name: 'Radar',
-    doc: 'Detects nearby bots in the direction it points. Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
+    doc: 'Detects bots inside its beam — the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
     members: [
       ...turnable('radar'),
       {

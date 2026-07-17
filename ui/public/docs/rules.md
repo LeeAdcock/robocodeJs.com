@@ -67,7 +67,7 @@ Bot centers keep a **16-unit margin** from every wall — a bot touching a wall 
 | Radar turn rate  | **4°/tick**       | radar turns relative to the turret                                                                                             |
 | Turret reload    | **40 ticks**      | ~4s between shots; `isReady()` / `onReady()` track it                                                                          |
 | Radar recharge   | **10 ticks**      | ~1s between scans                                                                                                              |
-| Radar range      | **300 units**     | the beam narrows with distance: ±25° up close, ±10° at max range                                                               |
+| Radar range      | **600 units**     | a narrow beam, 32 units wide at the bot flaring to ~244 units across at its tip — drawn under the radar in the arena           |
 | Bullet speed     | **25** units/tick | ≈250 units/sec                                                                                                                 |
 | Deployment hold  | **100 ticks**     | ~10s at match start with turrets held: `isReady()` is `false` and `fire()` rejects while bots deploy (reload still progresses) |
 
