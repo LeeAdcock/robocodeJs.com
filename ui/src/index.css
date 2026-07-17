@@ -249,20 +249,25 @@ svg.motion-snap * {
   list-style-type: square;
 }
 
-/* Block code: a tinted panel that keeps the bronze accent stripe as its
-   signature; long lines scroll instead of wrapping. */
+/* Block code: the same tinted, 1px-bordered, rounded treatment as the inline
+   chip — just scaled up to a panel with room to breathe. Matching the border,
+   radius and (via the code font-size below) the text size keeps inline and
+   block reading as one component; long lines scroll rather than wrap. */
 .markdown pre {
   margin-left: 20px;
   background: var(--code-bg);
-  border-left: 3px solid var(--rule);
-  border-radius: 0 4px 4px 0;
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
   padding: 10px 12px;
+  font-size: 0.9em;
   overflow-x: auto;
 }
 
 /* The nested <code> in a block drops the inline chip treatment (no double
    background/border) — the panel already carries the tint — and inherits the
-   body text colour like inline code. */
+   body text colour like inline code. font-size:1em resets the 0.9em from the
+   `.markdown code` rule above so it isn't multiplied by the panel's own 0.9em
+   (which would render block code smaller than inline); the panel sets the size. */
 .markdown pre code {
   background: none;
   border: 0;
