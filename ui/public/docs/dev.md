@@ -202,7 +202,7 @@ The radar provides the ability to detect other bots. Its detection area is a lon
 
 ### Contacts
 
-Every scan result is a **contact**: a [marker](#arena) pinned at the detected bot's position. Because a contact is a marker, all the marker methods work on it — `getX()`/`getY()` give the detected bot's arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured **live** from wherever you are now.
+Every scan result is a **contact**: a [marker](#arena) pinned at the spot where the detected bot **was at the moment of the scan** — the pin does not follow the bot afterwards. Because a contact is a marker, all the marker methods work on it — `getX()`/`getY()` give that pinned position in arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured from wherever **you** are now to the pin: they update as you move, **not** as the target moves. To estimate where a moving target actually is or will be, use `getIntercept(speed)` below (it extrapolates the target's motion for you) or take a fresh scan.
 
 The scan's own readings are available as methods too, so the whole surface is consistent:
 

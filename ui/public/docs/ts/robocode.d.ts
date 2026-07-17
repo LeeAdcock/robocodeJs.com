@@ -14,7 +14,7 @@ type BotMessage =
   | BotMessage[]
   | { [key: string]: BotMessage };
 
-/** One bot detected by a radar scan: a Marker at its scanned position (so getX/getY/getDistance/getBearing/isInBounds all work) that also carries the scan readings and an intercept solver. The Marker methods are live (measured from you now); the distance/angle properties are from the moment of the scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — the properties are the wire shape bot.send(contact) transmits. */
+/** One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan — the pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — the properties are the wire shape bot.send(contact) transmits. */
 interface Contact extends Marker {
   /** Unique id of the detected bot (same as the id property). */
   getId(): string;
@@ -32,9 +32,9 @@ interface Contact extends Marker {
   speed: number;
   /** Its body heading in degrees (absolute compass, 0 = north). */
   orientation: number;
-  /** Distance from you to it at the moment of the scan (getDistance() is the live value). */
+  /** Distance from you to it at the moment of the scan (getDistance() re-measures from wherever you are now to the pinned scan position). */
   distance: number;
-  /** Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() is the live value). */
+  /** Bearing to it at the moment of the scan, relative to your heading — so bot.turret.setOrientation(angle) aims at it (getBearing() re-measures from wherever you are now to the pinned scan position). */
   angle: number;
   /** True if it is on your team. */
   friendly: boolean;
