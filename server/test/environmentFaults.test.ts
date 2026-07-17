@@ -60,6 +60,22 @@ describe('Environment fault feed', () => {
 });
 
 describe('Environment restart', () => {
+  it('keeps recent faults and logs across a restart (post-match analysis)', async () => {
+    const env = new Environment(new Arena('ar1', 'u1'));
+    env.reportFault(makeFault({ message: 'last-match crash' }));
+    env.emit('log', { msg: 'last-match log', level: 30 });
+
+    // No apps are in the arena, so restart just resets state (no isolate rebuild).
+    await env.restart();
+
+    // Both buffers survive so run_match -> recent_faults / recent_logs can still
+    // read the finished match after the next one starts.
+    expect(env.getRecentFaults().map((f) => f.message)).toEqual([
+      'last-match crash',
+    ]);
+    expect(env.getRecentLogs()).toEqual([{ msg: 'last-match log', level: 30 }]);
+  });
+
   it('resets the tick clock to 0 so a new match does not inherit sudden death', async () => {
     const env = new Environment(new Arena('ar1', 'u1'));
     // Simulate a long first match that ran well past the sudden-death threshold.
