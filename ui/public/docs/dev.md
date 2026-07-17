@@ -32,7 +32,7 @@ The `marker` object returned has several convenience methods:
 
 - `marker.getX() : number` Returns the marker's x coordinate.
 - `marker.getY() : number` Returns the marker's y coordinate.
-- `marker.getDistance() : number` Returns the distance from the bot to the marker, rounded down to a whole number.
+- `marker.getDistance() : number` Returns the distance from the bot to the marker.
 - `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading. `bot.turn(marker.getBearing())` faces it.
 - `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena, the same check as `arena.contains(marker.getX(), marker.getY())`.
 

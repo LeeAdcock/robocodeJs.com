@@ -197,9 +197,14 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('arena.createMarker(750, 600).isInBounds()')).toBe(true);
   });
 
-  it('createMarker distance still floors to a whole number', () => {
-    // Regression lock on the marker-factory refactor: √5 ≈ 2.236 floors to 2.
-    expect(ctx.read('arena.createMarker(101, 202).getDistance()')).toBe(2);
+  it('createMarker distance is full precision', () => {
+    // getDistance() returns an unrounded float, matching getBearing()/getSpeed()
+    // and the raw .distance scan property — no method-vs-property mismatch for
+    // bots doing lead math. From (100, 200) to (101, 202): √5 ≈ 2.236.
+    expect(ctx.read('arena.createMarker(101, 202).getDistance()')).toBeCloseTo(
+      Math.sqrt(5),
+      10
+    );
   });
 
   // ---- Contacts: scan results as Markers-with-motion ----
