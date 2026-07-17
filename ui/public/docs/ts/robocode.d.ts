@@ -14,7 +14,7 @@ type BotMessage =
   | BotMessage[]
   | { [key: string]: BotMessage };
 
-/** One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan — the pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — the properties are the wire shape bot.send(contact) transmits. */
+/** One bot detected by a radar scan: a Marker pinned where that bot was at the moment of the scan — the pin does NOT follow the bot afterwards. getX/getY return that fixed position; getDistance/getBearing are measured from YOUR current position to the pin, so they change as you move, not as the target moves. To reason about where the target is heading, use getIntercept or take a fresh scan. Every reading is available both as a method (getId(), getSpeed(), …) and as a plain property — and the plain properties (including x/y/time) make a Contact serializable, so it can be broadcast with bot.send: the receiver gets the data (methods are not serialized) and rebuilds the full Contact with arena.createContact(message). */
 interface Contact extends Marker {
   /** Unique id of the detected bot (same as the id property). */
   getId(): string;
@@ -40,6 +40,8 @@ interface Contact extends Marker {
   friendly: boolean;
   /** Its current health (0–100) — target the weakest enemy or judge a threat. */
   health: number;
+  /** The clock tick when this contact was captured. Lets getIntercept (and a teammate who receives this contact via bot.send) account for how stale the reading is. */
+  time: number;
   /** Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible. */
   getIntercept(speed: number): Marker | null;
 }
@@ -50,8 +52,12 @@ interface SenderInfo {
   distance: number;
 }
 
-/** A virtual point in the arena with distance/bearing helpers, relative to the bot. */
+/** A virtual point in the arena with distance/bearing helpers, relative to the bot. Its x/y are plain properties, making a Marker serializable for use with bot.send (it transmits as its coordinates; methods are not serialized); a receiver rebuilds it with arena.createMarker(message.x, message.y). */
 interface Marker {
+  /** The marker's x coordinate (same as getX()). */
+  x: number;
+  /** The marker's y coordinate (same as getY()). */
+  y: number;
   /** The marker's x coordinate. */
   getX(): number;
   /** The marker's y coordinate. */
@@ -120,6 +126,8 @@ interface Arena {
   getHeight(): number;
   /** Creates a marker at the arena coordinate (x, y) for distance/bearing math. */
   createMarker(x: number, y: number): Marker;
+  /** Rebuilds a full Contact from its serialized data — typically a contact a teammate broadcast, since a Contact serializes as its plain data properties (methods are not serialized). The result has every Contact method, measured from YOUR position: getBearing()/getDistance() are live, and getIntercept accounts for ticks elapsed since the capture time. Extra fields (id, health, friendly, …) carry through as data. A missing time means "as of now"; non-numeric x/y/speed/orientation throw. */
+  createContact(data: { x: number; y: number; speed: number; orientation: number; time?: number }): Contact;
   /** Whether (x, y) lies inside the arena (0..width, 0..height, edges inclusive). */
   contains(x: number, y: number): boolean;
   /** A marker at the nearest point on the arena boundary — getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself. */
@@ -152,7 +160,7 @@ interface Bot {
   on(event: 'COLLIDED', handler: (event: { angle: number; friendly?: boolean }) => void | Promise<unknown>): void;
   /** Fires when your turret fires a shot. */
   on(event: 'FIRED', handler: () => void | Promise<unknown>): void;
-  /** Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. */
+  /** Fires when any bot in the arena (a teammate OR an enemy) broadcasts a message via bot.send. `message` is the payload (a primitive, or nested arrays/objects of primitives); `from.distance` is how far away the sender was. A broadcast Contact arrives as plain data — rebuild it with arena.createContact(message). */
   on(event: 'RECEIVED', handler: (message: BotMessage, from: SenderInfo) => void | Promise<unknown>): void;
   /** Returns this bot’s unique id. */
   getId(): string;
@@ -186,9 +194,9 @@ interface Bot {
   radius: number;
   /** Sets the bot's display name. */
   setName(name: string): void;
-  /** Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. */
+  /** Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y). */
   send(message: BotMessage): void;
-  /** Returns a marker at the bot's current location. */
+  /** Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position — a receiver rebuilds it with arena.createMarker(message.x, message.y). */
   dropMarker(): Marker;
 }
 

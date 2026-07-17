@@ -275,9 +275,12 @@ describe('compiler — bot API in a real isolate', () => {
     expect(s.friendly).toBe(true);
     expect(s.inb).toBe(true);
     expect(s.accessorsAgree).toBe(true);
-    // Backward compat: the wire shape is unchanged — bot.send(contact) still
-    // serializes exactly the ScanResult data fields (methods drop out).
-    const scanFields = [
+    // The wire shape — what bot.send(contact), spread, and JSON serialize
+    // (methods always drop out) — is the ScanResult data fields plus the
+    // frame-independent x/y/time, exactly what arena.createContact needs to
+    // rebuild the Contact on the receiving side. The scan's angle/distance
+    // are relative to the scanner, so alone they can't be re-anchored.
+    const wireFields = [
       'angle',
       'distance',
       'friendly',
@@ -285,12 +288,18 @@ describe('compiler — bot API in a real isolate', () => {
       'id',
       'orientation',
       'speed',
+      'time',
+      'x',
+      'y',
     ];
-    expect(Object.keys(s.json).sort()).toEqual(scanFields);
-    // ...and so is the enumerable surface: enumeration-based bot code
-    // (Object.keys, for...in, {...spread}) sees only the scan fields.
-    expect(s.keys.sort()).toEqual(scanFields);
-    expect(s.spreadKeys.sort()).toEqual(scanFields);
+    expect(Object.keys(s.json).sort()).toEqual(wireFields);
+    expect(s.json.x).toBeCloseTo(100, 6); // absolute capture position…
+    expect(s.json.y).toBeCloseTo(500, 6);
+    expect(s.json.time).toBe(42); // …and the capture tick survive the wire
+    // The enumerable surface matches: enumeration-based bot code
+    // (Object.keys, for...in, {...spread}) sees only data, never methods.
+    expect(s.keys.sort()).toEqual(wireFields);
+    expect(s.spreadKeys.sort()).toEqual(wireFields);
   });
 
   it('getIntercept aims at a stationary target and rejects bad speeds', async () => {
@@ -397,6 +406,135 @@ describe('compiler — bot API in a real isolate', () => {
     expect(e.y).toBeCloseTo(500, 6);
     expect(e.canIntercept).toBe(true);
     expect(e.distance).toBeCloseTo(300, 6);
+  });
+
+  it('markers serialize their position and rebuild with createMarker', () => {
+    // x/y are enumerable data, so bot.send(marker) / JSON round-trips carry
+    // the point; methods drop out as always.
+    expect(
+      ctx.read('JSON.parse(JSON.stringify(arena.createMarker(30, 40)))')
+    ).toEqual({ x: 30, y: 40 });
+    expect(ctx.read('arena.createMarker(30, 40).x')).toBe(30);
+    // The receive-side idiom: rebuild from the wire data.
+    expect(
+      ctx.read(
+        `(() => {
+          const m = JSON.parse(JSON.stringify(bot.dropMarker()))
+          return arena.createMarker(m.x, m.y).getDistance()
+        })()`
+      )
+    ).toBe(0);
+  });
+
+  it('arena.createContact rehydrates a serialized Contact, methods intact', async () => {
+    // Internal orientation 180 = API heading 0 (north): velocity (0, -5).
+    ctx.addOtherBot(400, 200, { speed: 5, orientation: 180 });
+    ctx.aimRadar(270); // beam along +x
+    ctx.run(`
+      bot.radar.scan().then((cs) => {
+        const c = cs[0]
+        const wire = JSON.parse(JSON.stringify(c)) // what bot.send delivers
+        const r = arena.createContact(wire)
+        const a = c.getIntercept(25), b = r.getIntercept(25)
+        globalThis._rt = {
+          x: r.getX(), y: r.getY(),
+          speed: r.getSpeed(), orientation: r.getOrientation(),
+          friendly: r.isFriendly(), health: r.getHealth(), id: r.getId(),
+          bearing: r.getBearing() === c.getBearing(),
+          distance: r.getDistance() === c.getDistance(),
+          sameIntercept:
+            !!a && !!b && a.getX() === b.getX() && a.getY() === b.getY(),
+          // A second hop serializes identically — relaying is lossless.
+          wire2: JSON.parse(JSON.stringify(r)),
+          wire1: wire,
+        }
+      })
+    `);
+    const rt = (await waitUntilRead('globalThis._rt', (v) => !!v)) as {
+      x: number;
+      y: number;
+      speed: number;
+      orientation: number;
+      friendly: boolean;
+      health: number;
+      id: string;
+      bearing: boolean;
+      distance: boolean;
+      sameIntercept: boolean;
+      wire2: Record<string, unknown>;
+      wire1: Record<string, unknown>;
+    };
+    expect(rt.x).toBeCloseTo(400, 6);
+    expect(rt.y).toBeCloseTo(200, 6);
+    expect(rt.speed).toBe(5);
+    expect(rt.orientation).toBe(0); // API heading (internal 180)
+    expect(rt.friendly).toBe(true); // same process in this fixture
+    expect(rt.health).toBe(100);
+    expect(rt.id).toBeTruthy();
+    expect(rt.bearing).toBe(true);
+    expect(rt.distance).toBe(true);
+    expect(rt.sameIntercept).toBe(true);
+    expect(rt.wire2).toEqual(rt.wire1);
+  });
+
+  it('a rehydrated Contact folds in ticks elapsed since its capture time', async () => {
+    ctx.addOtherBot(400, 200, { speed: 5, orientation: 180 });
+    ctx.aimRadar(270);
+    ctx.run(`
+      bot.radar.scan().then((cs) => {
+        globalThis._wire = JSON.parse(JSON.stringify(cs[0]))
+      })
+    `);
+    await waitUntilRead('typeof globalThis._wire', (v) => v === 'object');
+
+    // Three ticks after the capture, rehydrate and solve: like a live
+    // Contact, the solve must start from the target's projected position
+    // (400, 185), not the stale capture point.
+    ctx.setTime(45);
+    const i = ctx.read(`(() => {
+      const m = arena.createContact(globalThis._wire).getIntercept(25)
+      return m && { x: m.getX(), y: m.getY() }
+    })()`) as { x: number; y: number };
+    expect(i.x).toBeCloseTo(400, 6);
+    expectMeets(i, { x: 400, y: 185 }, { x: 0, y: -5 }, 25);
+  });
+
+  it('createContact defaults a missing time to now and clamps future times', () => {
+    ctx.setTime(45);
+    const read = (extra: string) =>
+      ctx.read(`(() => {
+        const m = arena.createContact(
+          Object.assign({ x: 400, y: 200, speed: 5, orientation: 0 }${extra})
+        ).getIntercept(25)
+        return m && { x: m.getX(), y: m.getY() }
+      })()`) as { x: number; y: number };
+
+    // No time: treated as captured now (dt = 0) — solve from (400, 200).
+    const fresh = read('');
+    expectMeets(fresh, { x: 400, y: 200 }, { x: 0, y: -5 }, 25);
+    // A capture tick "from the future" (e.g. recorded before a match restart
+    // reset the clock) is clamped to now, not projected backward.
+    const future = read(', { time: 9999 }');
+    expect(future).toEqual(fresh);
+    // A genuinely stale capture projects forward as usual.
+    const stale = read(', { time: 42 }');
+    expectMeets(stale, { x: 400, y: 185 }, { x: 0, y: -5 }, 25);
+  });
+
+  it('createContact rejects malformed input with a clear error', () => {
+    for (const bad of [
+      'null',
+      '42',
+      '"contact"',
+      '({})',
+      '({ x: 1, y: 2, speed: 0 })', // missing orientation
+      '({ x: "1", y: 2, speed: 0, orientation: 0 })', // non-numeric
+      '({ x: Infinity, y: 2, speed: 0, orientation: 0 })',
+    ]) {
+      expect(() => ctx.read(`arena.createContact(${bad})`)).toThrow(
+        /createContact/
+      );
+    }
   });
 
   it('removes Date and does not leak Node globals into the sandbox', () => {

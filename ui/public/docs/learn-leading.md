@@ -155,6 +155,11 @@ is a marker, `turnTowards` aims at it directly. Understanding **why** it works i
 what this lesson was for; now you get to use the short version with a clear
 conscience.
 
+One more trick for later: a contact is serializable, so a teammate can broadcast one
+with `bot.send(enemy)` and you can rebuild it — `getIntercept` and all, solved from
+**your** position — with `arena.createContact(message)`. That's the heart of team
+fire-control, and it's where [the last lesson](/learn/teamwork) ends up.
+
 ---
 
 [← Maps and math](/learn/navigation) · [Index](/learn) · Next: [Teamwork and graduation →](/learn/teamwork)

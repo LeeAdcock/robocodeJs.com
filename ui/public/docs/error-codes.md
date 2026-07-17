@@ -77,6 +77,25 @@ bot.on(Event.SCANNED, (targets) => {
 })
 ```
 
+Another common trigger: calling a contact method on a **received** contact. A
+broadcast contact arrives as plain serialized data — its methods are not serialized.
+
+```
+// Triggers E013: a contact sent via bot.send arrives without its methods,
+// so .getIntercept is not a function
+bot.on(Event.RECEIVED, (message) => {
+  const aim = message.getIntercept(bot.turret.bulletSpeed)
+})
+```
+
+```
+// Fixed: rebuild the full contact from the serialized data first
+bot.on(Event.RECEIVED, (message) => {
+  const aim = arena.createContact(message).getIntercept(bot.turret.bulletSpeed)
+  if (aim) bot.turret.turnTowards(aim.getX(), aim.getY())
+})
+```
+
 ## E017
 
 **Bot script failed to load — fatal.** The bot's source could not be compiled or

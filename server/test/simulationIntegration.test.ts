@@ -233,6 +233,73 @@ describe('sandbox + simulation integration', () => {
     expect(runner.health).toBeLessThan(start);
   });
 
+  it('relays a Contact over bot.send and hits via arena.createContact', async () => {
+    // End-to-end proof of the contact wire round-trip: a spotter scans and
+    // broadcasts the Contact (bot.send transmits its enumerable data — the
+    // methods never survive the wire); a shooter that NEVER scans rehydrates
+    // it with arena.createContact and leads the runner from a different
+    // position — only the absolute x/y/time frame makes that possible (the
+    // scan's angle/distance are relative to the spotter).
+    const spotter = world.addBot(
+      `bot.on(Event.SCANNED, (cs) => {
+         // The stationary shooter is also a non-friendly here; the runner is
+         // the one that moves.
+         const enemy = cs.find((c) => !c.isFriendly() && c.getSpeed() > 0)
+         if (enemy) { this.target = enemy; bot.send(enemy) }
+       })
+       clock.on(Event.TICK, () => {
+         if (bot.radar.isReady()) bot.radar.scan().catch(() => {})
+         if (!this.target) return
+         bot.radar.turnTowards(this.target.getX(), this.target.getY()).catch(() => {})
+       })`,
+      'spotter',
+      { x: 200, y: 300, orientation: 0 }
+    );
+    // Beam pre-aimed at the runner's start (same geometry as the intercept
+    // test above) so the test exercises the relay, not an initial sweep.
+    spotter.turret.orientation = 239;
+    spotter.turret.orientationTarget = 239;
+    spotter.turret.radar.orientation = 0;
+    spotter.turret.radar.orientationTarget = 0;
+    spotter.turret.radar.charged = 100;
+
+    const shooter = world.addBot(
+      `bot.on(Event.RECEIVED, (msg) => {
+         if (msg && typeof msg === 'object' && typeof msg.x === 'number')
+           this.target = arena.createContact(msg)
+       })
+       clock.on(Event.TICK, () => {
+         if (!this.target) return
+         const aim = this.target.getIntercept(bot.turret.bulletSpeed)
+         if (!aim) return
+         bot.turret.turnTowards(aim.getX(), aim.getY()).catch(() => {})
+         if (!bot.turret.isTurning() && bot.turret.isReady())
+           bot.turret.fire().catch(() => {})
+       })`,
+      'shooter',
+      { x: 200, y: 450, orientation: 0 }
+    );
+    // Turret pre-pointed near the runner's start so the lead solve, not a
+    // long swing, is what the window measures.
+    shooter.turret.orientation = 220;
+    shooter.turret.orientationTarget = 220;
+    shooter.turret.loaded = 100;
+
+    const runner = world.addBot(
+      `bot.on(Event.START, () => { bot.setSpeed(5) })`,
+      'runner',
+      { x: 450, y: 150, orientation: 0 } // internal 0: crosses along +y
+    );
+
+    const start = runner.health;
+    for (let i = 0; i < 11 && runner.health === start; i++) {
+      await world.tick(10);
+    }
+    expect(spotter.stats.shotsFired).toBe(0); // the spotter only spots
+    expect(shooter.stats.shotsFired).toBeGreaterThan(0);
+    expect(runner.health).toBeLessThan(start);
+  });
+
   it('detects an enemy with the radar (SCANNED + DETECTED)', async () => {
     const scanner = world.addBot(
       `bot.on(Event.SCANNED, (targets) => {
