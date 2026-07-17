@@ -49,4 +49,5 @@ programmers use.
 ---
 
 When you finish, the [full reference docs](/learn/docs) and the [example bots](/examples) are
-great places to keep growing. Let's go, [start Lesson 1 →](/learn/hello)
+great places to keep growing. That's all ahead of you, though. For now, take the
+first step: [start Lesson 1 →](/learn/hello)

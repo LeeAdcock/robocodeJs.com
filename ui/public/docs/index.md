@@ -28,8 +28,8 @@ to see how a bot comes together, step by step.
 
 # Coding your first JavaScript bot
 
-This quick walkthrough shows the key steps to building a bot (naming it, firing its
-turret, and getting it moving) so you can see how the pieces fit together. Prefer to
+In a few minutes you'll have a bot that names itself, fires its turret, and drives
+around the arena, just enough to feel how the pieces fit together. Prefer to
 start by reading instead? Take the guided **[Learn to Code course](/learn)** or dive into
 the full **[documentation](/learn/docs)**.
 
@@ -67,7 +67,7 @@ Deploy in the editor and every bot on your team picks up the new logic instantly
 
 # Next steps!
 
-That's the gist: a bot that drives, fires, and turns. It won't dominate the arena yet, but you've seen how the pieces fit together.
+That's the gist: a bot that drives, fires, and turns. It won't win any trophies yet, but you just wrote a working battle bot from a blank editor, and you've seen how all the pieces fit together.
 
 Ready to build your own? Take the guided **[Learn to Code course](/learn)** for the full step-by-step path, skim the detailed **[RobocodeJs documentation](/learn/docs)**, study a few **[example bots](/examples)**, or [deepen your knowledge](https://learnjavascript.online/) of JavaScript itself.
 
