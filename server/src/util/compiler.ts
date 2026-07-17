@@ -336,7 +336,13 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
       globalThis.__dispatch = (event, jsonArgs, resolve, reject) => {
         const handler = __handlers[event]
         if (!handler) { resolve(); return }
-        const returnValue = handler.apply(bot.scope, JSON.parse(jsonArgs))
+        const args = JSON.parse(jsonArgs)
+        // SCANNED hands the handler the same Contact objects radar.scan()
+        // resolves with (__makeContact is defined in a later init script;
+        // events only fire after init completes).
+        if (event === 'SCANNED' && Array.isArray(args[0]))
+          args[0] = args[0].map(__makeContact)
+        const returnValue = handler.apply(bot.scope, args)
         return (returnValue || Promise.resolve()).then(resolve, reject)
       }
       `
@@ -755,6 +761,68 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           for (let j = 1; j < 4; j++) if (d[j] < d[i]) i = j
           return __makeMarker(p[i][0], p[i][1])
         }
+      `
+      )
+      .runSync(bot.getContext(), {});
+
+    // Contacts: radar.scan() results (and SCANNED handler args) upgraded from
+    // plain data to Markers-with-motion. Pure in-isolate JS over the same
+    // copied scan payload — no new host plumbing.
+    process
+      .getSandbox()
+      .compileScriptSync(
+        `
+        // A Contact IS a Marker at the scanned bot's position (recovered from
+        // the capture-time bearing + distance) that still carries every raw
+        // ScanResult field — so existing bots reading .distance/.angle, and
+        // bot.send(contact), see exactly the data they always did — plus an
+        // intercept solver. Marker's getDistance()/getBearing() are live
+        // (measured from the bot NOW); .distance/.angle stay capture-time.
+        const __makeContact = (scan) => {
+          const t0 = clock.getTime()
+          const b = ((bot.getOrientation() + scan.angle) * Math.PI) / 180
+          const x0 = bot.getX() + scan.distance * Math.sin(b)
+          const y0 = bot.getY() - scan.distance * Math.cos(b)
+          const h = (scan.orientation * Math.PI) / 180
+          const vx = scan.speed * Math.sin(h)
+          const vy = -scan.speed * Math.cos(h)
+          return Object.assign(__makeMarker(x0, y0), scan, {
+            // Where to aim (or drive) so something leaving our position at
+            // the given speed meets this contact, assuming it holds its
+            // heading and speed — pass 25 (bullet speed) to lead a shot, or
+            // your own speed to cut it off. Closed-form smallest-positive
+            // root; folds in ticks elapsed since the scan. Returns a Marker,
+            // or null when no interception is possible.
+            getIntercept: (speed) => {
+              if (!(speed > 0) || !isFinite(speed)) return null
+              const dt = clock.getTime() - t0
+              const px = x0 + vx * dt - bot.getX()
+              const py = y0 + vy * dt - bot.getY()
+              const a = vx * vx + vy * vy - speed * speed
+              const bq = 2 * (px * vx + py * vy)
+              const c = px * px + py * py
+              let t
+              if (Math.abs(a) < 1e-9) {
+                if (Math.abs(bq) < 1e-9) return null
+                t = -c / bq
+              } else {
+                const disc = bq * bq - 4 * a * c
+                if (disc < 0) return null
+                const r = Math.sqrt(disc)
+                const pos = [(-bq - r) / (2 * a), (-bq + r) / (2 * a)]
+                  .filter((v) => v > 0)
+                if (pos.length === 0) return null
+                t = Math.min.apply(null, pos)
+              }
+              if (!(t > 0) || !isFinite(t)) return null
+              return __makeMarker(x0 + vx * (dt + t), y0 + vy * (dt + t))
+            },
+          })
+        }
+
+        const __rawScan = bot.radar.scan
+        bot.radar.scan = () =>
+          __rawScan().then((found) => found.map(__makeContact))
       `
       )
       .runSync(bot.getContext(), {});
