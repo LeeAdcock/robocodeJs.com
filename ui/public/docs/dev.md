@@ -90,6 +90,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 - `bot.getId() : string` Returns a unique identifier (a UUID string).
 - `bot.getHealth() : number` Returns the bot's health from 100 (full) down to 0 (unfortunately dead).
 - `bot.dropMarker() : marker` Returns a marker object for the bot's current location.
+- `bot.radius : number` The bot's collision radius (half its width). A wall is hit when the bot's center comes within one radius of an arena edge, and bots or bullets connect within two radii — useful for planning how much room a turn or a stop needs.
 
 ## Bot events
 
@@ -139,11 +140,14 @@ bot.setOrientation(90).then(() => {
 - `bot.isTurning() : boolean` Returns if the bot is actively turning.
 - `bot.turn(number) : Promise` Turns the bot the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turnTowards(x, y) : Promise` Turns the bot towards the provided coordinates. Returns a promise that resolves when the turn is complete.
+- `bot.turnRate : number` How many degrees the body turns per tick — divide an angle by this to know how long a turn will take.
 
 ### Speed
 
 - `bot.setSpeed(number) : Promise` Sets the bot's target speed as an integer between -5 and 5. Returns a promise that resolves when the speed is reached, or that is rejected if the target speed is altered before being achieved.
 - `bot.getSpeed() : number` Returns the speed.
+- `bot.maxSpeed : number` The fastest the bot can travel, in units per tick.
+- `bot.acceleration : number` How much the speed changes per tick while moving toward the target speed — needed to judge braking distance.
 
 ### Communications
 
@@ -162,6 +166,7 @@ As the bot turns, the turret will also turn. The position of the turret is relat
 - `bot.turret.isTurning() : boolean` Returns if the turret is actively turning.
 - `bot.turret.turn(number) : Promise` Turns the turret the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turret.turnTowards(x, y) : Promise` Turns the turret towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
+- `bot.turret.turnRate : number` How many degrees the turret turns per tick.
 
 ### Firing
 
@@ -170,6 +175,8 @@ At the start of every match there is a short **deployment window** (the first 10
 - `bot.turret.onReady(): Promise` Returns a promise that resolves when the turret is ready to fire. If the turret fires through another thread while this promise is pending, the promise will be rejected.
 - `bot.turret.isReady(): boolean` Returns a boolean indicating whether the turret is ready to fire.
 - `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:string}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena — and the shooter loses **3 health** for the missed shot. If the turret is not ready to fire, the Promise is rejected.
+- `bot.turret.bulletSpeed : number` How far a bullet travels per tick. Divide a target's distance by this to know the flight time when leading a shot.
+- `bot.turret.bulletDamage : number` Health an enemy loses when your bullet hits.
 
 ## Radar
 
@@ -182,6 +189,7 @@ The radar provides the ability to detect other nearby bots. Only bots within **3
 - `bot.radar.isTurning() : boolean` Returns if the radar is actively turning.
 - `bot.radar.turn(number) : Promise` Turns the radar the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.radar.turnTowards(x, y) : Promise` Turns the radar towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
+- `bot.radar.turnRate : number` How many degrees the radar turns per tick.
 
 ### Scanning
 

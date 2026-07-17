@@ -62,6 +62,8 @@ interface Radar {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the radar is currently turning. */
   isTurning(): boolean;
+  /** How many degrees the radar turns per tick — plan how long a turn will take before committing to it. */
+  turnRate: number;
   /** Performs a scan, resolving with the bots detected (empty array if none). Rejects if the radar is not ready. */
   scan(): Promise<ScanResult[]>;
   /** Resolves when the radar is ready to scan again. Rejects if it scans (from elsewhere) while pending. */
@@ -82,12 +84,18 @@ interface Turret {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the turret is currently turning. */
   isTurning(): boolean;
+  /** How many degrees the turret turns per tick — plan how long a turn will take before committing to it. */
+  turnRate: number;
   /** Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire (reloading, or during the opening deployment hold). */
   fire(): Promise<{ id?: string }>;
   /** Resolves when the turret is ready to fire again. Rejects if it fires (from elsewhere) while pending. */
   onReady(): Promise<void>;
   /** Returns whether the turret is ready to fire (false while reloading, and during the opening deployment hold). */
   isReady(): boolean;
+  /** How far a bullet travels per tick — divide a target’s distance by this to know the flight time when leading a shot. */
+  bulletSpeed: number;
+  /** Health an enemy loses when your bullet hits. */
+  bulletDamage: number;
 }
 
 /** The battlefield. A square; headings are degrees on a compass (0 = north, 90 = east, 180 = south, 270 = west). */
@@ -146,10 +154,18 @@ interface Bot {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the body is currently turning. */
   isTurning(): boolean;
+  /** How many degrees the body turns per tick. */
+  turnRate: number;
   /** Returns the current speed. */
   getSpeed(): number;
   /** Sets the target speed, an integer from -5 to 5. Resolves when reached; rejects if overridden. */
   setSpeed(speed: number): Promise<void>;
+  /** The fastest the bot can travel, in units per tick. */
+  maxSpeed: number;
+  /** How much the speed changes per tick while moving toward the target speed — needed to judge braking distance. */
+  acceleration: number;
+  /** The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, and bots or bullets connect within two. */
+  radius: number;
   /** Sets the bot's display name. */
   setName(name: string): void;
   /** Broadcasts a message to every bot in the arena — enemies included — received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. */
