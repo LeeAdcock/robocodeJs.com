@@ -7,7 +7,11 @@ vi.mock('../src/util/db', () => ({
   default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
 }));
 
-import Bot, { waitUntil, MAX_SENDS_PER_TICK } from '../src/types/bot';
+import Bot, {
+  waitUntil,
+  MAX_SENDS_PER_TICK,
+  BOT_MAX_SPEED,
+} from '../src/types/bot';
 import Environment, { DEPLOY_TICKS } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { normalizeAngle } from '../src/util/geometry';
@@ -133,10 +137,10 @@ describe('Bot', () => {
     await expect(p).rejects.toBe('Turn cancelled');
   });
 
-  it('setSpeed() clamps to speedMax and emits botAccelerate', async () => {
+  it('setSpeed() clamps to BOT_MAX_SPEED and emits botAccelerate', async () => {
     const { bot, emit } = makeRealBot();
     const p = bot.setSpeed(1000);
-    expect(bot.speedTarget).toBe(bot.speedMax);
+    expect(bot.speedTarget).toBe(BOT_MAX_SPEED);
     expect(emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'botAccelerate' })
@@ -144,14 +148,15 @@ describe('Bot', () => {
     await expect(p).rejects.toBe('Speed change cancelled');
   });
 
-  it('setSpeed() clamps below -speedMax (an unreachable target never settles)', async () => {
+  it('setSpeed() clamps below -BOT_MAX_SPEED (an unreachable target never settles)', async () => {
     const { bot, emit } = makeRealBot();
-    // Already at full reverse: with the target clamped to -speedMax the command
-    // is satisfied immediately. Unclamped, the -1000 target is unreachable (the
-    // physics caps speed at ±speedMax) and the promise could never resolve.
-    bot.speed = -bot.speedMax;
+    // Already at full reverse: with the target clamped to -BOT_MAX_SPEED the
+    // command is satisfied immediately. Unclamped, the -1000 target is
+    // unreachable (the physics caps speed at ±BOT_MAX_SPEED) and the promise
+    // could never resolve.
+    bot.speed = -BOT_MAX_SPEED;
     const p = bot.setSpeed(-1000);
-    expect(bot.speedTarget).toBe(-bot.speedMax);
+    expect(bot.speedTarget).toBe(-BOT_MAX_SPEED);
     expect(emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'botAccelerate', speedTarget: -5 })

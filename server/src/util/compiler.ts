@@ -1,4 +1,12 @@
-import Bot from '../types/bot';
+import Bot, {
+  BOT_RADIUS,
+  BOT_TURN_SPEED,
+  BOT_ACCELERATION,
+  BOT_MAX_SPEED,
+} from '../types/bot';
+import { TURRET_TURN_SPEED } from '../types/botTurret';
+import { RADAR_TURN_SPEED } from '../types/botRadar';
+import { BULLET_SPEED, BULLET_DAMAGE } from '../types/bullet';
 import { Event } from '../types/event';
 import { scheduleFactory } from './scheduleFactory';
 import ivm from 'isolated-vm';
@@ -204,6 +212,15 @@ function exposeVoid(
     .runSync(bot.getContext(), {});
 }
 
+// Isolate helpers are compiled from source text, so any engine constant they use
+// must be interpolated from the real host value — never re-typed as a literal, or
+// the sandbox's math and the physics silently drift apart. `num` is both the
+// convention marker and a guard: a NaN/Infinity would paste as broken source.
+const num = (n: number): string => {
+  if (!Number.isFinite(n)) throw new Error(`Non-finite isolate constant: ${n}`);
+  return JSON.stringify(n);
+};
+
 function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
   const radar = bot.turret.radar;
   exposeGetter(
@@ -256,6 +273,14 @@ function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
   exposeGetter(bot, isolate, 'bot.radar.isReady', '_bot_radar_isReady', () =>
     radar.isReady()
   );
+
+  // Engine constants, mirrored into the sandbox as plain data properties at
+  // init. None of these values vary mid-match today; if one ever becomes
+  // per-instance or mutable, its property must instead read the live field via
+  // an exposeGetter method or the sandbox copy silently goes stale.
+  isolate
+    .compileScriptSync(`bot.radar.turnRate = ${num(RADAR_TURN_SPEED)}`)
+    .runSync(bot.getContext(), {});
 }
 
 function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
@@ -319,6 +344,18 @@ function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
   exposeGetter(bot, isolate, 'bot.turret.isReady', '_bot_turret_isReady', () =>
     turret.isReady()
   );
+
+  // Engine constants, mirrored as plain data properties at init (see the
+  // note in exposeBotRadar).
+  isolate
+    .compileScriptSync(
+      `
+      bot.turret.turnRate = ${num(TURRET_TURN_SPEED)}
+      bot.turret.bulletSpeed = ${num(BULLET_SPEED)}
+      bot.turret.bulletDamage = ${num(BULLET_DAMAGE)}
+      `
+    )
+    .runSync(bot.getContext(), {});
 }
 
 function exposeBot(bot: Bot, isolate: ivm.Isolate) {
@@ -460,6 +497,19 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
         let bearing = Math.atan2(x - bot.getX(), bot.getY() - y) * (180 / Math.PI)
         return bot.setOrientation(bearing)
       }
+      `
+    )
+    .runSync(bot.getContext(), {});
+
+  // Engine constants, mirrored as plain data properties at init (see the
+  // note in exposeBotRadar).
+  isolate
+    .compileScriptSync(
+      `
+      bot.radius = ${num(BOT_RADIUS)}
+      bot.maxSpeed = ${num(BOT_MAX_SPEED)}
+      bot.acceleration = ${num(BOT_ACCELERATION)}
+      bot.turnRate = ${num(BOT_TURN_SPEED)}
       `
     )
     .runSync(bot.getContext(), {});
