@@ -777,9 +777,23 @@ const init = (env: Environment, process: Process, bot: Bot) => {
         arena.getWidth = () => _arena_getWidth().copy();
         arena.getHeight = () => _arena_getHeight().copy();
 
+        // Attach methods as NON-enumerable properties, so Object.keys /
+        // for...in / spread / JSON.stringify see only an object's data — a
+        // Contact enumerates exactly like the plain scan result it replaced.
+        const __withMethods = (obj, methods) => {
+          for (const k of Object.keys(methods))
+            Object.defineProperty(obj, k, {
+              value: methods[k],
+              enumerable: false,
+              writable: true,
+              configurable: true,
+            })
+          return obj
+        }
+
         // Single factory behind every positional helper (createMarker,
         // dropMarker, getNearestWall), so all markers share one shape.
-        const __makeMarker = (x, y) => ({
+        const __makeMarker = (x, y) => __withMethods({}, {
           getX: () => x,
           getY: () => y,
           getDistance: () => {
@@ -828,6 +842,9 @@ const init = (env: Environment, process: Process, bot: Bot) => {
         // bot.send(contact), see exactly the data they always did — plus an
         // intercept solver. Marker's getDistance()/getBearing() are live
         // (measured from the bot NOW); .distance/.angle stay capture-time.
+        // Only the scan fields are enumerable (methods ride along invisibly),
+        // so Object.keys / for...in / spread / JSON all behave exactly as
+        // they did on the plain objects scans used to return.
         const __makeContact = (scan) => {
           const t0 = clock.getTime()
           const b = ((bot.getOrientation() + scan.angle) * Math.PI) / 180
@@ -836,7 +853,7 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           const h = (scan.orientation * Math.PI) / 180
           const vx = scan.speed * Math.sin(h)
           const vy = -scan.speed * Math.cos(h)
-          return Object.assign(__makeMarker(x0, y0), scan, {
+          return __withMethods(Object.assign(__makeMarker(x0, y0), scan), {
             // Accessor forms of the raw scan readings, so the whole Contact
             // surface is methods like every other bot API object. The plain
             // properties stay for compatibility (and are the wire shape

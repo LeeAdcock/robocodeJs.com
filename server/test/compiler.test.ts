@@ -245,6 +245,11 @@ describe('compiler — bot API in a real isolate', () => {
             c.getOrientation() === c.orientation &&
             c.isFriendly() === c.friendly &&
             c.getHealth() === c.health,
+          // Methods are non-enumerable, so enumeration-based bot code
+          // (Object.keys, for...in, {...spread}) sees exactly the plain
+          // object scans always returned.
+          keys: Object.keys(c),
+          spreadKeys: Object.keys({ ...c }),
           json: JSON.parse(JSON.stringify(c)),
         }
       })
@@ -258,6 +263,8 @@ describe('compiler — bot API in a real isolate', () => {
       friendly: boolean;
       inb: boolean;
       accessorsAgree: boolean;
+      keys: string[];
+      spreadKeys: string[];
       json: Record<string, unknown>;
     };
     expect(s.n).toBe(1);
@@ -270,7 +277,7 @@ describe('compiler — bot API in a real isolate', () => {
     expect(s.accessorsAgree).toBe(true);
     // Backward compat: the wire shape is unchanged — bot.send(contact) still
     // serializes exactly the ScanResult data fields (methods drop out).
-    expect(Object.keys(s.json).sort()).toEqual([
+    const scanFields = [
       'angle',
       'distance',
       'friendly',
@@ -278,7 +285,12 @@ describe('compiler — bot API in a real isolate', () => {
       'id',
       'orientation',
       'speed',
-    ]);
+    ];
+    expect(Object.keys(s.json).sort()).toEqual(scanFields);
+    // ...and so is the enumerable surface: enumeration-based bot code
+    // (Object.keys, for...in, {...spread}) sees only the scan fields.
+    expect(s.keys.sort()).toEqual(scanFields);
+    expect(s.spreadKeys.sort()).toEqual(scanFields);
   });
 
   it('getIntercept aims at a stationary target and rejects bad speeds', async () => {
