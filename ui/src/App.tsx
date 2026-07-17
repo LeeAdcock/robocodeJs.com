@@ -1,5 +1,6 @@
 import './App.css';
 import ArenaSvg from './components/arena/arena';
+import ArenaLegend from './components/arena/arenaLegend';
 import {
   BrowserRouter as Router,
   Route,
@@ -509,6 +510,21 @@ function App() {
                   {shareNotice}
                 </Alert>
               )}
+            </div>
+          )}
+          {user && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '22px',
+                right: '22px',
+                // Above the arena SVG's own stacking context (isolation: isolate),
+                // mirroring the toolbar at top-left, so the roster legend stays
+                // visible over the arena.
+                zIndex: 1,
+              }}
+            >
+              <ArenaLegend arena={arena} />
             </div>
           )}
           <ArenaSvg
