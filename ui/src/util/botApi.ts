@@ -208,7 +208,7 @@ export const INTERFACES: ApiInterface[] = [
         kind: 'method',
         params: [{ name: 'speed', type: 'number' }],
         type: 'Marker | null',
-        doc: 'Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass 25 (bullet speed) to lead a shot, or your own speed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible.',
+        doc: 'Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible.',
       },
     ],
   },

@@ -30,7 +30,7 @@ interface Contact extends Marker {
   friendly: boolean;
   /** Its current health (0–100) — target the weakest enemy or judge a threat. */
   health: number;
-  /** Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass 25 (bullet speed) to lead a shot, or your own speed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible. */
+  /** Where to aim (or drive) so something leaving your position at the given speed meets this bot, assuming it keeps its heading and speed — pass bot.turret.bulletSpeed to lead a shot, or bot.maxSpeed to cut it off. Accounts for ticks elapsed since the scan. Returns null when no interception is possible. */
   getIntercept(speed: number): Marker | null;
 }
 

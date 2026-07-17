@@ -206,13 +206,13 @@ Every scan result is a **contact**: a [marker](#arena) pinned at the detected bo
 
 One extra method turns the scan's motion readings into an aiming answer:
 
-- `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `25` (the bullet speed) to lead a shot — `bot.turret.turnTowards(m.getX(), m.getY())` aims it — or pass your own speed to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
+- `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `bot.turret.bulletSpeed` to lead a shot — `bot.turret.turnTowards(m.getX(), m.getY())` aims it — or pass `bot.maxSpeed` to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
 
 ```
 bot.on(Event.SCANNED, (contacts) => {
   const enemy = contacts.find((c) => !c.friendly);
   if (!enemy) return;
-  const aim = enemy.getIntercept(25);
+  const aim = enemy.getIntercept(bot.turret.bulletSpeed);
   if (aim) bot.turret.turnTowards(aim.getX(), aim.getY());
 });
 ```

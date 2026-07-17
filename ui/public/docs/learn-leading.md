@@ -100,8 +100,9 @@ subtract our own heading to get a **body-relative** bearing the turret understan
 - **Sharpen the guess.** The bullet's flight time really depends on the _future_
   distance, not the current one. Run the whole calculation **twice**, feeding the
   first prediction's distance back into step 1 — the second answer is closer. Then
-  compare both answers to `enemy.getIntercept(25)` (see **The shortcut** below):
-  the helper solves exactly the equation your two-pass loop is converging toward.
+  compare both answers to `enemy.getIntercept(bot.turret.bulletSpeed)` (see **The
+  shortcut** below): the helper solves exactly the equation your two-pass loop is
+  converging toward.
 
 ## Common questions
 
@@ -140,14 +141,14 @@ bot.on(Event.SCANNED, (targets) => {
   const enemy = targets.find((t) => !t.friendly);
   if (!enemy) { bot.turn(15); return; }
 
-  const aim = enemy.getIntercept(25); // 25 = bullet speed
+  const aim = enemy.getIntercept(bot.turret.bulletSpeed); // = 25
   if (!aim) return; // no shot can catch it
   bot.turret.turnTowards(aim.getX(), aim.getY());
   if (bot.turret.isReady()) bot.turret.fire();
 });
 ```
 
-`getIntercept(25)` solves the meet-up equation exactly — it's your "run it twice"
+`getIntercept(bot.turret.bulletSpeed)` solves the meet-up equation exactly — it's your "run it twice"
 experiment taken to its limit — and even accounts for ticks that passed since the
 scan. It returns `null` when no interception is possible, and because the answer
 is a marker, `turnTowards` aims at it directly. Understanding **why** it works is

@@ -839,8 +839,8 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           return Object.assign(__makeMarker(x0, y0), scan, {
             // Where to aim (or drive) so something leaving our position at
             // the given speed meets this contact, assuming it holds its
-            // heading and speed — pass 25 (bullet speed) to lead a shot, or
-            // your own speed to cut it off. Closed-form smallest-positive
+            // heading and speed — pass bot.turret.bulletSpeed to lead a shot,
+            // or bot.maxSpeed to cut it off. Closed-form smallest-positive
             // root; folds in ticks elapsed since the scan. Returns a Marker,
             // or null when no interception is possible.
             getIntercept: (speed) => {

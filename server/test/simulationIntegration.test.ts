@@ -178,12 +178,12 @@ describe('sandbox + simulation integration', () => {
     expect(shooter.stats.shotsFired).toBeGreaterThan(0);
   });
 
-  it('hits a crossing bot by aiming at contact.getIntercept(25)', async () => {
+  it('hits a crossing bot by aiming at contact.getIntercept(bulletSpeed)', async () => {
     // End-to-end proof that the Contact intercept solver, the compass
     // conventions, and the actual bullet physics agree: a stationary shooter
-    // scans, aims the turret at getIntercept(25), and fires only once lined
-    // up — at a runner crossing its front, so a straight-at-the-target shot
-    // would trail behind it.
+    // scans, aims the turret at getIntercept(bot.turret.bulletSpeed), and
+    // fires only once lined up — at a runner crossing its front, so a
+    // straight-at-the-target shot would trail behind it.
     const shooter = world.addBot(
       `bot.on(Event.SCANNED, (cs) => {
          const enemy = cs.find((c) => !c.friendly)
@@ -195,7 +195,7 @@ describe('sandbox + simulation integration', () => {
          // Keep the radar on the last known position for the next scan; the
          // beam is wide enough to cover the drift between scans.
          bot.radar.turnTowards(this.target.getX(), this.target.getY()).catch(() => {})
-         const aim = this.target.getIntercept(25)
+         const aim = this.target.getIntercept(bot.turret.bulletSpeed)
          if (!aim) return
          bot.turret.turnTowards(aim.getX(), aim.getY()).catch(() => {})
          if (!bot.turret.isTurning() && bot.turret.isReady())

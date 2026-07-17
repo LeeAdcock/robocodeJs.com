@@ -62,9 +62,9 @@ bot.on(Event.SCANNED, (targets) => {
 
   // --- Lead the shot: aim where the target will be, not where it is. ---
   // Every scan result is a contact — a marker that also knows the target's
-  // speed and heading — and getIntercept(25) solves the lead exactly for a
-  // 25 units/tick bullet. (The Leading lesson derives this answer by hand.)
-  const aim = target.getIntercept(25);
+  // speed and heading — and getIntercept solves the lead exactly for our
+  // bullet speed. (The Leading lesson derives this answer by hand.)
+  const aim = target.getIntercept(bot.turret.bulletSpeed);
   if (!aim) return; // nothing we fire can catch it — keep tracking instead
   const aimBearing = aim.getBearing();
   bot.turret.setOrientation(aimBearing).catch(() => {});
