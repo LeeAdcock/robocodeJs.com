@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Navbar from 'react-bootstrap/Navbar';
 import Nav from 'react-bootstrap/Nav';
 import NavDropdown from 'react-bootstrap/NavDropdown';
@@ -6,6 +6,7 @@ import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
+import Spinner from 'react-bootstrap/Spinner';
 import {
   FaSyncAlt,
   FaPauseCircle,
@@ -60,6 +61,104 @@ const AppLink = function (props: AppLinkProps) {
       </>
     );
   }
+};
+
+// Outcome of the most recent "How do I..." search. Every Enter press ends in one
+// of these — a navigation (back to 'idle') or a message the player can read.
+type SearchStatus = 'idle' | 'pending' | 'none' | 'limited' | 'error';
+
+const SEARCH_MESSAGES: Record<string, React.ReactNode> = {
+  none: (
+    <>
+      No answer found — try the <Link to="/faq">FAQ</Link>.
+    </>
+  ),
+  limited: <>Too many searches — try again in a moment.</>,
+  error: (
+    <>
+      Search is unavailable — try the <Link to="/faq">FAQ</Link>.
+    </>
+  ),
+};
+
+const HelpSearch = function () {
+  const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [question, setQuestion] = useState('');
+  const [status, setStatus] = useState<SearchStatus>('idle');
+
+  const ask = () => {
+    const trimmed = question.trim();
+    if (!trimmed || status === 'pending') return;
+    setStatus('pending');
+    axios
+      .get(`/api/ask?question=${encodeURIComponent(trimmed)}`)
+      .then((res) => {
+        // The server answers `null` when nothing matched; anything else is a route.
+        if (!res.data?.answer) {
+          setStatus('none');
+          return;
+        }
+        setStatus('idle');
+        // Reset the box and drop focus once we've navigated away.
+        setQuestion('');
+        inputRef.current?.blur();
+        navigate(res.data.answer);
+      })
+      .catch((error) => {
+        // 429 is the shared API rate limiter (E022) — worth naming, since waiting
+        // actually fixes it. Everything else is an outage the player can't act on.
+        setStatus(error?.response?.status === 429 ? 'limited' : 'error');
+      });
+  };
+
+  return (
+    <Form style={{ position: 'relative' }} onSubmit={(e) => e.preventDefault()}>
+      <Form.Control
+        ref={inputRef}
+        size="sm"
+        type="search"
+        placeholder="How do I..."
+        aria-label="Search"
+        value={question}
+        onChange={(event) => {
+          setQuestion(event.target.value);
+          // A stale outcome shouldn't hang over a new question.
+          if (status !== 'pending') setStatus('idle');
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            ask();
+          }
+        }}
+      />
+      {status === 'pending' && (
+        <Spinner
+          animation="border"
+          size="sm"
+          role="status"
+          aria-label="Searching"
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            marginTop: '-0.5em',
+            color: '#adb5bd',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {/* Floated out of flow so a message never resizes the navbar. */}
+      <div
+        aria-live="polite"
+        className="nav-search-feedback"
+        style={{ display: status in SEARCH_MESSAGES ? 'block' : 'none' }}
+      >
+        {SEARCH_MESSAGES[status]}
+      </div>
+    </Form>
+  );
 };
 
 interface NavBarProps {
@@ -248,32 +347,7 @@ export default function NavBar(props: NavBarProps) {
             )}
           </Nav>
           <Nav className="nav-tools">
-            <Form>
-              <Form.Control
-                size="sm"
-                type="search"
-                placeholder="How do I..."
-                aria-label="Search"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    // Capture the input now; the synthetic event's currentTarget
-                    // is nulled by the time the promise resolves.
-                    const input = event.currentTarget;
-                    axios
-                      .get(
-                        `/api/ask?question=${encodeURIComponent(input.value)}`
-                      )
-                      .then((res) => {
-                        navigate(res.data.answer);
-                        // Reset the box and drop focus once we've navigated away.
-                        input.value = '';
-                        input.blur();
-                      });
-                  }
-                }}
-              />
-            </Form>
+            <HelpSearch />
             <OverlayTrigger
               placement={'bottom'}
               overlay={
