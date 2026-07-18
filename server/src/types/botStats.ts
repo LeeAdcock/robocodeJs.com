@@ -6,6 +6,9 @@ export class BotStats {
   shotsHit = 0;
   messagesSent = 0;
   messagesReceived = 0;
+  // Collisions (with a bot or a wall) counted once per contact, on the tick it
+  // begins — the same rising edge that fires the COLLIDED handler — not every
+  // tick two bodies stay pressed together, so a sustained shove counts as one.
   timesCollided = 0;
   timesHit = 0;
   timesDetected = 0;

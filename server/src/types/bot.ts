@@ -124,6 +124,12 @@ export default class Bot implements Point, Orientated {
   // isolate boundary, so it can't affect determinism. A restart builds fresh Bot
   // instances, so it resets automatically.
   public contacts: Set<string> = new Set();
+  // Whether this bot was in contact with an arena wall as of the previous tick.
+  // The wall counterpart of `contacts`: it lets Simulation fire the wall COLLIDED
+  // handler and count the collision only on the tick contact *begins* (a rising
+  // edge), so a bot held against a wall doesn't spam the handler every tick. Same
+  // properties as `contacts` — Simulation-only, determinism-safe, reset on restart.
+  public wallContact: boolean = false;
   public stats: BotStats = new BotStats();
   // Snapshot of `stats` as of the last cumulative-counter flush. Environment.flushStats
   // persists (stats - flushedStats) and then re-snapshots, which is what makes the

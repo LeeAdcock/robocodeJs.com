@@ -204,6 +204,82 @@ describe('Simulation.run — collisions', () => {
     expect(t1.stats.timesCollided).toBeGreaterThan(0);
   });
 
+  it('debounces bot-vs-bot COLLIDED to the tick contact begins', () => {
+    const c1 = vi.fn();
+    const c2 = vi.fn();
+    const t1 = makeBot({
+      id: '1',
+      x: 375,
+      y: 375,
+      handlers: { [Event.COLLIDED]: c1 },
+    });
+    const t2 = makeBot({
+      id: '2',
+      x: 385,
+      y: 375,
+      handlers: { [Event.COLLIDED]: c2 },
+    });
+    const env = makeEnv([makeProcess('a', [t1, t2])]);
+
+    // First overlap: each side is notified once, and counted once.
+    run(env);
+    expect(c1).toHaveBeenCalledTimes(1);
+    expect(c2).toHaveBeenCalledTimes(1);
+    expect(t1.stats.timesCollided).toBe(1);
+    expect(t2.stats.timesCollided).toBe(1);
+
+    // Still overlapping the next tick (the pair is already in contact): COLLIDED
+    // must not re-fire — this is the debounce. Force them back into overlap in
+    // case the prior tick's push separated them.
+    t1.x = 375;
+    t2.x = 385;
+    run(env);
+    expect(c1).toHaveBeenCalledTimes(1);
+    expect(c2).toHaveBeenCalledTimes(1);
+    expect(t1.stats.timesCollided).toBe(1);
+    expect(t2.stats.timesCollided).toBe(1);
+
+    // Separate fully so the contact resets, then bring them back together: a
+    // fresh contact fires (and counts) again.
+    t1.x = 100;
+    t2.x = 700;
+    run(env);
+    t1.x = 375;
+    t2.x = 385;
+    run(env);
+    expect(c1).toHaveBeenCalledTimes(2);
+    expect(c2).toHaveBeenCalledTimes(2);
+    expect(t1.stats.timesCollided).toBe(2);
+    expect(t2.stats.timesCollided).toBe(2);
+  });
+
+  it('debounces the arena-wall COLLIDED to the tick contact begins', () => {
+    const collided = vi.fn();
+    const bot = makeBot({ x: 10, handlers: { [Event.COLLIDED]: collided } });
+    const env = makeEnv([makeProcess('a', [bot])]);
+
+    // First contact with the west wall: fires once, counted once.
+    run(env);
+    expect(collided).toHaveBeenCalledTimes(1);
+    expect(bot.stats.timesCollided).toBe(1);
+
+    // Still pinned against the wall next tick: the event and the count hold
+    // steady (the per-tick stop and 1 damage stay level-triggered, but the
+    // reporting is edged).
+    bot.x = 10;
+    run(env);
+    expect(collided).toHaveBeenCalledTimes(1);
+    expect(bot.stats.timesCollided).toBe(1);
+
+    // Drive off the wall, then back into it: a fresh contact fires again.
+    bot.x = 375;
+    run(env);
+    bot.x = 10;
+    run(env);
+    expect(collided).toHaveBeenCalledTimes(2);
+    expect(bot.stats.timesCollided).toBe(2);
+  });
+
   it('pushes two overlapping bots apart instead of freezing them', () => {
     // 16 units apart on x — deep inside the 32-unit contact distance. Neither is
     // moving, so there's no closing speed and no damage; they should just resolve

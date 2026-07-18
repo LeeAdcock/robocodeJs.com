@@ -156,6 +156,12 @@ export default {
       process.bots.forEach((bot) => tickStartSpeed.set(bot, bot.speed));
     });
 
+    // Directed "already told this bot about that bot" markers for this tick,
+    // keyed `${observer.id}|${other.id}`. A colliding pair can be detected in both
+    // bots' passes (each bot resolves its own push separately), so this guarantees
+    // each side is notified at most once per tick even when both drive in together.
+    const collisionsReported = new Set<string>();
+
     // Then handle movement and interactions
     env.getProcesses().forEach((process) => {
       process.bots.forEach((bot) => {
@@ -220,24 +226,56 @@ export default {
 
                 if (distance < BOT_RADIUS * 2) {
                   contacts.add(otherBot.id);
-                  bot.stats.timesCollided += 1;
-                  otherBot.stats.timesCollided += 1;
-                  bot.logger.trace('Collided with bot');
-                  otherBot.logger.trace('Collided with bot');
-                  if (bot.handlers[Event.COLLIDED]) {
-                    bot.handlers[Event.COLLIDED]({
-                      angle: toRelativeBearing(angle, bot.orientation),
-                      friendly: otherProcess.getAppId() === process.getAppId(),
-                    });
+
+                  // Fire COLLIDED and count the collision only on the tick the
+                  // contact *begins* (a rising edge — this pair wasn't overlapping
+                  // last tick), not every tick two bots stay pressed together.
+                  // Otherwise bots rubbing against each other spam the handler and
+                  // inflate timesCollided. This mirrors the freshness the impact
+                  // damage already uses below (`separation.fresh`), so event, stat,
+                  // and damage now all land once per contact.
+                  //
+                  // We report BOTH sides here rather than letting each bot fire in
+                  // its own pass, because resolving `bot`'s push moves it to exactly
+                  // contact distance from `otherBot`; on `otherBot`'s later pass the
+                  // gap is no longer strictly overlapping, so it would never notify
+                  // itself. Each side is edge-gated on its OWN previous-tick contact
+                  // set (a rising edge — not overlapping last tick) and de-duped via
+                  // `collisionsReported` so it fires exactly once per contact begin.
+                  const friendly =
+                    otherProcess.getAppId() === process.getAppId();
+                  const botKey = `${bot.id}|${otherBot.id}`;
+                  const otherKey = `${otherBot.id}|${bot.id}`;
+                  if (
+                    !bot.contacts?.has(otherBot.id) &&
+                    !collisionsReported.has(botKey)
+                  ) {
+                    collisionsReported.add(botKey);
+                    bot.stats.timesCollided += 1;
+                    bot.logger.trace('Collided with bot');
+                    if (bot.handlers[Event.COLLIDED]) {
+                      bot.handlers[Event.COLLIDED]({
+                        angle: toRelativeBearing(angle, bot.orientation),
+                        friendly,
+                      });
+                    }
                   }
-                  if (otherBot.handlers[Event.COLLIDED]) {
-                    otherBot.handlers[Event.COLLIDED]({
-                      angle: toRelativeBearing(
-                        normalizeAngle(180 + angle),
-                        otherBot.orientation
-                      ),
-                      friendly: otherProcess.getAppId() === process.getAppId(),
-                    });
+                  if (
+                    !otherBot.contacts?.has(bot.id) &&
+                    !collisionsReported.has(otherKey)
+                  ) {
+                    collisionsReported.add(otherKey);
+                    otherBot.stats.timesCollided += 1;
+                    otherBot.logger.trace('Collided with bot');
+                    if (otherBot.handlers[Event.COLLIDED]) {
+                      otherBot.handlers[Event.COLLIDED]({
+                        angle: toRelativeBearing(
+                          normalizeAngle(180 + angle),
+                          otherBot.orientation
+                        ),
+                        friendly,
+                      });
+                    }
                   }
 
                   // Resolve against the deepest overlap this tick.
@@ -394,9 +432,17 @@ export default {
             newY > arenaHeight - BOT_RADIUS
           ) {
             hitWall = true;
-            bot.stats.timesCollided += 1;
-            bot.logger.trace('Collided with arena boundary');
-            if (bot.handlers[Event.COLLIDED]) {
+            // Fire the wall COLLIDED and count it only when the contact begins (a
+            // rising edge), mirroring the bot-vs-bot debounce above — a bot held
+            // against a wall shouldn't spam the handler or inflate timesCollided
+            // every tick. The per-tick stop and 1 damage below stay level-triggered
+            // (walls keep hurting while you lean on them); only the reporting is
+            // edged.
+            if (!bot.wallContact) {
+              bot.stats.timesCollided += 1;
+              bot.logger.trace('Collided with arena boundary');
+            }
+            if (!bot.wallContact && bot.handlers[Event.COLLIDED]) {
               // Point a unit vector at whichever boundary/boundaries we crossed
               // (west/east on x, north/south on y — both on a corner), then report
               // the bearing to that wall relative to our heading, exactly as a bot
@@ -540,6 +586,9 @@ export default {
           // the tick a contact begins, not every tick two bots stay pressed
           // together.
           bot.contacts = contacts;
+          // Same rising-edge bookkeeping for the wall, so the wall COLLIDED fires
+          // once per contact rather than every tick a bot is pinned to it.
+          bot.wallContact = hitWall;
 
           // Convenience method for manging rotating towards a target orientation
           // with a maximum rotational velocity.
