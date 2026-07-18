@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 
 import Arena from '../../types/arena';
 import { getMotionSnap, subscribeMotionSnap } from '../../util/motionSnap';
@@ -52,6 +52,14 @@ const ArenaStyle = React.memo((props: { width: number; height: number }) => (
       <stop offset="0" stopColor="white" stopOpacity=".1" />
       <stop offset="1" stopColor="white" stopOpacity="0" />
     </linearGradient>
+    {/* Soft dark scrim behind the deployment countdown digit: a radial fade to
+        transparent so the number stays legible over any terrain (grass, sand,
+        road) and in either theme, decoupling legibility from the stroke alone. */}
+    <radialGradient id="countdownScrim">
+      <stop offset="0" stopColor="rgba(0,0,0,0.45)" />
+      <stop offset="0.6" stopColor="rgba(0,0,0,0.28)" />
+      <stop offset="1" stopColor="rgba(0,0,0,0)" />
+    </radialGradient>
     {/* Soft radial glow used for the damage pulse; color themes via CSS var. */}
     {/* Hold high opacity out to ~0.5 (roughly the tank's edge, since the sprite
         covers the core) so the visible halo beyond the tank reads brightly. */}
@@ -99,6 +107,25 @@ export default function ArenaSvg(props: ArenaSvgProps) {
   // `motion-snap` class (index.css) suppresses the sprite CSS transitions so
   // the discontinuous jump doesn't animate as a physics-defying glide.
   const snapping = useSyncExternalStore(subscribeMotionSnap, getMotionSnap);
+
+  // Deployment countdown visibility. `counting` is true while ticks remain before
+  // deploy; when it flips false we keep the node mounted for one real-time beat so
+  // the CSS fade-out (index.css .arena-countdown) can play out. The unmount is
+  // timer-based, not tick-based, because the sim can advance several buffered
+  // ticks in a single render at the deploy moment — a tick-count tail would be
+  // leapt over before the fade finishes.
+  const deployTick = props.arena.deployTick ?? 0;
+  const counting = deployTick > 0 && deployTick - props.time > 0;
+  const [showCountdown, setShowCountdown] = useState(counting);
+  useEffect(() => {
+    if (counting) {
+      setShowCountdown(true);
+      return;
+    }
+    const t = setTimeout(() => setShowCountdown(false), 350);
+    return () => clearTimeout(t);
+  }, [counting]);
+
   return (
     <svg
       width="100%"
@@ -245,29 +272,48 @@ export default function ArenaSvg(props: ArenaSvgProps) {
           style={{ mixBlendMode: 'multiply', pointerEvents: 'none' }}
         />
       )}
-      {(props.arena.deployTick ?? 0) - props.time > 0 && (
-        // Deployment countdown: turrets are weapons-held until deployTick, so show
-        // the seconds remaining (~10 ticks/s) centered over the arena. In night
-        // mode use the theme's link accent (--link, the same warm tone as dark-mode
-        // anchor links) so its warmth stands out against the cool night tint; white
-        // in light mode. A dark outline keeps it legible over terrain either way,
-        // and pointerEvents none keeps bots clickable underneath.
-        <text
-          x={(props.arena.width || 750) / 2}
-          y={(props.arena.height || 750) / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize="110"
-          fontWeight="bold"
-          fill={props.darkMode ? 'var(--link)' : '#fff'}
-          stroke="rgba(0,0,0,0.55)"
-          strokeWidth="3"
-          paintOrder="stroke"
-          style={{ pointerEvents: 'none' }}
-        >
-          {Math.ceil(((props.arena.deployTick ?? 0) - props.time) / 10)}
-        </text>
-      )}
+      {showCountdown &&
+        (() => {
+          // Deployment countdown: turrets are weapons-held until deployTick, so
+          // show the seconds remaining (~10 ticks/s) centered over the arena. In
+          // night mode the theme's link accent (--link, the warm dark-mode anchor
+          // tone) stands out against the cool night tint; white in light mode. A
+          // soft dark radial scrim keeps it legible over any terrain (grass, sand,
+          // road) without leaning on the stroke, and the black outline adds a crisp
+          // edge. When `counting` ends, opacity flips to 0 and the group fades out
+          // (index.css) instead of vanishing; each digit pops in on its own key.
+          const cx = (props.arena.width || 750) / 2;
+          const cy = (props.arena.height || 750) / 2;
+          const seconds = Math.max(
+            1,
+            Math.ceil((deployTick - props.time) / 10)
+          );
+          return (
+            <g
+              className="arena-countdown"
+              style={{ opacity: counting ? 1 : 0, pointerEvents: 'none' }}
+            >
+              <circle cx={cx} cy={cy} r="100" fill="url(#countdownScrim)" />
+              <text
+                key={seconds}
+                className="arena-countdown-digit"
+                x={cx}
+                y={cy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize="110"
+                fontWeight="900"
+                fill={props.darkMode ? 'var(--link)' : '#fff'}
+                stroke="rgba(0,0,0,0.55)"
+                strokeWidth="3"
+                paintOrder="stroke"
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                {seconds}
+              </text>
+            </g>
+          );
+        })()}
     </svg>
   );
 }
