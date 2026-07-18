@@ -116,7 +116,8 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                   id="bot-count-toggle"
                   aria-label="Bots per app"
                 >
-                  <FaRobot /> {props.botCount ?? 5}
+                  <FaRobot style={{ marginRight: '0.4em' }} />
+                  {props.botCount ?? 5}
                 </Dropdown.Toggle>
               </OverlayTrigger>
               <Dropdown.Menu>
