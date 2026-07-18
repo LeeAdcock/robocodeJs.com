@@ -11,7 +11,7 @@
 
 In [Take aim](/learn/aim) you pointed the turret straight at an enemy. That works
 great against a **still** target. But bullets aren't instant. They travel
-**25 units per tick** (see the [rules](/rules)). While your bullet is in the air,
+**25 feet per clock tick** (see the [rules](/rules)). While your bullet is in the air,
 a moving enemy keeps driving, and by the time the bullet arrives, the enemy has
 left. You aimed at a ghost.
 
@@ -22,7 +22,7 @@ A scan hands you everything you need to predict that spot:
 
 - `target.distance`: how far away it is **now**
 - `target.orientation`: the direction it's **driving** (its absolute compass heading)
-- `target.speed`: how fast it's driving (units per tick)
+- `target.speed`: how fast it's driving (feet per clock tick)
 
 The plan, in three steps:
 
@@ -107,7 +107,7 @@ subtract our own heading to get a **body-relative** bearing the turret understan
 ## Common questions
 
 **Why `distance / 25`?**
-Bullets travel 25 units per tick, so a target 100 units away is about `100 / 25 = 4`
+Bullets travel 25 feet per clock tick, so a target 100 feet away is about `100 / 25 = 4`
 ticks of flight. That's how far into the future we predict.
 
 **Why subtract `bot.getOrientation()` at the end?**
@@ -123,7 +123,7 @@ than firing straight.
 
 ## You learned
 
-- Bullets take time to arrive (**25 units/tick**), so firing at a moving target's
+- Bullets take time to arrive (**25 feet/tick**), so firing at a moving target's
   current position misses.
 - **Leading** predicts where the target will be: flight time `≈ distance / 25`,
   then move the target along its `orientation` at its `speed`.

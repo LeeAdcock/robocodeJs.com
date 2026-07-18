@@ -13,6 +13,11 @@ elsewhere.
 Headings are degrees from `0` to `359`, like a compass. **`0°` is north (up) and angles
 increase clockwise**, the same as classic Robocode.
 
+**Every angle in the API is in degrees, never radians** — headings, bearings, turret and
+radar orientation, and turn amounts alike. JavaScript's `Math.atan2`/`sin`/`cos` work in
+radians, so convert at the boundary: multiply radians by `180 / Math.PI` before handing an
+angle to the API.
+
 ```
                      north
                      0°  ↑
@@ -40,36 +45,36 @@ How the frames fit together:
 
 ## Coordinates
 
-The arena is a **750 × 750** square. The top-left corner is `(0, 0)`:
+The arena is a **750 × 750-foot** square. The top-left corner is `(0, 0)`:
 
 - **x** grows to the **right** (`bot.getX()`, `0` … `750`)
 - **y** grows **downward** (`bot.getY()`, `0` … `750`)
 
 (So `0°`/north means moving toward smaller `y`.)
 
-Bot centers keep a **16-unit margin** from every wall. A bot touching a wall sits at
-`16` (or `734`), not `0`. Bots also spawn at least **50 units** apart.
+Bot centers keep a **16-foot margin** from every wall. A bot touching a wall sits at
+`16` (or `734`), not `0`. Bots also spawn at least **50 feet** apart.
 
 # Movement
 
-| Thing          | Value            | In context                               |
-| -------------- | ---------------- | ---------------------------------------- |
-| Top speed      | **5** units/tick | ≈50 units/sec, crosses the arena in ~15s |
-| Acceleration   | **2** units/tick | reaches top speed (or stops) in ~3 ticks |
-| Speed range    | **−5 … 5**       | negative is reverse; `0` stops           |
-| Body turn rate | **10°/tick**     | ≈100°/sec, a full spin in ~3.6s          |
+| Thing          | Value           | In context                                        |
+| -------------- | --------------- | ------------------------------------------------- |
+| Top speed      | **5** feet/tick | ≈50 feet/sec (~34 mph), crosses the arena in ~15s |
+| Acceleration   | **2** feet/tick | reaches top speed (or stops) in ~3 ticks          |
+| Speed range    | **−5 … 5**      | negative is reverse; `0` stops                    |
+| Body turn rate | **10°/tick**    | ≈100°/sec, a full spin in ~3.6s                   |
 
 # Turret & radar
 
-| Thing            | Value             | In context                                                                                                                     |
-| ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Turret turn rate | **4°/tick**       | ≈40°/sec (turret turns relative to the body)                                                                                   |
-| Radar turn rate  | **4°/tick**       | radar turns relative to the turret                                                                                             |
-| Turret reload    | **40 ticks**      | ~4s between shots; `isReady()` / `onReady()` track it                                                                          |
-| Radar recharge   | **10 ticks**      | ~1s between scans                                                                                                              |
-| Radar range      | **600 units**     | a narrow beam, 32 units wide at the bot flaring to ~244 units across at its tip, drawn under the radar in the arena            |
-| Bullet speed     | **25** units/tick | ≈250 units/sec                                                                                                                 |
-| Deployment hold  | **100 ticks**     | ~10s at match start with turrets held: `isReady()` is `false` and `fire()` rejects while bots deploy (reload still progresses) |
+| Thing            | Value            | In context                                                                                                                     |
+| ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Turret turn rate | **4°/tick**      | ≈40°/sec (turret turns relative to the body)                                                                                   |
+| Radar turn rate  | **4°/tick**      | radar turns relative to the turret                                                                                             |
+| Turret reload    | **40 ticks**     | ~4s between shots; `isReady()` / `onReady()` track it                                                                          |
+| Radar recharge   | **10 ticks**     | ~1s between scans                                                                                                              |
+| Radar range      | **600 feet**     | a narrow beam, 32 feet wide at the bot flaring to ~244 feet across at its tip, drawn under the radar in the arena              |
+| Bullet speed     | **25** feet/tick | ≈250 feet/sec                                                                                                                  |
+| Deployment hold  | **100 ticks**    | ~10s at match start with turrets held: `isReady()` is `false` and `fire()` rejects while bots deploy (reload still progresses) |
 
 # Combat & health
 
@@ -77,13 +82,13 @@ Bot centers keep a **16-unit margin** from every wall. A bot touching a wall sit
 | ----------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Health            | **100 → 0**              | `bot.getHealth()`; `100` is full, `0` is dead                                                                                                                           |
 | Bullet damage     | **−25**                  | a clean hit removes a quarter of full health                                                                                                                            |
-| Bullet hit radius | **32 units**             | a bullet hits any bot whose center is within 32 units                                                                                                                   |
-| Bot collision     | **32 units**             | two bots collide when their centers are within 32 units                                                                                                                 |
+| Bullet hit radius | **32 feet**              | a bullet hits any bot whose center is within 32 feet                                                                                                                    |
+| Bot collision     | **32 feet**              | two bots collide when their centers are within 32 feet                                                                                                                  |
 | Wall collision    | **0.75 × impact speed**  | driving into an arena edge stops you dead (speed → 0) and costs damage scaled by how fast you drove in; a gentle graze is free, and skimming along a wall costs nothing |
 | Bot ram           | **0.75 × closing speed** | a hard bump hurts once per contact (a gentle touch is free); the two bots are shoved apart but keep their speed, not stopped                                            |
 | Missed shot       | **−3**                   | a bullet that leaves the field without hitting anyone costs the shooter 3 health                                                                                        |
 
-**Friendly fire is on.** A bullet damages **any** bot within the 32-unit hit
+**Friendly fire is on.** A bullet damages **any** bot within the 32-foot hit
 radius, **including your own teammates**. There is no team exemption, so a shot
 that skims past a teammate can hurt them. Watch your line of fire when your bots
 cluster.
@@ -95,7 +100,7 @@ and expect to connect. (A shot that grazes a wall's hit radius still counts as a
 miss once it leaves the arena.)
 
 **Hitting a moving target: "lead" the shot.** A bullet leaves the muzzle and
-travels **25 units/tick**; it is not instant. If you aim where an enemy _is_, by
+travels **25 feet/tick**; it is not instant. If you aim where an enemy _is_, by
 the time the bullet arrives the enemy has moved and you miss. To connect, aim
 where the target _will be_. This is **leading**. A scan gives you the enemy's
 `speed` and `orientation` (its absolute heading), which is exactly what you need

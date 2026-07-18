@@ -71,7 +71,7 @@ constant tells them what it _means_, and gives them one obvious place to tune.
 Put a comment on the ones whose value is a judgement call.
 
 ```js
-// Bullets fly 25 units/tick and the target keeps moving, so shots past this
+// Bullets fly 25 feet/tick and the target keeps moving, so shots past this
 // range tend to miss as the lead estimate drifts. Don't take them.
 const RANGE = 250;
 // Only fire when the turret is within this many degrees of the aim point.

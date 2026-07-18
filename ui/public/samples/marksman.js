@@ -17,7 +17,7 @@
 
 bot.setName('Marksman');
 
-// Bullets fly 25 units/tick and the target keeps moving, so shots past this
+// Bullets fly 25 feet/tick and the target keeps moving, so shots past this
 // range tend to miss as the lead estimate drifts. Don't take them.
 const RANGE = 250;
 // Only fire when the turret is within this many degrees of the aim point.
