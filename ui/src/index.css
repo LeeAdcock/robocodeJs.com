@@ -461,15 +461,15 @@ body.dark .blog-signature img {
   border-color: transparent;
   color: #fff;
   box-shadow: none;
-  /* Center the icon and give it symmetric padding. Bootstrap's default button
-     padding is 6px vertical / 12px horizontal, and the icon sits on the text
-     baseline, so the glyph ended up further from the left and top edges than the
-     bottom. Flex-centering plus even 6px padding makes the scrim inset symmetric
-     (2px group + 6px here = 8px on every side), matching the roster legend. */
+  /* Center the icon. Bootstrap's default button padding is 6px vertical / 12px
+     horizontal, and the icon sits on the text baseline, so the glyph ended up
+     further from the left and top edges than the bottom. Flex-centering fixes
+     the alignment; the wider horizontal padding keeps the adjacent icons from
+     crowding each other now that the group holds half a dozen buttons. */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 6px 10px;
 }
 .arena-toolbar .btn.btn-secondary:hover,
 .arena-toolbar .btn.btn-secondary:focus-visible {

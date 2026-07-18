@@ -151,6 +151,15 @@ export default class Environment {
   // set via the API / MCP tools, never persisted. See BASE_TICK_MS / tickMs().
   private speed = 1;
   private static readonly BASE_TICK_MS = 100;
+
+  // How many bots each app fields (1–5). In-memory only, like speed — set via
+  // the API / MCP tools, never persisted, so a rebuilt Environment starts back
+  // at the default. Applied live by setBotCount() and used by restart()/addApp()
+  // when (re)building teams. The ceiling of 5 is the existing resource envelope
+  // (all of an app's bots share its one 8 MB isolate).
+  private botCount = Environment.DEFAULT_BOT_COUNT;
+  public static readonly DEFAULT_BOT_COUNT = 5;
+  public static readonly MAX_BOT_COUNT = 5;
   // Set while the async tick loop (runLoop) is alive, so resume() doesn't start a
   // second concurrent loop.
   private looping = false;
@@ -471,6 +480,52 @@ export default class Environment {
     });
   }
 
+  // --- Bots per app -------------------------------------------------------
+
+  getBotCount = () => this.botCount;
+
+  // Set how many bots each app fields (clamped to 1–MAX_BOT_COUNT). Applied
+  // live: every process immediately spawns its shortfall (new bots load the
+  // app's code and fire START like any other late join) or sheds its newest
+  // bots — removed outright, mirroring Process.dispose's per-bot cleanup, with
+  // no death or elimination recorded. The setting also drives restart() and
+  // addApp(), so future matches and newly added apps field the same quantity.
+  setBotCount(count: number): Promise<unknown> {
+    this.botCount = Math.min(
+      Environment.MAX_BOT_COUNT,
+      Math.max(1, Math.floor(count))
+    );
+    this.emit('event', { type: 'arenaBotCount', botCount: this.botCount });
+
+    // Bank cumulative stats before any bots vanish (same reasoning as
+    // removeApp: settling every app's deltas early is harmless).
+    if (this.processes.some((p) => p.bots.length > this.botCount)) {
+      this.flushStats();
+    }
+
+    return Promise.all(
+      this.processes.map((process) => {
+        while (process.bots.length > this.botCount) {
+          const [bot] = process.bots.splice(process.bots.length - 1, 1);
+          this.emitter.emit('event', {
+            type: 'arenaRemoveBot',
+            id: bot.id,
+            appId: process.getAppId(),
+          });
+          // Release the bot's isolate context (the process-shared isolate stays
+          // alive for its remaining siblings). Timers need no explicit stop:
+          // they live on the Bot itself, which nothing references once spliced.
+          bot.getContext().release();
+        }
+        const spawns: Promise<unknown>[] = [];
+        while (process.bots.length < this.botCount) {
+          spawns.push(this.spawnBot(process));
+        }
+        return Promise.all(spawns);
+      })
+    );
+  }
+
   // --- Deterministic bot execution ---------------------------------------
 
   // Register an in-flight isolate operation so the tick loop's drain awaits it.
@@ -784,7 +839,7 @@ export default class Environment {
     // seeded rng, so a fixed seed still reproduces the layout.
     const spawns = computeSpawns(
       this.processes.length,
-      5,
+      this.botCount,
       this.arena.getWidth(),
       this.arena.getHeight(),
       this.random
@@ -814,7 +869,7 @@ export default class Environment {
             name: app.getName(),
           });
 
-          const botCount = 5;
+          const botCount = this.botCount;
           return Promise.all(
             [...Array(botCount)].map((_unused, slot) => {
               const bot = new Bot(this, process);
@@ -877,30 +932,39 @@ export default class Environment {
       name: app.getName(),
     });
 
-    for (let x = 0; x < 5; x++) {
-      const bot = new Bot(this, process);
-      process.bots.push(bot);
-
-      compiler.init(this, process, bot);
-      bot.execute(process);
-
-      // Emit new bot event
-      this.emitter.emit('event', {
-        type: 'arenaPlaceBot',
-        id: bot.id,
-        appId: process.getAppId(),
-        bodyOrientation: bot.orientation,
-        bodyOrientationVelocity: bot.orientationVelocity,
-        turretOrientation: bot.turret.orientation,
-        turretOrientationVelocity: bot.turret.orientationVelocity,
-        radarOrientation: bot.turret.radar.orientation,
-        radarOrientationVelocity: bot.turret.radar.orientationVelocity,
-        speed: bot.speed,
-        speedMax: BOT_MAX_SPEED,
-        x: bot.x,
-        y: bot.y,
-      });
+    for (let x = 0; x < this.botCount; x++) {
+      this.spawnBot(process);
     }
+  }
+
+  // Place one new bot on a process's team mid-match: create it (the constructor
+  // picks a clear random spot), wire the sandbox API, run the app's code in it,
+  // and announce it to connected clients. Shared by addApp() and setBotCount();
+  // restart() has its own placement path (fair symmetric spawn layout).
+  private spawnBot(process: Process): Promise<unknown> {
+    const bot = new Bot(this, process);
+    process.bots.push(bot);
+
+    compiler.init(this, process, bot);
+    const executed = bot.execute(process);
+
+    // Emit new bot event
+    this.emitter.emit('event', {
+      type: 'arenaPlaceBot',
+      id: bot.id,
+      appId: process.getAppId(),
+      bodyOrientation: bot.orientation,
+      bodyOrientationVelocity: bot.orientationVelocity,
+      turretOrientation: bot.turret.orientation,
+      turretOrientationVelocity: bot.turret.orientationVelocity,
+      radarOrientation: bot.turret.radar.orientation,
+      radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+      speed: bot.speed,
+      speedMax: BOT_MAX_SPEED,
+      x: bot.x,
+      y: bot.y,
+    });
+    return executed;
   }
 
   removeApp(appId: AppId) {

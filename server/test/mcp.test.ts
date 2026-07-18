@@ -789,6 +789,46 @@ describe('mcp tools', () => {
     expect(JSON.parse(textOf(res))).toEqual({ arenaId: 'ar1', seed: 99 });
   });
 
+  it('set_arena_bot_count applies the per-app bot quantity to the resolved arena env', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    const env = {
+      setBotCount: vi.fn(() => Promise.resolve()),
+      getBotCount: () => 3,
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_arena_bot_count',
+      arguments: { arenaId: 'ar1', botCount: 3 },
+    })) as never;
+
+    expect(env.setBotCount).toHaveBeenCalledWith(3);
+    expect(JSON.parse(textOf(res))).toEqual({ arenaId: 'ar1', botCount: 3 });
+  });
+
+  it('set_arena_bot_count rejects an out-of-range quantity without touching the env', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    const env = { setBotCount: vi.fn(), getBotCount: () => 5 };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    // Schema violations may surface as a tool error result or a protocol-level
+    // rejection depending on the SDK; accept either — the invariant is that the
+    // env is never touched.
+    const result = await client
+      .callTool({
+        name: 'set_arena_bot_count',
+        arguments: { arenaId: 'ar1', botCount: 6 },
+      })
+      .then(
+        (r) => r as { isError?: boolean },
+        () => ({ isError: true })
+      );
+    expect(result.isError).toBe(true);
+    expect(env.setBotCount).not.toHaveBeenCalled();
+  });
+
   it('exposes reference resources (type definitions + doc/sample templates)', async () => {
     const client = await connect();
 

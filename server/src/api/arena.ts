@@ -368,6 +368,30 @@ const setSpeed = async (req: Request, res: Response) => {
 };
 app.post(dual('/speed'), loadUser, requireOwner, resolveArena, setSpeed);
 
+// Set how many bots each app fields (1–5). Applied live: increasing spawns the
+// shortfall for every app immediately; decreasing removes each app's newest
+// bots outright (no death or elimination recorded). Also applies to future
+// restarts and newly added apps. Set by the UI toolbar's quantity control and
+// the MCP `set_arena_bot_count` tool.
+const setBotCount = async (req: Request, res: Response) => {
+  const raw = (req.body ?? {}).botCount;
+  const botCount = Number(raw);
+  if (!Number.isInteger(botCount) || botCount < 1 || botCount > 5) {
+    res.status(400);
+    res.send('botCount must be an integer from 1 to 5');
+    return;
+  }
+  const arena = scopedArena(req);
+  return environmentService
+    .get(arena)
+    .then((env) => env.setBotCount(botCount))
+    .then(() => {
+      res.status(200);
+      res.send({ botCount });
+    });
+};
+app.post(dual('/bot-count'), loadUser, requireOwner, resolveArena, setBotCount);
+
 // Set the arena's random seed. Fixing the seed makes the match setup (bot
 // placement + starting orientations) reproducible; the change takes effect on the
 // next restart, which rebuilds the bots from the reseeded stream. A tooling/MCP

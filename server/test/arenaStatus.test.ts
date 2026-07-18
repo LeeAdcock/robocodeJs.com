@@ -94,6 +94,7 @@ const makeEnv = (
     getSpeed: () => speed,
     getTickMs: () => tickMs,
     getSeed: () => seed,
+    getBotCount: () => 5,
     getTime: () => time,
   }) as never;
 

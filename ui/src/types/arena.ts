@@ -21,4 +21,8 @@ export default interface Arena {
   // Tick at which the damage-free deployment window ends and turrets go live. The
   // UI shows a countdown while clock.time < deployTick.
   deployTick?: number;
+  // How many bots each app fields (1–5) — the configured setting, not the live
+  // count (bots die). From the snapshot / `arenaBotCount` event; the toolbar's
+  // quantity control sets it via the API.
+  botCount?: number;
 }

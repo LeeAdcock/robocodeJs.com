@@ -55,6 +55,7 @@ Once connected, these tools are available (all scoped to your account, except th
 - `step_arena`: advance a paused arena by exactly one tick (or `count` ticks) to inspect state transitions frame by frame — pause first, then read `arena_status` / `match_status` between steps. A no-op (`stepped: false`) while the arena is running
 - `set_arena_speed`: set the simulation speed to a multiplier (1 = the default ~10 ticks/second), or `0`/`"max"` to run unbounded. The simulation stays deterministic at any speed
 - `set_arena_seed`: fix the arena's random seed so bot placement and starting orientations are reproducible; restart the arena after setting it to lay out an identical match
+- `set_arena_bot_count`: set how many bots each app fields (1–5, default 5). Applied immediately — increasing spawns the shortfall for every app, decreasing removes each app's newest bots outright (no elimination recorded) — and to future restarts
 - `run_match`: run one match to a decision (optional `seed`) and return the winner + leaderboard; a blocking convenience for the restart → resume → poll `match_summary` loop. Spawns are outcome-deciding, so for a trustworthy ranking call it across several `seed`s and aggregate the results yourself
 
 **Observation**

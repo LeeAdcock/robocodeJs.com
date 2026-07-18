@@ -491,6 +491,12 @@ function App() {
                 }
                 doStep={() => axios.post(`/api/user/${user.id}/arena/step`)}
                 doShare={arena.id ? doShare : undefined}
+                botCount={arena.botCount}
+                doSetBotCount={(count) =>
+                  axios.post(`/api/user/${user.id}/arena/bot-count`, {
+                    botCount: count,
+                  })
+                }
               />
               {shareNotice && (
                 // The same green "success" theme as the bot share-link notice

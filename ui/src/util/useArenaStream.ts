@@ -218,6 +218,12 @@ export default function useArenaStream({
         // immediately (not jitter-buffered) so the cadence tracks the server.
         buffer.current.setTickMs(data.tickMs);
         return;
+      } else if (data.type === 'arenaBotCount') {
+        // The per-app bot quantity changed. The spawns/removals themselves
+        // arrive as their own arenaPlaceBot/arenaRemoveBot events — this just
+        // tracks the setting so the toolbar's quantity control stays in sync.
+        setArena((arena) => ({ ...arena, botCount: data.botCount }));
+        return;
       } else if (data.type === 'appRenamed') {
         onAppRenamedRef.current?.();
       } else if (data.type === 'arenaRestart') {
