@@ -8,7 +8,7 @@ vi.mock('../src/util/db', () => ({
   default: { query: () => Promise.resolve({ rows: [], rowCount: 0 }) },
 }));
 vi.mock('../src/services/AppService', () => ({
-  default: { get: () => Promise.resolve(null) },
+  default: { get: vi.fn(() => Promise.resolve(null)) },
 }));
 // Keep spawns isolate-free: sandbox wiring + code loading are compiler.test.ts
 // territory; here we exercise only the roster arithmetic and events. init's
@@ -29,6 +29,7 @@ import Bot from '../src/types/bot';
 import Environment, { Process } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import compiler from '../src/util/compiler';
+import appService from '../src/services/AppService';
 import Simulation, { applyEliminations } from '../src/util/simulation';
 import { Event } from '../src/types/event';
 import Bullet from '../src/types/bullet';
@@ -81,7 +82,12 @@ const collectEvents = (env: Environment) => {
 };
 
 describe('Environment.setBotCount', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(appService.get).mockImplementation(
+      () => Promise.resolve(null) as never
+    );
+  });
 
   it('defaults to 5 and clamps to 1–5', async () => {
     const env = makeEnv([]);
@@ -292,6 +298,69 @@ describe('Environment.setBotCount', () => {
     const env = makeEnv([]);
     await env.setBotCount(2);
     env.addApp({ getId: () => 'app1', getName: () => 'App 1' } as never);
+    expect(env.getProcesses()[0].bots.length).toBe(2);
+  });
+
+  it('is a no-op when the clamped count is unchanged: no broadcast, no roster walk', async () => {
+    const env = makeEnv([5]);
+    const events = collectEvents(env);
+
+    await env.setBotCount(5); // already the default
+    await env.setBotCount(99); // clamps to 5 — still unchanged
+
+    // (addListener replays the paused/resumed state to a new subscriber, so
+    // filter that bootstrap event out.)
+    expect(events.filter((e) => e.type !== 'arenaPaused')).toEqual([]);
+    expect(env.getProcesses()[0].bots.length).toBe(5);
+    expect(compiler.init).not.toHaveBeenCalled();
+    expect(compiler.execute).not.toHaveBeenCalled();
+  });
+
+  it('serializes with an in-flight restart: the team is never doubled', async () => {
+    const env = makeEnv([2, 2]);
+    // A real async gap between restart's dispose and its rebuild, like the
+    // appService DB round-trip in production.
+    vi.mocked(appService.get).mockImplementation(
+      (appId: string) =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ getId: () => appId, getName: () => appId }),
+            20
+          )
+        ) as never
+    );
+
+    // setBotCount lands while restart's lookup is still in flight. Unserialized,
+    // it would see the disposed (empty) rosters, spawn 3 bots per process, and
+    // restart's rebuild would then push 3 more — 6 per app until the next
+    // restart.
+    const restarted = env.restart();
+    const resized = env.setBotCount(3);
+    await Promise.all([restarted, resized]);
+
+    expect(env.getProcesses().map((p) => p.bots.length)).toEqual([3, 3]);
+    expect(env.getBotCount()).toBe(3);
+  });
+
+  it('applies a queued setBotCount after the restart it was issued behind', async () => {
+    const env = makeEnv([1]);
+    vi.mocked(appService.get).mockImplementation(
+      (appId: string) =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ getId: () => appId, getName: () => appId }),
+            10
+          )
+        ) as never
+    );
+
+    // Issued strictly in sequence: the resize to 2 queues behind the restart
+    // (which rebuilds at the freshly set count) and finds nothing left to do.
+    await Promise.all([env.restart(), env.setBotCount(2)]);
+    expect(env.getProcesses()[0].bots.length).toBe(2);
+
+    // A later restart keeps fielding the configured quantity.
+    await env.restart();
     expect(env.getProcesses()[0].bots.length).toBe(2);
   });
 });

@@ -209,6 +209,9 @@ export default class Environment {
   // per-tick budget (MAX_COMMANDS_PER_TICK, bot.ts) and exceeding it faults the
   // bot, so the queue can never exceed ~budget × live bots.
   private pendingCommands: PendingCommand[] = [];
+  // The tail of the serialized roster-rebuild chain (restart / setBotCount);
+  // see queueRosterOp below.
+  private rosterOp: Promise<unknown> = Promise.resolve();
   // In-flight isolate operations (event-handler dispatches, command settlements,
   // timer callbacks) started during the current tick. The loop awaits these before
   // advancing so every bot has run to its next await-park — this is what makes
@@ -502,6 +505,27 @@ export default class Environment {
     });
   }
 
+  // --- Roster-rebuild serialization ---------------------------------------
+  // restart() and setBotCount() both resize/rebuild process rosters across
+  // real async gaps (appService lookups, isolate code loads), and nothing else
+  // stops them interleaving: a setBotCount arriving between restart's
+  // process.dispose() and its post-lookup rebuild sees an emptied team, spawns
+  // a full one, and restart's .then pushes a second full one — the app fields
+  // double the configured count until the next restart. Chaining them through
+  // `rosterOp` (see queueRosterOp) means each runs only after the previous has
+  // fully settled. addApp() and removeApp() mutate the roster synchronously
+  // (no await between their reads and writes), so they cannot interleave
+  // mid-operation and stay unqueued; restart()'s rebuild re-checks membership
+  // so a removeApp landing in its async gap can't resurrect the removed
+  // process's bots.
+  private queueRosterOp = <T>(fn: () => Promise<T>): Promise<T> => {
+    const run = this.rosterOp.then(fn);
+    // Keep the chain alive past a failure; the caller still sees the rejection
+    // through `run`.
+    this.rosterOp = run.catch(() => undefined);
+    return run;
+  };
+
   // --- Bots per app -------------------------------------------------------
 
   getBotCount = () => this.botCount;
@@ -523,7 +547,10 @@ export default class Environment {
     this.botCount = next;
     this.emit('event', { type: 'arenaBotCount', botCount: this.botCount });
 
-    return this.applyBotCount();
+    // The setting and its broadcast land immediately; the roster walk queues
+    // behind any in-flight restart (see queueRosterOp) and re-reads
+    // this.botCount when it runs, so the newest setting always wins.
+    return this.queueRosterOp(() => this.applyBotCount());
   }
 
   // Bring every process's roster to the configured size: shed the excess or
@@ -856,7 +883,14 @@ export default class Environment {
     return true;
   };
 
-  async restart(): Promise<void> {
+  restart(): Promise<void> {
+    // Serialized with setBotCount's roster walk (see queueRosterOp): the
+    // rebuild below crosses real async gaps that a concurrent roster resize
+    // would otherwise corrupt.
+    return this.queueRosterOp(() => this.doRestart());
+  }
+
+  private async doRestart(): Promise<void> {
     this.emitter.emit('event', {
       type: 'arenaRestart',
     });
@@ -947,7 +981,10 @@ export default class Environment {
 
         // Restart each bot
         return appService.get(process.getAppId()).then((app) => {
-          if (!app) return;
+          // The lookup is a real async gap: the process may have been removed
+          // from the arena (removeApp) while it was in flight, and rebuilding
+          // then would resurrect bots into a detached process.
+          if (!app || !this.processes.includes(process)) return;
 
           this.emitter.emit('event', {
             type: 'arenaPlaceApp',
