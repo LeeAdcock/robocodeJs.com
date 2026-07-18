@@ -177,7 +177,7 @@ const AngleTag = (props: { angle: number; length: number; color: string }) => {
       fill={props.color}
       style={{ fontSize: '7px', fontFamily: 'monospace' }}
     >
-      {normalizeDeg(props.angle)}°
+      {Math.round(normalizeDeg(props.angle))}°
     </text>
   );
 };
@@ -505,12 +505,19 @@ const TelemetryPanel = (props: {
   height: number;
 }) => {
   const { bot } = props;
-  const turret = normalizeDeg(bot.bodyOrientation + bot.turretOrientation);
-  const radar = normalizeDeg(
-    bot.bodyOrientation + bot.turretOrientation + bot.radarOrientation
+  // Rounded to whole degrees — the sub-degree precision is noise at this
+  // readout size, and rounding both head/headTarget also collapses a hair's
+  // difference so it doesn't render a spurious "→" while settling on target.
+  const turret = Math.round(
+    normalizeDeg(bot.bodyOrientation + bot.turretOrientation)
   );
-  const headTarget = normalizeDeg(bot.bodyOrientationTarget);
-  const head = normalizeDeg(bot.bodyOrientation);
+  const radar = Math.round(
+    normalizeDeg(
+      bot.bodyOrientation + bot.turretOrientation + bot.radarOrientation
+    )
+  );
+  const headTarget = Math.round(normalizeDeg(bot.bodyOrientationTarget));
+  const head = Math.round(normalizeDeg(bot.bodyOrientation));
   const rows: [string, string][] = [
     ['pos', `${Math.round(finite(bot.x))}, ${Math.round(finite(bot.y))}`],
     ['head', head === headTarget ? `${head}°` : `${head}° → ${headTarget}°`],

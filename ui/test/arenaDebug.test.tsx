@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import ArenaSvg from '../src/components/arena/arena';
 
 // One live bot with a bullet in flight, enough to exercise every schematic
@@ -93,5 +93,49 @@ describe('ArenaSvg debug (schematic) view', () => {
     // Debug view is its own flat themed surface; the scenic multiply overlay
     // must not paint over it even when the app theme is dark.
     expect(container.querySelector('[style*="multiply"]')).toBeNull();
+  });
+
+  it('draws scanner→target detection lines from a bot that just scanned', () => {
+    // Two bots; the scanner (b1) has a transient `detected` list naming the
+    // other (b2). The reducer sets this on a radarScan and clears it shortly
+    // after — while set, the debug view draws a line between the two.
+    const scanner = { ...bot, id: 'b1', detected: ['b2'] };
+    const target = { ...bot, id: 'b2', x: 300, y: 400, detected: undefined };
+    const twoBotArena: any = {
+      width: 750,
+      height: 750,
+      clock: { time: 0 },
+      apps: [{ id: 'a1', name: 'Test', bots: [scanner, target] }],
+    };
+    const { container } = render(
+      <ArenaSvg
+        arena={twoBotArena}
+        darkMode={false}
+        debugMode={true}
+        time={0}
+      />
+    );
+    const lines = container.querySelectorAll('g[name="debug-detections"] line');
+    expect(lines).toHaveLength(1);
+    // The line spans scanner → target.
+    const line = lines[0];
+    expect(line.getAttribute('x1')).toBe('100');
+    expect(line.getAttribute('x2')).toBe('300');
+    expect(line.getAttribute('y2')).toBe('400');
+  });
+
+  it('focuses a tank on click: range rings and telemetry appear', () => {
+    const { container } = render(
+      <ArenaSvg arena={arena} darkMode={false} debugMode={true} time={0} />
+    );
+    // Nothing focused initially — the focus-only range rings aren't drawn.
+    expect(container.querySelector('circle[r="100"]')).toBeNull();
+
+    // Click the tank's collision circle to focus it.
+    fireEvent.click(container.querySelector('circle[r="16"]')!);
+
+    // The focused bot gets range rings (100/200/300) and a telemetry panel.
+    expect(container.querySelector('circle[r="100"]')).toBeTruthy();
+    expect(container.textContent).toContain('health');
   });
 });
