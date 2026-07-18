@@ -126,12 +126,16 @@ describe('compiler — bot API in a real isolate', () => {
 
   // Bot code now runs off-thread via async apply, so effects land after a
   // boundary round-trip. Poll the isolate for a value rather than racing a fixed
-  // delay (timing varies under parallel-test CPU load).
+  // delay (timing varies under parallel-test CPU load). The deadline sits ABOVE
+  // the sandbox execution budget (SANDBOX_TIMEOUT_MS, default 5s): a legitimately
+  // slow thread-pool apply must still be waited out, or a CPU-starved CI runner
+  // would fail the security-contract tests spuriously (and the doctrine here says
+  // to read such a failure as a real regression, not a flake).
   const waitUntilRead = async (
     expr: string,
     done: (v: unknown) => boolean
   ): Promise<unknown> => {
-    const deadline = Date.now() + 3000;
+    const deadline = Date.now() + 8000;
     while (!done(ctx.read(expr)) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 25));
     }
@@ -147,17 +151,27 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('clock.getTime()')).toBe(42);
   });
 
+  // Determinism (R4): a bot must have no source of real wall-clock time or true
+  // entropy, so a seeded match replays identically. Date is removed, and so is
+  // Intl — otherwise Intl.DateTimeFormat().format() would leak the current time.
+  it('removes wall-clock time sources (Date and Intl) from the isolate', () => {
+    expect(ctx.read('typeof Date')).toBe('undefined');
+    expect(ctx.read('typeof Intl')).toBe('undefined');
+    // The determinism the removal protects: bots read the sim clock instead.
+    expect(ctx.read('clock.getTime()')).toBe(42);
+  });
+
   it('mirrors the physics constants as plain data properties with the engine values', () => {
     // Interpolated at init via compiler's num(), so these assert the sandbox
     // copies match the real engine values.
-    expect(ctx.read('bot.radius')).toBe(16);
-    expect(ctx.read('bot.maxSpeed')).toBe(5);
-    expect(ctx.read('bot.acceleration')).toBe(2);
-    expect(ctx.read('bot.turnRate')).toBe(10);
-    expect(ctx.read('bot.turret.turnRate')).toBe(4);
-    expect(ctx.read('bot.turret.bulletSpeed')).toBe(25);
-    expect(ctx.read('bot.turret.bulletDamage')).toBe(25);
-    expect(ctx.read('bot.radar.turnRate')).toBe(4);
+    expect(ctx.read('bot.RADIUS')).toBe(16);
+    expect(ctx.read('bot.MAX_SPEED')).toBe(5);
+    expect(ctx.read('bot.ACCELERATION')).toBe(2);
+    expect(ctx.read('bot.TURN_RATE')).toBe(10);
+    expect(ctx.read('bot.turret.TURN_RATE')).toBe(4);
+    expect(ctx.read('bot.turret.BULLET_SPEED')).toBe(25);
+    expect(ctx.read('bot.turret.BULLET_DAMAGE')).toBe(25);
+    expect(ctx.read('bot.radar.TURN_RATE')).toBe(4);
   });
 
   // The fixture arena is deliberately non-square (750×600) so these fail
@@ -850,6 +864,127 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.bot.orientationTarget).toBe(180);
     ctx.run('bot.setOrientation(90).catch(() => {})'); // east
     expect(ctx.bot.orientationTarget).toBe(270);
+  });
+
+  // --- Sandbox security contract (negative capabilities) -------------------
+  // These lock the escape-relevant guarantees of the isolate boundary rather
+  // than any single bot API: no host or Node capability leaks into bot scope,
+  // and the host-captured dispatch entry points cannot be hijacked by a bot
+  // reassigning the globals. A failure here means the sandbox boundary
+  // regressed — treat it as a security bug, not a flaky test. See the
+  // security-sensitive-edit guidance for exposed `_bot_*` functions in CLAUDE.md
+  // (every one must return copied plain data, never a live host reference).
+
+  it('denies Node and host globals to bot code', () => {
+    // A bare V8 isolate has none of Node's globals, and compiler.ts never
+    // exposes the `ivm` module itself — every Callback/Reference/ExternalCopy is
+    // built host-side. If any of these becomes reachable, untrusted bot code has
+    // a path off the sandbox. `typeof` on an undeclared name is safe (no throw),
+    // so this reads uniformly whether the name is a missing global or absent.
+    // Read all names in ONE round-trip and compare as a map, so a failure names
+    // exactly which global leaked (a bare per-name expect would not).
+    const names = [
+      'process',
+      'require',
+      'module',
+      'exports',
+      'Buffer',
+      'global',
+      'setImmediate',
+      'ivm',
+      '__dirname',
+      '__filename',
+    ];
+    const types = ctx.read(
+      `({ ${names.map((n) => `'${n}': typeof (${n})`).join(', ')} })`
+    ) as Record<string, string>;
+    expect(types).toEqual(
+      Object.fromEntries(names.map((n) => [n, 'undefined']))
+    );
+  });
+
+  it('sets Date to undefined so bots cannot read wall-clock time', () => {
+    // Determinism canary: bots must use clock.getTime() (the sim clock), never a
+    // real clock. A non-undefined Date means real time — or true entropy — leaked
+    // into the isolate.
+    expect(ctx.read('typeof Date')).toBe('undefined');
+  });
+
+  it('replaces Math.random with the exact seeded mulberry32 stream (not host entropy)', () => {
+    // Math.random is overwritten with a mulberry32 seeded from the arena PRNG so a
+    // fixed seed replays a match. The harness pins env.random to () => 0.5, so the
+    // seed is deterministic (Math.floor(0.5 * 2**32) = 0x80000000) and the stream
+    // is fixed. Assert the EXACT draws (independently computed from the mulberry32
+    // definition, not read back from this code): a bare "finite number in [0,1)"
+    // check passes equally for V8's native Math.random and so would not detect the
+    // override being dropped — this does. If compiler.ts's mathSeed derivation or
+    // generator changes, update these constants deliberately.
+    expect(ctx.read('[Math.random(), Math.random(), Math.random()]')).toEqual([
+      0.8205775609239936, 0.4481089550536126, 0.7836112855002284,
+    ]);
+  });
+
+  it('seeds Math.random reproducibly across isolates (same seed → same stream)', () => {
+    // Two independently-compiled bots draw from the SAME fixed seed (both use the
+    // harness's env.random = () => 0.5), so their streams must be identical —
+    // which host-entropy Math.random could never be. This pins the "seeded and
+    // reproducible" half of the contract without hard-coding the constants.
+    const a = makeCompiledBot();
+    const b = makeCompiledBot();
+    try {
+      const seqA = a.read('[Math.random(), Math.random(), Math.random()]');
+      const seqB = b.read('[Math.random(), Math.random(), Math.random()]');
+      expect(seqA).toEqual(seqB);
+      // Guard against a degenerate constant generator: the stream actually varies.
+      expect(new Set(seqA as number[]).size).toBe(3);
+    } finally {
+      a.proc.dispose();
+      b.proc.dispose();
+    }
+  });
+
+  it('a bot cannot hijack promise settlement by reassigning __settle', async () => {
+    // The host settles parked bot promises through a Reference to __settle it
+    // captured at init, before any bot code runs. A bot that overwrites
+    // globalThis.__settle must NOT intercept settlement: the captured reference
+    // still points at the original function object. (This locks the CURRENT
+    // pinned-Reference contract by name — a refactor that renamed the entry point
+    // would need its own coverage, but any such change must preserve this: the
+    // host-driven settle path is not reachable by reassigning a bot-visible global.)
+    ctx.run(`
+      globalThis._settled = null
+      globalThis._hijackSettle = false
+      globalThis.__settle = () => { globalThis._hijackSettle = true }
+      // isRunning() is false in this harness, so the command settles (rejects)
+      // immediately — through the captured reference, not the bot's replacement.
+      bot
+        .setSpeed(3)
+        .then(() => { globalThis._settled = 'ok' })
+        .catch((e) => { globalThis._settled = 'err:' + e })
+    `);
+    await waitUntilRead('globalThis._settled', (v) => v !== null);
+    // The REAL host result was delivered (the command rejected), proving the
+    // captured path settled it — not merely that something set the flag.
+    expect(ctx.read('globalThis._settled')).toBe('err:Speed change cancelled');
+    // ...and the bot's replacement __settle was never invoked.
+    expect(ctx.read('globalThis._hijackSettle')).toBe(false);
+  });
+
+  it('a bot cannot hijack event dispatch by reassigning __dispatch', async () => {
+    // Events reach handlers through a Reference to __dispatch captured at init.
+    // Reassigning globalThis.__dispatch from bot code must not divert dispatch.
+    ctx.run(`
+      globalThis._started = false
+      globalThis._hijackDispatch = false
+      bot.on(Event.START, () => { globalThis._started = true })
+      globalThis.__dispatch = () => { globalThis._hijackDispatch = true }
+    `);
+    // Drive the handler the way the simulation loop does.
+    ctx.bot.handlers[Event.START]();
+    expect(await waitUntilRead('globalThis._started', (v) => v === true)).toBe(
+      true
+    );
+    expect(ctx.read('globalThis._hijackDispatch')).toBe(false);
   });
 });
 

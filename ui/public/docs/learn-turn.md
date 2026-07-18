@@ -9,8 +9,7 @@
 
 ## The idea
 
-A robot faces some direction, measured in **degrees** from `0` to `359`, like a
-compass or a clock face. A full circle is `360` degrees.
+A robot faces some direction, measured in **degrees** from `0` to `359`, like a compass or a clock face. A full circle is `360` degrees.
 
 It works like a real compass:
 
@@ -21,8 +20,7 @@ It works like a real compass:
 
 There are two ways to steer:
 
-- `bot.turn(20)`: turn **20 degrees from where you're facing now**. Positive turns one
-  way (clockwise), negative the other way.
+- `bot.turn(20)`: turn **20 degrees from where you're facing now**. Positive turns one way (clockwise), negative the other way.
 - `bot.setOrientation(90)`: face an **exact** compass direction (here, east).
 
 ## Try it
@@ -47,33 +45,23 @@ Press **Deploy**. Rusty drives in circles!
 
 The new pieces:
 
-- `bot.isTurning()` answers **yes or no**: "am I in the middle of a turn?" (`true` or
-  `false`). A yes/no value like this is called a **boolean**, more on those next lesson.
-- `if (!bot.isTurning())` means "**if** I'm **not** already turning." The `!` means
-  "not." So: only start a new turn once the last one finishes.
+- `bot.isTurning()` answers **yes or no**: "am I in the middle of a turn?" (`true` or `false`). A yes/no value like this is called a **boolean**, more on those next lesson.
+- `if (!bot.isTurning())` means "**if** I'm **not** already turning." The `!` means "not." So: only start a new turn once the last one finishes.
 
 ## Experiment
 
 - Change `bot.turn(20)` to `bot.turn(5)` (wide, lazy circle) or `bot.turn(90)` (sharp).
 - Try a negative turn like `bot.turn(-20)`. Rusty loops the other way.
-- Add this to your TICK handler to see the direction:
-  `console.log('facing', bot.getOrientation());`
-- Replace the loop with a fixed heading: put `bot.setOrientation(0);` in START to drive
-  straight north.
+- Add this to your TICK handler to see the direction: `console.log('facing', bot.getOrientation());`
+- Replace the loop with a fixed heading: put `bot.setOrientation(0);` in START to drive straight north.
 
 ## Common questions
 
-**Which way is `0`?**
-North (up), just like a real compass, and the numbers increase clockwise (`90` east,
-`180` south, `270` west). If you've played classic Robocode, this is the same.
+**Which way is `0`?** North (up), just like a real compass, and the numbers increase clockwise (`90` east, `180` south, `270` west). If you've played classic Robocode, this is the same.
 
-**What's the difference between `turn` and `setOrientation`?**
-`turn` is **relative** ("turn 20 more from here"). `setOrientation` is **absolute**
-("face exactly this way"). Use whichever is easier for what you want.
+**What's the difference between `turn` and `setOrientation`?** `turn` is **relative** ("turn 20 more from here"). `setOrientation` is **absolute** ("face exactly this way"). Use whichever is easier for what you want.
 
-**The robot turns slowly. Is that a bug?**
-No. Robots turn at a limited speed, just like real machines. A big turn takes a little
-time to finish.
+**The robot turns slowly. Is that a bug?** No. Robots turn at a limited speed, just like real machines. A big turn takes a little time to finish.
 
 ## You learned
 

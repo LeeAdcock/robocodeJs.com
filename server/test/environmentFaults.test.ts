@@ -7,6 +7,7 @@ vi.mock('../src/util/db', () => ({
 
 import Environment, { BotFault } from '../src/types/environment';
 import Arena from '../src/types/arena';
+import { logger, LogEvent } from '../src/util/logger';
 
 const makeFault = (over: Partial<BotFault> = {}): BotFault => ({
   appId: 'a1',
@@ -86,5 +87,40 @@ describe('Environment restart', () => {
     await env.restart();
 
     expect(env.getTime()).toBe(0);
+  });
+});
+
+// D3 hardening: the per-tick bot-work drain has always been bounded
+// (MAX_DRAIN_ROUNDS), but the warning it emitted on exhaustion carried no `event`
+// field, so — unlike every other alertable condition — a CloudWatch log-metric
+// alarm could not fire on it. This asserts the exhaustion log now carries the
+// stable event id.
+describe('Environment drain-exhaustion is alarmable', () => {
+  it('logs bot.drain_exhausted with the arena id when the drain bound is hit', async () => {
+    const prev = process.env.MAX_DRAIN_ROUNDS;
+    // 0 rounds: the drain loop body never runs and reports immediately.
+    process.env.MAX_DRAIN_ROUNDS = '0';
+    const warn = vi.spyOn(logger, 'warn').mockReturnValue(undefined as never);
+    try {
+      const env = new Environment(new Arena('ar1', 'u1'));
+      // drainBotWork is private; invoke it directly for a focused unit test.
+      await (
+        env as unknown as { drainBotWork: () => Promise<void> }
+      ).drainBotWork();
+
+      const drainLogs = warn.mock.calls.filter(
+        (c) =>
+          (c[0] as { event?: string })?.event === LogEvent.BOT_DRAIN_EXHAUSTED
+      );
+      expect(drainLogs).toHaveLength(1);
+      expect(drainLogs[0][0]).toMatchObject({
+        event: LogEvent.BOT_DRAIN_EXHAUSTED,
+        arenaId: 'ar1',
+      });
+    } finally {
+      warn.mockRestore();
+      if (prev === undefined) delete process.env.MAX_DRAIN_ROUNDS;
+      else process.env.MAX_DRAIN_ROUNDS = prev;
+    }
   });
 });

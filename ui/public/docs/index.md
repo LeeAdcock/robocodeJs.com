@@ -10,30 +10,18 @@ See that arena? It's a live demo: real bots battling right now. In a few minutes
 
 # Get started
 
-**The fastest way in:** sign in with your Google account, then open the menu and choose
-**Apps → Create new application**. Your bots drop straight into the arena and you're ready
-to code. No setup, no downloads, nothing to install. Follow the quick walkthrough below
-to see how a bot comes together, step by step.
+**The fastest way in:** sign in with your Google account, then open the menu and choose **Apps → Create new application**. Your bots drop straight into the arena and you're ready to code. No setup, no downloads, nothing to install. Follow the quick walkthrough below to see how a bot comes together, step by step.
 
 **Prefer a different on-ramp?** Pick the path that fits you:
 
-- **New to coding?** Start the **[Learn to Code course](/learn)**, a guided, 15-lesson
-  path that takes you from "what is code?" to a fully featured battle bot, no experience
-  needed.
-- **Coming from classic Robocode?** Read **[Coming from classic Robocode](/classic)** for
-  a quick map of what's the same, what's different, and how to port your instincts.
-- **Want the details?** Keep the **[API reference](/learn/docs)**, **[game rules &
-  physics](/rules)**, and **[FAQ](/faq)** handy, and browse the
-  **[example bots](/examples)**.
-- **Want an AI to help?** Connect Claude (or any MCP client) to write, run, and watch
-  your bots for you. See **[Connect an AI (MCP)](/mcp)**.
+- **New to coding?** Start the **[Learn to Code course](/learn)**, a guided, 15-lesson path that takes you from "what is code?" to a fully featured battle bot, no experience needed.
+- **Coming from classic Robocode?** Read **[Coming from classic Robocode](/classic)** for a quick map of what's the same, what's different, and how to port your instincts.
+- **Want the details?** Keep the **[API reference](/learn/docs)**, **[game rules & physics](/rules)**, and **[FAQ](/faq)** handy, and browse the **[example bots](/examples)**.
+- **Want an AI to help?** Connect Claude (or any MCP client) to write, run, and watch your bots for you. See **[Connect an AI (MCP)](/mcp)**.
 
 # Coding your first JavaScript bot
 
-In a few minutes you'll have a bot that names itself, fires its turret, and drives
-around the arena, just enough to feel how the pieces fit together. Prefer to
-start by reading instead? Take the guided **[Learn to Code course](/learn)** or dive into
-the full **[documentation](/learn/docs)**.
+In a few minutes you'll have a bot that names itself, fires its turret, and drives around the arena, just enough to feel how the pieces fit together. Prefer to start by reading instead? Take the guided **[Learn to Code course](/learn)** or dive into the full **[documentation](/learn/docs)**.
 
 Everything you control hangs off the `bot` object. **Name your bot:**
 

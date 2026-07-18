@@ -31,30 +31,30 @@ npm run bundle  # zip the deploy artifact (break-glass manual EB upload only)
 
 PostgreSQL connection (see `src/util/db.ts`):
 
-| Variable                        | Purpose                                                                                                                                                                                                                                 |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RDS_HOSTNAME`                  | database host                                                                                                                                                                                                                           |
-| `RDS_PORT`                      | database port (default `5432`)                                                                                                                                                                                                          |
-| `RDS_DB_NAME`                   | database name                                                                                                                                                                                                                           |
-| `RDS_USERNAME`                  | database user                                                                                                                                                                                                                           |
-| `RDS_PASSWORD`                  | database password                                                                                                                                                                                                                       |
-| `GOOGLE_CLIENT_ID`              | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with.                                                                                                        |
-| `NODE_ENV`                      | `production` enables the `Secure` flag on the session cookie                                                                                                                                                                            |
-| `SANDBOX_TIMEOUT_MS`            | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`)                                                                                                     |
-| `LOG_LEVEL`                     | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test                                                                                 |
+| Variable | Purpose |
+| --- | --- |
+| `RDS_HOSTNAME` | database host |
+| `RDS_PORT` | database port (default `5432`) |
+| `RDS_DB_NAME` | database name |
+| `RDS_USERNAME` | database user |
+| `RDS_PASSWORD` | database password |
+| `GOOGLE_CLIENT_ID` | OAuth client id tokens are verified against (audience); defaults to the app's client id. Must match the id the UI signs in with. |
+| `NODE_ENV` | `production` enables the `Secure` flag on the session cookie |
+| `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`) |
+| `LOG_LEVEL` | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test |
 | `RDS_SSL` / `RDS_SSL_NO_VERIFY` | TLS to Postgres — verified against the vendored RDS CA bundle (`certs/rds-global-bundle.pem`) by default. `RDS_SSL_NO_VERIFY=true` encrypts without verifying the CA (old behaviour, for a non-RDS cert); `RDS_SSL=false` disables TLS. |
-| `MAX_TOTAL_ARENAS`              | global ceiling on concurrently-created arenas across **all** users (default `1000`); creation past it returns `503`                                                                                                                     |
+| `MAX_TOTAL_ARENAS` | global ceiling on concurrently-created arenas across **all** users (default `1000`); creation past it returns `503` |
 
 Global bot ladder (GitHub #151 — `src/services/LadderService.ts`; the background matchmaking loop is **off unless `LADDER_ENABLED=true`**, and never runs under test):
 
-| Variable                   | Purpose                                                                                                                                      |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LADDER_ENABLED`           | set to `true` to start the background ranked-match loop; anything else (or unset) leaves it off                                              |
-| `LADDER_CONCURRENCY`       | number of ranked matches to run at once (default `1`; a match is real isolate compute, so keep this low on a small box)                      |
-| `LADDER_MATCH_INTERVAL_MS` | pause after a completed match before the next, per worker (default `3000`)                                                                   |
-| `LADDER_IDLE_MS`           | backoff when there's no eligible pair or the loop is load-gated (default `60000`)                                                            |
+| Variable | Purpose |
+| --- | --- |
+| `LADDER_ENABLED` | set to `true` to start the background ranked-match loop; anything else (or unset) leaves it off |
+| `LADDER_CONCURRENCY` | number of ranked matches to run at once (default `1`; a match is real isolate compute, so keep this low on a small box) |
+| `LADDER_MATCH_INTERVAL_MS` | pause after a completed match before the next, per worker (default `3000`) |
+| `LADDER_IDLE_MS` | backoff when there's no eligible pair or the loop is load-gated (default `60000`) |
 | `LADDER_MAX_LIVE_ISOLATES` | load gate: skip ranked matches while live user arenas hold more than this many isolates, so the ladder yields to real players (default `40`) |
-| `LADDER_MATCH_TIMEOUT_MS`  | per-match wall-clock cap before a match is abandoned as undecided (default `60000`)                                                          |
+| `LADDER_MATCH_TIMEOUT_MS` | per-match wall-clock cap before a match is abandoned as undecided (default `60000`) |
 
 Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema is created lazily on first connection.
 
@@ -71,17 +71,17 @@ Each service issues `CREATE TABLE IF NOT EXISTS` at import time, so the schema i
 
 Most routes are namespaced under `/api/user/:userId/...`. Mutating routes require ownership: `requireOwner` (the actor owns the `:userId`/arena) and, for confidential/destructive **app** routes, `requireAppOwner` (source read/write, delete, compile, reboot — the A01 IDOR fix). Metadata reads and add-by-reference are intentionally open (spectating / share-links). See [Security](#security--resource-limits).
 
-| Router       | Highlights                                                                                                                                                                                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `health.ts`  | `GET /health` liveness check                                                                                                                                                                                                                                                                              |
-| `demo.ts`    | public demo arena + its SSE streams (no auth)                                                                                                                                                                                                                                                             |
-| `help.ts`    | help responses, classified with `ml-classify-text`                                                                                                                                                                                                                                                        |
-| `session.ts` | `POST`/`DELETE /api/session` — sign in / out (sets the HttpOnly `auth` cookie); see [Auth](#auth)                                                                                                                                                                                                         |
-| `token.ts`   | mint / rotate the per-user **MCP bearer API token** (stored only as a sha256 hash)                                                                                                                                                                                                                        |
-| `user.ts`    | `GET /api/user` (current user) and `/api/user/:userId`                                                                                                                                                                                                                                                    |
-| `app.ts`     | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile` / `.../reboot` / `.../check` (dry-run compile), capped at `MAX_APPS_PER_USER`                                                                                                                                                               |
-| `arena.ts`   | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); status (`buildArenaStatus`) and `.../summary` (`buildMatchSummary`); roster add/remove + enable/disable (incl. add-by-reference); `restart`/`pause`/`resume`/`speed`/`seed`; and the live `.../events` & `.../logs` SSE streams |
-| `mcp.ts`     | in-process **Model Context Protocol** server at `POST /api/mcp`; see [MCP server](#mcp-server)                                                                                                                                                                                                            |
+| Router | Highlights |
+| --- | --- |
+| `health.ts` | `GET /health` liveness check |
+| `demo.ts` | public demo arena + its SSE streams (no auth) |
+| `help.ts` | help responses, classified with `ml-classify-text` |
+| `session.ts` | `POST`/`DELETE /api/session` — sign in / out (sets the HttpOnly `auth` cookie); see [Auth](#auth) |
+| `token.ts` | mint / rotate the per-user **MCP bearer API token** (stored only as a sha256 hash) |
+| `user.ts` | `GET /api/user` (current user) and `/api/user/:userId` |
+| `app.ts` | app CRUD, `GET/PUT .../app/:appId/source`, `POST .../compile` / `.../reboot` / `.../check` (dry-run compile), capped at `MAX_APPS_PER_USER` |
+| `arena.ts` | arena collection (`GET`/`POST .../arenas`, `DELETE .../arenas/:arenaId`); status (`buildArenaStatus`) and `.../summary` (`buildMatchSummary`); roster add/remove + enable/disable (incl. add-by-reference); `restart`/`pause`/`resume`/`speed`/`seed`; and the live `.../events` & `.../logs` SSE streams |
+| `mcp.ts` | in-process **Model Context Protocol** server at `POST /api/mcp`; see [MCP server](#mcp-server) |
 
 > **Multi-arena:** a user can own several arenas. Each action route is registered at **two paths sharing one handler** (the `dual()` helper): `/api/user/:userId/arena/...` resolves the user's **default arena** (lazily created if none) — this is what the UI uses — while `/api/user/:userId/arenas/:arenaId/...` addresses a **specific arena** for external tooling. The `resolveArena` middleware enforces that an `:arenaId` belongs to `:userId`. Creation is capped at `MAX_ARENAS_PER_USER` (10) per user and `MAX_TOTAL_ARENAS` globally. Keep arena management out of the UI; build it against `/arenas`.
 
@@ -180,20 +180,20 @@ The server uses a structured [pino](https://getpino.io) logger (`src/util/logger
 
 Beyond ordinary info/debug logs, a set of **named fault/security events** is logged with a stable `event` field so a pipeline can alert on them. Each carries relevant context (`appId`, `arenaId`, `tankId`, etc.):
 
-| `event`                | Level       | Meaning / why monitor                                                                                                                                                                                                                                                       |
-| ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bot.fault`            | warn        | A bot crashed (`kind`: `load`/`init`/`handler`/`timer`/`callback`, or `log-flood`). **`timedOut: true`** means it tripped `SANDBOX_TIMEOUT_MS` — a runaway loop or possible sandbox-escape attempt; alert on these specifically. A rising overall rate signals broken bots. |
-| `sandbox.catastrophic` | error       | A fatal V8 error in an isolate — typically the 8 MB memory limit (runaway allocation / abuse).                                                                                                                                                                              |
-| `auth.failed`          | warn        | A gated route rejected an invalid/expired credential. A spike suggests probing or a token problem.                                                                                                                                                                          |
-| `auth.forbidden`       | warn        | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse; the sharpest access-control signal.                                                                                                                                 |
-| `auth.signin`          | info        | A verified Google sign-in established a session (`sub`). Baseline for sign-in rate.                                                                                                                                                                                         |
-| `auth.token.created`   | info        | An MCP API token was minted/rotated (`userId`, `clientId`).                                                                                                                                                                                                                 |
-| `auth.token.revoked`   | info        | An MCP API token was revoked (`clientId`).                                                                                                                                                                                                                                  |
-| `rate.limited`         | warn        | A request was refused by a rate limiter (`limiter`, `key`, `method`, `path`; `429`/`E022`). Sustained hits = abuse or a misbehaving client.                                                                                                                                 |
-| `mcp.tool`             | info        | An MCP tool was invoked (`userId`, `tool`). Audit trail for the bearer-token surface, which grants full control of a user's bots/arenas — attribute actions and spot anomalous automation.                                                                                  |
-| `db.error`             | error       | Database/pool error (lost connection, auth failure).                                                                                                                                                                                                                        |
-| `http.error`           | error       | An unhandled error reached the Express error handler (a 5xx).                                                                                                                                                                                                               |
-| `process.fatal`        | error/fatal | An `unhandledRejection` or `uncaughtException` escaped to the process.                                                                                                                                                                                                      |
+| `event` | Level | Meaning / why monitor |
+| --- | --- | --- |
+| `bot.fault` | warn | A bot crashed (`kind`: `load`/`init`/`handler`/`timer`/`callback`, or `log-flood`). **`timedOut: true`** means it tripped `SANDBOX_TIMEOUT_MS` — a runaway loop or possible sandbox-escape attempt; alert on these specifically. A rising overall rate signals broken bots. |
+| `sandbox.catastrophic` | error | A fatal V8 error in an isolate — typically the 8 MB memory limit (runaway allocation / abuse). |
+| `auth.failed` | warn | A gated route rejected an invalid/expired credential. A spike suggests probing or a token problem. |
+| `auth.forbidden` | warn | An authenticated user tried to act on **another** user's resource (`actor`/`target`) — potential abuse; the sharpest access-control signal. |
+| `auth.signin` | info | A verified Google sign-in established a session (`sub`). Baseline for sign-in rate. |
+| `auth.token.created` | info | An MCP API token was minted/rotated (`userId`, `clientId`). |
+| `auth.token.revoked` | info | An MCP API token was revoked (`clientId`). |
+| `rate.limited` | warn | A request was refused by a rate limiter (`limiter`, `key`, `method`, `path`; `429`/`E022`). Sustained hits = abuse or a misbehaving client. |
+| `mcp.tool` | info | An MCP tool was invoked (`userId`, `tool`). Audit trail for the bearer-token surface, which grants full control of a user's bots/arenas — attribute actions and spot anomalous automation. |
+| `db.error` | error | Database/pool error (lost connection, auth failure). |
+| `http.error` | error | An unhandled error reached the Express error handler (a 5xx). |
+| `process.fatal` | error/fatal | An `unhandledRejection` or `uncaughtException` escaped to the process. |
 
 Note: a bot choosing **not** to await a command whose promise later rejects (e.g. a cancelled `bot.setSpeed`) is normal and is **not** logged as a fault or treated as a crash.
 
@@ -201,20 +201,20 @@ Note: a bot choosing **not** to await a command whose promise later rejects (e.g
 
 The app emits these signals; **wiring alarms is a deploy-time/ops concern** (the app can't page anyone itself). In production the logger emits JSON, so any pipeline that ingests the container's stdout — CloudWatch Logs metric filters, Datadog, Grafana Loki, etc. — can match on the `event` field and alarm. Suggested starting points:
 
-| Condition                                        | Why / suggested threshold                                                         |
-| ------------------------------------------------ | --------------------------------------------------------------------------------- |
-| `event="sandbox.catastrophic"`                   | Any occurrence — isolate OOM / fatal V8 error. Page on ≥1.                        |
-| `event="bot.fault" timedOut=true`                | Runaway/possible sandbox-escape attempt. Alert on a rising rate.                  |
-| `event="auth.forbidden"` from one `actor`        | Cross-user probing. Alert on repeated hits from the same actor in a short window. |
-| `event="rate.limited"` sustained                 | Abuse or a broken client hammering a limiter; correlate by `key`.                 |
-| `event="auth.failed"` spike                      | Credential probing.                                                               |
-| `event="process.fatal"` / `event="db.error"`     | Process/DB health — page on any.                                                  |
-| `event="mcp.tool"` anomalous volume per `userId` | A compromised or runaway token; the audit trail to review after an incident.      |
+| Condition | Why / suggested threshold |
+| --- | --- |
+| `event="sandbox.catastrophic"` | Any occurrence — isolate OOM / fatal V8 error. Page on ≥1. |
+| `event="bot.fault" timedOut=true` | Runaway/possible sandbox-escape attempt. Alert on a rising rate. |
+| `event="auth.forbidden"` from one `actor` | Cross-user probing. Alert on repeated hits from the same actor in a short window. |
+| `event="rate.limited"` sustained | Abuse or a broken client hammering a limiter; correlate by `key`. |
+| `event="auth.failed"` spike | Credential probing. |
+| `event="process.fatal"` / `event="db.error"` | Process/DB health — page on any. |
+| `event="mcp.tool"` anomalous volume per `userId` | A compromised or runaway token; the audit trail to review after an incident. |
 
 **AWS wiring (this deployment).** These `.ebextensions` files are **active** and turn the above into CloudWatch alarms → the `Alerts` SNS topic (a confirmed email subscription; override via the `ALERT_SNS_TOPIC_ARN` / `ALERT_LOG_GROUP` env properties):
 
 - **`cloudwatch-logs.config`** — streams the instance's stdout (where the pino JSON lands) to a CloudWatch Logs group, `/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log`. Required for any log-based alarm; also makes the logs queryable in Logs Insights.
-- **`cloudwatch-alarms.config`** — log-metric-filter alarms on the **security** events: `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, `rate.limited`.
+- **`cloudwatch-alarms.config`** — log-metric-filter alarms on the **security** events: `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, `rate.limited`, `bot.command_flood` (a bot exceeded its per-tick command budget and was faulted), `bot.drain_exhausted`.
 - **`cloudwatch-ops-alarms.config`** — **availability / infrastructure / reliability** alarms: ALB unhealthy-hosts + ELB/target 5xx (site-down), RDS free-storage / CPU / connections / freeable-memory, EC2 CPU + CPU-credit-balance, and the `db.error` / `http.error` log events. These reference the EB-created stack resources (`AWSEBRDSDatabase`, `AWSEBV2LoadBalancer`, `AWSEBV2LoadBalancerTargetGroup`, `AWSEBAutoScalingGroup`).
 - **`options.config`** also sets `aws:elasticbeanstalk:sns:topics` so EB's own environment events (deploy failures, environment-degraded, instance replacement) email the same inbox.
 

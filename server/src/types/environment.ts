@@ -176,7 +176,11 @@ export default class Environment {
   private statsSink:
     ((deltas: Partial<Record<keyof BotStats, number>>) => void) | null = null;
 
-  // Commands the bots are awaiting, settled deterministically each tick.
+  // Commands the bots are awaiting, settled deterministically each tick. Each
+  // entry lives on the HOST heap (outside the isolates' 8 MB limits), but growth
+  // is bounded structurally: every command is charged against its issuing bot's
+  // per-tick budget (MAX_COMMANDS_PER_TICK, bot.ts) and exceeding it faults the
+  // bot, so the queue can never exceed ~budget × live bots.
   private pendingCommands: PendingCommand[] = [];
   // In-flight isolate operations (event-handler dispatches, command settlements,
   // timer callbacks) started during the current tick. The loop awaits these before
@@ -527,7 +531,14 @@ export default class Environment {
     // registered in botOps before we judge quiescence — without it, work can leak
     // into the next tick and make the result depend on wall-clock timing.
     const flush = () => new Promise((resolve) => setImmediate(resolve));
-    for (let round = 0; round < Environment.MAX_DRAIN_ROUNDS; round++) {
+    // Env-tunable (default MAX_DRAIN_ROUNDS) so tests can force the exhaustion
+    // path; 0 makes drain a no-op that reports immediately (so `|| default`
+    // would be wrong — 0 is falsy — hence the explicit finite check).
+    const parsed = Number(process.env.MAX_DRAIN_ROUNDS);
+    const maxRounds = Number.isFinite(parsed)
+      ? parsed
+      : Environment.MAX_DRAIN_ROUNDS;
+    for (let round = 0; round < maxRounds; round++) {
       const settled = this.settlePendingCommands();
       await flush();
       let hadOps = false;
@@ -538,8 +549,15 @@ export default class Environment {
       }
       if (settled === 0 && !hadOps) return;
     }
+    // Hitting the bound means a bot kept the tick busy for the whole budget —
+    // a runaway/abuse signal. Carry a stable `event` (like every other alertable
+    // condition) so a log-metric alarm can fire; without it this was invisible.
     logger.warn(
-      { arenaId: this.arena.getId() },
+      {
+        event: LogEvent.BOT_DRAIN_EXHAUSTED,
+        arenaId: this.arena.getId(),
+        rounds: maxRounds,
+      },
       'bot work drain exceeded MAX_DRAIN_ROUNDS'
     );
   };

@@ -9,18 +9,11 @@
 
 ## The idea
 
-A `let` box from Lesson 8 is forgotten the moment its handler finishes. But a robot needs
-memory that **lasts** between events, like its current mood. For that we use **`this`**:
-a shared notebook that all your handlers can read and write, and that even survives a
-code Deploy.
+A `let` box from Lesson 8 is forgotten the moment its handler finishes. But a robot needs memory that **lasts** between events, like its current mood. For that we use **`this`**: a shared notebook that all your handlers can read and write, and that even survives a code Deploy.
 
-A great use of lasting memory is a **state machine**: your robot is always in one
-**mode** (a state), and it behaves differently depending on which. We'll use two modes:
-`SEARCH` (wander and look) and `ATTACK` (shoot the enemy). The bot switches modes as
-things happen.
+A great use of lasting memory is a **state machine**: your robot is always in one **mode** (a state), and it behaves differently depending on which. We'll use two modes: `SEARCH` (wander and look) and `ATTACK` (shoot the enemy). The bot switches modes as things happen.
 
-We'll also tidy our code into a **named function**, a reusable bundle we can call by
-name from anywhere.
+We'll also tidy our code into a **named function**, a reusable bundle we can call by name from anywhere.
 
 ## Try it
 
@@ -57,54 +50,31 @@ function aimAndFire(target) {
 }
 ```
 
-Press **Deploy**. Rusty wanders in `SEARCH`, and the moment it spots an enemy it flips to
-`ATTACK` and fires.
+Press **Deploy**. Rusty wanders in `SEARCH`, and the moment it spots an enemy it flips to `ATTACK` and fires.
 
 New pieces:
 
-- `this.mode = 'SEARCH'` stores the mode in lasting memory; `this.mode === 'ATTACK'`
-  checks it.
-- `targets.filter((t) => !t.friendly)` makes a **new list** containing only the enemies.
-  `filter` keeps the items that pass your test.
-- `function aimAndFire(target) { ... }` defines a reusable action we call with
-  `aimAndFire(enemies[0])`.
+- `this.mode = 'SEARCH'` stores the mode in lasting memory; `this.mode === 'ATTACK'` checks it.
+- `targets.filter((t) => !t.friendly)` makes a **new list** containing only the enemies. `filter` keeps the items that pass your test.
+- `function aimAndFire(target) { ... }` defines a reusable action we call with `aimAndFire(enemies[0])`.
 
 ## Experiment
 
 - Watch the brain work: add `console.log('mode:', this.mode);` at the top of your TICK.
-- Add a third mode. In SCANNED, if there are no enemies but you were attacking, set
-  `this.mode = 'SEARCH'`. Try adding a `FLEE` mode you switch to later (next lesson!).
-- Make ATTACK chase: inside the `enemies.length > 0` block, add
-  `bot.setOrientation(enemies[0].angle);`
+- Add a third mode. In SCANNED, if there are no enemies but you were attacking, set `this.mode = 'SEARCH'`. Try adding a `FLEE` mode you switch to later (next lesson!).
+- Make ATTACK chase: inside the `enemies.length > 0` block, add `bot.setOrientation(enemies[0].angle);`
 
 ## Common questions
 
-**Why `this.mode` instead of `let mode`?**
-A `let` inside a handler is forgotten when that handler ends. `this.mode` lives on your
-robot's shared notebook, so every handler sees the same value, and it even survives a
-code Deploy, so editing mid-match won't wipe your robot's memory.
+**Why `this.mode` instead of `let mode`?** A `let` inside a handler is forgotten when that handler ends. `this.mode` lives on your robot's shared notebook, so every handler sees the same value, and it even survives a code Deploy, so editing mid-match won't wipe your robot's memory.
 
-**Do my five robots share this memory?**
-No, each robot gets its **own** private notebook. When one bot sets `this.mode`, the
-other four don't see it, and a top-level `let` variable is private to a single bot too
-(they run the same code, but each keeps its own copy). To share something across your
-team, you **send a message**. That's [Lesson 15](/learn/teamwork).
+**Do my five robots share this memory?** No, each robot gets its **own** private notebook. When one bot sets `this.mode`, the other four don't see it, and a top-level `let` variable is private to a single bot too (they run the same code, but each keeps its own copy). To share something across your team, you **send a message**. That's [Lesson 15](/learn/teamwork).
 
-**What happens to my variables when I Save?**
-Saving **reloads your code**: it runs again from the top. So a top-level `let value = 123`
-is set right back to `123` on every Save, losing whatever it had grown to. But `this.value`
-lives on the notebook that _survives_ a reload, so it keeps its value across Saves. That's
-the real reason to reach for `this` for anything your robot needs to remember while you keep
-tweaking its code mid-match. (A **Reboot** is the exception: it wipes the notebook too and
-re-runs `START` from scratch.)
+**What happens to my variables when I Save?** Saving **reloads your code**: it runs again from the top. So a top-level `let value = 123` is set right back to `123` on every Save, losing whatever it had grown to. But `this.value` lives on the notebook that _survives_ a reload, so it keeps its value across Saves. That's the real reason to reach for `this` for anything your robot needs to remember while you keep tweaking its code mid-match. (A **Reboot** is the exception: it wipes the notebook too and re-runs `START` from scratch.)
 
-**What does `filter` do (vs `forEach`)?**
-`forEach` _visits_ every item. `filter` _builds a new shorter list_ of just the items that
-match (here, the enemies).
+**What does `filter` do (vs `forEach`)?** `forEach` _visits_ every item. `filter` _builds a new shorter list_ of just the items that match (here, the enemies).
 
-**Why make a function like `aimAndFire`?**
-So you can reuse it and keep your handlers short and readable. If you want to aim-and-fire
-in two places, you write it once and call it twice.
+**Why make a function like `aimAndFire`?** So you can reuse it and keep your handlers short and readable. If you want to aim-and-fire in two places, you write it once and call it twice.
 
 ## You learned
 

@@ -117,12 +117,12 @@ node index.js              # root proxy on :5000  (open this one)
 
 This works because the server picks one of two modes at startup based on a single signal — whether `RDS_HOSTNAME` is set:
 
-|                | **Local-dev mode** (default)                                                                          | **Production-like mode**                                                   |
-| -------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Trigger**    | `RDS_HOSTNAME` unset _and_ `NODE_ENV` ≠ `production`/`test`                                           | `RDS_HOSTNAME` set (or `NODE_ENV=production`)                              |
-| **Database**   | In-memory [pg-mem](https://github.com/oguimbal/pg-mem) — created on boot, **resets on every restart** | Real PostgreSQL via the `RDS_*` variables                                  |
-| **Auth**       | **Bypassed** — every request is a fixed "Local Dev" user; no sign-in, the Google button never appears | Real **Google OAuth** (`GOOGLE_CLIENT_ID`); sign in with the in-app button |
-| **First load** | "Local Dev" user is auto-created with starter bots and a live arena                                   | A user/arena is created on first sign-in                                   |
+|  | **Local-dev mode** (default) | **Production-like mode** |
+| --- | --- | --- |
+| **Trigger** | `RDS_HOSTNAME` unset _and_ `NODE_ENV` ≠ `production`/`test` | `RDS_HOSTNAME` set (or `NODE_ENV=production`) |
+| **Database** | In-memory [pg-mem](https://github.com/oguimbal/pg-mem) — created on boot, **resets on every restart** | Real PostgreSQL via the `RDS_*` variables |
+| **Auth** | **Bypassed** — every request is a fixed "Local Dev" user; no sign-in, the Google button never appears | Real **Google OAuth** (`GOOGLE_CLIENT_ID`); sign in with the in-app button |
+| **First load** | "Local Dev" user is auto-created with starter bots and a live arena | A user/arena is created on first sign-in |
 
 The toggle is computed in `server/src/util/devMode.ts` (`isLocalDev`). **Local-dev mode is for your machine only:** it can never activate when `NODE_ENV=production` (re-checked at the auth-bypass site), and it's disabled under `NODE_ENV=test` so the test suite exercises the real code paths. A real deployment always sets both `NODE_ENV=production` and `RDS_HOSTNAME`, so it gets production-like mode.
 

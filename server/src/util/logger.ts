@@ -28,6 +28,8 @@ export const logger = pino(
 // in event="auth.failed".
 export const LogEvent = {
   BOT_FAULT: 'bot.fault', // bot crashed (compile/run/handler/timer/timeout)
+  BOT_COMMAND_FLOOD: 'bot.command_flood', // bot exceeded its per-tick command budget and was faulted (runaway/abuse)
+  BOT_DRAIN_EXHAUSTED: 'bot.drain_exhausted', // per-tick bot-work drain hit MAX_DRAIN_ROUNDS
   SANDBOX_CATASTROPHIC: 'sandbox.catastrophic', // isolate OOM / fatal V8 error
   AUTH_FAILED: 'auth.failed', // invalid/expired credential
   AUTH_FORBIDDEN: 'auth.forbidden', // authenticated user acting on another's resource

@@ -1,6 +1,6 @@
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Bot, { waitUntil } from './bot';
+import Bot, { commandBudgetRejected, finiteArg, waitUntil } from './bot';
 import {
   normalizeAngle,
   toApiHeading,
@@ -8,7 +8,7 @@ import {
 } from '../util/geometry';
 
 // Degrees the radar turns per tick (seeds the per-instance runtime field and
-// is mirrored into the sandbox as the bot.radar.turnRate attribute), and
+// is mirrored into the sandbox as the bot.radar.TURN_RATE attribute), and
 // charge added per tick toward the 100 full-charge threshold.
 export const RADAR_TURN_SPEED = 4;
 export const RADAR_CHARGE_RATE = 10;
@@ -44,7 +44,15 @@ export class BotRadar implements Orientated {
   }
 
   setOrientation(d: number) {
-    const target = normalizeAngle(Math.round(d));
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
+    const n = finiteArg(d);
+    if (n === null) {
+      this.bot.logger.trace(
+        'Ignoring non-finite radar setOrientation argument'
+      );
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -77,7 +85,13 @@ export class BotRadar implements Orientated {
   }
 
   turn(d: number) {
-    const target = normalizeAngle(Math.round(this.orientation + d));
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
+    const n = finiteArg(d);
+    if (n === null) {
+      this.bot.logger.trace('Ignoring non-finite radar turn argument');
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(this.orientation + n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -104,6 +118,7 @@ export class BotRadar implements Orientated {
   }
 
   onReady() {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     let peakValue = this.charged;
     return waitUntil(
       this.bot.env,
@@ -126,6 +141,7 @@ export class BotRadar implements Orientated {
   }
 
   scan() {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     if (this.charged < 100) return Promise.reject('Radar not ready');
     this.bot.logger.trace('Scanning');
     this.charged = 0;

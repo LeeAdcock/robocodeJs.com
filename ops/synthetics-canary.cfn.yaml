@@ -1,13 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  External uptime check for RobocodeJs: a CloudWatch Synthetics canary that GETs
-  the public /health every 5 minutes and asserts HTTP 200, with an alarm to the
-  existing Alerts SNS topic. This catches DNS / TLS / load-balancer / edge
-  outages that the in-AWS ALB/EC2/RDS alarms (in .ebextensions) cannot see.
-
-  Deployed as its OWN stack (NOT via .ebextensions) because a Synthetics canary
-  runs off the EB instance and needs its own IAM role + an S3 artifact bucket.
-  See ops/README.md for the deploy command.
+  External uptime check for RobocodeJs: a CloudWatch Synthetics canary that GETs the public /health every 5 minutes and asserts HTTP 200, with an alarm to the existing Alerts SNS topic. This catches DNS / TLS / load-balancer / edge outages that the in-AWS ALB/EC2/RDS alarms (in .ebextensions) cannot see.
+  
+  Deployed as its OWN stack (NOT via .ebextensions) because a Synthetics canary runs off the EB instance and needs its own IAM role + an S3 artifact bucket. See ops/README.md for the deploy command.
 
 Parameters:
   HealthUrl:

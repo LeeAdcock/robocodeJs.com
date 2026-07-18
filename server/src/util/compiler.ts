@@ -279,7 +279,7 @@ function exposeBotRadar(bot: Bot, isolate: ivm.Isolate) {
   // per-instance or mutable, its property must instead read the live field via
   // an exposeGetter method or the sandbox copy silently goes stale.
   isolate
-    .compileScriptSync(`bot.radar.turnRate = ${num(RADAR_TURN_SPEED)}`)
+    .compileScriptSync(`bot.radar.TURN_RATE = ${num(RADAR_TURN_SPEED)}`)
     .runSync(bot.getContext(), {});
 }
 
@@ -350,9 +350,9 @@ function exposeBotTurret(bot: Bot, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-      bot.turret.turnRate = ${num(TURRET_TURN_SPEED)}
-      bot.turret.bulletSpeed = ${num(BULLET_SPEED)}
-      bot.turret.bulletDamage = ${num(BULLET_DAMAGE)}
+      bot.turret.TURN_RATE = ${num(TURRET_TURN_SPEED)}
+      bot.turret.BULLET_SPEED = ${num(BULLET_SPEED)}
+      bot.turret.BULLET_DAMAGE = ${num(BULLET_DAMAGE)}
       `
     )
     .runSync(bot.getContext(), {});
@@ -506,10 +506,10 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
   isolate
     .compileScriptSync(
       `
-      bot.radius = ${num(BOT_RADIUS)}
-      bot.maxSpeed = ${num(BOT_MAX_SPEED)}
-      bot.acceleration = ${num(BOT_ACCELERATION)}
-      bot.turnRate = ${num(BOT_TURN_SPEED)}
+      bot.RADIUS = ${num(BOT_RADIUS)}
+      bot.MAX_SPEED = ${num(BOT_MAX_SPEED)}
+      bot.ACCELERATION = ${num(BOT_ACCELERATION)}
+      bot.TURN_RATE = ${num(BOT_TURN_SPEED)}
       `
     )
     .runSync(bot.getContext(), {});
@@ -743,6 +743,11 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           _bot_register(event)
         }
         Date = undefined
+        // Determinism: Date is gone, but Intl.DateTimeFormat().format() with no
+        // argument formats the *current* wall-clock time — a back-door real clock
+        // (and entropy source) that would break seeded-match reproducibility. Bots
+        // have no need for locale formatting, so remove Intl entirely.
+        Intl = undefined
         {
           let __rng = ${mathSeed} >>> 0
           Math.random = () => {
@@ -875,8 +880,8 @@ const init = (env: Environment, process: Process, bot: Bot) => {
             getHealth: () => data.health,
             // Where to aim (or drive) so something leaving our position at
             // the given speed meets this contact, assuming it holds its
-            // heading and speed — pass bot.turret.bulletSpeed to lead a shot,
-            // or bot.maxSpeed to cut it off. Closed-form smallest-positive
+            // heading and speed — pass bot.turret.BULLET_SPEED to lead a shot,
+            // or bot.MAX_SPEED to cut it off. Closed-form smallest-positive
             // root; folds in ticks elapsed since the scan. Returns a Marker,
             // or null when no interception is possible.
             getIntercept: (speed) => {
