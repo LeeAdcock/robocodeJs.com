@@ -436,3 +436,73 @@ describe('BotRadar.scan', () => {
     expect(found[0].friendly).toBe(true);
   });
 });
+
+describe('BotRadar orientation & charge', () => {
+  it('setOrientation() sets the absolute target and emits radarTurn', async () => {
+    const { bot, emit } = makeRealBot();
+    const p = bot.turret.radar.setOrientation(90);
+    expect(bot.turret.radar.orientationTarget).toBe(90);
+    expect(emit).toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'radarTurn', radarOrientationTarget: 90 })
+    );
+    // isRunning() is false in the mock env, so the turn is cancelled at once.
+    await expect(p).rejects.toBeDefined();
+  });
+
+  it('setOrientation() to the current target is a no-op (no event)', async () => {
+    const { bot, emit } = makeRealBot();
+    // The radar target is pinned to 0 in makeRealBot.
+    await expect(bot.turret.radar.setOrientation(0)).resolves.toBeUndefined();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('turn() rotates relative to the current orientation and emits radarTurn', async () => {
+    const { bot, emit } = makeRealBot();
+    bot.turret.radar.orientation = 30;
+    const p = bot.turret.radar.turn(90); // 30 + 90 = 120
+    expect(bot.turret.radar.orientationTarget).toBe(120);
+    expect(emit).toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'radarTurn' })
+    );
+    await expect(p).rejects.toBeDefined();
+  });
+
+  it('turn() by a full revolution lands on the same target (no-op, no event)', async () => {
+    const { bot, emit } = makeRealBot();
+    await expect(bot.turret.radar.turn(360)).resolves.toBeUndefined();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('getOrientation() returns integer degrees (floored, normalized)', () => {
+    const { bot } = makeRealBot();
+    bot.turret.radar.orientation = 90.9;
+    expect(bot.turret.radar.getOrientation()).toBe(90);
+    bot.turret.radar.orientation = -10;
+    expect(bot.turret.radar.getOrientation()).toBe(350);
+  });
+
+  it('isTurning() reflects whether the radar has reached its target', () => {
+    const { bot } = makeRealBot();
+    expect(bot.turret.radar.isTurning()).toBe(false);
+    bot.turret.radar.orientationTarget = 45;
+    expect(bot.turret.radar.isTurning()).toBe(true);
+  });
+
+  it('isReady()/onReady() resolve once the radar is fully charged', async () => {
+    const { bot } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    expect(bot.turret.radar.isReady()).toBe(true);
+    await expect(bot.turret.radar.onReady()).resolves.toBeUndefined();
+  });
+
+  it('onReady() rejects while uncharged and the sim is stopped', async () => {
+    const { bot } = makeRealBot();
+    bot.turret.radar.charged = 50;
+    expect(bot.turret.radar.isReady()).toBe(false);
+    await expect(bot.turret.radar.onReady()).rejects.toBe(
+      'Radar already scanned'
+    );
+  });
+});

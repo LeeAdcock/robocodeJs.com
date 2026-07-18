@@ -9,7 +9,9 @@ export default defineConfig({
     include: ['test/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
+      // `json-summary` is consumed by the root combined-coverage gate
+      // (scripts/coverage-check.cjs) — see the root `coverage` script.
+      reporter: ['text', 'html', 'lcov', 'json-summary'],
       reportsDirectory: './coverage',
       // Measure the app source only. Vitest already excludes test files,
       // node_modules, configs, and .d.ts by default; we add the SPA entry

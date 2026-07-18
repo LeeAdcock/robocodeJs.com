@@ -425,3 +425,38 @@ body.dark .blog-signature img {
     animation: none;
   }
 }
+
+/* Arena control toolbar (arenaToolbar.tsx). Give the button group the same
+   translucent charcoal scrim the roster legend uses (arenaLegend.tsx) so the two
+   arena overlays read as one HUD instead of two greys. The buttons themselves go
+   transparent — Bootstrap's `secondary` variant otherwise re-asserts its opaque
+   grey (including on :hover/:focus), so we override the background here rather
+   than inline — with a subtle light wash on hover/focus for feedback. */
+.arena-toolbar {
+  background: rgba(33, 37, 41, 0.55);
+  border-radius: 6px;
+  padding: 2px;
+}
+.arena-toolbar .btn.btn-secondary {
+  background: transparent;
+  border-color: transparent;
+  color: #fff;
+  box-shadow: none;
+  /* Center the icon and give it symmetric padding. Bootstrap's default button
+     padding is 6px vertical / 12px horizontal, and the icon sits on the text
+     baseline, so the glyph ended up further from the left and top edges than the
+     bottom. Flex-centering plus even 6px padding makes the scrim inset symmetric
+     (2px group + 6px here = 8px on every side), matching the roster legend. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+.arena-toolbar .btn.btn-secondary:hover,
+.arena-toolbar .btn.btn-secondary:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+}
+.arena-toolbar .btn.btn-secondary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

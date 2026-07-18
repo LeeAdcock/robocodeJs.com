@@ -2,7 +2,9 @@
 
 **Welcome to the arena! RobocodeJs is a browser-based programming game where you write JavaScript to control a team of battle bots. Brainstorm a strategy, program your bots, and set them loose in the arena to find and defeat the competition. It all runs right in your browser. Onwards to fame and glory!**
 
-The arena is a square battlefield where teams of bots fight. Each app you write is the shared "brain" for one team: five bots that scan with radar, aim a turret, and drive around hunting the other teams. Your goal is simple: knock them out before they knock out you. Edit your code and save, and every bot on your team instantly starts using the new logic, so you can reset the match, add or remove opponents, and keep tuning your strategy in seconds.
+The arena is a square battlefield where teams of bots fight. Each app you write is the shared "brain" for one team: five bots that scan with radar, aim a turret, and drive around hunting the other teams. Your goal is simple: knock them out before they knock out you.
+
+Edit your code and save, and every bot on your team instantly starts using the new logic, so you can reset the match, add or remove opponents, and keep tuning your strategy in seconds.
 
 See that arena? It's a live demo: real bots battling right now. In a few minutes, yours can be in there too.
 

@@ -30,7 +30,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
   return (
     <>
       <ButtonToolbar style={{ justifyContent: 'flex-end' }}>
-        <ButtonGroup style={{ marginRight: '5px' }}>
+        <ButtonGroup className="arena-toolbar" style={{ marginRight: '5px' }}>
           {props.isPaused && (
             <OverlayTrigger
               placement={'bottom'}
@@ -38,7 +38,6 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             >
               <Button
                 variant="secondary"
-                size="sm"
                 aria-label="Resume"
                 onClick={props.doResume}
                 style={{ color: 'var(--accent)' }}
@@ -54,7 +53,6 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             >
               <Button
                 variant="secondary"
-                size="sm"
                 aria-label="Pause"
                 onClick={props.doPause}
               >
@@ -69,7 +67,6 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           >
             <Button
               variant="secondary"
-              size="sm"
               aria-label="Reset"
               onClick={props.doRestart}
             >
@@ -86,7 +83,6 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             >
               <Button
                 variant="secondary"
-                size="sm"
                 aria-label="Copy public watch link"
                 onClick={(e) => {
                   // Dismiss the tooltip so it doesn't overlap the "copied" toast;
