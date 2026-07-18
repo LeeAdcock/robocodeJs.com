@@ -80,10 +80,12 @@ the turret.) See [the turret](/learn/docs#turret).
 
 ## Why does `bot.turn(350)` turn left instead of right?
 
-Turns take the shortest path to the target angle, so turning 350° clockwise
-is executed as 10° counter-clockwise. Use signed values for direction:
-positive turns clockwise, negative counter-clockwise. See
-[movement](/learn/docs#movement).
+`bot.turn()` sets a target heading — the value you pass is added to your
+current heading, wrapping at 360° — and the bot rotates there by the
+shortest route. Turning 350° clockwise and 10° counter-clockwise end at the
+same heading, so the bot takes the shorter one. Keep values between -180
+and 180 and the sign picks the direction: positive turns clockwise,
+negative counter-clockwise. See [movement](/learn/docs#movement).
 
 # Radar
 
