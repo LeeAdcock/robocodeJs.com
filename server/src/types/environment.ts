@@ -132,6 +132,18 @@ export const SUDDEN_DEATH_TIME = 7500;
 // spawn before combat — removing the last of the start-position luck. ~10s at 1x.
 export const DEPLOY_TICKS = 100;
 
+// Hard cap on how many commands an arena may have parked in its pending-command
+// queue at once. Each awaited bot command (turn/setSpeed/fire/scan/…) parks an
+// entry here on the HOST heap — outside the isolate's 8 MB limit — so a bot that
+// synchronously issues an unbounded chain (e.g. `for(;;) bot.turn(i)`) within a
+// single handler could grow this without bound and exhaust host memory before the
+// sandbox timeout fires (the documented t2.micro OOM mode). The ceiling is far
+// above any legitimate arena (a handful of parked commands per live bot); past it
+// new commands are rejected with E026 rather than queued. Read per call so tests
+// can lower it; env-tunable for prod. Mirrors the per-tick send/timer budgets.
+const maxPendingCommands = (): number =>
+  Number(process.env.MAX_PENDING_COMMANDS) || 10000;
+
 export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
@@ -178,6 +190,10 @@ export default class Environment {
 
   // Commands the bots are awaiting, settled deterministically each tick.
   private pendingCommands: PendingCommand[] = [];
+  // Latched while the pending-command queue sits at its cap, so a runaway bot
+  // flooding commands is logged as an abuse signal exactly once per episode (not
+  // once per rejected call). Cleared when the queue fully drains.
+  private pendingFlooded = false;
   // In-flight isolate operations (event-handler dispatches, command settlements,
   // timer callbacks) started during the current tick. The loop awaits these before
   // advancing so every bot has run to its next await-park — this is what makes
@@ -491,6 +507,26 @@ export default class Environment {
     new Promise<void>((resolve, reject) => {
       if (success()) return resolve();
       if (failure && failure()) return reject(msg);
+      // Bound the host-side queue: a runaway bot flooding commands can't grow it
+      // without limit (would exhaust host memory before the sandbox timeout). Past
+      // the cap the command is rejected, and the first rejection of an episode is
+      // logged once as a structured abuse signal (arena-attributed).
+      if (this.pendingCommands.length >= maxPendingCommands()) {
+        if (!this.pendingFlooded) {
+          this.pendingFlooded = true;
+          logger.warn(
+            {
+              event: LogEvent.BOT_COMMAND_FLOOD,
+              arenaId: this.arena.getId(),
+              pending: this.pendingCommands.length,
+            },
+            'arena pending-command queue hit its cap; rejecting further commands'
+          );
+        }
+        return reject(
+          `${ErrorCodes.E026}: too many pending commands (max ${maxPendingCommands()} per arena)`
+        );
+      }
       this.pendingCommands.push({ success, failure, resolve, reject, msg });
     });
 
@@ -512,6 +548,8 @@ export default class Environment {
       }
     }
     this.pendingCommands = remaining;
+    // Queue fully drained: re-arm the flood log for the next episode.
+    if (remaining.length === 0) this.pendingFlooded = false;
     return settled;
   };
 
@@ -527,7 +565,14 @@ export default class Environment {
     // registered in botOps before we judge quiescence — without it, work can leak
     // into the next tick and make the result depend on wall-clock timing.
     const flush = () => new Promise((resolve) => setImmediate(resolve));
-    for (let round = 0; round < Environment.MAX_DRAIN_ROUNDS; round++) {
+    // Env-tunable (default MAX_DRAIN_ROUNDS) so tests can force the exhaustion
+    // path; 0 makes drain a no-op that reports immediately (so `|| default`
+    // would be wrong — 0 is falsy — hence the explicit finite check).
+    const parsed = Number(process.env.MAX_DRAIN_ROUNDS);
+    const maxRounds = Number.isFinite(parsed)
+      ? parsed
+      : Environment.MAX_DRAIN_ROUNDS;
+    for (let round = 0; round < maxRounds; round++) {
       const settled = this.settlePendingCommands();
       await flush();
       let hadOps = false;
@@ -538,8 +583,15 @@ export default class Environment {
       }
       if (settled === 0 && !hadOps) return;
     }
+    // Hitting the bound means a bot kept the tick busy for the whole budget —
+    // a runaway/abuse signal. Carry a stable `event` (like every other alertable
+    // condition) so a log-metric alarm can fire; without it this was invisible.
     logger.warn(
-      { arenaId: this.arena.getId() },
+      {
+        event: LogEvent.BOT_DRAIN_EXHAUSTED,
+        arenaId: this.arena.getId(),
+        rounds: maxRounds,
+      },
       'bot work drain exceeded MAX_DRAIN_ROUNDS'
     );
   };

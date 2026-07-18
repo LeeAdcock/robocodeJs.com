@@ -268,6 +268,33 @@ and it applies to both the editor's save and the MCP `set_app_source` /
 unintended content (a huge paste, or generated boilerplate) landed in the editor.
 Fix: trim the source below the limit.
 
+## E026
+
+**Too many pending commands: the command was rejected.** Your bot has more than
+the per-arena limit of **10,000** awaited commands (`bot.turn`, `bot.setSpeed`,
+`bot.turret.fire`, `bot.radar.scan`, …) parked at once. Each awaited command
+waits for the simulation to reach a state, so issuing them faster than they can
+complete — typically firing thousands in a tight loop without `await` — piles
+them up until the arena refuses more. The rejected command's promise rejects (so
+an `await` throws); the bot keeps playing. This almost always means commands are
+being launched in an unbounded loop instead of awaited one at a time. Fix: `await`
+each command before issuing the next, and don't call movement/turret/radar
+commands inside an unbounded loop.
+
+```
+// Triggers E026: thousands of un-awaited commands pile up in one tick
+clock.on(Event.TICK, () => {
+  for (let a = 0; a < 100000; a++) bot.turn(a) // no await — all parked at once
+})
+```
+
+```
+// Fixed: await the command so only one is in flight
+clock.on(Event.TICK, async () => {
+  await bot.turn(90)
+})
+```
+
 ## Reserved codes
 
 `E002`, `E005`–`E012`, `E014`–`E016`, `W001`, and `W002` are reserved and not
