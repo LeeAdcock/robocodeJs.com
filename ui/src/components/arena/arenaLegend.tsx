@@ -25,7 +25,9 @@ export default function ArenaLegend(props: { arena: Arena }) {
         // terrain and the cool night-mode tint, in either app theme.
         background: 'rgba(33, 37, 41, 0.55)',
         color: '#fff',
-        fontSize: '0.8rem',
+        // Match the site body text size (1rem) so the roster reads at the same
+        // scale as page copy rather than as fine print.
+        fontSize: '1rem',
         lineHeight: 1.3,
         pointerEvents: 'none',
         maxWidth: '12em',
