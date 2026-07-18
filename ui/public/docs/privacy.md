@@ -2,37 +2,37 @@
 
 Last updated: July 18, 2026
 
-RobocodeJs ([https://robocodejs.com](https://robocodejs.com)) is a browser-based programming game where you write JavaScript bots that battle in an arena. This policy describes what data the service actually collects, what it's used for, and what control you have over it. We've kept it short and specific on purpose — there is no fine print.
+RobocodeJs ([https://robocodejs.com](https://robocodejs.com)) is a browser-based programming game where you write JavaScript bots that battle in an arena. This policy describes what data the service actually collects, what it's used for, and what control you have over it. We've kept it short and specific on purpose. There is no fine print.
 
-The short version: we collect the minimum needed to run the game — your Google sign-in profile, the bots and arenas you create, and standard server logs. We run no analytics or advertising, use exactly one cookie, and never sell your data or share it for marketing.
+The short version: we collect the minimum needed to run the game, namely your Google sign-in profile, the bots and arenas you create, and standard server logs. We run no analytics or advertising, use exactly one cookie, and never sell your data or share it for marketing.
 
 ## What we collect
 
-**Your Google profile.** Sign in with Google is the only sign-in method. When you sign in, Google shares your name, email address, and a link to your profile picture with us. We store your name, email, and that picture link with your account, along with when the account was created and when it was last active. The picture itself stays on Google's servers — your browser loads it directly from Google, and we never copy or host it. We require a verified email address to create an account, and we never see your Google password.
+**Your Google profile.** Sign in with Google is the only sign-in method. When you sign in, Google shares your name, email address, and a link to your profile picture with us. We store your name, email, and that picture link with your account, along with when the account was created and when it was last active. The picture itself stays on Google's servers; your browser loads it directly from Google, and we never copy or host it. We require a verified email address to create an account, and we never see your Google password.
 
 **What you create.** Your bot programs (source code and names), your arenas, your match results and ratings, and any achievements you unlock are stored with your account.
 
-**Server logs.** Like almost every web service, our servers log requests — including IP addresses — for rate limiting, abuse prevention, and debugging. Logs are operational data: we keep them for a short period and don't use them to profile you.
+**Server logs.** Like almost every web service, our servers log requests, including IP addresses, for rate limiting, abuse prevention, and debugging. Logs are operational data: we keep them for a short period and don't use them to profile you.
 
 That's the complete list. We don't collect payment information (there's nothing to buy), location data, or contacts, and we don't buy data about you from anyone else.
 
 ## Cookies and tracking
 
-We use **one cookie**: a session cookie named `auth` that holds your Google sign-in credential so you stay signed in. It is inaccessible to scripts (HttpOnly), the sign-in it carries expires on its own within about an hour, and it is deleted when you log out. That's the only cookie — there is no consent banner because there's nothing to consent to beyond signing in.
+We use **one cookie**: a session cookie named `auth` that holds your Google sign-in credential so you stay signed in. It is inaccessible to scripts (HttpOnly), the sign-in it carries expires on its own within about an hour, and it is deleted when you log out. That's the only cookie, and there is no consent banner because there's nothing to consent to beyond signing in.
 
 We run **no analytics, no advertising, no tracking pixels, and no third-party trackers** of any kind.
 
-Your browser's local storage holds a few preferences — color theme, editor font size, debug view — purely for your convenience. They never leave your browser.
+Your browser's local storage holds a few preferences (color theme, editor font size, debug view) purely for your convenience. They never leave your browser.
 
 ## What's public
 
 RobocodeJs is a competitive game, so some things are visible to others by design:
 
 - **The rankings page.** If your bots compete on the global ladder, your display name (the name on your Google account), your bot's name, and its rating appear on the public leaderboard, visible to anyone.
-- **Spectating.** If you share your arena's watch link, anyone with the link can watch your matches live — bot names, positions, and battle events.
+- **Spectating.** If you share your arena's watch link, anyone with the link can watch your matches live: bot names, positions, and battle events.
 - **Sharing a bot.** If you share a bot's add-link, other players can field your bot in their own arenas.
 
-Your bot's **source code is always private to you**. Spectators and players who add your bot see only its behavior in the arena — never the code. Your email address is never shown publicly.
+Your bot's **source code is always private to you**. Spectators and players who add your bot see only its behavior in the arena, never the code. Your email address is never shown publicly.
 
 Your display name comes from your Google account, which for many people is their real name. If you'd rather compete under a different name, change the display name on your Google account.
 
@@ -42,7 +42,7 @@ To keep the global ladder fresh, our servers periodically run automated ranked m
 
 ## Connecting AI tools
 
-You can optionally connect AI assistants to your account through a standard connector sign-in flow (OAuth). A connected assistant can read and edit your bots and control your arenas **on your behalf** — access you grant explicitly when you connect. To disconnect, remove the connector in your AI client; the credentials behind the connection are short-lived and expire on their own. We store those credentials only as cryptographic hashes — we can't read them back, and neither could anyone who obtained our database.
+You can optionally connect AI assistants to your account through a standard connector sign-in flow (OAuth). A connected assistant can read and edit your bots and control your arenas on your behalf, an access you grant explicitly when you connect. To disconnect, remove the connector in your AI client; the credentials behind the connection are short-lived and expire on their own. We store those credentials only as cryptographic hashes, so we can't read them back, and neither could anyone who obtained our database.
 
 What you share _with_ an AI assistant (for example, bot code you paste into a chat) is handled under that provider's privacy policy, not ours.
 
