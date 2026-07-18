@@ -18,10 +18,10 @@ See also the [game rules & physics](/rules) for exact speeds, turn rates, reload
 
 The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
 
-- `arena.getWidth() : number` Returns the arena's width in units.
-- `arena.getHeight() : number` Returns the arena's height in units.
+- `arena.getWidth() : number` Returns the arena's width in feet.
+- `arena.getHeight() : number` Returns the arena's height in feet.
 - `arena.contains(x, y) : boolean` Returns whether the coordinate lies inside the arena (between 0 and the width/height, edges inclusive).
-- `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary. `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 units before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
+- `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary. `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 feet before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
 
 You can create virtual markers in the arena to simplify calculations of angles and distance. A marker is dropped either at the bot's current location or at a coordinate you specify.
 
@@ -152,18 +152,18 @@ bot.setOrientation(90).then(() => {
 - `bot.isTurning() : boolean` Returns if the bot is actively turning.
 - `bot.turn(number) : Promise` Turns the bot the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turnTowards(x, y) : Promise` Turns the bot towards the provided coordinates. Returns a promise that resolves when the turn is complete.
-- `bot.turnRate : number` How many degrees the body turns per tick. Divide an angle by this to know how long a turn will take.
+- `bot.turnRate : number` How many degrees the body turns per clock tick. Divide an angle by this to know how long a turn will take.
 
 ### Speed
 
 - `bot.setSpeed(number) : Promise` Sets the bot's target speed as an integer between -5 and 5. Returns a promise that resolves when the speed is reached, or that is rejected if the target speed is altered before being achieved.
 - `bot.getSpeed() : number` Returns the speed.
-- `bot.maxSpeed : number` The fastest the bot can travel, in units per tick.
-- `bot.acceleration : number` How much the speed changes per tick while moving toward the target speed, needed to judge braking distance.
+- `bot.maxSpeed : number` The fastest the bot can travel, in feet per clock tick.
+- `bot.acceleration : number` How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance.
 
 ### Communications
 
-- `bot.send(message)` Broadcasts a message that every other bot in the arena (teammates **and** enemies) can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them. A message that isn't JSON data, is larger than 4,096 characters once encoded, or nests more than 8 levels deep is rejected. `send` throws (code `E023`). A bot may also broadcast at most 50 messages per tick; sends past that budget are silently dropped (code `E024`). See the [error code reference](/error-codes).
+- `bot.send(message)` Broadcasts a message that every other bot in the arena (teammates **and** enemies) can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them. A message that isn't JSON data, is larger than 4,096 characters once encoded, or nests more than 8 levels deep is rejected. `send` throws (code `E023`). A bot may also broadcast at most 50 messages per clock tick; sends past that budget are silently dropped (code `E024`). See the [error code reference](/error-codes).
 
 ## Turret
 
@@ -180,7 +180,7 @@ The turret takes time to reload after firing, and methods let you check when it 
 - `bot.turret.isTurning() : boolean` Returns if the turret is actively turning.
 - `bot.turret.turn(number) : Promise` Turns the turret the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turret.turnTowards(x, y) : Promise` Turns the turret towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
-- `bot.turret.turnRate : number` How many degrees the turret turns per tick.
+- `bot.turret.turnRate : number` How many degrees the turret turns per clock tick.
 
 ### Firing
 
@@ -189,15 +189,15 @@ At the start of every match there is a short **deployment window** (the first 10
 - `bot.turret.onReady(): Promise` Returns a promise that resolves when the turret is ready to fire. If the turret fires through another thread while this promise is pending, the promise will be rejected.
 - `bot.turret.isReady(): boolean` Returns a boolean indicating whether the turret is ready to fire.
 - `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:string}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena, and the shooter loses **3 health** for the missed shot. If the turret is not ready to fire, the Promise is rejected.
-- `bot.turret.bulletSpeed : number` How far a bullet travels per tick. Divide a target's distance by this to know the flight time when leading a shot.
+- `bot.turret.bulletSpeed : number` How far a bullet travels per clock tick. Divide a target's distance by this to know the flight time when leading a shot.
 - `bot.turret.bulletDamage : number` Health an enemy loses when your bullet hits.
 
 ## Radar
 
 The radar detects other bots. Its detection area is a long, narrow wedge:
 
-- reaching **600 units**
-- one tank-width (32 units) across at your bot, widening to about 244 units across at its tip
+- reaching **600 feet**
+- one tank-width (32 feet) across at your bot, widening to about 244 feet across at its tip
 - any bot whose center is inside it is detected
 
 It's shown as the beam drawn under the radar in the arena; the drawing is slightly slimmer at its base than the detection area, so anything the beam visibly touches is detected. Vision is directional on purpose: you can see far, but only where you choose to look, so pointing the radar well matters more than being close.
@@ -213,7 +213,7 @@ The radar takes time to recharge after each scan, and methods let you check when
 - `bot.radar.isTurning() : boolean` Returns if the radar is actively turning.
 - `bot.radar.turn(number) : Promise` Turns the radar the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.radar.turnTowards(x, y) : Promise` Turns the radar towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
-- `bot.radar.turnRate : number` How many degrees the radar turns per tick.
+- `bot.radar.turnRate : number` How many degrees the radar turns per clock tick.
 
 ### Scanning
 

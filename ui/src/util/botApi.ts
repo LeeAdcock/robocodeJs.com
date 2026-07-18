@@ -151,7 +151,7 @@ const turnable = (subject: string): ApiMember[] => [
     name: 'turnRate',
     kind: 'property',
     type: 'number',
-    doc: `How many degrees the ${subject} turns per tick. Plan how long a turn will take before committing to it.`,
+    doc: `How many degrees the ${subject} turns per clock tick. Plan how long a turn will take before committing to it.`,
   },
 ];
 
@@ -310,7 +310,7 @@ export const INTERFACES: ApiInterface[] = [
   },
   {
     name: 'Radar',
-    doc: 'Detects bots inside its beam: the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
+    doc: 'Detects bots inside its beam: the long, narrow wedge drawn under the radar in the arena (600 feet far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans.',
     members: [
       ...turnable('radar'),
       {
@@ -360,7 +360,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'bulletSpeed',
         kind: 'property',
         type: 'number',
-        doc: 'How far a bullet travels per tick. Divide a target’s distance by this to know the flight time when leading a shot.',
+        doc: 'How far a bullet travels per clock tick. Divide a target’s distance by this to know the flight time when leading a shot.',
       },
       {
         name: 'bulletDamage',
@@ -422,7 +422,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'getNearestWall',
         kind: 'method',
         type: 'Marker',
-        doc: 'A marker at the nearest point on the arena boundary: getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself.',
+        doc: 'A marker at the nearest point on the arena boundary: getDistance() is how far the wall is, getBearing() which way. Note you collide 16 feet before the wall itself.',
       },
     ],
   },
@@ -541,7 +541,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'turnRate',
         kind: 'property',
         type: 'number',
-        doc: 'How many degrees the body turns per tick.',
+        doc: 'How many degrees the body turns per clock tick.',
       },
       {
         name: 'getSpeed',
@@ -560,13 +560,13 @@ export const INTERFACES: ApiInterface[] = [
         name: 'maxSpeed',
         kind: 'property',
         type: 'number',
-        doc: 'The fastest the bot can travel, in units per tick.',
+        doc: 'The fastest the bot can travel, in feet per clock tick.',
       },
       {
         name: 'acceleration',
         kind: 'property',
         type: 'number',
-        doc: 'How much the speed changes per tick while moving toward the target speed, needed to judge braking distance.',
+        doc: 'How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance.',
       },
       {
         name: 'radius',

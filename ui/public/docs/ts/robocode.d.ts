@@ -70,7 +70,7 @@ interface Marker {
   isInBounds(): boolean;
 }
 
-/** Detects bots inside its beam: the long, narrow wedge drawn under the radar in the arena (600 units far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
+/** Detects bots inside its beam: the long, narrow wedge drawn under the radar in the arena (600 feet far, one tank-width at the bot). Mounted on the turret, so it turns with the body and turret. Recharges between scans. */
 interface Radar {
   /** Returns the radar's orientation in degrees (0–359). */
   getOrientation(): number;
@@ -82,7 +82,7 @@ interface Radar {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the radar is currently turning. */
   isTurning(): boolean;
-  /** How many degrees the radar turns per tick. Plan how long a turn will take before committing to it. */
+  /** How many degrees the radar turns per clock tick. Plan how long a turn will take before committing to it. */
   turnRate: number;
   /** Performs a scan, resolving with the Contacts detected (empty array if none). Rejects if the radar is not ready. */
   scan(): Promise<Contact[]>;
@@ -104,7 +104,7 @@ interface Turret {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the turret is currently turning. */
   isTurning(): boolean;
-  /** How many degrees the turret turns per tick. Plan how long a turn will take before committing to it. */
+  /** How many degrees the turret turns per clock tick. Plan how long a turn will take before committing to it. */
   turnRate: number;
   /** Fires the turret. Resolves with `{ id }` of the bot hit, or `{}` if the bullet missed. Rejects if not ready to fire (reloading, or during the opening deployment hold). */
   fire(): Promise<{ id?: string }>;
@@ -112,7 +112,7 @@ interface Turret {
   onReady(): Promise<void>;
   /** Returns whether the turret is ready to fire (false while reloading, and during the opening deployment hold). */
   isReady(): boolean;
-  /** How far a bullet travels per tick. Divide a target’s distance by this to know the flight time when leading a shot. */
+  /** How far a bullet travels per clock tick. Divide a target’s distance by this to know the flight time when leading a shot. */
   bulletSpeed: number;
   /** Health an enemy loses when your bullet hits. */
   bulletDamage: number;
@@ -130,7 +130,7 @@ interface Arena {
   createContact(data: { x: number; y: number; speed: number; orientation: number; time?: number }): Contact;
   /** Whether (x, y) lies inside the arena (0..width, 0..height, edges inclusive). */
   contains(x: number, y: number): boolean;
-  /** A marker at the nearest point on the arena boundary: getDistance() is how far the wall is, getBearing() which way. Note you collide 16 units before the wall itself. */
+  /** A marker at the nearest point on the arena boundary: getDistance() is how far the wall is, getBearing() which way. Note you collide 16 feet before the wall itself. */
   getNearestWall(): Marker;
 }
 
@@ -180,15 +180,15 @@ interface Bot {
   turnTowards(x: number, y: number): Promise<void>;
   /** Returns whether the body is currently turning. */
   isTurning(): boolean;
-  /** How many degrees the body turns per tick. */
+  /** How many degrees the body turns per clock tick. */
   turnRate: number;
   /** Returns the current speed. */
   getSpeed(): number;
   /** Sets the target speed, an integer from -5 to 5. Resolves when reached; rejects if overridden. */
   setSpeed(speed: number): Promise<void>;
-  /** The fastest the bot can travel, in units per tick. */
+  /** The fastest the bot can travel, in feet per clock tick. */
   maxSpeed: number;
-  /** How much the speed changes per tick while moving toward the target speed, needed to judge braking distance. */
+  /** How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance. */
   acceleration: number;
   /** The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, and bots or bullets connect within two. */
   radius: number;

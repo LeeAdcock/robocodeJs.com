@@ -240,7 +240,7 @@ re-delivered to every other bot in the arena, so an unbounded stream of sends ca
 flood the match; the extra calls this tick are ignored (they simply don't send)
 and the bot keeps playing. Sends past the cap don't throw, unlike a malformed
 message ([E023](#e023)). This almost always means `bot.send` is being called in a
-tight loop. Fix: send at most a handful of messages per tick. Coordinate with a
+tight loop. Fix: send at most a handful of messages per clock tick. Coordinate with a
 compact payload rather than a stream of them, and avoid calling `send` inside an
 unbounded loop. The budget resets every tick.
 
