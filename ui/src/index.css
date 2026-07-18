@@ -393,3 +393,35 @@ body.dark .blog-signature img {
 .bot-health-bar-dead {
   animation: bot-health-bar-fade 800ms ease-out forwards;
 }
+
+/* Deployment countdown (arena.tsx). The whole group fades out when the count
+   reaches zero — opacity is flipped to 0 in the component, and this transition
+   makes it smooth in real time regardless of the ~10 tick/s re-render cadence,
+   so the number eases away instead of vanishing on a tick boundary. Each new
+   digit pops in (quick scale + fade) as it mounts under its per-second key. */
+.arena-countdown {
+  transition: opacity 300ms ease-out;
+}
+.arena-countdown-digit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arena-countdown-pop 280ms ease-out;
+}
+@keyframes arena-countdown-pop {
+  from {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arena-countdown {
+    transition: none;
+  }
+  .arena-countdown-digit {
+    animation: none;
+  }
+}
