@@ -62,14 +62,14 @@ Another common trigger: calling a contact method on a **received** contact. A br
 // Triggers E013: a contact sent via bot.send arrives without its methods,
 // so .getIntercept is not a function
 bot.on(Event.RECEIVED, (message) => {
-  const aim = message.getIntercept(bot.turret.bulletSpeed)
+  const aim = message.getIntercept(bot.turret.BULLET_SPEED)
 })
 ```
 
 ```
 // Fixed: rebuild the full contact from the serialized data first
 bot.on(Event.RECEIVED, (message) => {
-  const aim = arena.createContact(message).getIntercept(bot.turret.bulletSpeed)
+  const aim = arena.createContact(message).getIntercept(bot.turret.BULLET_SPEED)
   if (aim) bot.turret.turnTowards(aim.getX(), aim.getY())
 })
 ```
@@ -198,16 +198,7 @@ clock.on(Event.TICK, () => {
 
 ## E026
 
-**Too many pending commands: the command was rejected.** Your bot has more than
-the per-arena limit of **10,000** awaited commands (`bot.turn`, `bot.setSpeed`,
-`bot.turret.fire`, `bot.radar.scan`, …) parked at once. Each awaited command
-waits for the simulation to reach a state, so issuing them faster than they can
-complete — typically firing thousands in a tight loop without `await` — piles
-them up until the arena refuses more. The rejected command's promise rejects (so
-an `await` throws); the bot keeps playing. This almost always means commands are
-being launched in an unbounded loop instead of awaited one at a time. Fix: `await`
-each command before issuing the next, and don't call movement/turret/radar
-commands inside an unbounded loop.
+**Too many pending commands: the command was rejected.** Your bot has more than the per-arena limit of **10,000** awaited commands (`bot.turn`, `bot.setSpeed`, `bot.turret.fire`, `bot.radar.scan`, …) parked at once. Each awaited command waits for the simulation to reach a state, so issuing them faster than they can complete — typically firing thousands in a tight loop without `await` — piles them up until the arena refuses more. The rejected command's promise rejects (so an `await` throws); the bot keeps playing. This almost always means commands are being launched in an unbounded loop instead of awaited one at a time. Fix: `await` each command before issuing the next, and don't call movement/turret/radar commands inside an unbounded loop.
 
 ```
 // Triggers E026: thousands of un-awaited commands pile up in one tick

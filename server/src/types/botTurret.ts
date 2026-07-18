@@ -8,7 +8,7 @@ import { BotRadar } from './botRadar';
 import { DEPLOY_TICKS } from './environment';
 
 // Degrees the turret turns per tick (seeds the per-instance runtime field and
-// is mirrored into the sandbox as the bot.turret.turnRate attribute), and
+// is mirrored into the sandbox as the bot.turret.TURN_RATE attribute), and
 // reload progress added per tick toward the 100 full-charge threshold.
 export const TURRET_TURN_SPEED = 4;
 export const TURRET_RELOAD_RATE = 2.5;
