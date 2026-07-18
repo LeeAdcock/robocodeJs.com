@@ -19,12 +19,16 @@ const finite = (n: number): number => (Number.isFinite(n) ? n : 0);
 const translate = (x: number, y: number): string =>
   'translate(' + finite(x) + ',' + finite(y) + ')';
 
-// The bullet's (x,y) is now the muzzle — the server spawns it BARREL_LENGTH (32)
-// forward of the hull center (botTurret.ts), where these sprites were already
-// drawn. So the sprites sit directly at (x,y): the old `translate(_, -32)` that
-// pushed them to the barrel tip is gone (the model moved forward by that same
-// 32, so the on-screen position is unchanged — the point just agrees with the
-// art now). The flame trails back along the flight line from the muzzle.
+// The bullet's (x,y) is the muzzle — the server spawns it BARREL_LENGTH (32)
+// forward of the hull center (botTurret.ts). That single point is the one the
+// collision uses and the debug view draws, so the **projectile** sprite is
+// centered exactly on it (its 4×14 art centered via translate(-2,-7)): the
+// visible bullet, its collision, and the debug dot all coincide.
+//
+// The flame (shotLarge) is only a trailing muzzle-flash effect, not the bullet's
+// reference point — it keeps its original arrangement relative to the projectile
+// (front at the bullet's leading tip, trailing back along the flight line), so
+// it's offset by that same (-2,-7) plus the art's own (-6,0).
 const BulletSvg = React.memo((props: BulletProps) => (
   <g key={props.id} name="bullet">
     <image
@@ -39,7 +43,7 @@ const BulletSvg = React.memo((props: BulletProps) => (
         translate(props.x, props.y),
         'rotate(180)',
         'rotate(' + finite(props.orientation) + ')',
-        'translate(-6, 0)',
+        'translate(-8, -7)',
       ].join(' ')}
     />
 
@@ -59,7 +63,7 @@ const BulletSvg = React.memo((props: BulletProps) => (
         translate(props.x, props.y),
         'rotate(180)',
         'rotate(' + finite(props.orientation) + ')',
-        'translate(0, 0)',
+        'translate(-2, -7)',
       ].join(' ')}
     />
   </g>

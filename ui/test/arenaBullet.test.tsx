@@ -5,11 +5,9 @@ import BulletSvg from '../src/components/arena/arenaBullet';
 
 afterEach(cleanup);
 
-// The server now spawns a bullet at the muzzle (BARREL_LENGTH forward of the
-// hull), so (x,y) is where the projectile actually is. These sprites therefore
-// sit directly at (x,y) — the old forward `translate(_, -32)` that pushed them
-// to the barrel tip is gone, keeping the model position and the drawing in
-// agreement (what the debug view exposed).
+// The server spawns a bullet at the muzzle (BARREL_LENGTH forward of the hull),
+// so (x,y) is the single point the collision uses and the debug view draws. The
+// projectile sprite is centered exactly on it; the flame only trails from it.
 describe('BulletSvg (scenic bullet)', () => {
   const renderBullet = () =>
     render(
@@ -18,19 +16,32 @@ describe('BulletSvg (scenic bullet)', () => {
       </svg>
     );
 
-  it('draws both sprites translated to the bullet position, with no forward offset', () => {
+  const spriteByHref = (root: ParentNode, needle: string) =>
+    Array.from(root.querySelectorAll('image')).find((img) =>
+      (img.getAttribute('href') ?? '').includes(needle)
+    );
+
+  it('anchors both sprites at the bullet position, oriented along its heading', () => {
     const { container } = renderBullet();
     const images = container.querySelectorAll('image');
     expect(images).toHaveLength(2);
     for (const img of images) {
       const t = img.getAttribute('transform') ?? '';
-      // Positioned at the bullet's (x,y)...
       expect(t).toContain('translate(200,140)');
-      // ...and oriented along its heading.
       expect(t).toContain('rotate(45)');
-      // The old muzzle push-forward is gone — the sprite is at (x,y), not 32
-      // units ahead of it.
+      // The old muzzle push-forward is gone (the model moved to the muzzle).
       expect(t).not.toContain('-32');
     }
+  });
+
+  it('centers the projectile outline exactly on (x,y); the flame only trails', () => {
+    const { container } = renderBullet();
+    // The actual bullet (4×14 outline) is centered on the point: translate(-2,-7).
+    const bullet = spriteByHref(container, 'outline');
+    expect(bullet?.getAttribute('transform')).toContain('translate(-2, -7)');
+    // The flame is a trailing effect, offset back from the bullet — not centered
+    // on the point.
+    const flame = spriteByHref(container, 'shotLarge');
+    expect(flame?.getAttribute('transform')).toContain('translate(-8, -7)');
   });
 });
