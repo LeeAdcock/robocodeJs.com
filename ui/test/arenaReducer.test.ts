@@ -165,6 +165,42 @@ describe('applyArenaEvent — bots', () => {
     expect(arena.apps[0].bots[0].speedTarget).toBe(0);
   });
 
+  it('a plain botAccelerate does not touch the trail', () => {
+    const arena = makeArena([makeApp('a1', [makeBot('t1')])]);
+    apply(arena, {
+      type: 'botAccelerate',
+      id: 't1',
+      speed: 3,
+      speedTarget: 5,
+      speedAcceleration: 1,
+      speedMax: 5,
+      x: 40,
+      y: 50,
+    });
+    expect(arena.apps[0].bots[0].pathIndex).toBe(0);
+  });
+
+  it('a nudged botAccelerate records the landing point on the trail', () => {
+    // A collision push carries `nudged` — the client has no other way to learn the
+    // sideways jump, so it must drop a trail vertex or the drawn track cuts the
+    // corner once the bot drives on.
+    const arena = makeArena([makeApp('a1', [makeBot('t1')])]);
+    apply(arena, {
+      type: 'botAccelerate',
+      id: 't1',
+      speed: 2,
+      speedTarget: 5,
+      speedAcceleration: 2,
+      speedMax: 5,
+      x: 40,
+      y: 50,
+      nudged: true,
+    });
+    const t = arena.apps[0].bots[0];
+    expect(t.pathIndex).toBe(1);
+    expect(t.path[0]).toMatchObject({ x: 40, y: 50 });
+  });
+
   it('botDamaged sets health and stops the bot when destroyed', () => {
     const arena = makeArena([
       makeApp('a1', [makeBot('t1', { speed: 4, speedTarget: 4 })]),
