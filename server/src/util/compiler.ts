@@ -743,6 +743,11 @@ const init = (env: Environment, process: Process, bot: Bot) => {
           _bot_register(event)
         }
         Date = undefined
+        // Determinism: Date is gone, but Intl.DateTimeFormat().format() with no
+        // argument formats the *current* wall-clock time — a back-door real clock
+        // (and entropy source) that would break seeded-match reproducibility. Bots
+        // have no need for locale formatting, so remove Intl entirely.
+        Intl = undefined
         {
           let __rng = ${mathSeed} >>> 0
           Math.random = () => {
