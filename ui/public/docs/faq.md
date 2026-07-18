@@ -39,6 +39,15 @@ deterministic. Use `clock.getTime()` (the current tick) instead, and note
 that `setInterval`/`setTimeout` take **ticks**, not milliseconds. See
 [JavaScript timers](/learn/docs#javascript-timers).
 
+## Are angles in degrees or radians?
+
+**Degrees**, always (`0`–`359`), never radians. Every heading, bearing, and
+turret or radar orientation is in degrees, and every method that takes an
+angle expects degrees. JavaScript's `Math.atan2`, `Math.sin`, and `Math.cos`
+work in **radians**, so convert when you cross between them: degrees are
+radians `× 180 / Math.PI`. See
+[directions & the compass](/rules#directions-the-compass).
+
 # Combat & movement
 
 ## Why is my bot losing health when nobody is shooting it?

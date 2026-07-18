@@ -13,6 +13,11 @@ elsewhere.
 Headings are degrees from `0` to `359`, like a compass. **`0°` is north (up) and angles
 increase clockwise**, the same as classic Robocode.
 
+**Every angle in the API is in degrees, never radians** — headings, bearings, turret and
+radar orientation, and turn amounts alike. JavaScript's `Math.atan2`/`sin`/`cos` work in
+radians, so convert at the boundary: multiply radians by `180 / Math.PI` before handing an
+angle to the API.
+
 ```
                      north
                      0°  ↑

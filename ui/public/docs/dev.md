@@ -16,7 +16,7 @@ See also the [game rules & physics](/rules) for exact speeds, turn rates, reload
 
 # Arena
 
-The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
+The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Every angle in the API — headings, bearings, and turret and radar orientation — is in degrees, never radians (JavaScript's `Math.atan2`/`sin`/`cos` use radians, so convert with `× 180 / Math.PI`). Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
 
 - `arena.getWidth() : number` Returns the arena's width in feet.
 - `arena.getHeight() : number` Returns the arena's height in feet.
