@@ -21,8 +21,8 @@ interface EditorToolbarProps {
   doPause: React.MouseEventHandler<HTMLElement>;
   doResume: React.MouseEventHandler<HTMLElement>;
   doRestart: React.MouseEventHandler<HTMLElement>;
-  // Advance the paused sim by one tick — the debug view's step control. Shown
-  // only in debug mode while paused (stepping frame by frame to inspect state).
+  // Advance the paused sim by one tick — a general control shown whenever the
+  // arena is paused (stepping frame by frame to inspect state, in any view).
   doStep?: React.MouseEventHandler<HTMLElement>;
   // Copy a public /watch/:arenaId link to the clipboard. Absent until the arena
   // snapshot (which carries the arena id) has loaded.
@@ -71,7 +71,7 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             </OverlayTrigger>
           )}
 
-          {debugMode && props.isPaused && props.doStep && (
+          {props.isPaused && props.doStep && (
             <OverlayTrigger
               placement={'bottom'}
               overlay={<Tooltip id={`step`}>Step one tick</Tooltip>}

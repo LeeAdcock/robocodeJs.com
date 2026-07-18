@@ -800,6 +800,53 @@ export const buildServer = (user: User): McpServer => {
     (env) => env.resume(),
     { idempotentHint: true }
   );
+  // step_arena is its own tool (not via control()) so it can report whether the
+  // step actually ran (false when the arena is running) and how many ticks it
+  // advanced with the optional `count`. The debug view's single-step control,
+  // for AI clients: pause_arena first, then step and read arena_status between
+  // ticks to inspect state transitions frame by frame.
+  server.registerTool(
+    'step_arena',
+    {
+      title: 'Step arena',
+      description:
+        'Advance a paused arena by exactly one tick (or `count` ticks) so state ' +
+        'transitions can be inspected frame by frame — pause_arena first, then ' +
+        'read arena_status/match_status between steps. Does nothing (stepped: ' +
+        'false) if the arena is running or a tick is already in flight; resume ' +
+        'or restart it to run freely again. `ticks` reports how many ticks it ' +
+        'actually advanced.',
+      inputSchema: {
+        arenaId: z.string().describe('The arena id'),
+        count: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe('Number of ticks to advance (1–100, default 1)'),
+      },
+      outputSchema: {
+        arenaId: z.string(),
+        stepped: z.boolean(),
+        ticks: z.number(),
+      },
+      annotations: { openWorldHint: false },
+    },
+    async ({ arenaId, count }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      // Each step() runs one tick and leaves the arena paused, so the next
+      // step() can run; a running arena refuses the first step (ticks stays 0).
+      let ticks = 0;
+      for (let i = 0; i < (count ?? 1); i++) {
+        if (!(await env.step())) break;
+        ticks += 1;
+      }
+      return ok({ arenaId: arena.getId(), stepped: ticks > 0, ticks });
+    }
+  );
   // restart_arena is its own tool (not via control()) so it can report the seed
   // the new match runs on. A pinned seed reproduces every restart; an unpinned
   // arena mints a fresh seed each restart — returning it lets a client reproduce

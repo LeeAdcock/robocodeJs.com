@@ -504,6 +504,79 @@ describe('mcp tools', () => {
     expect((res.structuredContent as { seed: number }).seed).toBe(12345);
   });
 
+  it('step_arena advances a paused arena one tick and reports it stepped', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    const env = { step: vi.fn().mockResolvedValue(true) };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'step_arena',
+      arguments: { arenaId: 'ar1' },
+    })) as never;
+
+    expect(env.step).toHaveBeenCalledTimes(1);
+    expect(
+      (res as { structuredContent: { stepped: boolean; ticks: number } })
+        .structuredContent
+    ).toMatchObject({ stepped: true, ticks: 1 });
+  });
+
+  it('step_arena with count advances N ticks, stopping early when a step refuses', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    // Two ticks succeed, then the third refuses (e.g. the arena is now running).
+    const env = {
+      step: vi
+        .fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false),
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'step_arena',
+      arguments: { arenaId: 'ar1', count: 5 },
+    })) as never;
+
+    // Stopped at the refusal — not all 5 attempted.
+    expect(env.step).toHaveBeenCalledTimes(3);
+    expect(
+      (res as { structuredContent: { stepped: boolean; ticks: number } })
+        .structuredContent
+    ).toMatchObject({ stepped: true, ticks: 2 });
+  });
+
+  it('step_arena reports stepped:false when the arena is running (no tick)', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    const env = { step: vi.fn().mockResolvedValue(false) };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'step_arena',
+      arguments: { arenaId: 'ar1' },
+    })) as never;
+
+    expect(
+      (res as { structuredContent: { stepped: boolean; ticks: number } })
+        .structuredContent
+    ).toMatchObject({ stepped: false, ticks: 0 });
+  });
+
+  it('step_arena refuses an arena owned by someone else', async () => {
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'step_arena',
+      arguments: { arenaId: 'ar2' },
+    })) as { isError?: boolean };
+
+    expect(res.isError).toBe(true);
+  });
+
   it('run_match reseeds, restarts+resumes, runs to a decision, and returns the winner', async () => {
     const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
     vi.mocked(arenaService.get).mockResolvedValue(arena as never);

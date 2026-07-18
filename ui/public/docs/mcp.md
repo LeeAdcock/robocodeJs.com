@@ -75,6 +75,10 @@ global `leaderboard`):
   decided yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
 - `add_app_to_arena` / `remove_app_from_arena`
 - `pause_arena` / `resume_arena` / `restart_arena`
+- `step_arena`: advance a paused arena by exactly one tick (or `count` ticks) to
+  inspect state transitions frame by frame — pause first, then read `arena_status`
+  / `match_status` between steps. A no-op (`stepped: false`) while the arena is
+  running
 - `set_arena_speed`: set the simulation speed to a multiplier (1 = the default
   ~10 ticks/second), or `0`/`"max"` to run unbounded. The simulation stays
   deterministic at any speed
