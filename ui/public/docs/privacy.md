@@ -10,7 +10,7 @@ The short version: we collect the minimum needed to run the game, namely your Go
 
 **Your Google profile.** Sign in with Google is the only sign-in method. When you sign in, Google shares your name, email address, and a link to your profile picture with us. We store your name, email, and that picture link with your account, along with when the account was created and when it was last active. The picture itself stays on Google's servers; your browser loads it directly from Google, and we never copy or host it. We require a verified email address to create an account, and we never see your Google password.
 
-**What you create.** Your bot programs (source code and names), your arenas, your match results and ratings, and any achievements you unlock are stored with your account.
+**What you create.** Your bot programs (source code and names), your arenas, your match results and ratings, and any achievements you unlock are stored with your account. Your code is yours: you keep all rights to the bot code you write. By using the service you let us store and run it as needed to operate the game, whether in your own arenas, in arenas where other players field a bot you've shared, or in background ranked matches.
 
 **Server logs.** Like almost every web service, our servers log requests, including IP addresses, for rate limiting, abuse prevention, and debugging. Logs are operational data: we keep them for a short period and don't use them to profile you.
 
