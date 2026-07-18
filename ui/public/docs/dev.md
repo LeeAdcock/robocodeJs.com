@@ -118,11 +118,11 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 ## Movement
 
-The bot can turn left or right, and move straight ahead at a desired speed. The turn rate is limited, so a measurable amount of time will pass between setting the desired orientation and the bot achieving that orientation. Similarly there is a limited acceleration and deceleration.
+The bot can turn left or right, and move straight ahead at a desired speed. The turn rate is limited, so a measurable amount of time passes between setting a desired orientation and the bot reaching it. Acceleration and deceleration are limited in the same way.
 
 Turns always take the shortest path to the target angle (`bot.turn(350)` is executed as 10 degrees counter-clockwise, not 350 clockwise), so use signed values to control direction (positive clockwise, negative counter-clockwise). The same applies to the turret and radar.
 
-Methods that set these values will return a Promise object that is resolved when the desired value is reached. If other logic changes the desired value before it is reached, the Promise will be rejected - optionally these rejections can be caught and handled. (A pending command is also rejected if the bot is destroyed or the match stops before the value is reached.) Leaving such a rejection unhandled is safe: it is logged to your bot's log panel but does **not** stop the bot, so you only need to `.catch()` them when you want to react to the cancellation (or to keep your logs quiet).
+Methods that set these values return a Promise that resolves once the desired value is reached. If other logic changes the target first, the Promise is rejected instead — you can catch these rejections and handle them if you like. (A pending command is also rejected if the bot is destroyed or the match stops before the value is reached.) Leaving such a rejection unhandled is safe: it is logged to your bot's log panel but does **not** stop the bot, so you only need to `.catch()` them when you want to react to the cancellation (or to keep your logs quiet).
 
 Asynchronously set a desired value and ignore any result:
 
@@ -167,11 +167,11 @@ bot.setOrientation(90).then(() => {
 
 ## Turret
 
-The turret provides the ability to fire at other bots. The turret is attached to the top of the bot, so its orientation is relative to the bot's orientation.
+The turret fires at other bots. It is attached to the top of the bot, so its orientation is relative to the bot's orientation.
 
 As the bot turns, the turret will also turn. The position of the turret is relative to the bot, not to the arena, so an aimed turret swings with the body, and if the body turns after you aim you'll need to re-aim (or aim just before firing). An orientation of 0 degrees aligns the turret directly forward.
 
-The turret will take time to reload after being fired and methods exist to identify when it is available to fire. Every shot is identical: there is no power, heat, or ammunition mechanic. The constraints are the reload timer and the miss penalty (see [game rules](/rules)).
+The turret takes time to reload after firing, and methods let you check when it is ready to fire again. Every shot is identical: there is no power, heat, or ammunition mechanic. The constraints are the reload timer and the miss penalty (see [game rules](/rules)).
 
 ### Orientation
 
@@ -194,7 +194,7 @@ At the start of every match there is a short **deployment window** (the first 10
 
 ## Radar
 
-The radar provides the ability to detect other bots. Its detection area is a long, narrow wedge:
+The radar detects other bots. Its detection area is a long, narrow wedge:
 
 - reaching **600 units**
 - one tank-width (32 units) across at your bot, widening to about 244 units across at its tip
@@ -202,9 +202,9 @@ The radar provides the ability to detect other bots. Its detection area is a lon
 
 It's shown as the beam drawn under the radar in the arena; the drawing is slightly slimmer at its base than the detection area, so anything the beam visibly touches is detected. Vision is directional on purpose: you can see far, but only where you choose to look, so pointing the radar well matters more than being close.
 
-The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena. The radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed.
+The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 aligns the radar directly with the turret. As the bot or the turret turns, the radar will also turn relative to the arena. The radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed.
 
-The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
+The radar takes time to recharge after each scan, and methods let you check when it is ready to scan again. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
 
 ### Orientation
 
