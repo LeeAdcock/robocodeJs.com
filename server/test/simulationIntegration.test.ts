@@ -507,4 +507,34 @@ describe('sandbox + simulation integration', () => {
       )
     ).toBe(true);
   });
+
+  it('faults a bot that floods commands past its per-tick budget (E026), leaving its opponent untouched', async () => {
+    // Well past MAX_COMMANDS_PER_TICK (100) in a single handler, un-awaited —
+    // the flood shape the per-bot budget exists to punish (#293).
+    const flooder = world.addBot(
+      `clock.on(Event.TICK, () => {
+         for (let i = 0; i < 200; i++) bot.turn(i % 360)
+       })`,
+      'flooder',
+      { x: 200, y: 200 }
+    );
+    const victim = world.addBot(
+      `clock.on(Event.TICK, () => { bot.setSpeed(5) })`,
+      'victim',
+      { x: 500, y: 500 }
+    );
+
+    await world.tick(3);
+
+    // The flooder faulted (E026 on the fault feed) and Simulation killed it.
+    expect(flooder.appCrashed).toBe(true);
+    expect(flooder.health).toBe(0);
+    const fault = world.faults.find((f) => f.code === 'E026');
+    expect(fault).toMatchObject({ kind: 'command-flood', appId: 'flooder' });
+
+    // The opponent's commands were untouched by the flood: it kept playing.
+    expect(victim.appCrashed).toBe(false);
+    expect(victim.health).toBe(100);
+    expect(victim.speedTarget).toBe(5);
+  });
 });

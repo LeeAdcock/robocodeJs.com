@@ -214,7 +214,7 @@ The app emits these signals; **wiring alarms is a deploy-time/ops concern** (the
 **AWS wiring (this deployment).** These `.ebextensions` files are **active** and turn the above into CloudWatch alarms → the `Alerts` SNS topic (a confirmed email subscription; override via the `ALERT_SNS_TOPIC_ARN` / `ALERT_LOG_GROUP` env properties):
 
 - **`cloudwatch-logs.config`** — streams the instance's stdout (where the pino JSON lands) to a CloudWatch Logs group, `/aws/elasticbeanstalk/robocode-prod/var/log/web.stdout.log`. Required for any log-based alarm; also makes the logs queryable in Logs Insights.
-- **`cloudwatch-alarms.config`** — log-metric-filter alarms on the **security** events: `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, `rate.limited`.
+- **`cloudwatch-alarms.config`** — log-metric-filter alarms on the **security** events: `sandbox.catastrophic`, `process.fatal`, `bot.fault timedOut`, `auth.forbidden`, `rate.limited`, `bot.command_flood` (a bot exceeded its per-tick command budget and was faulted), `bot.drain_exhausted`.
 - **`cloudwatch-ops-alarms.config`** — **availability / infrastructure / reliability** alarms: ALB unhealthy-hosts + ELB/target 5xx (site-down), RDS free-storage / CPU / connections / freeable-memory, EC2 CPU + CPU-credit-balance, and the `db.error` / `http.error` log events. These reference the EB-created stack resources (`AWSEBRDSDatabase`, `AWSEBV2LoadBalancer`, `AWSEBV2LoadBalancerTargetGroup`, `AWSEBAutoScalingGroup`).
 - **`options.config`** also sets `aws:elasticbeanstalk:sns:topics` so EB's own environment events (deploy failures, environment-degraded, instance replacement) email the same inbox.
 
