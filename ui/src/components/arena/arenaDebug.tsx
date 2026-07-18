@@ -28,8 +28,8 @@ import {
 // the 0/360 seam — the exact technique arenaBot.tsx uses for the sprites.
 //
 // Click a tank to focus it: the rest dim, and its telemetry panel, range rings,
-// and per-vector angle tags appear. Grid coordinate labels, lead-prediction
-// ghosts, radar detection lines, and bullet remaining-travel are always on.
+// and per-vector angle tags appear. Grid coordinate labels, heading trajectory
+// lines, radar detection lines, and bullet remaining-travel are always on.
 
 const BOT_RADIUS = 16;
 const GRID = 50;
@@ -42,9 +42,6 @@ const LABEL_STEP = 100;
 const TURRET_RAY = 24;
 const RADAR_RAY = 20;
 const SPEED_SCALE = 22;
-// Lead prediction: extrapolate each bot's position this many ticks ahead from
-// its current velocity, so you can see where to aim.
-const PREDICT_TICKS = 12;
 // Range rings around the focused bot: this many, at this spacing (units).
 const RANGE_RING_STEP = 100;
 const RANGE_RING_COUNT = 3;
@@ -425,40 +422,30 @@ const DebugBullet = (props: { bullet: Bullet; remaining: number }) => {
   );
 };
 
-// Faint ghost of where a moving bot will be PREDICT_TICKS from now, from its
-// current velocity — the lead a shooter needs.
-const LeadGhost = (props: { bot: Bot; appIndex: number }) => {
+// Faint dotted trajectory line: extends from a moving bot along its travel
+// heading to the far wall (clipped by the arena), so you can read where it's
+// headed and lead it. Transform-based (translate + rotate) so it eases smoothly
+// like the vectors. Drawn in the travel direction — a reversing bot projects
+// backward (Math.sign(speed) flips the fixed base line).
+const HeadingProjection = (props: { bot: Bot; appIndex: number }) => {
   const { bot } = props;
+  const angle = useContinuousAngle(bot.bodyOrientation);
   if (bot.health <= 0 || Math.abs(bot.speed) <= 0.01) return null;
-  const u = unit(bot.bodyOrientation);
-  const x = finite(bot.x);
-  const y = finite(bot.y);
-  const px = x + u.x * bot.speed * PREDICT_TICKS;
-  const py = y + u.y * bot.speed * PREDICT_TICKS;
-  const stroke = teamStroke(props.appIndex);
   return (
     <g
+      transform={`translate(${finite(bot.x)},${finite(bot.y)}) rotate(${angle})`}
+      style={TRANSITION}
       pointerEvents="none"
-      opacity={0.28}
-      style={{ transition: 'all 200ms linear' }}
     >
       <line
-        x1={x}
-        y1={y}
-        x2={px}
-        y2={py}
-        stroke={stroke}
+        x1={0}
+        y1={0}
+        x2={0}
+        y2={Math.sign(bot.speed) * 1500}
+        stroke={teamStroke(props.appIndex)}
         strokeWidth={1}
-        strokeDasharray="1 3"
-      />
-      <circle
-        cx={px}
-        cy={py}
-        r={BOT_RADIUS}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={1}
-        strokeDasharray="3 3"
+        strokeDasharray="1 4"
+        opacity={0.3}
       />
     </g>
   );
@@ -682,11 +669,11 @@ export default function DebugArenaSvg(props: {
         ))}
       </g>
 
-      {/* Lead-prediction ghosts for every moving bot. */}
-      <g name="debug-ghosts">
+      {/* Dotted trajectory line from every moving bot along its heading. */}
+      <g name="debug-projections">
         {apps.map((app, appIndex) =>
           app.bots.map((bot) => (
-            <LeadGhost key={bot.id} bot={bot} appIndex={appIndex} />
+            <HeadingProjection key={bot.id} bot={bot} appIndex={appIndex} />
           ))
         )}
       </g>
