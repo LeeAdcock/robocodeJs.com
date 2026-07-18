@@ -19,6 +19,12 @@ const finite = (n: number): number => (Number.isFinite(n) ? n : 0);
 const translate = (x: number, y: number): string =>
   'translate(' + finite(x) + ',' + finite(y) + ')';
 
+// The bullet's (x,y) is now the muzzle — the server spawns it BARREL_LENGTH (32)
+// forward of the hull center (botTurret.ts), where these sprites were already
+// drawn. So the sprites sit directly at (x,y): the old `translate(_, -32)` that
+// pushed them to the barrel tip is gone (the model moved forward by that same
+// 32, so the on-screen position is unchanged — the point just agrees with the
+// art now). The flame trails back along the flight line from the muzzle.
 const BulletSvg = React.memo((props: BulletProps) => (
   <g key={props.id} name="bullet">
     <image
@@ -33,7 +39,7 @@ const BulletSvg = React.memo((props: BulletProps) => (
         translate(props.x, props.y),
         'rotate(180)',
         'rotate(' + finite(props.orientation) + ')',
-        'translate(-6, -32)',
+        'translate(-6, 0)',
       ].join(' ')}
     />
 
@@ -53,7 +59,7 @@ const BulletSvg = React.memo((props: BulletProps) => (
         translate(props.x, props.y),
         'rotate(180)',
         'rotate(' + finite(props.orientation) + ')',
-        'translate(0, -32)',
+        'translate(0, 0)',
       ].join(' ')}
     />
   </g>
