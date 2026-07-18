@@ -435,9 +435,9 @@ export default {
             // Fire the wall COLLIDED and count it only when the contact begins (a
             // rising edge), mirroring the bot-vs-bot debounce above — a bot held
             // against a wall shouldn't spam the handler or inflate timesCollided
-            // every tick. The per-tick stop and 1 damage below stay level-triggered
-            // (walls keep hurting while you lean on them); only the reporting is
-            // edged.
+            // every tick. Impact damage is edged the same way (below); only the
+            // physical stop stays level-triggered — a wall can't yield, so we hold
+            // the bot at rest for as long as it's driving into it.
             if (!bot.wallContact) {
               bot.stats.timesCollided += 1;
               bot.logger.trace('Collided with arena boundary');
@@ -468,12 +468,11 @@ export default {
           }
 
           if (hitWall) {
-            // A wall can't yield: stop dead where we are, as before. The
-            // unattributed 1 damage is applied once (a wall has no shooter, so
-            // passing null credits nobody for the collision death).
+            // A wall can't yield: stop dead where we are, as before. The stop is
+            // level-triggered (we hold the bot at rest for as long as it drives
+            // into the wall) and we always tell the UI about it.
             bot.speedTarget = 0;
             bot.speed = 0;
-            damage(bot, 1, null);
             env.emit('event', {
               type: 'botStop',
               time: env.getTime(),
@@ -481,12 +480,40 @@ export default {
               x: bot.x,
               y: bot.y,
             });
-            env.emit('event', {
-              type: 'botDamaged',
-              time: env.getTime(),
-              id: bot.id,
-              health: bot.health,
-            });
+
+            // Impact damage on the rising edge only, scaled by how fast we drove
+            // into the wall — symmetric with bot-vs-bot ram damage: a graze below
+            // COLLISION_MIN_CLOSING_SPEED is free, a hard crash hurts. The impact
+            // speed is our velocity projected onto the wall's inward normal (not
+            // our raw speed), so skimming along a wall costs nothing and only the
+            // component driving into it counts, exactly as closingSpeed does for a
+            // bot. Read the speed from the tick-start snapshot (bot.speed was just
+            // zeroed by the stop above); the heading is unchanged this tick.
+            // Unattributed like every collision (a wall has no shooter, so null
+            // credits nobody for the death).
+            const impactVel = tickStartSpeed.get(bot) ?? bot.speed;
+            const velX =
+              impactVel * Math.sin(-bot.orientation * (Math.PI / 180));
+            const velY =
+              impactVel * Math.cos(-bot.orientation * (Math.PI / 180));
+            const wallNormalX =
+              newX < BOT_RADIUS ? -1 : newX > arenaWidth - BOT_RADIUS ? 1 : 0;
+            const wallNormalY =
+              newY < BOT_RADIUS ? -1 : newY > arenaHeight - BOT_RADIUS ? 1 : 0;
+            const wallNormalLen = Math.hypot(wallNormalX, wallNormalY) || 1;
+            const impactSpeed = Math.max(
+              0,
+              (velX * wallNormalX + velY * wallNormalY) / wallNormalLen
+            );
+            if (!bot.wallContact && impactSpeed > COLLISION_MIN_CLOSING_SPEED) {
+              damage(bot, impactSpeed * COLLISION_DAMAGE_FACTOR, null);
+              env.emit('event', {
+                type: 'botDamaged',
+                time: env.getTime(),
+                id: bot.id,
+                health: bot.health,
+              });
+            }
           } else {
             // Move — to the separated position if we overlapped another bot,
             // otherwise freely to the candidate position.

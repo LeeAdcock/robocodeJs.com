@@ -73,15 +73,15 @@ Bot centers keep a **16-unit margin** from every wall. A bot touching a wall sit
 
 # Combat & health
 
-| Thing             | Value                    | In context                                                                                                                   |
-| ----------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Health            | **100 → 0**              | `bot.getHealth()`; `100` is full, `0` is dead                                                                                |
-| Bullet damage     | **−25**                  | a clean hit removes a quarter of full health                                                                                 |
-| Bullet hit radius | **32 units**             | a bullet hits any bot whose center is within 32 units                                                                        |
-| Bot collision     | **32 units**             | two bots collide when their centers are within 32 units                                                                      |
-| Wall collision    | **−1 per tick**          | driving into an arena edge stops you (speed → 0) and costs 1 health each tick you stay against it                            |
-| Bot ram           | **0.75 × closing speed** | a hard bump hurts once per contact (a gentle touch is free); the two bots are shoved apart but keep their speed, not stopped |
-| Missed shot       | **−3**                   | a bullet that leaves the field without hitting anyone costs the shooter 3 health                                             |
+| Thing             | Value                    | In context                                                                                                                                                              |
+| ----------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Health            | **100 → 0**              | `bot.getHealth()`; `100` is full, `0` is dead                                                                                                                           |
+| Bullet damage     | **−25**                  | a clean hit removes a quarter of full health                                                                                                                            |
+| Bullet hit radius | **32 units**             | a bullet hits any bot whose center is within 32 units                                                                                                                   |
+| Bot collision     | **32 units**             | two bots collide when their centers are within 32 units                                                                                                                 |
+| Wall collision    | **0.75 × impact speed**  | driving into an arena edge stops you dead (speed → 0) and costs damage scaled by how fast you drove in; a gentle graze is free, and skimming along a wall costs nothing |
+| Bot ram           | **0.75 × closing speed** | a hard bump hurts once per contact (a gentle touch is free); the two bots are shoved apart but keep their speed, not stopped                                            |
+| Missed shot       | **−3**                   | a bullet that leaves the field without hitting anyone costs the shooter 3 health                                                                                        |
 
 **Friendly fire is on.** A bullet damages **any** bot within the 32-unit hit
 radius, **including your own teammates**. There is no team exemption, so a shot
