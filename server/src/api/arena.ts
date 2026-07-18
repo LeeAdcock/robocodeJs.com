@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import Environment from '../types/environment';
 import arenaService from '../services/ArenaService';
 import appService from '../services/AppService';
 import userService from '../services/UserService';
@@ -368,17 +369,23 @@ const setSpeed = async (req: Request, res: Response) => {
 };
 app.post(dual('/speed'), loadUser, requireOwner, resolveArena, setSpeed);
 
-// Set how many bots each app fields (1–5). Applied live: increasing spawns the
-// shortfall for every app immediately; decreasing removes each app's newest
-// bots outright (no death or elimination recorded). Also applies to future
-// restarts and newly added apps. Set by the UI toolbar's quantity control and
-// the MCP `set_arena_bot_count` tool.
+// Set how many bots each app fields (1–Environment.MAX_BOT_COUNT). Applied
+// live: increasing spawns the shortfall for every app immediately; decreasing
+// sheds each app's excess outright, dead bots first (no death or elimination
+// recorded). Also applies to future restarts and newly added apps. Set by the
+// UI toolbar's quantity control and the MCP `set_arena_bot_count` tool.
 const setBotCount = async (req: Request, res: Response) => {
   const raw = (req.body ?? {}).botCount;
   const botCount = Number(raw);
-  if (!Number.isInteger(botCount) || botCount < 1 || botCount > 5) {
+  if (
+    !Number.isInteger(botCount) ||
+    botCount < 1 ||
+    botCount > Environment.MAX_BOT_COUNT
+  ) {
     res.status(400);
-    res.send('botCount must be an integer from 1 to 5');
+    res.send(
+      `botCount must be an integer from 1 to ${Environment.MAX_BOT_COUNT}`
+    );
     return;
   }
   const arena = scopedArena(req);

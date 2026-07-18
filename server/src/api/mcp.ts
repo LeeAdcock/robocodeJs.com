@@ -18,6 +18,7 @@ import { provider, RESOURCE_URL } from './oauth';
 import User from '../types/user';
 import Arena from '../types/arena';
 import App from '../types/app';
+import Environment from '../types/environment';
 import appService from '../services/AppService';
 import formatter from '../util/formatter';
 import arenaService from '../services/ArenaService';
@@ -954,15 +955,22 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Set arena bot count',
       description:
-        'Set how many bots each app fields in an arena (1–5; the default is ' +
-        '5). Applied immediately: increasing spawns the shortfall for every ' +
+        `Set how many bots each app fields in an arena (1–${Environment.MAX_BOT_COUNT}; the default is ` +
+        `${Environment.DEFAULT_BOT_COUNT}). Applied immediately: increasing spawns the shortfall for every ` +
         'app (new bots load the app’s code and fire START like any late ' +
-        'join); decreasing removes each app’s newest bots outright — no death ' +
-        'or elimination is recorded. The setting also applies to future ' +
-        'restarts and newly added apps. In-memory like speed and seed: a ' +
-        'freshly rebuilt arena starts back at 5.',
+        'join); decreasing sheds each app’s excess bots outright, dead bots ' +
+        'first — no death or elimination is recorded, and a shed bot’s ' +
+        'already-fired bullets keep flying until they resolve. The setting ' +
+        'also applies to future restarts and newly added apps. In-memory ' +
+        'like speed and seed: a freshly rebuilt arena starts back at ' +
+        `${Environment.DEFAULT_BOT_COUNT}.`,
       inputSchema: {
-        botCount: z.number().int().min(1).max(5).describe('Bots per app (1–5)'),
+        botCount: z
+          .number()
+          .int()
+          .min(1)
+          .max(Environment.MAX_BOT_COUNT)
+          .describe(`Bots per app (1–${Environment.MAX_BOT_COUNT})`),
         arenaId: z.string().describe('The arena id'),
       },
       outputSchema: { arenaId: z.string(), botCount: z.number() },

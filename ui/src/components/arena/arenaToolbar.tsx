@@ -121,6 +121,10 @@ export default function EditorToolbar(props: EditorToolbarProps) {
                 </Dropdown.Toggle>
               </OverlayTrigger>
               <Dropdown.Menu>
+                {/* Mirrors the server's Environment.MAX_BOT_COUNT
+                    (server/src/types/environment.ts) — the UI can't import
+                    server code, so extend this list if that constant changes
+                    (REST/MCP validation follows it automatically). */}
                 {[1, 2, 3, 4, 5].map((count) => (
                   <Dropdown.Item
                     as="button"

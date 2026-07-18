@@ -992,45 +992,17 @@ export default class Environment {
             name: app.getName(),
           });
 
-          const botCount = this.botCount;
+          // Each bot's fair, symmetric layout slot overrides the constructor's
+          // random placement (spawnBot falls back to the random spot if no
+          // layout slot exists — defensive, e.g. an unusual team count), and
+          // the placement is announced only once the bot's code has loaded.
           return Promise.all(
-            [...Array(botCount)].map((_unused, slot) => {
-              const bot = new Bot(this, process);
-              bot.needsStarting = true;
-
-              // Overwrite the constructor's random placement with this bot's
-              // fair, symmetric spawn. Falls back to the random placement if no
-              // layout slot exists (defensive — e.g. an unusual team count).
-              const spawn = spawns[teamIndex]?.[slot];
-              if (spawn) {
-                bot.x = spawn.x;
-                bot.y = spawn.y;
-                bot.orientation = spawn.orientation;
-                bot.orientationTarget = spawn.orientation;
-              }
-
-              process.bots.push(bot);
-              compiler.init(this, process, bot);
-              return bot.execute(process).then(() => {
-                // Emit new bot event
-                this.emitter.emit('event', {
-                  type: 'arenaPlaceBot',
-                  id: bot.id,
-                  appId: process.getAppId(),
-                  bodyOrientation: bot.orientation,
-                  bodyOrientationVelocity: bot.orientationVelocity,
-                  turretOrientation: bot.turret.orientation,
-                  turretOrientationVelocity: bot.turret.orientationVelocity,
-                  radarOrientation: bot.turret.radar.orientation,
-                  radarOrientationVelocity:
-                    bot.turret.radar.orientationVelocity,
-                  speed: bot.speed,
-                  speedMax: BOT_MAX_SPEED,
-                  x: bot.x,
-                  y: bot.y,
-                });
-              });
-            })
+            [...Array(this.botCount)].map((_unused, slot) =>
+              this.spawnBot(process, {
+                spawn: spawns[teamIndex]?.[slot],
+                emitAfterExecute: true,
+              })
+            )
           );
         });
       })
@@ -1060,33 +1032,57 @@ export default class Environment {
     }
   }
 
-  // Place one new bot on a process's team mid-match: create it (the constructor
-  // picks a clear random spot), wire the sandbox API, run the app's code in it,
-  // and announce it to connected clients. Shared by addApp() and setBotCount();
-  // restart() has its own placement path (fair symmetric spawn layout).
-  private spawnBot(process: Process): Promise<unknown> {
+  // Place one new bot on a process's team: create it (the constructor picks a
+  // clear random spot), wire the sandbox API, run the app's code in it, and
+  // announce it to connected clients. Shared by addApp(), setBotCount(), and
+  // restart() — the one home of the arenaPlaceBot payload for a new bot.
+  private spawnBot(
+    process: Process,
+    options?: {
+      // Overwrite the constructor's random placement (restart's fair,
+      // symmetric layout slot).
+      spawn?: { x: number; y: number; orientation: number };
+      // Announce the placement only after the app's code has loaded
+      // (restart's ordering) rather than immediately (the mid-match
+      // late-join ordering of addApp/setBotCount).
+      emitAfterExecute?: boolean;
+    }
+  ): Promise<unknown> {
     const bot = new Bot(this, process);
+    const spawn = options?.spawn;
+    if (spawn) {
+      bot.x = spawn.x;
+      bot.y = spawn.y;
+      bot.orientation = spawn.orientation;
+      bot.orientationTarget = spawn.orientation;
+    }
     process.bots.push(bot);
 
     compiler.init(this, process, bot);
-    const executed = bot.execute(process);
 
-    // Emit new bot event
-    this.emitter.emit('event', {
-      type: 'arenaPlaceBot',
-      id: bot.id,
-      appId: process.getAppId(),
-      bodyOrientation: bot.orientation,
-      bodyOrientationVelocity: bot.orientationVelocity,
-      turretOrientation: bot.turret.orientation,
-      turretOrientationVelocity: bot.turret.orientationVelocity,
-      radarOrientation: bot.turret.radar.orientation,
-      radarOrientationVelocity: bot.turret.radar.orientationVelocity,
-      speed: bot.speed,
-      speedMax: BOT_MAX_SPEED,
-      x: bot.x,
-      y: bot.y,
-    });
+    const emitPlaced = () => {
+      this.emitter.emit('event', {
+        type: 'arenaPlaceBot',
+        id: bot.id,
+        appId: process.getAppId(),
+        bodyOrientation: bot.orientation,
+        bodyOrientationVelocity: bot.orientationVelocity,
+        turretOrientation: bot.turret.orientation,
+        turretOrientationVelocity: bot.turret.orientationVelocity,
+        radarOrientation: bot.turret.radar.orientation,
+        radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+        speed: bot.speed,
+        speedMax: BOT_MAX_SPEED,
+        x: bot.x,
+        y: bot.y,
+      });
+    };
+
+    if (options?.emitAfterExecute) {
+      return bot.execute(process).then(emitPlaced);
+    }
+    const executed = bot.execute(process);
+    emitPlaced();
     return executed;
   }
 
