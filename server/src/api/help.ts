@@ -102,8 +102,8 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
-    // Team play & messaging -> the Teamwork lesson (send/receive has no clean
-    // /learn/docs anchor; the lesson is the better resource).
+    // Team play & messaging -> the Teamwork lesson. The reference also has a
+    // /learn/docs#communications anchor, but the lesson is the better first stop.
     answer: '/learn/teamwork',
     keywords: [
       'teamwork',
@@ -119,6 +119,97 @@ const KEYWORD_ROUTES: {
       'talk to teammates',
       'broadcast',
     ],
+  },
+  {
+    // Bot state across handlers -> the State section (covers `this`, why saves
+    // don't reset state, and reboot). After Survival so "low health" keeps
+    // winning; before the capability sections so "remember" beats nothing.
+    answer: '/learn/docs#state-and-the-start-event',
+    keywords: [
+      'state',
+      'remember',
+      'remembers',
+      'remembering',
+      'forget',
+      'forgets',
+      'variable',
+      'variables',
+      'reboot',
+      'persist',
+    ],
+  },
+  {
+    // Promises & async flow -> the Waiting lesson. Before the turret/radar
+    // routes so "wait for the turret" lands on the concept, not the hardware.
+    answer: '/learn/waiting',
+    keywords: ['promise', 'promises', 'async', 'await', 'wait', 'waiting'],
+  },
+  {
+    // Damage & health numbers -> the combat table. Must sit after Survival
+    // ("low health" is a strategy question, bare "health" a rules question)
+    // and before the turret route so "bullet damage" gets the numbers.
+    answer: '/rules#combat--health',
+    keywords: ['damage', 'health', 'hp', 'hit points'],
+  },
+  {
+    // Match end conditions -> the match-length rules.
+    answer: '/rules#match-length',
+    keywords: [
+      'sudden death',
+      'match length',
+      'how long is a match',
+      'winner',
+      'who wins',
+      'tie',
+    ],
+  },
+  {
+    // Exact numbers & mechanics -> the rules page.
+    answer: '/rules',
+    keywords: ['rules', 'physics', 'game rules', 'turn rate', 'reload time'],
+  },
+  {
+    // Veterans of the original game -> the porting guide.
+    answer: '/classic',
+    keywords: ['classic', 'java', 'original robocode', 'porting'],
+  },
+  {
+    // Ready-made code to study -> the example bots.
+    answer: '/examples',
+    keywords: [
+      'example',
+      'examples',
+      'sample',
+      'samples',
+      'sample code',
+      'starter bot',
+    ],
+  },
+  {
+    // The live board itself, vs. how it works (next entry).
+    answer: '/leaderboard',
+    keywords: ['leaderboard', 'top bots', 'best bots'],
+  },
+  {
+    // How the global ladder works -> the rankings explainer.
+    answer: '/rankings',
+    keywords: [
+      'ranking',
+      'rankings',
+      'rating',
+      'ratings',
+      'elo',
+      'ladder',
+      'ranked',
+    ],
+  },
+  {
+    answer: '/faq',
+    keywords: ['faq', 'frequently asked', 'common questions'],
+  },
+  {
+    answer: '/privacy',
+    keywords: ['privacy', 'personal data', 'delete my account', 'my data'],
   },
   {
     // Console output -> the live log panel (or the docs when signed out).
@@ -378,6 +469,37 @@ const about = [
   'is this open source?',
   'how do I get in touch?',
 ];
+const rules = [
+  'how much damage does a bullet do?',
+  'how are collisions penalized?',
+  'what are the exact speeds?',
+  'what happens at the end of a long match?',
+];
+const examples = [
+  'show me some example code',
+  'are there sample bots I can look at?',
+  'where can I find examples?',
+];
+const rankings = [
+  'how do the global rankings work?',
+  'how is my rating calculated?',
+  'how does my bot get ranked?',
+];
+const classic = [
+  'how is this different from the original robocode?',
+  'I played robocode in java',
+  'coming from classic robocode',
+];
+const state = [
+  'how do I remember things between events?',
+  'why does my bot forget what it was doing?',
+  'how do I keep information across handlers?',
+];
+const waiting = [
+  'how do I wait for an action to finish?',
+  'how do promises work here?',
+  'how do I chain actions one after another?',
+];
 
 const classifier = new Classifier();
 classifier.train(arena, 'arena');
@@ -391,6 +513,12 @@ classifier.train(events, 'events');
 classifier.train(learn, 'learn');
 classifier.train(mcp, 'mcp');
 classifier.train(about, 'about');
+classifier.train(rules, 'rules');
+classifier.train(examples, 'examples');
+classifier.train(rankings, 'rankings');
+classifier.train(classic, 'classic');
+classifier.train(state, 'state');
+classifier.train(waiting, 'waiting');
 
 const CLASSIFIER_ANSWERS: Record<string, string> = {
   arena: '/learn/docs#arena',
@@ -403,6 +531,12 @@ const CLASSIFIER_ANSWERS: Record<string, string> = {
   learn: '/learn',
   mcp: '/mcp',
   about: '/about',
+  rules: '/rules',
+  examples: '/examples',
+  rankings: '/rankings',
+  classic: '/classic',
+  state: '/learn/docs#state-and-the-start-event',
+  waiting: '/learn/waiting',
 };
 
 const app = express();
