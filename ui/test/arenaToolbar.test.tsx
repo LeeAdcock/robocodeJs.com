@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import ArenaToolbar from '../src/components/arena/arenaToolbar';
 
 const noop = () => undefined;
@@ -107,5 +107,54 @@ describe('ArenaToolbar Step control', () => {
       />
     );
     expect(screen.queryByLabelText('Step one tick')).toBeNull();
+  });
+});
+
+// The bot-quantity dropdown sets how many bots each app fields (1–5). It is an
+// owner control: it renders only when a doSetBotCount handler is wired (the
+// spectator watch page mounts no toolbar at all, but the gating also covers any
+// future read-only use of this component).
+describe('ArenaToolbar bot quantity control', () => {
+  it('is hidden without a doSetBotCount handler', () => {
+    render(
+      <ArenaToolbar
+        isPaused={false}
+        doPause={noop}
+        doResume={noop}
+        doRestart={noop}
+      />
+    );
+    expect(screen.queryByLabelText('Bots per app')).toBeNull();
+  });
+
+  it('shows the current quantity on the toggle', () => {
+    render(
+      <ArenaToolbar
+        isPaused={false}
+        doPause={noop}
+        doResume={noop}
+        doRestart={noop}
+        botCount={3}
+        doSetBotCount={noop}
+      />
+    );
+    expect(screen.getByLabelText('Bots per app').textContent).toContain('3');
+  });
+
+  it('invokes the handler with the chosen quantity', () => {
+    const doSetBotCount = vi.fn();
+    render(
+      <ArenaToolbar
+        isPaused={false}
+        doPause={noop}
+        doResume={noop}
+        doRestart={noop}
+        botCount={3}
+        doSetBotCount={doSetBotCount}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Bots per app'));
+    fireEvent.click(screen.getByRole('button', { name: '5 bots per app' }));
+    expect(doSetBotCount).toHaveBeenCalledWith(5);
   });
 });
