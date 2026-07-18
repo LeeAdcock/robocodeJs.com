@@ -950,6 +950,34 @@ export const buildServer = (user: User): McpServer => {
   );
 
   server.registerTool(
+    'set_arena_bot_count',
+    {
+      title: 'Set arena bot count',
+      description:
+        'Set how many bots each app fields in an arena (1–5; the default is ' +
+        '5). Applied immediately: increasing spawns the shortfall for every ' +
+        'app (new bots load the app’s code and fire START like any late ' +
+        'join); decreasing removes each app’s newest bots outright — no death ' +
+        'or elimination is recorded. The setting also applies to future ' +
+        'restarts and newly added apps. In-memory like speed and seed: a ' +
+        'freshly rebuilt arena starts back at 5.',
+      inputSchema: {
+        botCount: z.number().int().min(1).max(5).describe('Bots per app (1–5)'),
+        arenaId: z.string().describe('The arena id'),
+      },
+      outputSchema: { arenaId: z.string(), botCount: z.number() },
+      annotations: IDEMPOTENT,
+    },
+    async ({ botCount, arenaId }) => {
+      const arena = await ownedArena(user, arenaId);
+      if (!arena) return fail('No such arena, or it is not yours.');
+      const env = await environmentService.get(arena);
+      await env.setBotCount(botCount);
+      return ok({ arenaId: arena.getId(), botCount: env.getBotCount() });
+    }
+  );
+
+  server.registerTool(
     'run_match',
     {
       title: 'Run a match',

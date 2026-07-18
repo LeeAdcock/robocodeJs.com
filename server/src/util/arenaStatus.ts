@@ -33,6 +33,10 @@ export const buildArenaStatus = async (
     tickMs: env.getTickMs(),
     // Current PRNG seed for reproducible match setup (see Environment.setSeed).
     seed: env.getSeed(),
+    // How many bots each app fields (1–5, see Environment.setBotCount). The
+    // per-app `bots` arrays below reflect what's actually alive; this is the
+    // configured setting, so the UI's quantity control can show it.
+    botCount: env.getBotCount(),
     // Tick at which the damage-free deployment window ends and turrets go live.
     // The UI shows a countdown while clock.time < deployTick.
     deployTick: DEPLOY_TICKS,

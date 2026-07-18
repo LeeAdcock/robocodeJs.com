@@ -755,6 +755,41 @@ describe('arena endpoints', () => {
     expect(environmentService.get).not.toHaveBeenCalled();
   });
 
+  it('POST /api/user/:userId/arena/bot-count sets the per-app bot quantity', async () => {
+    const setBotCount = vi.fn(() => Promise.resolve());
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+      getUserId: () => 'u1',
+    } as never);
+    vi.mocked(environmentService.get).mockResolvedValue({
+      setBotCount,
+    } as never);
+
+    const res = await request(makeApp(arenaRouter, mockUser('u1')))
+      .post('/api/user/u1/arena/bot-count')
+      .send({ botCount: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ botCount: 3 });
+    expect(setBotCount).toHaveBeenCalledWith(3);
+  });
+
+  it('POST /api/user/:userId/arena/bot-count rejects out-of-range and non-integer values', async () => {
+    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
+      getId: () => 'ar1',
+      getUserId: () => 'u1',
+    } as never);
+
+    for (const botCount of [0, 6, 2.5, 'many']) {
+      const res = await request(makeApp(arenaRouter, mockUser('u1')))
+        .post('/api/user/u1/arena/bot-count')
+        .send({ botCount });
+      expect(res.status).toBe(400);
+    }
+    expect(environmentService.get).not.toHaveBeenCalled();
+  });
+
   it('POST /api/user/:userId/arena/seed sets the arena seed', async () => {
     const setSeed = vi.fn();
     vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
