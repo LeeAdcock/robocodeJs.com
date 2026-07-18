@@ -70,7 +70,7 @@ describe('GET /api/ask', () => {
 
   it('routes a console/logs search (docs when signed out)', async () => {
     expect(await ask('where does console.log go?')).toBe(
-      '/learn/docs#consolelogging'
+      '/learn/docs#console-logging'
     );
   });
 

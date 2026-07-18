@@ -19,7 +19,7 @@ const logsAnswer = (req: Request): string => {
   const user = (req as unknown as AuthenticatedRequest).user;
   return user
     ? `/user/${user.getId()}/arena/logs`
-    : '/learn/docs#consolelogging';
+    : '/learn/docs#console-logging';
 };
 
 // Ordered by priority: the first category whose keywords appear (as whole words)
