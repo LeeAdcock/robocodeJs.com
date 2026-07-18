@@ -2,7 +2,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import BotSvg, {
-  HEALTH_BAR_FILL,
+  healthBarFill,
   HEALTH_BAR_TRACK,
 } from '../src/components/arena/arenaBot';
 
@@ -27,16 +27,16 @@ const renderBot = (props: Partial<typeof base> = {}) =>
     </svg>
   );
 
-describe('BotSvg health bar (greyscale, fixed fill, width-only drain)', () => {
+describe('BotSvg health bar (team-colored fill, width-only drain)', () => {
   afterEach(cleanup);
 
-  // Health reads purely from the bar's *width*: a constant dark fill over a
-  // lighter track, with no color fade as it drains. Greyscale is color-blind-safe
-  // by construction — the green->red ramp it replaced was the canonical
-  // red-green-CVD failure mode (#132), so guard against any color ramp returning.
-  const fillRect = (container: HTMLElement) =>
+  // Health reads purely from the bar's *width*: a constant team-colored fill over
+  // a lighter gray track, with no color fade as it drains. The color encodes the
+  // *team* (matching the tank sprite), never health — so this is not a return of
+  // the green->red health ramp #132 removed (the red-green-CVD failure mode).
+  const fillRect = (container: HTMLElement, appIndex = base.appIndex) =>
     Array.from(container.querySelectorAll('rect')).find(
-      (r) => r.getAttribute('fill') === HEALTH_BAR_FILL
+      (r) => r.getAttribute('fill') === healthBarFill(appIndex)
     ) as SVGRectElement | undefined;
 
   it('sizes the fill from health, over a lighter track', () => {
@@ -53,12 +53,21 @@ describe('BotSvg health bar (greyscale, fixed fill, width-only drain)', () => {
     expect(fill!.style.transition).not.toContain('fill');
   });
 
-  it('keeps the same fixed fill color at every health level (no fade)', () => {
+  it('keeps the same fill color at every health level (no health fade)', () => {
     for (const health of [100, 50, 10]) {
       const { container } = renderBot({ health });
-      expect(fillRect(container)?.getAttribute('fill')).toBe(HEALTH_BAR_FILL);
+      expect(fillRect(container)?.getAttribute('fill')).toBe(
+        healthBarFill(base.appIndex)
+      );
       cleanup();
     }
+  });
+
+  it('colors the bar by team, not health', () => {
+    // Different teams get different (constant) fills; the same team is stable.
+    expect(healthBarFill(0)).not.toBe(healthBarFill(3)); // blue vs red
+    const { container } = renderBot({ appIndex: 3, health: 40 });
+    expect(fillRect(container, 3)?.getAttribute('fill')).toBe(healthBarFill(3));
   });
 
   it('is a full-width bar at 100 health', () => {

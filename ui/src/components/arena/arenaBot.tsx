@@ -82,13 +82,26 @@ interface BotRadarProps {
 const getBotId = (appIndex: number, botIndex: number) =>
   (appIndex + 1) * 10 + (botIndex + 1);
 
-// Health-bar colors: a fixed dark fill over a light-gray track, so health reads
-// purely from the bar's *width* — no color fade as it drains. Greyscale is
-// color-blind-safe by construction (the green->red hsl ramp it replaced was the
-// canonical red-green-CVD failure mode, GitHub #132). The arena's night-mode
-// tint recolors these along with the rest of the SVG.
-export const HEALTH_BAR_FILL = '#222';
-export const HEALTH_BAR_TRACK = '#bbb';
+// Health-bar colors: each team's own tank hue (sampled from the sprites, then
+// deepened for contrast) painted over a light-gray track, so health reads purely
+// from the bar's *width* — the fill color never changes as it drains. Tying the
+// fill to the tank color needs no separate legend, and the deepening keeps every
+// team legible over the light track. This is NOT the health->color ramp #132
+// removed (green->red, the canonical red-green-CVD failure mode): the color here
+// encodes *team*, never health, and matches the sprite the numeric id tag already
+// disambiguates. Keyed by the same names as `colors`; wraps with that palette.
+// The arena's night-mode multiply tint darkens these along with the rest of the
+// SVG (multiply preserves luminance order, so fill-over-track contrast holds).
+const HEALTH_BAR_FILL_BY_TEAM: Record<string, string> = {
+  blue: '#286389', // #419FDD
+  dark: '#3b3a35', // #5F5D55
+  sand: '#988c70', // #F5E1B4
+  red: '#8f2f25', // #E74C3C
+  green: '#186d3c', // #27AF60
+};
+export const HEALTH_BAR_TRACK = '#d4d4d4';
+export const healthBarFill = (appIndex: number): string =>
+  HEALTH_BAR_FILL_BY_TEAM[colors[appIndex]] ?? '#222';
 
 const BotTurretSvg = (props: BotTurretProps) => {
   const angle = useContinuousAngle(
@@ -308,10 +321,10 @@ const BotSvg = React.memo((props: BotProps) => {
                 x={-16}
                 y={16}
                 fillOpacity="0.9"
-                // Fixed dark fill, no color change; only the width animates as
-                // health drains, so the slow collision bleed reads as visible
-                // motion instead of imperceptible per-tick steps.
-                fill={HEALTH_BAR_FILL}
+                // Fixed team-colored fill, no color change; only the width
+                // animates as health drains, so the slow collision bleed reads as
+                // visible motion instead of imperceptible per-tick steps.
+                fill={healthBarFill(props.appIndex)}
                 style={{
                   width: 32 * (Math.max(0, props.health) / 100),
                   transition: 'width 300ms linear',
