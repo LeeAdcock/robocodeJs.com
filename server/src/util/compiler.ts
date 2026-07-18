@@ -19,6 +19,7 @@ import { ErrorCodes } from '../types/ErrorCodes';
 import { logBotFault, logger, LogEvent } from './logger';
 import { toApiHeading, toInternalHeading } from './geometry';
 import { parseMessage } from './message';
+import { lintUndeclared } from './sourceLint';
 
 // Identifying context for a faulting bot, for the structured server log.
 const botCtx = (bot: Bot) => ({
@@ -532,7 +533,17 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
 // required. The opener adds NO newline, so bot-code line numbers in fault
 // reports (parsed from `<isolated-vm>:line:col`) are unchanged; the closing
 // `})()` sits on its own trailing line, after all author code.
-const wrapSource = (source: string): string => `(() => {${source}\n})()`;
+//
+// Why `'use strict'`: sloppy mode turns a typo'd assignment (`speeed = 5`) into
+// a silent implicit global that reads back as if it worked — the least
+// debuggable failure a bot author can hit. Strict mode makes it throw a
+// ReferenceError where it happens instead (and `check`'s no-undef lint catches
+// it before deploy). The directive only strictens the author's code: it sits
+// inside the arrow body, so the enclosing script stays sloppy and the arrow's
+// `this` is still the context's global object — the `this.foo` state pattern
+// is unaffected (explicit property assignment is legal in strict mode).
+const wrapSource = (source: string): string =>
+  `(() => {'use strict';${source}\n})()`;
 
 // Execute the bot code
 const execute = (process: Process, bot: Bot): Promise<unknown> => {
@@ -1188,11 +1199,15 @@ const init = (env: Environment, process: Process, bot: Bot) => {
 // it was a sandbox timeout.
 export interface CheckResult {
   valid: boolean;
-  stage?: 'compile' | 'load';
+  stage?: 'compile' | 'lint' | 'load';
   errorCode?: ErrorCodes;
   message?: string;
   timedOut?: boolean;
 }
+
+// How many undeclared-variable findings to spell out in a lint failure message
+// before collapsing the rest into a count.
+const MAX_LINT_FINDINGS_SHOWN = 5;
 
 // Dry-run compile: load a bot's source in a throwaway isolate WITHOUT adding it to
 // an arena, and RETURN any syntax/load error instead of logging it (as `execute`
@@ -1237,6 +1252,28 @@ const check = async (source: string): Promise<CheckResult> => {
       script = process.getSandbox().compileScriptSync(wrapSource(source));
     } catch (e) {
       return failure('compile', e);
+    }
+    // Static no-undef pass (E027): bots run in strict mode, so an undeclared
+    // variable throws at runtime — catch it here with a line number instead,
+    // including inside handlers the load stage below never executes. Runs
+    // after the compile stage so a plain syntax error keeps its E017 shape.
+    const findings = lintUndeclared(source);
+    if (findings.length > 0) {
+      const shown = findings
+        .slice(0, MAX_LINT_FINDINGS_SHOWN)
+        .map(
+          (f) =>
+            `${f.message.replace(/\.$/, '')} (line ${f.line}, char ${f.column})`
+        );
+      const more = findings.length - shown.length;
+      return {
+        valid: false,
+        stage: 'lint',
+        errorCode: ErrorCodes.E027,
+        message:
+          shown.join('; ') + (more > 0 ? `; and ${more} more` : '') + '.',
+        timedOut: false,
+      };
     }
     try {
       // Top-level load — runs the bot's setup (registering handlers, etc.),

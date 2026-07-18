@@ -214,6 +214,24 @@ clock.on(Event.TICK, async () => {
 })
 ```
 
+## E027
+
+**Undeclared variable: the check failed.** Your code references a variable that was never declared — usually a typo, or a variable assigned without `const`/`let`/`var`. This code is reported by the editor's **Check** button (and the `check_app_source` MCP tool), not by a running bot: bot code runs in [strict mode](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Strict_mode), so at runtime the same reference throws a `ReferenceError` the moment it runs (surfacing as [E017](#e017) at load, or a crash mid-match inside a handler) — the checker catches it up front, with the line number, even inside handlers that haven't run yet. `Date` also triggers this code: it doesn't exist in the sandbox — use `clock.getTime()` instead. Fix: declare the variable with `const`/`let`, or store state shared across handlers on `this`.
+
+```
+// Triggers E027: `speeed` is a typo and was never declared
+clock.on(Event.TICK, () => {
+  speeed = 5
+})
+```
+
+```
+// Fixed: declared state, stored on `this` to share across handlers
+bot.on(Event.START, () => {
+  this.speed = 5
+})
+```
+
 ## Reserved codes
 
 `E002`, `E005`–`E012`, `E014`–`E016`, `W001`, and `W002` are reserved and not currently emitted. If you ever see one, it's safe to report it.

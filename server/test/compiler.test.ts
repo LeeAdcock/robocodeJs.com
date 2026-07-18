@@ -47,6 +47,7 @@ function makeCompiledBot() {
     trackBotOp: (op: Promise<unknown>) => {
       void Promise.resolve(op).catch(() => undefined);
     },
+    reportFault: () => undefined,
   };
   const bot = new Bot(env as any, proc as any);
   bot.x = 100;
@@ -1032,6 +1033,97 @@ describe('compiler.check — dry-run compile (throwaway isolate)', () => {
       if (prev === undefined) delete process.env.SANDBOX_TIMEOUT_MS;
       else process.env.SANDBOX_TIMEOUT_MS = prev;
     }
+  });
+
+  it('flags an undeclared variable inside a handler at the lint stage (E027)', async () => {
+    // The dry-run load never executes handler bodies, so only the lint stage
+    // can catch this before the bot crashes mid-match.
+    const result = await compiler.check(
+      `clock.on(Event.TICK, () => {\n  speeed = 5\n})`
+    );
+    expect(result.valid).toBe(false);
+    expect(result.stage).toBe('lint');
+    expect(result.errorCode).toBe('E027');
+    expect(result.message).toContain("'speeed' is not defined");
+    expect(result.message).toContain('(line 2,');
+  });
+
+  it('lint accepts the documented globals, this-state, and typeof guards', async () => {
+    const result = await compiler.check(
+      [
+        `const a = Math.random();`,
+        `if (typeof unset !== 'undefined') console.log('feature detected');`,
+        `this.total = a;`,
+        `logger.info(JSON.stringify({ a }));`,
+        `const t = setInterval(() => bot.setSpeed(1), 5);`,
+        `clearInterval(t);`,
+        `bot.on(Event.START, () => console.log(clock.getTime(), arena.getWidth()));`,
+      ].join('\n')
+    );
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('lint allows a top-level return (legal in the runtime function wrapper)', async () => {
+    const result = await compiler.check(
+      `if (Math.random() > 2) return;\nbot.setSpeed(1)`
+    );
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('lint flags Date, which the sandbox removes for determinism', async () => {
+    const result = await compiler.check(
+      `bot.on(Event.START, () => console.log(Date.now()))`
+    );
+    expect(result.valid).toBe(false);
+    expect(result.stage).toBe('lint');
+    expect(result.message).toContain("'Date' is not defined");
+  });
+
+  it('collapses a long list of lint findings into a count', async () => {
+    const source = Array.from(
+      { length: 7 },
+      (_, i) => `clock.on(Event.TICK, () => { typo${i} = ${i} })`
+    ).join('\n');
+    const result = await compiler.check(source);
+    expect(result.valid).toBe(false);
+    expect(result.stage).toBe('lint');
+    expect(result.message).toContain("'typo4' is not defined");
+    expect(result.message).not.toContain('typo5');
+    expect(result.message).toContain('and 2 more');
+  });
+});
+
+describe('compiler — strict mode (implicit globals fail fast)', () => {
+  let ctx: ReturnType<typeof makeCompiledBot>;
+
+  beforeEach(() => {
+    ctx = makeCompiledBot();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    ctx.proc.dispose();
+  });
+
+  it('an assignment to an undeclared variable crashes the load instead of creating a silent global', async () => {
+    // Sloppy mode would make `speeed = 5` an implicit global that reads back
+    // fine — the least debuggable typo a bot author can hit. wrapSource's
+    // 'use strict' directive makes it throw where it happens.
+    vi.spyOn(appService, 'get').mockResolvedValue({
+      getSource: () => 'speeed = 5;',
+    } as unknown as Awaited<ReturnType<typeof appService.get>>);
+    await compiler.execute(ctx.proc, ctx.bot);
+    expect(ctx.bot.appCrashed).toBe(true);
+    // And the silent global was never created.
+    expect(ctx.read('typeof speeed')).toBe('undefined');
+  });
+
+  it('explicit this-state assignment stays legal under strict mode', async () => {
+    vi.spyOn(appService, 'get').mockResolvedValue({
+      getSource: () => 'this.total = 1;',
+    } as unknown as Awaited<ReturnType<typeof appService.get>>);
+    await compiler.execute(ctx.proc, ctx.bot);
+    expect(ctx.bot.appCrashed).toBeFalsy();
+    expect(ctx.read('this.total')).toBe(1);
   });
 });
 

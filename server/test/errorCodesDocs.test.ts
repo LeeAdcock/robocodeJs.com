@@ -16,7 +16,8 @@ const doc = fs.readFileSync(
 // The codes actually emitted today: by the simulation engine (see compiler.ts /
 // bot.ts / environment.ts / scheduleFactory.ts) and by the API layer (E022, from
 // the rate limiter in middleware/rateLimit.ts; E025, the source-size cap in
-// api/app.ts + api/mcp.ts).
+// api/app.ts + api/mcp.ts; E027, the undeclared-variable lint in
+// compiler.check via util/sourceLint.ts).
 const LIVE_CODES = [
   'E001',
   'E003',
@@ -29,6 +30,7 @@ const LIVE_CODES = [
   'E021',
   'E022',
   'E025',
+  'E027',
 ];
 
 describe('error-codes documentation', () => {
