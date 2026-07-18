@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import BotSvg, { healthColor } from '../src/components/arena/arenaBot';
+import BotSvg, {
+  HEALTH_BAR_FILL,
+  HEALTH_BAR_TRACK,
+} from '../src/components/arena/arenaBot';
 
 const base = {
   appName: 'Bot',
@@ -24,42 +27,48 @@ const renderBot = (props: Partial<typeof base> = {}) =>
     </svg>
   );
 
-describe('BotSvg health bar', () => {
+describe('BotSvg health bar (greyscale, fixed fill, width-only drain)', () => {
   afterEach(cleanup);
 
-  it('sizes and colors the bar from health', () => {
+  // Health reads purely from the bar's *width*: a constant dark fill over a
+  // lighter track, with no color fade as it drains. Greyscale is color-blind-safe
+  // by construction — the green->red ramp it replaced was the canonical
+  // red-green-CVD failure mode (#132), so guard against any color ramp returning.
+  const fillRect = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('rect')).find(
+      (r) => r.getAttribute('fill') === HEALTH_BAR_FILL
+    ) as SVGRectElement | undefined;
+
+  it('sizes the fill from health, over a lighter track', () => {
     const { container } = renderBot({ health: 50 });
-    const bar = container.querySelector('rect[fill^="rgb"]') as SVGRectElement;
-    expect(bar).toBeTruthy();
-    expect(bar.style.width).toBe('16px'); // 32 * 0.5
-    // Mid-health is a desaturated midpoint of the blue<->orange ramp.
-    expect(bar.getAttribute('fill')).toBe('rgb(146, 132, 146)');
+    const fill = fillRect(container);
+    const track = Array.from(container.querySelectorAll('rect')).find(
+      (r) => r.getAttribute('fill') === HEALTH_BAR_TRACK
+    );
+    expect(fill).toBeTruthy();
+    expect(track).toBeTruthy();
+    expect(fill!.style.width).toBe('16px'); // 32 * 0.5
+    // Width animates, but the fill color does not.
+    expect(fill!.style.transition).toContain('width');
+    expect(fill!.style.transition).not.toContain('fill');
   });
 
-  it('is full and blue at 100 health', () => {
+  it('keeps the same fixed fill color at every health level (no fade)', () => {
+    for (const health of [100, 50, 10]) {
+      const { container } = renderBot({ health });
+      expect(fillRect(container)?.getAttribute('fill')).toBe(HEALTH_BAR_FILL);
+      cleanup();
+    }
+  });
+
+  it('is a full-width bar at 100 health', () => {
     const { container } = renderBot({ health: 100 });
-    const bar = container.querySelector('rect[fill^="rgb"]') as SVGRectElement;
-    expect(bar.style.width).toBe('32px');
-    expect(bar.getAttribute('fill')).toBe('rgb(59, 130, 232)'); // blue
+    expect(fillRect(container)!.style.width).toBe('32px');
   });
 
   it('hides the bar when the bot is dead', () => {
     const { container } = renderBot({ health: 0 });
-    expect(container.querySelector('rect[fill^="rgb"]')).toBeNull();
-  });
-});
-
-describe('healthColor (color-blind-safe ramp, #132)', () => {
-  // Guard against a regression to a green->red (or any green-passing) ramp: the
-  // green channel must never dominate across the whole health range.
-  it('is blue at full, orange at empty, and never green in between', () => {
-    expect(healthColor(100)).toBe('rgb(59, 130, 232)'); // blue
-    expect(healthColor(0)).toBe('rgb(232, 134, 59)'); // orange
-    for (let h = 0; h <= 100; h += 5) {
-      const [r, g, b] = healthColor(h).match(/\d+/g)!.map(Number);
-      // "green" would mean g clearly the largest channel; it never is here.
-      expect(g).toBeLessThanOrEqual(Math.max(r, b));
-    }
+    expect(fillRect(container)).toBeUndefined();
   });
 });
 

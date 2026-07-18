@@ -82,17 +82,13 @@ interface BotRadarProps {
 const getBotId = (appIndex: number, botIndex: number) =>
   (appIndex + 1) * 10 + (botIndex + 1);
 
-// Health-bar color: full health -> blue, drained -> orange, interpolated in RGB
-// so the ramp passes through a desaturated midpoint rather than through green.
-// Blue<->orange is a color-blind-safe pair; the old green->red hsl ramp was the
-// canonical red-green-CVD failure mode (GitHub #132). Exported for testing.
-export const healthColor = (health: number): string => {
-  const t = Math.max(0, Math.min(100, health)) / 100;
-  const ch = (drained: number, full: number) =>
-    Math.round(drained + t * (full - drained));
-  // orange rgb(232,134,59) -> blue rgb(59,130,232)
-  return `rgb(${ch(232, 59)}, ${ch(134, 130)}, ${ch(59, 232)})`;
-};
+// Health-bar colors: a fixed dark fill over a light-gray track, so health reads
+// purely from the bar's *width* — no color fade as it drains. Greyscale is
+// color-blind-safe by construction (the green->red hsl ramp it replaced was the
+// canonical red-green-CVD failure mode, GitHub #132). The arena's night-mode
+// tint recolors these along with the rest of the SVG.
+export const HEALTH_BAR_FILL = '#222';
+export const HEALTH_BAR_TRACK = '#bbb';
 
 const BotTurretSvg = (props: BotTurretProps) => {
   const angle = useContinuousAngle(
@@ -304,7 +300,7 @@ const BotSvg = React.memo((props: BotProps) => {
                 x={-16}
                 y={16}
                 stroke={'black'}
-                fill="#DE7A4A"
+                fill={HEALTH_BAR_TRACK}
                 fillOpacity="0.9"
               />
               <rect
@@ -312,13 +308,13 @@ const BotSvg = React.memo((props: BotProps) => {
                 x={-16}
                 y={16}
                 fillOpacity="0.9"
-                // Color shifts blue (full) -> orange (drained), and the width
-                // animates, so the slow collision bleed reads as visible motion
-                // instead of imperceptible per-tick steps. See healthColor.
-                fill={healthColor(props.health)}
+                // Fixed dark fill, no color change; only the width animates as
+                // health drains, so the slow collision bleed reads as visible
+                // motion instead of imperceptible per-tick steps.
+                fill={HEALTH_BAR_FILL}
                 style={{
                   width: 32 * (Math.max(0, props.health) / 100),
-                  transition: 'width 300ms linear, fill 300ms linear',
+                  transition: 'width 300ms linear',
                 }}
               />
             </g>
