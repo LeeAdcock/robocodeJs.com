@@ -77,7 +77,7 @@ teammate, `false` is an enemy, and a wall has no `friendly` at all (`undefined`)
 
 ## You learned
 
-- The **COLLIDED** event fires when you hit something and stops you.
+- The **COLLIDED** event fires when you hit something — a wall stops you, another bot shoves you apart.
 - Its handler gets an **object** `info` with `info.angle` and `info.friendly`.
 - `if (...) { } else { }` makes a decision; `true`/`false` values are **booleans**.
 
