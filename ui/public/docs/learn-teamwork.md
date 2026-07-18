@@ -9,19 +9,12 @@
 
 ## The idea
 
-Your team is **five bots running the same code**. They can coordinate by sending
-**messages** to each other:
+Your team is **five bots running the same code**. They can coordinate by sending **messages** to each other:
 
-- `bot.send(7)`: broadcast a message. It can be a **number** (or a string, or a
-  small object of them, like `{ x: 100, y: 200 }`).
-- The **RECEIVED** event fires on the other bots, handing them that message (plus
-  `from`, telling you how far away the sender was).
+- `bot.send(7)`: broadcast a message. It can be a **number** (or a string, or a small object of them, like `{ x: 100, y: 200 }`).
+- The **RECEIVED** event fires on the other bots, handing them that message (plus `from`, telling you how far away the sender was).
 
-One catch: `bot.send` is heard by **every** bot in the arena, **enemies included**,
-not just your team. So a real team tags its messages with something only teammates
-know and checks it before trusting one (the [Magnetic](/examples) example shows how).
-For this lesson we'll keep it simple. A number is enough to share something useful,
-like the compass direction of an enemy.
+One catch: `bot.send` is heard by **every** bot in the arena, **enemies included**, not just your team. So a real team tags its messages with something only teammates know and checks it before trusting one (the [Magnetic](/examples) example shows how). For this lesson we'll keep it simple. A number is enough to share something useful, like the compass direction of an enemy.
 
 ## Try it
 
@@ -56,43 +49,21 @@ bot.on(Event.RECEIVED, (heading) => {
 });
 ```
 
-Press **Deploy**. Now the whole team swings their turrets toward an enemy the moment _any_
-one of them sees it. (`Math.round` just sends a tidy whole number.)
+Press **Deploy**. Now the whole team swings their turrets toward an enemy the moment _any_ one of them sees it. (`Math.round` just sends a tidy whole number.)
 
-**Sharing a position instead of a direction.** A direction is only right from where
-_you_ stand. A teammate across the arena pointing the same way looks at a different
-spot. Every scan result is a **contact** (a marker pinned at the enemy's location), so
-you can broadcast its actual coordinates instead:
-`bot.send({ x: enemies[0].getX(), y: enemies[0].getY() })`, and each teammate aims with
-`bot.turret.turnTowards(message.x, message.y)`, the same point for everyone. The
-**Squad** example bot builds this out, team secret and all.
+**Sharing a position instead of a direction.** A direction is only right from where _you_ stand. A teammate across the arena pointing the same way looks at a different spot. Every scan result is a **contact** (a marker pinned at the enemy's location), so you can broadcast its actual coordinates instead: `bot.send({ x: enemies[0].getX(), y: enemies[0].getY() })`, and each teammate aims with `bot.turret.turnTowards(message.x, message.y)`, the same point for everyone. The **Squad** example bot builds this out, team secret and all.
 
-**Sharing the whole contact.** You can even broadcast the contact itself:
-`bot.send(enemies[0])`. A contact is **serializable**: what actually transmits is its
-plain data (position, speed, heading, and so on; the methods aren't serialized, and
-its `angle`/`distance` readings are relative to the _sender_). Each teammate rebuilds
-a full contact from that data with `arena.createContact(message)`, its methods answer
-from **their** position, so `getBearing()` points _them_ at the enemy, and
-`getIntercept(bot.turret.bulletSpeed)` even leads the shot for them (see
-[Lesson 12](/learn/leading)). Markers work the same way: a sent marker arrives as its
-`x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it, so
-`bot.send(bot.dropMarker())` is the one-liner for telling teammates where **you** are.
+**Sharing the whole contact.** You can even broadcast the contact itself: `bot.send(enemies[0])`. A contact is **serializable**: what actually transmits is its plain data (position, speed, heading, and so on; the methods aren't serialized, and its `angle`/`distance` readings are relative to the _sender_). Each teammate rebuilds a full contact from that data with `arena.createContact(message)`, its methods answer from **their** position, so `getBearing()` points _them_ at the enemy, and `getIntercept(bot.turret.bulletSpeed)` even leads the shot for them (see [Lesson 12](/learn/leading)). Markers work the same way: a sent marker arrives as its `x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it, so `bot.send(bot.dropMarker())` is the one-liner for telling teammates where **you** are.
 
 ## Debugging like a pro
 
 When a bot misbehaves, these are your tools:
 
-- **`console.log(...)`**: print anything (numbers, text, even objects) to see what your
-  bot is thinking. You used this throughout the course.
-- **`logger.warn(...)` / `logger.error(...)`**: like `console.log`, but tagged by
-  importance so problems stand out in the log panel.
-- **The log panel** (**Arena → View Logs**) also shows **faults**: if your code has a typo,
-  throws an error, or runs too long, the bot is stopped and the reason appears there.
-- **Save vs Reboot:** Save swaps in new code while the bot keeps its memory; **Reboot**
-  (⏻ or `Ctrl-Shift-S`) restarts the bot fresh and re-runs `START`. Reboot when you want a
-  clean slate.
-- **Keep handlers quick** and don't write endless loops: a handler that never finishes
-  will crash the bot.
+- **`console.log(...)`**: print anything (numbers, text, even objects) to see what your bot is thinking. You used this throughout the course.
+- **`logger.warn(...)` / `logger.error(...)`**: like `console.log`, but tagged by importance so problems stand out in the log panel.
+- **The log panel** (**Arena → View Logs**) also shows **faults**: if your code has a typo, throws an error, or runs too long, the bot is stopped and the reason appears there.
+- **Save vs Reboot:** Save swaps in new code while the bot keeps its memory; **Reboot** (⏻ or `Ctrl-Shift-S`) restarts the bot fresh and re-runs `START`. Reboot when you want a clean slate.
+- **Keep handlers quick** and don't write endless loops: a handler that never finishes will crash the bot.
 
 ## 🎓 You can now use the whole toolkit
 
@@ -121,16 +92,14 @@ Build your own champion bot that combines what you've learned. A strong bot usua
 3. **Survives**: dodge when HIT and flee when health is low (Lesson 11).
 4. **Coordinates** with teammates over `send` / RECEIVED (this lesson).
 
-Mix in markers, timers, and a state machine however you like. Test it by adding a few
-copies to the arena (the **[+]** button) and watching them fight.
+Mix in markers, timers, and a state machine however you like. Test it by adding a few copies to the arena (the **[+]** button) and watching them fight.
 
 ## Where to go next
 
 - The [full reference docs](/learn/docs): every method and event in one place.
 - The [example bots](/examples): nine complete strategies to read, run, and remix.
 
-Congratulations, you went from "what is code?" to programming a team of battling robots.
-Now go build something awesome! 🤖
+Congratulations, you went from "what is code?" to programming a team of battling robots. Now go build something awesome! 🤖
 
 ---
 

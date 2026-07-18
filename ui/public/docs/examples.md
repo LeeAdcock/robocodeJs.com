@@ -1,9 +1,6 @@
 # Example Bots
 
-Complete bot strategies you can read, run, and remix. Click one to open it in a
-read-only viewer, then use **Clone this bot** to drop a copy into your arena and
-start editing. New to bots? Work through the [lessons](/learn) first, then come
-back here to see the ideas combined.
+Complete bot strategies you can read, run, and remix. Click one to open it in a read-only viewer, then use **Clone this bot** to drop a copy into your arena and start editing. New to bots? Work through the [lessons](/learn) first, then come back here to see the ideas combined.
 
 ## Getting started
 

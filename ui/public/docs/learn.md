@@ -1,17 +1,12 @@
 # Learn to Code with Robots
 
-Welcome! This is a hands-on course that teaches you to **code from scratch** by
-building battle robots. You don't need to know anything about programming. We'll
-explain every idea in plain words, with examples you can try right away.
+Welcome! This is a hands-on course that teaches you to **code from scratch** by building battle robots. You don't need to know anything about programming. We'll explain every idea in plain words, with examples you can try right away.
 
-Each lesson is short and builds on the one before it. By the end you'll be able to use
-**every** feature RobocodeJs offers, and you'll have learned the core ideas that all
-programmers use.
+Each lesson is short and builds on the one before it. By the end you'll be able to use **every** feature RobocodeJs offers, and you'll have learned the core ideas that all programmers use.
 
 ## How it works
 
-- Read the lesson, then **paste the code into your own bot** and press **Deploy** to watch
-  it run in the arena on the right.
+- Read the lesson, then **paste the code into your own bot** and press **Deploy** to watch it run in the arena on the right.
 - Try the **Experiment** at the end of each lesson: that's where the learning sticks.
 - Stuck? Each lesson has a **Common questions** section for the usual surprises.
 
@@ -48,6 +43,4 @@ programmers use.
 
 ---
 
-When you finish, the [full reference docs](/learn/docs) and the [example bots](/examples) are
-great places to keep growing. That's all ahead of you, though. For now, take the
-first step: [start Lesson 1 →](/learn/hello)
+When you finish, the [full reference docs](/learn/docs) and the [example bots](/examples) are great places to keep growing. That's all ahead of you, though. For now, take the first step: [start Lesson 1 →](/learn/hello)

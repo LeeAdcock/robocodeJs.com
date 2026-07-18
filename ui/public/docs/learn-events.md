@@ -9,15 +9,11 @@
 
 ## The idea
 
-So far our robot just sits there. To make it _act_, we need to run code at the right
-moments. Programmers do this with **events**.
+So far our robot just sits there. To make it _act_, we need to run code at the right moments. Programmers do this with **events**.
 
-An event is something that happens, like a doorbell ringing. You decide what to do
-**when** it happens. "When the doorbell rings, open the door." In code we call the
-"what to do" part a **handler** (it _handles_ the event).
+An event is something that happens, like a doorbell ringing. You decide what to do **when** it happens. "When the doorbell rings, open the door." In code we call the "what to do" part a **handler** (it _handles_ the event).
 
-The most important event is the **TICK**. The game has a clock that ticks many times a
-second, like a heartbeat. Every tick is a chance for your robot to think and act.
+The most important event is the **TICK**. The game has a clock that ticks many times a second, like a heartbeat. Every tick is a chance for your robot to think and act.
 
 ## Try it
 
@@ -31,44 +27,29 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Deploy**, then open the **log panel** (menu: **Arena → View Logs**). You'll see
-`tick!` printed over and over, once per heartbeat.
+Press **Deploy**, then open the **log panel** (menu: **Arena → View Logs**). You'll see `tick!` printed over and over, once per heartbeat.
 
 Let's break down the new line:
 
 - `clock.on(Event.TICK, ...)` means "**when** the clock ticks, do this."
-- The part `() => { ... }` is the **handler**, the code that runs each tick. This shape
-  is called a **function**: a little bundle of instructions you hand to the game to run
-  later. The `=>` is just how we write "a function that does...".
-- `console.log('tick!')` prints a message to the log panel. `console.log` is your robot's
-  way of "thinking out loud", super useful for seeing what's going on.
+- The part `() => { ... }` is the **handler**, the code that runs each tick. This shape is called a **function**: a little bundle of instructions you hand to the game to run later. The `=>` is just how we write "a function that does...".
+- `console.log('tick!')` prints a message to the log panel. `console.log` is your robot's way of "thinking out loud", super useful for seeing what's going on.
 
 ## Experiment
 
 - Change `'tick!'` to a message of your own.
-- Add a second line inside the handler: `console.log('still going');`. Both lines run
-  every tick, top to bottom.
-- The TICK is where most of your robot's behavior will live. Keep this handler. We'll
-  fill it with real actions in the next lessons.
+- Add a second line inside the handler: `console.log('still going');`. Both lines run every tick, top to bottom.
+- The TICK is where most of your robot's behavior will live. Keep this handler. We'll fill it with real actions in the next lessons.
 
 ## Common questions
 
-**My logs are scrolling too fast!**
-That's normal. The clock ticks quickly. We're just peeking. Soon we'll do real actions
-instead of printing.
+**My logs are scrolling too fast!** That's normal. The clock ticks quickly. We're just peeking. Soon we'll do real actions instead of printing.
 
-**What's a "function"?**
-A function is a reusable bundle of instructions. Here we're handing one to `clock.on`
-so the game can run it every tick. You'll write many functions as you go.
+**What's a "function"?** A function is a reusable bundle of instructions. Here we're handing one to `clock.on` so the game can run it every tick. You'll write many functions as you go.
 
-**What's the difference between `bot` and `clock`?**
-`bot` is your robot. `clock` is the game's timer. You ask `clock` to tell you _when_ to
-act, and you tell `bot` _what_ to do.
+**What's the difference between `bot` and `clock`?** `bot` is your robot. `clock` is the game's timer. You ask `clock` to tell you _when_ to act, and you tell `bot` _what_ to do.
 
-**What if I register two handlers for the same event?**
-The second one **replaces** the first, it doesn't add to it. Each event type holds just
-one handler, so the most recent `on(...)` wins and earlier ones stop running. Put
-everything you want to happen on a tick inside a single handler.
+**What if I register two handlers for the same event?** The second one **replaces** the first, it doesn't add to it. Each event type holds just one handler, so the most recent `on(...)` wins and earlier ones stop running. Put everything you want to happen on a tick inside a single handler.
 
 ## You learned
 

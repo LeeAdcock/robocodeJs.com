@@ -9,15 +9,12 @@
 
 ## The idea
 
-Your robot has a **turret**, the cannon on top. It's a _part_ of your robot, so you
-reach it through `bot.turret`, and it has its own actions:
+Your robot has a **turret**, the cannon on top. It's a _part_ of your robot, so you reach it through `bot.turret`, and it has its own actions:
 
 - `bot.turret.fire()`: shoot!
 - `bot.turret.isReady()`: is the cannon reloaded? (`true`/`false`)
 
-After each shot the turret needs time to **reload**. If you try to fire while it's
-reloading, nothing happens. So the polite thing is to **check first** with `isReady()`,
-exactly the kind of true/false check you met last lesson.
+After each shot the turret needs time to **reload**. If you try to fire while it's reloading, nothing happens. So the polite thing is to **check first** with `isReady()`, exactly the kind of true/false check you met last lesson.
 
 There's also an event, **FIRED**, that happens the moment a shot goes off.
 
@@ -43,30 +40,20 @@ bot.on(Event.FIRED, () => {
 });
 ```
 
-Press **Deploy**. Rusty stands still and fires whenever the cannon is loaded. The log
-prints `boom!` on every shot.
+Press **Deploy**. Rusty stands still and fires whenever the cannon is loaded. The log prints `boom!` on every shot.
 
 ## Experiment
 
-- Make the turret sweep while shooting: add `bot.turret.turn(30);` right after
-  `bot.turret.fire();`. Now Rusty sprays shots in different directions.
-- Remove the `if (bot.turret.isReady())` check so it _tries_ to fire every tick. It still
-  only fires when loaded. The check just keeps things tidy.
+- Make the turret sweep while shooting: add `bot.turret.turn(30);` right after `bot.turret.fire();`. Now Rusty sprays shots in different directions.
+- Remove the `if (bot.turret.isReady())` check so it _tries_ to fire every tick. It still only fires when loaded. The check just keeps things tidy.
 
 ## Common questions
 
-**What is `bot.turret`?**
-It's the cannon, a part of your robot. `bot.turret.fire()` reads as "robot → turret →
-fire." Your robot also has `bot.radar` (next lesson) the same way.
+**What is `bot.turret`?** It's the cannon, a part of your robot. `bot.turret.fire()` reads as "robot → turret → fire." Your robot also has `bot.radar` (next lesson) the same way.
 
-**Why does my robot fire slower than every tick?**
-Because of reload time. `isReady()` is `false` while reloading, so the `if` skips firing
-until it's loaded again.
+**Why does my robot fire slower than every tick?** Because of reload time. `isReady()` is `false` while reloading, so the `if` skips firing until it's loaded again.
 
-**Does firing hurt me or my teammates?**
-Firing itself is free, but a shot that _misses_ and flies off the field costs you **3 health**,
-so don't fire blindly into empty space. Your shots _can_ also hit teammates. Soon we'll learn
-to scan and only fire at enemies.
+**Does firing hurt me or my teammates?** Firing itself is free, but a shot that _misses_ and flies off the field costs you **3 health**, so don't fire blindly into empty space. Your shots _can_ also hit teammates. Soon we'll learn to scan and only fire at enemies.
 
 ## You learned
 
