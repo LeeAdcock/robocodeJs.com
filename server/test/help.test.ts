@@ -98,6 +98,69 @@ describe('GET /api/ask', () => {
     expect(await ask('how do I talk to my teammates?')).toBe('/learn/teamwork');
   });
 
+  it('routes damage/health questions to the combat rules', async () => {
+    expect(await ask('how much damage does a shot do?')).toBe(
+      '/rules#combat--health'
+    );
+    expect(await ask('why is my bot losing health?')).toBe(
+      '/rules#combat--health'
+    );
+  });
+
+  it('still prefers the survival lesson for "low health" strategy questions', async () => {
+    expect(await ask('what do I do at low health?')).toBe('/learn/survival');
+  });
+
+  it('routes match-end and general rules questions to the rules page', async () => {
+    expect(await ask('sudden death')).toBe('/rules#match-length');
+    expect(await ask('who wins a match?')).toBe('/rules#match-length');
+    expect(await ask('game rules')).toBe('/rules');
+    expect(await ask('physics')).toBe('/rules');
+  });
+
+  it('routes state and reboot questions to the state section', async () => {
+    expect(await ask('reboot')).toBe('/learn/docs#state-and-the-start-event');
+    expect(await ask('how do I store state?')).toBe(
+      '/learn/docs#state-and-the-start-event'
+    );
+    expect(await ask('why does my bot forget?')).toBe(
+      '/learn/docs#state-and-the-start-event'
+    );
+  });
+
+  it('routes promise/async questions to the waiting lesson', async () => {
+    expect(await ask('how do promises work?')).toBe('/learn/waiting');
+    expect(await ask('await')).toBe('/learn/waiting');
+  });
+
+  it('routes example searches to the example bots', async () => {
+    expect(await ask('example')).toBe('/examples');
+    expect(await ask('are there sample bots?')).toBe('/examples');
+  });
+
+  it('routes classic-Robocode searches to the porting guide', async () => {
+    expect(await ask('coming from java robocode')).toBe('/classic');
+    expect(await ask('classic')).toBe('/classic');
+  });
+
+  it('routes ladder searches to the leaderboard and rankings explainer', async () => {
+    expect(await ask('leaderboard')).toBe('/leaderboard');
+    expect(await ask('how does elo work?')).toBe('/rankings');
+    expect(await ask('rating')).toBe('/rankings');
+  });
+
+  it('routes faq and privacy searches to their pages', async () => {
+    expect(await ask('faq')).toBe('/faq');
+    expect(await ask('privacy')).toBe('/privacy');
+  });
+
+  it('classifies keyword-free phrasings for the new destinations', async () => {
+    expect(await ask('how do I chain actions one after another?')).toBe(
+      '/learn/waiting'
+    );
+    expect(await ask('how are collisions penalized?')).toBe('/rules');
+  });
+
   it('answers null when nothing matches, rather than a dead /help route', async () => {
     // No keyword and no vocabulary the classifier recognizes -> a real miss.
     const res = await request(helpRouter).get(
