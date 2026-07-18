@@ -74,7 +74,7 @@ number like `40`.
 
 - **HIT**: a bullet struck you.
 - **DETECTED**: an enemy's radar saw you (no damage, but you're a target).
-- **COLLIDED**: you ran into a wall or robot (you stop).
+- **COLLIDED**: you ran into a wall (which stops you) or another robot (which shoves you both apart).
 
 **Why `info.angle + 90`?**
 `info.angle` is the bearing back toward the shooter, relative to your heading. `bot.turn`
