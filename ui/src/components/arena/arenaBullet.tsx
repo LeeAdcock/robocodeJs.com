@@ -19,11 +19,11 @@ const finite = (n: number): number => (Number.isFinite(n) ? n : 0);
 const translate = (x: number, y: number): string =>
   'translate(' + finite(x) + ',' + finite(y) + ')';
 
-// The bullet's (x,y) is the muzzle — the server spawns it BARREL_LENGTH (32)
-// forward of the hull center (botTurret.ts). That single point is the one the
-// collision uses and the debug view draws, so the **projectile** sprite is
-// centered exactly on it (its 4×14 art centered via translate(-2,-7)): the
-// visible bullet, its collision, and the debug dot all coincide.
+// The bullet's (x,y) is the muzzle — the server spawns it BARREL_LENGTH (24, the
+// drawn barrel tip) forward of the hull center (botTurret.ts). That single point
+// is the one the collision uses and the debug view draws, so the **projectile**
+// sprite is centered exactly on it (its 4×14 art centered via translate(-2,-7)):
+// the visible bullet, its collision, and the debug dot all coincide.
 //
 // The flame (shotLarge) is only a trailing muzzle-flash effect, not the bullet's
 // reference point — it keeps its original arrangement relative to the projectile
