@@ -528,7 +528,8 @@ const TelemetryPanel = (props: {
     ],
     ['turret', `${turret}°`],
     ['radar', `${radar}°`],
-    ['health', `${Math.round(bot.health)}`],
+    // Clamp at 0: a bot shot below zero this tick shouldn't read negative.
+    ['health', `${Math.round(Math.max(0, bot.health))}`],
   ];
   const lineH = 14;
   const padX = 8;
