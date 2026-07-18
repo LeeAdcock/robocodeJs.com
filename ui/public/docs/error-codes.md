@@ -198,12 +198,12 @@ clock.on(Event.TICK, () => {
 
 ## E026
 
-**Too many pending commands: the command was rejected.** Your bot has more than the per-arena limit of **10,000** awaited commands (`bot.turn`, `bot.setSpeed`, `bot.turret.fire`, `bot.radar.scan`, …) parked at once. Each awaited command waits for the simulation to reach a state, so issuing them faster than they can complete — typically firing thousands in a tight loop without `await` — piles them up until the arena refuses more. The rejected command's promise rejects (so an `await` throws); the bot keeps playing. This almost always means commands are being launched in an unbounded loop instead of awaited one at a time. Fix: `await` each command before issuing the next, and don't call movement/turret/radar commands inside an unbounded loop.
+**Command budget exceeded: the bot was faulted.** Your bot issued more than **100** commands (`bot.turn`, `bot.setSpeed`, `bot.turret.fire`, `bot.radar.scan`, …) in a single tick. The budget is per bot, per tick, and exceeding it is treated as a crash: the over-budget command's promise rejects (so an `await` throws), the bot is faulted and eliminated from the match, and the fault appears in the arena's fault feed. Well-behaved bots issue only a handful of commands per tick, so this almost always means commands are being launched in an unbounded loop instead of awaited one at a time. Fix: `await` each command before issuing the next, and don't call movement/turret/radar commands inside an unbounded loop.
 
 ```
-// Triggers E026: thousands of un-awaited commands pile up in one tick
+// Triggers E026: un-awaited commands pile up in one tick; the 101st faults the bot
 clock.on(Event.TICK, () => {
-  for (let a = 0; a < 100000; a++) bot.turn(a) // no await — all parked at once
+  for (let a = 0; a < 100000; a++) bot.turn(a) // no await — all issued at once
 })
 ```
 

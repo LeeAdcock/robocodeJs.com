@@ -10,19 +10,23 @@ vi.mock('../src/util/db', () => ({
 import Bot, {
   waitUntil,
   MAX_SENDS_PER_TICK,
+  MAX_COMMANDS_PER_TICK,
   BOT_MAX_SPEED,
 } from '../src/types/bot';
 import Environment, { DEPLOY_TICKS } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { normalizeAngle } from '../src/util/geometry';
 import { Event } from '../src/types/event';
+import { logger, LogEvent } from '../src/util/logger';
 
 // Build a real Bot backed by a mock environment. isRunning() returns false so
 // the waitUntil-based movement methods settle (reject) immediately instead of
 // leaving polling timers running across tests.
 function makeRealBot() {
   const emit = vi.fn();
+  const faults: Record<string, unknown>[] = [];
   const proc = {
+    appId: 'app1',
     bots: [] as unknown[],
     getAppId: () => 'app1',
     getSandbox: () => ({}),
@@ -50,6 +54,11 @@ function makeRealBot() {
     trackBotOp: (op: Promise<unknown>) => {
       void Promise.resolve(op).catch(() => undefined);
     },
+    // Capture structured faults (mirrors Environment.reportFault) so tests can
+    // assert the command-budget fault path.
+    reportFault: (fault: Record<string, unknown>) => {
+      faults.push(fault);
+    },
   };
   const bot = new Bot(env as any, proc as any);
   bot.logger = {
@@ -72,6 +81,7 @@ function makeRealBot() {
     env: env as any,
     proc,
     emit,
+    faults,
     setTime: (t: number) => {
       clock = t;
     },
@@ -614,4 +624,116 @@ describe('non-finite command arguments are rejected before reaching physics', ()
       expect(c.target(bot)).toBe(c.goodTarget);
     });
   }
+});
+
+// Per-bot per-tick command budget (GitHub #293, replacing the #292 per-arena
+// queue cap): every command entry point charges the issuing bot's own budget,
+// and exceeding it FAULTS that bot (appCrashed + an E026 on the fault feed) —
+// so flooding is self-defeating, and a flooder structurally cannot consume an
+// opponent's command capacity the way the shared per-arena cap allowed.
+describe('per-bot per-tick command budget (E026)', () => {
+  const floodLogs = (warn: { mock: { calls: unknown[][] } }) =>
+    warn.mock.calls.filter(
+      (c) => (c[0] as { event?: string })?.event === LogEvent.BOT_COMMAND_FLOOD
+    );
+
+  it('faults the bot with E026 when the budget is exceeded, once', async () => {
+    const { bot, faults } = makeRealBot();
+    const warn = vi.spyOn(logger, 'warn').mockReturnValue(undefined as never);
+    try {
+      // Exactly at the budget: fine. Each call settles (rejects as cancelled by
+      // the stopped harness env) or no-ops; both charge the budget.
+      for (let i = 0; i < MAX_COMMANDS_PER_TICK; i++)
+        bot.turn(1).catch(() => undefined);
+      expect(bot.appCrashed).toBe(false);
+      expect(faults).toHaveLength(0);
+
+      // One past the budget: the command rejects with E026 and the bot faults.
+      await expect(bot.turn(1)).rejects.toMatch('E026');
+      expect(bot.appCrashed).toBe(true);
+      expect(faults).toHaveLength(1);
+      expect(faults[0]).toMatchObject({
+        code: 'E026',
+        kind: 'command-flood',
+        appId: 'app1',
+        botId: bot.id,
+      });
+
+      // Further over-budget calls keep rejecting, but the fault and the
+      // structured abuse log are single-shot (the bot is already dead).
+      await expect(bot.setSpeed(3)).rejects.toMatch('E026');
+      expect(faults).toHaveLength(1);
+      const logs = floodLogs(warn);
+      expect(logs).toHaveLength(1);
+      expect(logs[0][0]).toMatchObject({
+        event: LogEvent.BOT_COMMAND_FLOOD,
+        appId: 'app1',
+        botId: bot.id,
+      });
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('resets the counter when the clock advances (budget is per tick)', () => {
+    const { bot, faults, setTime } = makeRealBot();
+    for (let i = 0; i < MAX_COMMANDS_PER_TICK; i++)
+      bot.turn(1).catch(() => undefined);
+    setTime(1);
+    for (let i = 0; i < MAX_COMMANDS_PER_TICK; i++)
+      bot.turn(1).catch(() => undefined);
+    expect(bot.appCrashed).toBe(false);
+    expect(faults).toHaveLength(0);
+  });
+
+  it('turret and radar commands draw from the same per-bot budget', async () => {
+    const { bot, faults } = makeRealBot();
+    const commands = [
+      () => bot.turn(1),
+      () => bot.turret.turn(1),
+      () => bot.turret.radar.turn(1),
+      () => bot.setSpeed(2),
+    ];
+    for (let i = 0; i < MAX_COMMANDS_PER_TICK; i++)
+      commands[i % commands.length]().catch(() => undefined);
+
+    // The over-budget call is charged at entry — before any readiness check —
+    // so it rejects with E026 rather than 'Radar not ready'.
+    await expect(bot.turret.radar.scan()).rejects.toMatch('E026');
+    expect(bot.appCrashed).toBe(true);
+    expect(faults).toHaveLength(1);
+  });
+
+  it("a flooding bot cannot consume another bot's capacity (per-bot isolation)", async () => {
+    const { bot: flooder, env, faults } = makeRealBot();
+    // A second bot from a different app sharing the same environment — the
+    // two-bots-one-arena shape the old per-arena cap starved.
+    const proc2 = {
+      appId: 'app2',
+      bots: [] as unknown[],
+      getAppId: () => 'app2',
+      getSandbox: () => ({}),
+    };
+    const victim = new Bot(env, proc2 as any);
+    victim.logger = {
+      trace: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any;
+    victim.orientation = 0;
+    victim.orientationTarget = 0;
+
+    for (let i = 0; i <= MAX_COMMANDS_PER_TICK; i++)
+      flooder.turn(1).catch(() => undefined);
+    expect(flooder.appCrashed).toBe(true);
+
+    // The victim's command runs its normal path in the same tick — rejected as
+    // cancelled by the stopped harness env, NOT with E026 — and only the
+    // flooder was faulted.
+    await expect(victim.turn(90)).rejects.toBe('Turn cancelled');
+    expect(victim.appCrashed).toBe(false);
+    expect(faults).toHaveLength(1);
+    expect(faults[0].appId).toBe('app1');
+  });
 });

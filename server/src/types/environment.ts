@@ -132,18 +132,6 @@ export const SUDDEN_DEATH_TIME = 7500;
 // spawn before combat — removing the last of the start-position luck. ~10s at 1x.
 export const DEPLOY_TICKS = 100;
 
-// Hard cap on how many commands an arena may have parked in its pending-command
-// queue at once. Each awaited bot command (turn/setSpeed/fire/scan/…) parks an
-// entry here on the HOST heap — outside the isolate's 8 MB limit — so a bot that
-// synchronously issues an unbounded chain (e.g. `for(;;) bot.turn(i)`) within a
-// single handler could grow this without bound and exhaust host memory before the
-// sandbox timeout fires (the documented t2.micro OOM mode). The ceiling is far
-// above any legitimate arena (a handful of parked commands per live bot); past it
-// new commands are rejected with E026 rather than queued. Read per call so tests
-// can lower it; env-tunable for prod. Mirrors the per-tick send/timer budgets.
-const maxPendingCommands = (): number =>
-  Number(process.env.MAX_PENDING_COMMANDS) || 10000;
-
 export default class Environment {
   public processes: Process[] = [];
   private arena: Arena;
@@ -188,12 +176,12 @@ export default class Environment {
   private statsSink:
     ((deltas: Partial<Record<keyof BotStats, number>>) => void) | null = null;
 
-  // Commands the bots are awaiting, settled deterministically each tick.
+  // Commands the bots are awaiting, settled deterministically each tick. Each
+  // entry lives on the HOST heap (outside the isolates' 8 MB limits), but growth
+  // is bounded structurally: every command is charged against its issuing bot's
+  // per-tick budget (MAX_COMMANDS_PER_TICK, bot.ts) and exceeding it faults the
+  // bot, so the queue can never exceed ~budget × live bots.
   private pendingCommands: PendingCommand[] = [];
-  // Latched while the pending-command queue sits at its cap, so a runaway bot
-  // flooding commands is logged as an abuse signal exactly once per episode (not
-  // once per rejected call). Cleared when the queue fully drains.
-  private pendingFlooded = false;
   // In-flight isolate operations (event-handler dispatches, command settlements,
   // timer callbacks) started during the current tick. The loop awaits these before
   // advancing so every bot has run to its next await-park — this is what makes
@@ -507,26 +495,6 @@ export default class Environment {
     new Promise<void>((resolve, reject) => {
       if (success()) return resolve();
       if (failure && failure()) return reject(msg);
-      // Bound the host-side queue: a runaway bot flooding commands can't grow it
-      // without limit (would exhaust host memory before the sandbox timeout). Past
-      // the cap the command is rejected, and the first rejection of an episode is
-      // logged once as a structured abuse signal (arena-attributed).
-      if (this.pendingCommands.length >= maxPendingCommands()) {
-        if (!this.pendingFlooded) {
-          this.pendingFlooded = true;
-          logger.warn(
-            {
-              event: LogEvent.BOT_COMMAND_FLOOD,
-              arenaId: this.arena.getId(),
-              pending: this.pendingCommands.length,
-            },
-            'arena pending-command queue hit its cap; rejecting further commands'
-          );
-        }
-        return reject(
-          `${ErrorCodes.E026}: too many pending commands (max ${maxPendingCommands()} per arena)`
-        );
-      }
       this.pendingCommands.push({ success, failure, resolve, reject, msg });
     });
 
@@ -548,8 +516,6 @@ export default class Environment {
       }
     }
     this.pendingCommands = remaining;
-    // Queue fully drained: re-arm the flood log for the next episode.
-    if (remaining.length === 0) this.pendingFlooded = false;
     return settled;
   };
 
