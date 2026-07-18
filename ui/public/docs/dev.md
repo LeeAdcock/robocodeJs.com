@@ -48,7 +48,9 @@ bot.on(Event.DETECTED, () => {
 })
 ```
 
-If an event handler returns nothing, it will be called each time the event occurs. This can at times result in unintended side effects if multiple events happen in quick succession and the handler is executing multiple times in parallel. To account for this, if the registered event handler returns a Promise, that Promise must resolve before the event handler will be called again for the same event type. Events can return Promises as demonstrated below with a traditional `return` statement, the abbreviated arrow syntax, or through using `async...await`.
+If an event handler returns nothing, it will be called each time the event occurs. This can at times result in unintended side effects if multiple events happen in quick succession and the handler is executing multiple times in parallel.
+
+To account for this, if the registered event handler returns a Promise, that Promise must resolve before the event handler will be called again for the same event type. Events can return Promises as demonstrated below with a traditional `return` statement, the abbreviated arrow syntax, or through using `async...await`.
 
 Define a chain of behaviors when an event occurs:
 
@@ -116,7 +118,11 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 ## Movement
 
-The bot can turn left or right, and move straight ahead at a desired speed. The turn rate is limited, so a measurable amount of time will pass between setting the desired orientation and the bot achieving that orientation. Similarly there is a limited acceleration and deceleration. Turns always take the shortest path to the target angle (`bot.turn(350)` is executed as 10 degrees counter-clockwise, not 350 clockwise), so use signed values to control direction (positive clockwise, negative counter-clockwise). The same applies to the turret and radar. Methods that set these values will return a Promise object that is resolved when the desired value is reached. If other logic changes the desired value before it is reached, the Promise will be rejected - optionally these rejections can be caught and handled. (A pending command is also rejected if the bot is destroyed or the match stops before the value is reached.) Leaving such a rejection unhandled is safe: it is logged to your bot's log panel but does **not** stop the bot, so you only need to `.catch()` them when you want to react to the cancellation (or to keep your logs quiet).
+The bot can turn left or right, and move straight ahead at a desired speed. The turn rate is limited, so a measurable amount of time will pass between setting the desired orientation and the bot achieving that orientation. Similarly there is a limited acceleration and deceleration.
+
+Turns always take the shortest path to the target angle (`bot.turn(350)` is executed as 10 degrees counter-clockwise, not 350 clockwise), so use signed values to control direction (positive clockwise, negative counter-clockwise). The same applies to the turret and radar.
+
+Methods that set these values will return a Promise object that is resolved when the desired value is reached. If other logic changes the desired value before it is reached, the Promise will be rejected - optionally these rejections can be caught and handled. (A pending command is also rejected if the bot is destroyed or the match stops before the value is reached.) Leaving such a rejection unhandled is safe: it is logged to your bot's log panel but does **not** stop the bot, so you only need to `.catch()` them when you want to react to the cancellation (or to keep your logs quiet).
 
 Asynchronously set a desired value and ignore any result:
 
@@ -163,7 +169,9 @@ bot.setOrientation(90).then(() => {
 
 The turret provides the ability to fire at other bots. The turret is attached to the top of the bot, so its orientation is relative to the bot's orientation.
 
-As the bot turns, the turret will also turn. The position of the turret is relative to the bot, not to the arena, so an aimed turret swings with the body, and if the body turns after you aim you'll need to re-aim (or aim just before firing). An orientation of 0 degrees aligns the turret directly forward. The turret will take time to reload after being fired and methods exist to identify when it is available to fire. Every shot is identical: there is no power, heat, or ammunition mechanic. The constraints are the reload timer and the miss penalty (see [game rules](/rules)).
+As the bot turns, the turret will also turn. The position of the turret is relative to the bot, not to the arena, so an aimed turret swings with the body, and if the body turns after you aim you'll need to re-aim (or aim just before firing). An orientation of 0 degrees aligns the turret directly forward.
+
+The turret will take time to reload after being fired and methods exist to identify when it is available to fire. Every shot is identical: there is no power, heat, or ammunition mechanic. The constraints are the reload timer and the miss penalty (see [game rules](/rules)).
 
 ### Orientation
 
@@ -186,7 +194,17 @@ At the start of every match there is a short **deployment window** (the first 10
 
 ## Radar
 
-The radar provides the ability to detect other bots. Its detection area is a long, narrow wedge reaching **600 units**, one tank-width (32 units) across at your bot, widening to about 244 units across at its tip, and any bot whose center is inside it is detected. It's shown as the beam drawn under the radar in the arena; the drawing is slightly slimmer at its base than the detection area, so anything the beam visibly touches is detected. Vision is directional on purpose: you can see far, but only where you choose to look, so pointing the radar well matters more than being close. The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena. The radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed. The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
+The radar provides the ability to detect other bots. Its detection area is a long, narrow wedge:
+
+- reaching **600 units**
+- one tank-width (32 units) across at your bot, widening to about 244 units across at its tip
+- any bot whose center is inside it is detected
+
+It's shown as the beam drawn under the radar in the arena; the drawing is slightly slimmer at its base than the detection area, so anything the beam visibly touches is detected. Vision is directional on purpose: you can see far, but only where you choose to look, so pointing the radar well matters more than being close.
+
+The radar is attached to the top of the turret, so its orientation is relative to the turret's orientation. An orientation of 0 points the radar directly aligned to the turret. As the bot or the turret turns, the radar will also turn relative to the arena. The radar looks where the body, turret, and radar angles add up, so a scan that "should" have seen something usually means one of the three has turned since you aimed.
+
+The radar will take time to recharge after each scan, and methods exist to identify when it is available to scan. Scanning is not stealthy: every bot your scan detects receives a `DETECTED` event, so sweeping the field announces you to whoever you find.
 
 ### Orientation
 
@@ -205,7 +223,9 @@ The radar provides the ability to detect other bots. Its detection area is a lon
 
 ### Contacts
 
-Every scan result is a **contact**: a [marker](#arena) pinned at the spot where the detected bot **was at the moment of the scan**. The pin does not follow the bot afterwards. Because a contact is a marker, all the marker methods work on it: `getX()`/`getY()` give that pinned position in arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured from wherever **you** are now to the pin: they update as you move, **not** as the target moves. To estimate where a moving target actually is or will be, use `getIntercept(speed)` below (it extrapolates the target's motion for you) or take a fresh scan.
+Every scan result is a **contact**: a [marker](#arena) pinned at the spot where the detected bot **was at the moment of the scan**. The pin does not follow the bot afterwards.
+
+Because a contact is a marker, all the marker methods work on it: `getX()`/`getY()` give that pinned position in arena coordinates (no trigonometry needed), and `getDistance()`/`getBearing()`/`isInBounds()` are measured from wherever **you** are now to the pin: they update as you move, **not** as the target moves. To estimate where a moving target actually is or will be, use `getIntercept(speed)` below (it extrapolates the target's motion for you) or take a fresh scan.
 
 The scan's own readings are available as methods too, so the whole surface is consistent:
 
@@ -216,7 +236,9 @@ The scan's own readings are available as methods too, so the whole surface is co
 - `contact.getHealth() : number` Its health at the moment of the scan (0–100).
 - `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `bot.turret.bulletSpeed` to lead a shot (`bot.turret.turnTowards(m.getX(), m.getY())` aims it), or pass `bot.maxSpeed` to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
 
-The raw readings also remain as plain properties, `{ id, speed, orientation, distance, angle, friendly, health }`, exactly as scans have always reported them, plus the frame-independent `x`, `y` (the detected bot's arena coordinates at the moment of the scan) and `time` (the clock tick of the capture). The properties are a snapshot from the moment of the scan (`distance`/`angle` don't update as you move; that's what `getDistance()`/`getBearing()` are for), and they are what makes a contact serializable. They're exactly what `bot.send(contact)` transmits.
+The raw readings also remain as plain properties, `{ id, speed, orientation, distance, angle, friendly, health }`, exactly as scans have always reported them, plus the frame-independent `x`, `y` (the detected bot's arena coordinates at the moment of the scan) and `time` (the clock tick of the capture).
+
+The properties are a snapshot from the moment of the scan (`distance`/`angle` don't update as you move; that's what `getDistance()`/`getBearing()` are for), and they are what makes a contact serializable. They're exactly what `bot.send(contact)` transmits.
 
 **Sharing a contact with teammates.** A contact is serializable, so it can be broadcast directly with `bot.send(contact)`: what's delivered is the plain data properties (methods are not serialized), and the received `angle`/`distance` are relative to the **sender**, not to whoever receives it. The receiver rebuilds the full contact with `arena.createContact(message)`: the result has every contact method measured from the receiver's own position, and `getIntercept` accounts for the ticks elapsed since the sender's scan.
 
@@ -263,7 +285,9 @@ Faults are written to your bot's log panel with a short code (like `E017`). See 
 
 ## State and the START event
 
-When a bot's code is loaded (when it first starts, and again every time you save a change), it is re-executed to pick up your new handlers. The `START` event fires only on that first start (and again on an arena restart or a reboot), **not** on an ordinary save. Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
+When a bot's code is loaded (when it first starts, and again every time you save a change), it is re-executed to pick up your new handlers. The `START` event fires only on that first start (and again on an arena restart or a reboot), **not** on an ordinary save.
+
+Initialize your bot's state in a `START` handler and store it on `this`, which is shared across all of the bot's event handlers (so `TICK`, `HIT`, and the rest can read it). Plain top-level variables are reset every time the code is reloaded.
 
 ```
 // Reset to its initial value every time the code is (re)loaded.
