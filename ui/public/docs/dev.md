@@ -1,6 +1,6 @@
 # Bot Development
 
-Each bot's logic is defined in JavaScript that is initialized at the beginning of a match to provide initial commands and register event handlers. Saving your code reloads it live (your event handlers are replaced immediately) but it does **not** re-run the `START` handler, so a running bot keeps the state it set up. Use the editor's **Reboot** button (or `Ctrl-Shift-S`) to reload your code and re-run `START` when you want a fresh initialization.
+You write each bot's logic in JavaScript, which runs at the start of a match to issue its initial commands and register its event handlers. Saving your code reloads it live (your event handlers are replaced immediately) but it does **not** re-run the `START` handler, so a running bot keeps the state it set up. Use the editor's **Reboot** button (or `Ctrl-Shift-S`) to reload your code and re-run `START` when you want a fresh initialization.
 
 The in-browser code editor offers **autocomplete** for the whole bot API: type `bot.`, `arena.`, `clock.`, or `Event.` to see the available members, each with its signature and a short description.
 
@@ -23,7 +23,7 @@ The arena where bots live is a square. Headings are specified in degrees on a co
 - `arena.contains(x, y) : boolean` Returns whether the coordinate lies inside the arena (between 0 and the width/height, edges inclusive).
 - `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary. `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 units before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
 
-Virtual markers can be created in the arena that provide simplified calculations for angles and distance. These markers are either dropped at the current bot location, or at a specified coordinate.
+You can create virtual markers in the arena to simplify calculations of angles and distance. A marker is dropped either at the bot's current location or at a coordinate you specify.
 
 - `arena.createMarker(x, y) : marker` Creates a marker at the provided arena coordinates.
 - `arena.createContact(data) : contact` Rebuilds a full [contact](#contacts) from its serialized data, typically a contact a teammate broadcast, since a contact serializes as its plain data properties (methods are not serialized). `data` needs numeric `x`, `y`, `speed`, and `orientation`; a `time` (the capture tick) lets `getIntercept` account for staleness and defaults to now; any other fields (`id`, `health`, `friendly`, …) carry through as data. The rebuilt contact's methods are measured from **your** position.
@@ -36,11 +36,11 @@ The `marker` object returned has several convenience methods:
 - `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading. `bot.turn(marker.getBearing())` faces it.
 - `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena, the same check as `arena.contains(marker.getX(), marker.getY())`.
 
-A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable. It can be passed to `bot.send` (or through JSON), transmitting as its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`. In particular, `bot.send(bot.dropMarker())` is the recommended way to broadcast your own position to teammates.
+A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable. It can be passed to `bot.send` (or through JSON) and travels as just its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`. In particular, `bot.send(bot.dropMarker())` is the recommended way to broadcast your own position to teammates.
 
 # Events Overview
 
-Most of your bot application code will be defined as functions you create that are executed when events take place in your bot's environment. These functions, which are registered on the bot as event handlers, enable you to define how your bot reacts and adapts. Each time you set an event handler with the `on` function, it will overwrite any previously defined handler for that event type.
+Most of your bot's code lives in functions that run when events happen in its environment. You register these functions on the bot as event handlers, and they define how your bot reacts and adapts. Each time you set a handler with the `on` function, it overwrites any previous handler for that event type.
 
 ```
 bot.on(Event.DETECTED, () => {
@@ -83,14 +83,14 @@ clock.on(Event.TICK, async () => {
 
 # Clock
 
-You can access the current "simulation time" using the 'clock' object. Registering a handler for clock ticks enables providing logic that executes at a set frequency. For logic that executes on different frequencies, details on the JavaScript timers are below. A clock tick is the smallest increment of time within the simulation.
+The `clock` object gives you the current "simulation time". Register a handler for clock ticks to run logic at a set frequency; for logic that runs at other frequencies, see the JavaScript timers below. A clock tick is the smallest increment of time within the simulation.
 
 - `clock.getTime() : number` Returns the number of clock ticks elapsed in the current match.
 - `clock.on(Event.TICK, () => {} )` Registers a callback that is executed every clock tick.
 
 # Bot
 
-The `bot` object provides the programmatic ability to control the various capabilities of the bot. This includes navigation, radar, fire control, and communications. Methods allow triggering behaviors on the bot, while callbacks enable reacting to events that occur on the bot.
+The `bot` object is how you control the bot's capabilities: navigation, radar, fire control, and communications. Its methods trigger behaviors, while callbacks let you react to events that occur on the bot.
 
 A few basic methods exist for setting and retrieving information about the bot.
 
@@ -273,11 +273,11 @@ bot.on(Event.SCANNED, (contacts) => {
 
 The sandbox is plain JavaScript plus the bot API, nothing else. There is no network access (`fetch`, `XMLHttpRequest`, WebSockets), no module system (`import`/`require`, no npm packages), and no browser or Node globals (`window`, `document`, `process`). Everything a bot can use is on this page: `bot`, `arena`, `clock`, `Event`, `console`, `logger`, the timers, `Math`, and `Promise`.
 
-All app code is executed in a sandbox environment which limits all bots running the same application to use 8 MB of memory. When multiple applications are running in the arena simultaneously, each application will have its own 8 MB of allocated memory. Exceeding this limit will cause all bots running the application to terminate.
+All app code runs in a sandbox that gives each application 8 MB of memory, shared by all of that application's bots. When several applications run in the arena at once, each gets its own 8 MB. Exceeding the limit terminates every bot running that application.
 
-Callback functions are limited to 5 seconds of runtime. Long duration activities could be implemented by returning a Promise. Exceeding this limit will cause the bot to terminate.
+Callback functions are limited to 5 seconds of runtime, and exceeding that terminates the bot. For long-running work, return a Promise rather than blocking.
 
-Synchronous syntax-errors or runtime-errors in the application code will cause the bot to terminate. This can impact the bot as soon as the match begins, or at any point while it is running.
+A synchronous syntax or runtime error in your code terminates the bot, whether it happens as the match begins or at any point while it is running.
 
 An _unhandled promise rejection_ is treated more leniently. For example, an `await bot.turn(...)` that is cancelled because newer logic changed the target will reject, and if you don't `.catch()` it that rejection escapes your handler, but it is only logged to your bot's log panel, it does not terminate the bot. The same is true of a rejection thrown from inside a timer callback.
 
@@ -310,7 +310,7 @@ clock.on(Event.TICK, () => {
 
 ## Console Logging
 
-The normal `console.log()` and related functions can be used for output messages. These are captured for display in the bot's log panel in the user interface, as well as being formatted and written to the browser console.
+Use the usual `console.log()` and related functions for output. Each message is captured for the bot's log panel in the interface, and is also formatted and written to the browser console.
 
 ```
 console.log(`here a useful log message!`)
@@ -346,7 +346,7 @@ logger.error('unexpected scan', results)
 
 ## JavaScript Timers
 
-Any timers or intervals created in the bot logic will be automatically cleaned up when bots are removed from the arena, or will be paused and resumed with the game. Timers should be created within an event handler, such as `START` shown below, instead of at the root of the application to avoid duplicate timer instances when the app is recompiled and reinitialized.
+Any timers or intervals you create are cleaned up automatically when a bot is removed from the arena, and they pause and resume with the game. Create them inside an event handler such as `START` (shown below) rather than at the root of your app, so you don't end up with duplicate timers each time the app is recompiled and reinitialized.
 
 ```
 bot.on(Event.START, () => {
@@ -357,11 +357,11 @@ bot.on(Event.START, () => {
 })
 ```
 
-Timers will operate in "simulated time" instead of real-world time. The interval provided to `setInterval` and `setTimeout` is the number of simulated clock ticks, this is in contrast to the traditional interval value being the number of milliseconds. At the default speed a tick is about 100 ms, so an interval of `10` fires roughly once a second.
+Timers operate in "simulated time" instead of real-world time. The interval you pass to `setInterval` and `setTimeout` is a number of simulated clock ticks, not the traditional number of milliseconds. At the default speed a tick is about 100 ms, so an interval of `10` fires roughly once a second.
 
 A bot may hold at most **64** active timers (`setInterval` and `setTimeout` combined). Registrations past the cap are ignored. The call returns `-1` and the callback never fires (code `E021`, non-fatal).
 
-If a registered `Event.TICK` event handler returns a promise, then although it is called again until the previous promise resolves, this does not impact the function of any active timers. For this reason, it is possible that the number of times the clock ticker handler is called might appear to have a discrepancy when compared to the firing rate of any timers.
+A `TICK` handler that returns a promise is not called again until that promise resolves, but this does not affect your active timers — they keep firing on their own schedule. As a result, the number of times your tick handler runs can look out of step with how often your timers fire.
 
 ## Date.now()
 
