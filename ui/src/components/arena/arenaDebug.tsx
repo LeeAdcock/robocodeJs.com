@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 
@@ -29,7 +29,9 @@ import {
 //
 // Click a tank to focus it: the rest dim, and its telemetry panel, range rings,
 // and per-vector angle tags appear. Grid coordinate labels, heading trajectory
-// lines, radar detection lines, and bullet remaining-travel are always on.
+// lines, radar detection lines, and bullet remaining-travel are always on. Hover
+// the arena for a live coordinate readout; press-drag to measure distance and
+// angle (in the same 0°=up heading convention the bots use) between two points.
 
 const BOT_RADIUS = 16;
 const GRID = 50;
@@ -97,6 +99,11 @@ const distanceToEdge = (
   else if (u.y < -1e-6) t = Math.min(t, (0 - y) / u.y);
   return Number.isFinite(t) ? Math.max(0, t) : 0;
 };
+
+// Heading (0°=up, clockwise — the same convention the bots use) from A to B, so
+// a measured bearing is directly comparable to a bot's turret/heading angle.
+const bearing = (ax: number, ay: number, bx: number, by: number): number =>
+  normalizeDeg((Math.atan2(-(bx - ax), by - ay) * 180) / Math.PI);
 
 // Vivid per-team stroke for the tank circle — the one place team identity is
 // encoded in the schematic (paired with the numeric id label). Tuned to read on
@@ -570,6 +577,28 @@ export default function DebugArenaSvg(props: {
   const height = props.arena.height || 750;
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Mouse probe + measurement ruler. `mouse` is the cursor in arena coordinates
+  // (null when off the arena); `drag` is the ruler anchor while press-dragging.
+  // The anchor is mirrored into a ref so the move handler reads it without a
+  // stale closure, and `moved` distinguishes a real drag (ruler) from a plain
+  // click (clear focus) on pointer-up.
+  const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const movedRef = useRef(false);
+
+  // Screen pixel → arena user coordinates via the SVG's CTM (accounts for the
+  // viewBox and letterboxing). Returns null when unavailable (e.g. jsdom).
+  const toArena = (
+    e: React.PointerEvent<SVGRectElement>
+  ): { x: number; y: number } | null => {
+    const svg = e.currentTarget.ownerSVGElement;
+    const ctm = svg?.getScreenCTM();
+    if (!ctm) return null;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    return { x: p.x, y: p.y };
+  };
+
   const apps = props.arena.apps;
   // Position lookup (for detection lines) and the focused-bot resolution.
   const posById: Record<string, { x: number; y: number }> = {};
@@ -629,7 +658,34 @@ export default function DebugArenaSvg(props: {
         width={width}
         height={height}
         fill="url(#debugGrid)"
-        onClick={() => setSelectedId(null)}
+        style={{ cursor: 'crosshair' }}
+        onPointerDown={(e) => {
+          const p = toArena(e);
+          if (!p) return;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          dragRef.current = p;
+          movedRef.current = false;
+          setDrag(p);
+          setMouse(p);
+        }}
+        onPointerMove={(e) => {
+          const p = toArena(e);
+          if (!p) return;
+          setMouse(p);
+          const a = dragRef.current;
+          if (a && Math.hypot(p.x - a.x, p.y - a.y) > 3)
+            movedRef.current = true;
+        }}
+        onPointerUp={(e) => {
+          e.currentTarget.releasePointerCapture?.(e.pointerId);
+          // A press with no real drag is a click on empty space → clear focus.
+          if (!movedRef.current) setSelectedId(null);
+          dragRef.current = null;
+          setDrag(null);
+        }}
+        onPointerLeave={() => {
+          if (!dragRef.current) setMouse(null);
+        }}
       />
       <rect
         x={0.5}
@@ -759,6 +815,81 @@ export default function DebugArenaSvg(props: {
           appName={selected.appName}
           height={height}
         />
+      )}
+
+      {/* Mouse coordinate probe / drag-to-measure ruler. A bg-colored text stroke
+          (paintOrder stroke) keeps the readout legible over grid and vectors. */}
+      {mouse && (
+        <g pointerEvents="none">
+          {drag ? (
+            <>
+              <line
+                x1={drag.x}
+                y1={drag.y}
+                x2={mouse.x}
+                y2={mouse.y}
+                stroke="var(--debug-fg)"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+              <circle cx={drag.x} cy={drag.y} r={2.5} fill="var(--debug-fg)" />
+              <circle
+                cx={mouse.x}
+                cy={mouse.y}
+                r={2.5}
+                fill="var(--debug-fg)"
+              />
+              <text
+                x={mouse.x + 8}
+                y={mouse.y - 8}
+                fill="var(--debug-fg)"
+                stroke="var(--debug-bg)"
+                strokeWidth={3}
+                paintOrder="stroke"
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                }}
+              >
+                {Math.round(Math.hypot(mouse.x - drag.x, mouse.y - drag.y))}u{' '}
+                {Math.round(bearing(drag.x, drag.y, mouse.x, mouse.y))}°
+              </text>
+            </>
+          ) : (
+            <>
+              <line
+                x1={mouse.x - 5}
+                y1={mouse.y}
+                x2={mouse.x + 5}
+                y2={mouse.y}
+                stroke="var(--debug-fg)"
+                strokeWidth={0.75}
+                opacity={0.7}
+              />
+              <line
+                x1={mouse.x}
+                y1={mouse.y - 5}
+                x2={mouse.x}
+                y2={mouse.y + 5}
+                stroke="var(--debug-fg)"
+                strokeWidth={0.75}
+                opacity={0.7}
+              />
+              <text
+                x={mouse.x + 8}
+                y={mouse.y - 8}
+                fill="var(--debug-fg)"
+                stroke="var(--debug-bg)"
+                strokeWidth={3}
+                paintOrder="stroke"
+                style={{ fontSize: '9px', fontFamily: 'monospace' }}
+              >
+                {Math.round(mouse.x)}, {Math.round(mouse.y)}
+              </text>
+            </>
+          )}
+        </g>
       )}
     </>
   );
