@@ -263,6 +263,42 @@ describe('Simulation.run — collisions', () => {
     expect(t1.health).toBeCloseTo(92.5, 5);
     expect(t2.health).toBeCloseTo(92.5, 5);
   });
+
+  it('sheds the inward speed of a head-on collision (friction, not ice)', () => {
+    // A bot ramming a stationary one dead-on: collision friction absorbs the
+    // velocity driving into it, so it stops on impact and must re-accelerate,
+    // rather than gliding around at full speed like it's on ice.
+    const t1 = makeBot({ id: '1', x: 375, y: 370, speed: 5, speedTarget: 5 });
+    const t2 = makeBot({ id: '2', x: 375, y: 400, speed: 0, speedTarget: 0 });
+    run(makeEnv([makeProcess('a', [t1, t2])]));
+    expect(t1.speed).toBeCloseTo(0, 5);
+    expect(t1.speedTarget).toBe(5); // intent survives — it recovers once clear
+  });
+
+  it('does not grind a settled contact toward death (sticky contact)', () => {
+    // Two bots locked dead-center take the one initial impact, then hold: friction
+    // parks them at contact distance and the sticky-contact rule keeps re-entry from
+    // registering as a fresh collision, so health must stop dropping (the pre-fix
+    // failure mode was ~1 HP/tick until one died).
+    const t1 = makeBot({ id: '1', x: 375, y: 370, speed: 5, speedTarget: 5 });
+    const t2 = makeBot({
+      id: '2',
+      x: 375,
+      y: 400,
+      orientation: 180,
+      speed: 5,
+      speedTarget: 5,
+    });
+    const env = makeEnv([makeProcess('a', [t1, t2])]);
+    for (let i = 0; i < 3; i++) run(env); // let the pair settle into contact
+    const settled1 = t1.health;
+    const settled2 = t2.health;
+    for (let i = 0; i < 40; i++) run(env);
+    expect(t1.health).toBe(settled1);
+    expect(t2.health).toBe(settled2);
+    expect(t1.health).toBeGreaterThan(0);
+    expect(t2.health).toBeGreaterThan(0);
+  });
 });
 
 describe('Simulation.run — bullets', () => {

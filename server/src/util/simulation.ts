@@ -11,6 +11,7 @@ import {
   BOT_ACCELERATION,
   COLLISION_MIN_CLOSING_SPEED,
   COLLISION_DAMAGE_FACTOR,
+  COLLISION_FRICTION,
 } from '../types/bot';
 import { TURRET_RELOAD_RATE } from '../types/botTurret';
 import { RADAR_CHARGE_RATE } from '../types/botRadar';
@@ -144,6 +145,17 @@ export default {
         });
     });
 
+    // Snapshot every bot's speed before any movement resolution runs. Bots are
+    // processed one at a time and collision friction mutates a bot's speed as it
+    // resolves, so a later bot must read this tick-start speed (not the already-
+    // frictioned live value) when computing closing speed against it — otherwise a
+    // symmetric head-on would score less impact damage on whichever bot resolves
+    // second.
+    const tickStartSpeed = new Map<Bot, number>();
+    env.getProcesses().forEach((process) => {
+      process.bots.forEach((bot) => tickStartSpeed.set(bot, bot.speed));
+    });
+
     // Then handle movement and interactions
     env.getProcesses().forEach((process) => {
       process.bots.forEach((bot) => {
@@ -170,6 +182,7 @@ export default {
             x: number;
             y: number;
             closingSpeed: number;
+            cosNormal: number;
             fresh: boolean;
           } | null;
           let deepestOverlap = BOT_RADIUS * 2;
@@ -186,6 +199,24 @@ export default {
                     (180 / Math.PI) -
                     90
                 );
+
+                // Sticky contact: if we are already touching this bot at our
+                // CURRENT position (not just on the projected move), remember it so
+                // impact damage counts it as an ongoing contact next tick, not a
+                // fresh one. Without this a pair that friction has stalled at exactly
+                // contact distance separates to gap 2R, no longer "overlaps" on the
+                // next projected move, and so would re-register as a fresh collision
+                // and be damaged again every time it inched back in — grinding two
+                // dead-centre bots to death. Impact damage and the COLLIDED handlers
+                // still fire only on the projected-move overlap below; this only
+                // seeds `contacts` for the freshness check.
+                const currentDistance = Math.sqrt(
+                  Math.pow(otherBot.x - startX, 2) +
+                    Math.pow(otherBot.y - startY, 2)
+                );
+                if (currentDistance < BOT_RADIUS * 2 + 1e-6) {
+                  contacts.add(otherBot.id);
+                }
 
                 if (distance < BOT_RADIUS * 2) {
                   contacts.add(otherBot.id);
@@ -238,21 +269,38 @@ export default {
                     const unitY = normalY / normalLength;
 
                     // Closing speed = how fast the gap is shrinking = the pair's
-                    // relative velocity projected onto the separating axis.
+                    // relative velocity projected onto the separating axis. Read
+                    // both speeds from the tick-start snapshot so a bot already
+                    // frictioned earlier this tick still contributes its full
+                    // pre-impact velocity here (see `tickStartSpeed`).
+                    const botSpeed = tickStartSpeed.get(bot) ?? bot.speed;
+                    const otherSpeed =
+                      tickStartSpeed.get(otherBot) ?? otherBot.speed;
                     const velX =
-                      bot.speed * Math.sin(-bot.orientation * (Math.PI / 180));
+                      botSpeed * Math.sin(-bot.orientation * (Math.PI / 180));
                     const velY =
-                      bot.speed * Math.cos(-bot.orientation * (Math.PI / 180));
+                      botSpeed * Math.cos(-bot.orientation * (Math.PI / 180));
                     const otherVelX =
-                      otherBot.speed *
+                      otherSpeed *
                       Math.sin(-otherBot.orientation * (Math.PI / 180));
                     const otherVelY =
-                      otherBot.speed *
+                      otherSpeed *
                       Math.cos(-otherBot.orientation * (Math.PI / 180));
                     const closingSpeed = -(
                       (velX - otherVelX) * unitX +
                       (velY - otherVelY) * unitY
                     );
+
+                    // Cosine of our heading against the push-away normal: our own
+                    // velocity projected onto the normal, divided by our speed. It
+                    // is negative when we are driving into the other bot; -1 is
+                    // dead-on, 0 is a pure sideways graze. Collision friction uses
+                    // it to absorb only the inward (head-on) part of our motion.
+                    const speedMag = Math.sqrt(velX * velX + velY * velY);
+                    const cosNormal =
+                      speedMag > 0
+                        ? (velX * unitX + velY * unitY) / speedMag
+                        : 0;
 
                     separation = {
                       // Place us exactly at contact distance along the normal, out
@@ -261,6 +309,7 @@ export default {
                       x: otherBot.x + unitX * BOT_RADIUS * 2,
                       y: otherBot.y + unitY * BOT_RADIUS * 2,
                       closingSpeed,
+                      cosNormal,
                       fresh: !bot.contacts?.has(otherBot.id),
                     };
                   }
@@ -428,6 +477,23 @@ export default {
             );
 
             if (separation) {
+              // Collision friction: shed the part of our motion that was driving
+              // into the other bot, keeping the tangential slide that carries us
+              // around it. `cosNormal < 0` means we were closing; the surviving
+              // fraction of our speed is |sin| of the impact angle plus whatever
+              // inward motion COLLISION_FRICTION lets through (0 = frictionless
+              // glide, 1 = fully inelastic — a head-on ram stops dead). This scales
+              // the post-acceleration speed, so speedTarget still pulls us back up
+              // to intent once we work clear.
+              if (separation.cosNormal < 0) {
+                const inward = -separation.cosNormal;
+                const kept = (1 - COLLISION_FRICTION) * inward;
+                const survives = Math.sqrt(
+                  Math.max(0, 1 - inward * inward + kept * kept)
+                );
+                bot.speed *= survives;
+              }
+
               // Impact damage, once per contact, scaled by how fast we were
               // closing — a gentle touch is free, a hard ram hurts. Unattributed
               // like every other collision (no ram-kill credit; see `damage`).
@@ -452,6 +518,9 @@ export default {
               // per-tick position update, so tell it where the push actually left
               // us. We reuse botAccelerate (speed unchanged — unlike the wall's
               // botStop) rather than snapping the bot to a halt on the client.
+              // `nudged` flags this as a collision push (not a bot's own
+              // accelerate) so the client records the landing point on the bot's
+              // trail — otherwise the drawn track would cut the corner.
               env.emit('event', {
                 type: 'botAccelerate',
                 time: env.getTime(),
@@ -462,6 +531,7 @@ export default {
                 speedTarget: bot.speedTarget,
                 speedAcceleration: BOT_ACCELERATION,
                 speedMax: BOT_MAX_SPEED,
+                nudged: true,
               });
             }
           }

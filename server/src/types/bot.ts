@@ -48,6 +48,15 @@ export const BOT_MAX_SPEED = 5;
 export const COLLISION_MIN_CLOSING_SPEED = 1;
 export const COLLISION_DAMAGE_FACTOR = 0.75;
 
+// How much of a bot's velocity *into* the bot it hits is absorbed on contact, so
+// collisions don't feel frictionless ("sliding around each other like ice"). The
+// component of motion driving into the other bot is an inelastic normal impact; the
+// tangential (sideways) component that carries a bot around its target is kept. At
+// 1 a head-on ram stops dead on impact and must re-accelerate, while a glancing hit
+// barely slows; 0 restores the old frictionless glide. speedTarget is untouched, so
+// a bumped bot always recovers its intended speed once it works clear.
+export const COLLISION_FRICTION = 1;
+
 // Minimal structural type for the per-bot bot logger (a browser-bunyan
 // instance wired up in compiler.ts). It is only ever called, so the five level
 // methods are all we need — and all that scheduleFactory's Timer shares.

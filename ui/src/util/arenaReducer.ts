@@ -1,6 +1,6 @@
 import Arena from '../types/arena';
 import PointInTime from '../types/pointInTime';
-import Simulate from './simulate';
+import Simulate, { recordTrailPoint } from './simulate';
 
 // Applies a single Server-Sent-Event from the arena stream to the arena state.
 //
@@ -48,6 +48,13 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
           bot.speedMax = data.speedMax;
           bot.x = data.x;
           bot.y = data.y;
+          // A collision nudge moves the bot sideways without a heading change, so
+          // the client's own interpolation (which only records vertices on a turn)
+          // would never capture it — the trail would cut the corner once the bot
+          // drives on. Record the landing point so the polyline kinks at the bump.
+          if (data.nudged) {
+            recordTrailPoint(bot, data.x, data.y, time);
+          }
         }
       })
     );
