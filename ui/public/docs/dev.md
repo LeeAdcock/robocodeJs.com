@@ -273,6 +273,8 @@ bot.on(Event.SCANNED, (contacts) => {
 
 The sandbox is plain JavaScript plus the bot API, nothing else. There is no network access (`fetch`, `XMLHttpRequest`, WebSockets), no module system (`import`/`require`, no npm packages), and no browser or Node globals (`window`, `document`, `process`). Everything a bot can use is on this page: `bot`, `arena`, `clock`, `Event`, `console`, `logger`, the timers, `Math`, and `Promise`.
 
+App code runs in [strict mode](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Strict_mode), so every variable must be declared with `const`, `let`, or `var` (or stored on `this` — see [State and the START event](#state-and-the-start-event)). Assigning to an undeclared name throws a `ReferenceError` instead of silently creating a global, so a typo'd variable fails where it happens rather than corrupting your bot's logic. The editor's **Check** button catches these before a match as [E027](/error-codes#e027).
+
 All app code runs in a sandbox that gives each application 8 MB of memory, shared by all of that application's bots. When several applications run in the arena at once, each gets its own 8 MB. Exceeding the limit terminates every bot running that application.
 
 Callback functions are limited to 5 seconds of runtime, and exceeding that terminates the bot. For long-running work, return a Promise rather than blocking.

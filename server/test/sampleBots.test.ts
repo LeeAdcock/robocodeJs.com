@@ -15,6 +15,7 @@ import { Process } from '../src/types/environment';
 import Simulation from '../src/util/simulation';
 import { Event } from '../src/types/event';
 import { makeSimEnv } from './simEnv';
+import { STARTER_BOTS } from '../src/util/starterBots';
 
 const SAMPLES_DIR = path.join(process.cwd(), '..', 'ui', 'public', 'samples');
 const samples = fs.readdirSync(SAMPLES_DIR).filter((f) => f.endsWith('.js'));
@@ -71,4 +72,21 @@ describe('sample bots run without crashing', () => {
     expect(bot.appCrashed).toBe(false);
     proc.dispose();
   });
+});
+
+// Every bot we ship must come back clean from the checker — samples are what
+// authors copy from, and starters are what every new account boots with, so a
+// strict-mode or no-undef failure here would greet users as a broken bot.
+describe('shipped bots pass the checker (strict mode + no-undef lint)', () => {
+  it.each(samples)('sample %s checks clean', async (file) => {
+    const source = fs.readFileSync(path.join(SAMPLES_DIR, file), 'utf-8');
+    expect(await compiler.check(source)).toEqual({ valid: true });
+  });
+
+  it.each(STARTER_BOTS.map((b) => [b.name, b.source] as const))(
+    'starter %s checks clean',
+    async (_name, source) => {
+      expect(await compiler.check(source)).toEqual({ valid: true });
+    }
+  );
 });

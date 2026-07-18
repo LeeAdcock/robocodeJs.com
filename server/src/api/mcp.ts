@@ -422,10 +422,12 @@ export const buildServer = (user: User): McpServer => {
       title: 'Check app source',
       description:
         'Dry-run compile app source WITHOUT deploying it: loads the source in a ' +
-        'throwaway sandbox and reports any syntax or load error (with its error ' +
-        'code — see the robocodejs://reference/error-codes resource). Pass ' +
-        '`source` to check arbitrary code before creating an app, or `appId` to ' +
-        'check a saved app. A clean result is `{ valid: true }`.',
+        'throwaway sandbox and reports any syntax error, undeclared-variable ' +
+        'lint finding (bots run in strict mode, so an undeclared variable ' +
+        'throws at runtime), or load error (with its error code — see the ' +
+        'robocodejs://reference/error-codes resource). Pass `source` to check ' +
+        'arbitrary code before creating an app, or `appId` to check a saved ' +
+        'app. A clean result is `{ valid: true }`.',
       inputSchema: {
         source: z.string().optional().describe('App source to check'),
         appId: z
@@ -435,7 +437,7 @@ export const buildServer = (user: User): McpServer => {
       },
       outputSchema: {
         valid: z.boolean(),
-        stage: z.enum(['compile', 'load']).optional(),
+        stage: z.enum(['compile', 'lint', 'load']).optional(),
         errorCode: z.string().optional(),
         message: z.string().optional(),
         timedOut: z.boolean().optional(),

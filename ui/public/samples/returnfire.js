@@ -12,7 +12,7 @@ bot.setName('ReturnFire');
 // Create a function to make this behavior reusable. HIT/COLLIDED report a
 // bearing relative to our body, so we turn BY that amount to face the threat,
 // then fire once the turret is ready.
-retaliate = (bearing) => {
+const retaliate = (bearing) => {
   return bot.turn(bearing).then(bot.turret.onReady).then(bot.turret.fire);
 };
 
