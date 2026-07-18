@@ -1,6 +1,6 @@
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Bot, { waitUntil } from './bot';
+import Bot, { finiteArg, waitUntil } from './bot';
 import {
   normalizeAngle,
   toApiHeading,
@@ -44,7 +44,14 @@ export class BotRadar implements Orientated {
   }
 
   setOrientation(d: number) {
-    const target = normalizeAngle(Math.round(d));
+    const n = finiteArg(d);
+    if (n === null) {
+      this.bot.logger.trace(
+        'Ignoring non-finite radar setOrientation argument'
+      );
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -77,7 +84,12 @@ export class BotRadar implements Orientated {
   }
 
   turn(d: number) {
-    const target = normalizeAngle(Math.round(this.orientation + d));
+    const n = finiteArg(d);
+    if (n === null) {
+      this.bot.logger.trace('Ignoring non-finite radar turn argument');
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(this.orientation + n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }

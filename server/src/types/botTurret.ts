@@ -2,7 +2,7 @@ import Bullet, { BULLET_SPEED } from './bullet';
 import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Bot, { waitUntil } from './bot';
+import Bot, { finiteArg, waitUntil } from './bot';
 import { normalizeAngle } from '../util/geometry';
 import { BotRadar } from './botRadar';
 import { DEPLOY_TICKS } from './environment';
@@ -31,7 +31,14 @@ export class BotTurret implements Orientated {
   }
 
   setOrientation(d: number) {
-    const target = normalizeAngle(Math.round(d));
+    const n = finiteArg(d);
+    if (n === null) {
+      this.bot.logger.trace(
+        'Ignoring non-finite turret setOrientation argument'
+      );
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -66,7 +73,12 @@ export class BotTurret implements Orientated {
   }
 
   turn(d: number) {
-    const target = normalizeAngle(Math.round(this.orientation + d));
+    const n = finiteArg(d);
+    if (n === null) {
+      this.bot.logger.trace('Ignoring non-finite turret turn argument');
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(this.orientation + n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }

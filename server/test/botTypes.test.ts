@@ -506,3 +506,112 @@ describe('BotRadar orientation & charge', () => {
     );
   });
 });
+
+// R2 hardening: bot code is untrusted and weakly typed, so a non-finite numeric
+// argument (NaN / Infinity / a passed object) must never reach the shared physics
+// — otherwise it can drive this bot's x/y to NaN and propagate through the
+// collision math into other bots, corrupting the whole arena. Every numeric
+// command coerces then finite-guards its argument (see finiteArg in bot.ts),
+// treating a non-finite value as a no-op that leaves the target unchanged.
+describe('non-finite command arguments are rejected before reaching physics', () => {
+  // Each case: the setter, the target field it must NOT corrupt, and a known-good
+  // value to prove the guard only blocks the non-finite path (not all input).
+  const cases: Array<{
+    name: string;
+    call: (bot: Bot, d: unknown) => Promise<unknown>;
+    target: (bot: Bot) => number;
+    good: number;
+    goodTarget: number;
+  }> = [
+    {
+      name: 'bot.setSpeed',
+      call: (bot, d) => bot.setSpeed(d as number),
+      target: (bot) => bot.speedTarget,
+      good: 3,
+      goodTarget: 3,
+    },
+    {
+      name: 'bot.turn',
+      call: (bot, d) => bot.turn(d as number),
+      target: (bot) => bot.orientationTarget,
+      good: 90,
+      goodTarget: 90,
+    },
+    {
+      name: 'bot.setOrientation',
+      call: (bot, d) => bot.setOrientation(d as number),
+      target: (bot) => bot.orientationTarget,
+      good: 90,
+      goodTarget: 90,
+    },
+    {
+      name: 'bot.turret.turn',
+      call: (bot, d) => bot.turret.turn(d as number),
+      target: (bot) => bot.turret.orientationTarget,
+      good: 90,
+      goodTarget: 90,
+    },
+    {
+      name: 'bot.turret.setOrientation',
+      call: (bot, d) => bot.turret.setOrientation(d as number),
+      target: (bot) => bot.turret.orientationTarget,
+      good: 90,
+      goodTarget: 90,
+    },
+    {
+      name: 'bot.turret.radar.turn',
+      call: (bot, d) => bot.turret.radar.turn(d as number),
+      target: (bot) => bot.turret.radar.orientationTarget,
+      good: 90,
+      goodTarget: 90,
+    },
+    {
+      name: 'bot.turret.radar.setOrientation',
+      call: (bot, d) => bot.turret.radar.setOrientation(d as number),
+      target: (bot) => bot.turret.radar.orientationTarget,
+      good: 90,
+      goodTarget: 90,
+    },
+  ];
+
+  // Values that coerce to a non-finite number (Number(x) is NaN/±Infinity) and so
+  // must be blocked. Note null/[]/'' coerce to a finite 0 and are intentionally
+  // NOT here — a null speed is a harmless "stop", not arena-poisoning.
+  const nonFinite: Array<[string, unknown]> = [
+    ['NaN', NaN],
+    ['Infinity', Infinity],
+    ['-Infinity', -Infinity],
+    ['an object', {}],
+    ['a non-numeric string', 'fast'],
+    ['undefined', undefined],
+  ];
+
+  for (const c of cases) {
+    for (const [label, bad] of nonFinite) {
+      it(`${c.name}(${label}) is a no-op that resolves and leaves the target unchanged`, async () => {
+        const { bot } = makeRealBot();
+        const before = c.target(bot);
+        // Resolves (does not reject) and never mutates the target.
+        await expect(c.call(bot, bad)).resolves.toBeUndefined();
+        expect(c.target(bot)).toBe(before);
+        // NaN in particular must not have silently poisoned the field.
+        expect(Number.isNaN(c.target(bot))).toBe(false);
+      });
+    }
+
+    it(`${c.name} still applies a finite argument (guard is not over-broad)`, async () => {
+      const { bot } = makeRealBot();
+      // isRunning() is false in the harness, so a real change settles (rejects)
+      // immediately — but the target is set synchronously first, which is what we
+      // assert. The rejection is expected and swallowed.
+      c.call(bot, c.good).catch(() => undefined);
+      expect(c.target(bot)).toBe(c.goodTarget);
+    });
+
+    it(`${c.name} accepts a numeric string (backward-compatible coercion)`, async () => {
+      const { bot } = makeRealBot();
+      c.call(bot, String(c.good)).catch(() => undefined);
+      expect(c.target(bot)).toBe(c.goodTarget);
+    });
+  }
+});

@@ -81,6 +81,21 @@ export const waitUntil = (
   msg: string | null = null
 ) => env.waitForCondition(successCondition, failureCondition, msg);
 
+// Coerce a bot-supplied numeric command argument, returning null when it is not
+// a finite number. Bot code is untrusted and weakly typed, so `bot.setSpeed(NaN)`,
+// `bot.turn({})`, or `radar.setOrientation(Infinity)` would otherwise flow a
+// non-finite value straight into the shared physics — poisoning this bot's x/y
+// and potentially propagating NaN into other bots through the collision math,
+// corrupting the whole arena (not a sandbox escape, but a griefing vector). We
+// still coerce (so a legacy numeric string like "90" keeps working), then reject
+// only the genuinely non-finite results (NaN/Infinity/objects/null). Callers
+// treat null as a no-op. Mirrors the num() guard the compiler applies to
+// host->isolate constants; this is its isolate->host counterpart.
+export const finiteArg = (d: unknown): number | null => {
+  const n = Number(d);
+  return Number.isFinite(n) ? n : null;
+};
+
 export default class Bot implements Point, Orientated {
   private context: ivm.Context | null = null;
   public turret: BotTurret;
@@ -346,7 +361,12 @@ export default class Bot implements Point, Orientated {
   }
 
   setOrientation(d: number) {
-    const target = normalizeAngle(Math.round(d));
+    const n = finiteArg(d);
+    if (n === null) {
+      this.logger.trace('Ignoring non-finite setOrientation argument');
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -385,7 +405,12 @@ export default class Bot implements Point, Orientated {
   }
 
   turn(d: number) {
-    const target = normalizeAngle(Math.round(this.orientation + d));
+    const n = finiteArg(d);
+    if (n === null) {
+      this.logger.trace('Ignoring non-finite turn argument');
+      return Promise.resolve();
+    }
+    const target = normalizeAngle(Math.round(this.orientation + n));
     if (target === this.orientationTarget) {
       return Promise.resolve();
     }
@@ -414,10 +439,15 @@ export default class Bot implements Point, Orientated {
   }
 
   setSpeed(d: number) {
+    const n = finiteArg(d);
+    if (n === null) {
+      this.logger.trace('Ignoring non-finite setSpeed argument');
+      return Promise.resolve();
+    }
     // Clamp symmetrically: the physics caps actual speed at ±BOT_MAX_SPEED, so
     // an unclamped negative target (e.g. -10) would be unreachable and leave
     // the returned promise pending forever.
-    const target = Math.max(-BOT_MAX_SPEED, Math.min(d, BOT_MAX_SPEED));
+    const target = Math.max(-BOT_MAX_SPEED, Math.min(n, BOT_MAX_SPEED));
     if (target === this.speedTarget) {
       return Promise.resolve();
     }
