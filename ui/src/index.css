@@ -362,3 +362,34 @@ body.dark .blog-signature img {
   filter: invert(1);
   mix-blend-mode: screen;
 }
+
+/* Bot death settle (see arenaBot.tsx BotSvg). A killed tank eases from crisp
+   into a blurred, dimmed wreck over ~800ms instead of snapping. These are
+   one-shot animations (not transitions) run on mount: living and dead bots
+   render in separate SVG groups so wrecks sit beneath live tanks, which means
+   a kill *remounts* the bot node — a transition can't bridge a remount, an
+   on-mount animation with `forwards` can (it holds the end state after). */
+@keyframes bot-death-settle {
+  from {
+    filter: blur(0);
+    opacity: 1;
+  }
+  to {
+    filter: blur(2px);
+    opacity: 0.5;
+  }
+}
+@keyframes bot-health-bar-fade {
+  from {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.bot-dead {
+  animation: bot-death-settle 800ms ease-out forwards;
+}
+.bot-health-bar-dead {
+  animation: bot-health-bar-fade 800ms ease-out forwards;
+}

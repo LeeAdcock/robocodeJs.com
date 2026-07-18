@@ -37,9 +37,6 @@ const ArenaStyle = React.memo((props: { width: number; height: number }) => (
         height="32"
       />
     </pattern>
-    <filter id="blur" x="0" y="0">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
-    </filter>
     <filter id="shadow" colorInterpolationFilters="sRGB">
       <feDropShadow dx="0" dy="0" stdDeviation="3" floodOpacity="0.5" />
     </filter>
