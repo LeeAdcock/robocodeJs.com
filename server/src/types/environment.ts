@@ -677,6 +677,26 @@ export default class Environment {
     this.settlePendingCommands();
   }
 
+  // Advance exactly one simulation tick while paused — the debug "step" control.
+  // Refuses if the arena is running or a tick is still in flight (the loop owns
+  // ticking then, and two overlapping ticks would corrupt state). `running` is
+  // held true for just this one tick so a bot's awaited command isn't cancelled
+  // by its own `!isRunning()` failure guard mid-step; the arena is left paused
+  // afterward (no arenaResumed is emitted, so clients stay paused, and the tick
+  // event advances their clock by one). Returns whether a tick actually ran.
+  step = async (): Promise<boolean> => {
+    if (this.running || this.looping) return false;
+    this.looping = true;
+    this.running = true;
+    try {
+      await this.tick();
+    } finally {
+      this.running = false;
+      this.looping = false;
+    }
+    return true;
+  };
+
   async restart(): Promise<void> {
     this.emitter.emit('event', {
       type: 'arenaRestart',

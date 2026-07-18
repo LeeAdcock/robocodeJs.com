@@ -489,6 +489,7 @@ function App() {
                 doRestart={() =>
                   axios.post(`/api/user/${user.id}/arena/restart`)
                 }
+                doStep={() => axios.post(`/api/user/${user.id}/arena/step`)}
                 doShare={arena.id ? doShare : undefined}
               />
               {shareNotice && (

@@ -18,7 +18,7 @@ const translate = (x: number, y: number): string =>
 // when the underlying angle crosses the 0/360 seam. A non-finite target (a not-
 // yet-populated orientation) is ignored so the last good angle is kept rather
 // than poisoning the accumulator with NaN.
-function useContinuousAngle(target: number): number {
+export function useContinuousAngle(target: number): number {
   const ref = useRef(finite(target));
   if (Number.isFinite(target)) {
     ref.current += shortestAngleDelta(ref.current, target);

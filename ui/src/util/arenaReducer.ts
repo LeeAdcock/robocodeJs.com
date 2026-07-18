@@ -74,7 +74,13 @@ export default function applyArenaEvent(arena: Arena, data: any, time: number) {
       app.bots.forEach((bot) => {
         if (bot.id === data.id) {
           bot.radarOn = true;
-          setTimeout(() => (bot.radarOn = false), 200);
+          // Detected bot ids (undefined on legacy events) drive the debug view's
+          // scanner→target lines; cleared with radarOn so the flash is transient.
+          bot.detected = data.detected;
+          setTimeout(() => {
+            bot.radarOn = false;
+            bot.detected = undefined;
+          }, 200);
         }
       })
     );

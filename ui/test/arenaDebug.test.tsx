@@ -69,12 +69,16 @@ describe('ArenaSvg debug (schematic) view', () => {
     // The tank drawn as the sim's collision circle (radius 16).
     const circle = container.querySelector('circle[r="16"]');
     expect(circle).toBeTruthy();
-    // Aim/speed vectors reference the arrowhead markers.
-    expect(
-      container.querySelector('[marker-end="url(#debug-arrow-turret)"]')
-    ).toBeTruthy();
+    // The heading ray (bot is moving) carries the arrowhead marker.
     expect(
       container.querySelector('[marker-end="url(#debug-arrow-speed)"]')
+    ).toBeTruthy();
+    // Turret + radar aim rays are drawn (circle-contained, by color).
+    expect(
+      container.querySelector('[stroke="var(--debug-turret)"]')
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[stroke="var(--debug-radar)"]')
     ).toBeTruthy();
     // The bullet's projected path is drawn.
     expect(

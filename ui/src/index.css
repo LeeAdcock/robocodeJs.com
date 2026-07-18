@@ -27,7 +27,7 @@
      50px grid, and one hue per vector channel (speed / turret aim / radar aim /
      bullet). Defined in both themes so the schematic re-themes with the page. */
   --debug-bg: #f4f6f8;
-  --debug-grid: rgba(30, 41, 59, 0.14);
+  --debug-grid: rgba(30, 41, 59, 0.28);
   --debug-fg: #334155;
   --debug-speed: #1f9d55;
   --debug-turret: #d97706;
@@ -61,7 +61,7 @@ body.dark {
   /* Debug view (schematic) — a dark drafting surface with brighter vector hues
      so the grid and aim rays stay legible against it. */
   --debug-bg: #12151c;
-  --debug-grid: rgba(148, 163, 184, 0.18);
+  --debug-grid: rgba(148, 163, 184, 0.32);
   --debug-fg: #cbd5e1;
   --debug-speed: #34d399;
   --debug-turret: #fbbf24;
