@@ -8,7 +8,7 @@ The short version: we collect the minimum needed to run the game — your Google
 
 ## What we collect
 
-**Your Google profile.** Sign in with Google is the only sign-in method. When you sign in, Google shares your name, email address, and profile picture with us, and we store them with your account, along with when the account was created and when it was last active. We require a verified email address to create an account. We never see your Google password.
+**Your Google profile.** Sign in with Google is the only sign-in method. When you sign in, Google shares your name, email address, and a link to your profile picture with us. We store your name, email, and that picture link with your account, along with when the account was created and when it was last active. The picture itself stays on Google's servers — your browser loads it directly from Google, and we never copy or host it. We require a verified email address to create an account, and we never see your Google password.
 
 **What you create.** Your bot programs (source code and names), your arenas, your match results and ratings, and any achievements you unlock are stored with your account.
 
