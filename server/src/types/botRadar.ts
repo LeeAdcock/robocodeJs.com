@@ -1,6 +1,6 @@
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Bot, { finiteArg, waitUntil } from './bot';
+import Bot, { commandBudgetRejected, finiteArg, waitUntil } from './bot';
 import {
   normalizeAngle,
   toApiHeading,
@@ -44,6 +44,7 @@ export class BotRadar implements Orientated {
   }
 
   setOrientation(d: number) {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.bot.logger.trace(
@@ -84,6 +85,7 @@ export class BotRadar implements Orientated {
   }
 
   turn(d: number) {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.bot.logger.trace('Ignoring non-finite radar turn argument');
@@ -116,6 +118,7 @@ export class BotRadar implements Orientated {
   }
 
   onReady() {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     let peakValue = this.charged;
     return waitUntil(
       this.bot.env,
@@ -138,6 +141,7 @@ export class BotRadar implements Orientated {
   }
 
   scan() {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     if (this.charged < 100) return Promise.reject('Radar not ready');
     this.bot.logger.trace('Scanning');
     this.charged = 0;

@@ -27,6 +27,28 @@ import { logger, LogEvent } from '../util/logger';
 // send is not a crash). Tunable via env so it can be tightened in prod.
 export const MAX_SENDS_PER_TICK = Number(process.env.MAX_SENDS_PER_TICK) || 50;
 
+// Per-tick cap on how many commands (movement/turret/radar) a single bot may
+// issue. Each command may park a PendingCommand on the HOST heap — outside the
+// isolate's 8 MB limit — so a bot synchronously issuing an unbounded chain
+// (e.g. `for(;;) bot.turn(i)`) within one handler could exhaust host memory
+// before the sandbox timeout fires (the documented t2.micro OOM mode). Unlike
+// the send budget above (drop and keep playing), exceeding this budget FAULTS
+// the bot: it is marked crashed and Simulation kills it — flooding is strictly
+// self-defeating. And because the budget is per bot, a flooder can never
+// consume another bot's capacity (the ranked-play fairness gap the old
+// per-arena queue cap had: one bot's burst rejected its opponent's commands).
+// Generous — legitimate bots issue well under ~10 commands per tick — because
+// the penalty is death. Tunable via env so it can be adjusted in prod.
+export const MAX_COMMANDS_PER_TICK =
+  Number(process.env.MAX_COMMANDS_PER_TICK) || 100;
+
+// The rejection every over-budget command returns; awaiting it throws E026 in
+// the bot (informative in its final logs — the fault below is what kills it).
+export const commandBudgetRejected = (): Promise<never> =>
+  Promise.reject(
+    `${ErrorCodes.E026}: command budget exceeded (${MAX_COMMANDS_PER_TICK} per tick)`
+  );
+
 // A tank's collision radius (half its width): bots contact a wall when their
 // center comes within one radius of it, and contact bots/bullets within two.
 // Mirrored into the sandbox as the bot.radius attribute (compiler.ts).
@@ -162,6 +184,13 @@ export default class Bot implements Point, Orientated {
   private sendCount = 0;
   private sendWindow = -1;
   private sendWarned = false;
+  // Per-tick command budget bookkeeping (see MAX_COMMANDS_PER_TICK /
+  // chargeCommandBudget below). Same windowing as the send budget; the separate
+  // `commandFaulted` latch keeps the fault single-shot — tripping it kills the
+  // bot for the rest of the match, so the latch never needs re-arming.
+  private commandCount = 0;
+  private commandWindow = -1;
+  private commandFaulted = false;
   public logger!: Logger;
   public process: Process;
   public env: Environment;
@@ -360,7 +389,44 @@ export default class Bot implements Point, Orientated {
     }
   }
 
+  // Charge one command against this bot's per-tick budget. Called at the entry
+  // of every command method on Bot / BotTurret / BotRadar (the latter two via
+  // `this.bot`). Within budget: returns true and the command proceeds. Past it:
+  // faults the bot — appCrashed (Simulation kills it), a structured per-bot
+  // abuse log, and an E026 on the fault feed (recent_faults / match_summary) —
+  // and returns false; the caller returns commandBudgetRejected(). The window
+  // is the current sim tick; when it advances, the counter resets.
+  chargeCommandBudget = (): boolean => {
+    const now = this.env.getTime();
+    if (now !== this.commandWindow) {
+      this.commandWindow = now;
+      this.commandCount = 0;
+    }
+    this.commandCount += 1;
+    if (this.commandCount <= MAX_COMMANDS_PER_TICK) return true;
+    if (!this.commandFaulted) {
+      this.commandFaulted = true;
+      this.appCrashed = true;
+      const err = new Error(
+        `${ErrorCodes.E026}: command budget exceeded (${MAX_COMMANDS_PER_TICK} per tick)`
+      );
+      this.logger.error(err.message);
+      logger.warn(
+        {
+          event: LogEvent.BOT_COMMAND_FLOOD,
+          appId: this.process.appId,
+          botId: this.id,
+          arenaId: this.env.getArena().getId?.(),
+        },
+        'bot exceeded its per-tick command budget; faulting the bot'
+      );
+      compiler.emitBotFault(this, ErrorCodes.E026, 'command-flood', err);
+    }
+    return false;
+  };
+
   setOrientation(d: number) {
+    if (!this.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.logger.trace('Ignoring non-finite setOrientation argument');
@@ -405,6 +471,7 @@ export default class Bot implements Point, Orientated {
   }
 
   turn(d: number) {
+    if (!this.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.logger.trace('Ignoring non-finite turn argument');
@@ -439,6 +506,7 @@ export default class Bot implements Point, Orientated {
   }
 
   setSpeed(d: number) {
+    if (!this.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.logger.trace('Ignoring non-finite setSpeed argument');

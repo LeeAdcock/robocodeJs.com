@@ -8,12 +8,6 @@ vi.mock('../src/util/db', () => ({
 import Environment, { BotFault } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { logger, LogEvent } from '../src/util/logger';
-import { ErrorCodes } from '../src/types/ErrorCodes';
-
-const floodLogs = (warn: { mock: { calls: unknown[][] } }) =>
-  warn.mock.calls.filter(
-    (c) => (c[0] as { event?: string })?.event === LogEvent.BOT_COMMAND_FLOOD
-  );
 
 const makeFault = (over: Partial<BotFault> = {}): BotFault => ({
   appId: 'a1',
@@ -93,85 +87,6 @@ describe('Environment restart', () => {
     await env.restart();
 
     expect(env.getTime()).toBe(0);
-  });
-});
-
-// R1 hardening: each awaited bot command parks an entry on the HOST heap (outside
-// the isolate's 8 MB limit), so a runaway bot issuing an unbounded command chain
-// in one handler could exhaust host memory before the sandbox timeout. A per-arena
-// cap rejects commands past the ceiling and logs the abuse once per episode.
-describe('Environment pending-command flood cap', () => {
-  const never = () => false;
-
-  const withCap = async (
-    cap: string,
-    fn: (env: Environment, warn: ReturnType<typeof vi.spyOn>) => Promise<void>
-  ) => {
-    const prev = process.env.MAX_PENDING_COMMANDS;
-    process.env.MAX_PENDING_COMMANDS = cap;
-    const warn = vi.spyOn(logger, 'warn').mockReturnValue(undefined as never);
-    try {
-      await fn(new Environment(new Arena('ar1', 'u1')), warn);
-    } finally {
-      warn.mockRestore();
-      if (prev === undefined) delete process.env.MAX_PENDING_COMMANDS;
-      else process.env.MAX_PENDING_COMMANDS = prev;
-    }
-  };
-
-  it('rejects commands past MAX_PENDING_COMMANDS with E026, logging once per episode', async () => {
-    await withCap('3', async (env, warn) => {
-      // Fill the queue to the cap; these park (never settle).
-      for (let i = 0; i < 3; i++)
-        env.waitForCondition(never, null, null).catch(() => undefined);
-
-      // Over the cap: rejects with E026, arena-attributed abuse signal logged.
-      await expect(env.waitForCondition(never, null, null)).rejects.toMatch(
-        ErrorCodes.E026
-      );
-      // A further over-cap call still rejects, but is not logged again.
-      await expect(env.waitForCondition(never, null, null)).rejects.toMatch(
-        ErrorCodes.E026
-      );
-
-      const logs = floodLogs(warn);
-      expect(logs).toHaveLength(1);
-      expect(logs[0][0]).toMatchObject({
-        event: LogEvent.BOT_COMMAND_FLOOD,
-        arenaId: 'ar1',
-      });
-    });
-  });
-
-  it('re-arms the flood log after the queue fully drains', async () => {
-    await withCap('1', async (env, warn) => {
-      let ok = false;
-      const parked = env.waitForCondition(() => ok, null, null); // parks (at cap)
-      await expect(env.waitForCondition(never, null, null)).rejects.toMatch(
-        ErrorCodes.E026
-      ); // episode 1 logged
-
-      // Drain the queue: the parked command settles, clearing the latch.
-      ok = true;
-      expect(env.settlePendingCommands()).toBe(1);
-      await expect(parked).resolves.toBeUndefined();
-
-      // A fresh flood is a new episode and logs again.
-      env.waitForCondition(never, null, null).catch(() => undefined); // parks (at cap)
-      await expect(env.waitForCondition(never, null, null)).rejects.toMatch(
-        ErrorCodes.E026
-      ); // episode 2 logged
-
-      expect(floodLogs(warn)).toHaveLength(2);
-    });
-  });
-
-  it('does not cap or log under the ceiling', async () => {
-    await withCap('10000', async (env, warn) => {
-      for (let i = 0; i < 20; i++)
-        env.waitForCondition(never, null, null).catch(() => undefined);
-      expect(floodLogs(warn)).toHaveLength(0);
-    });
   });
 });
 

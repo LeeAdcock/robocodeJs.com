@@ -2,7 +2,7 @@ import Bullet, { BULLET_SPEED } from './bullet';
 import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
-import Bot, { finiteArg, waitUntil } from './bot';
+import Bot, { commandBudgetRejected, finiteArg, waitUntil } from './bot';
 import { normalizeAngle } from '../util/geometry';
 import { BotRadar } from './botRadar';
 import { DEPLOY_TICKS } from './environment';
@@ -31,6 +31,7 @@ export class BotTurret implements Orientated {
   }
 
   setOrientation(d: number) {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.bot.logger.trace(
@@ -73,6 +74,7 @@ export class BotTurret implements Orientated {
   }
 
   turn(d: number) {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     const n = finiteArg(d);
     if (n === null) {
       this.bot.logger.trace('Ignoring non-finite turret turn argument');
@@ -112,6 +114,7 @@ export class BotTurret implements Orientated {
   private deployed = () => this.bot.env.getTime() >= DEPLOY_TICKS;
 
   onReady() {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     let peakValue = this.loaded;
     return waitUntil(
       this.bot.env,
@@ -134,6 +137,7 @@ export class BotTurret implements Orientated {
   }
 
   fire() {
+    if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
     if (this.loaded < 100 || !this.deployed())
       return Promise.reject('Turret not ready');
     this.bot.logger.trace('Turret firing');
