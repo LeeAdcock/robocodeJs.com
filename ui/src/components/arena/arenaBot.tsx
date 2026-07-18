@@ -82,17 +82,26 @@ interface BotRadarProps {
 const getBotId = (appIndex: number, botIndex: number) =>
   (appIndex + 1) * 10 + (botIndex + 1);
 
-// Health-bar color: full health -> blue, drained -> orange, interpolated in RGB
-// so the ramp passes through a desaturated midpoint rather than through green.
-// Blue<->orange is a color-blind-safe pair; the old green->red hsl ramp was the
-// canonical red-green-CVD failure mode (GitHub #132). Exported for testing.
-export const healthColor = (health: number): string => {
-  const t = Math.max(0, Math.min(100, health)) / 100;
-  const ch = (drained: number, full: number) =>
-    Math.round(drained + t * (full - drained));
-  // orange rgb(232,134,59) -> blue rgb(59,130,232)
-  return `rgb(${ch(232, 59)}, ${ch(134, 130)}, ${ch(59, 232)})`;
+// Health-bar colors: each team's own tank hue (sampled from the sprites, then
+// deepened for contrast) painted over a light-gray track, so health reads purely
+// from the bar's *width* — the fill color never changes as it drains. Tying the
+// fill to the tank color needs no separate legend, and the deepening keeps every
+// team legible over the light track. This is NOT the health->color ramp #132
+// removed (green->red, the canonical red-green-CVD failure mode): the color here
+// encodes *team*, never health, and matches the sprite the numeric id tag already
+// disambiguates. Keyed by the same names as `colors`; wraps with that palette.
+// The arena's night-mode multiply tint darkens these along with the rest of the
+// SVG (multiply preserves luminance order, so fill-over-track contrast holds).
+const HEALTH_BAR_FILL_BY_TEAM: Record<string, string> = {
+  blue: '#286389', // #419FDD
+  dark: '#3b3a35', // #5F5D55
+  sand: '#988c70', // #F5E1B4
+  red: '#8f2f25', // #E74C3C
+  green: '#186d3c', // #27AF60
 };
+export const HEALTH_BAR_TRACK = '#d4d4d4';
+export const healthBarFill = (appIndex: number): string =>
+  HEALTH_BAR_FILL_BY_TEAM[colors[appIndex]] ?? '#222';
 
 const BotTurretSvg = (props: BotTurretProps) => {
   const angle = useContinuousAngle(
@@ -304,7 +313,7 @@ const BotSvg = React.memo((props: BotProps) => {
                 x={-16}
                 y={16}
                 stroke={'black'}
-                fill="#DE7A4A"
+                fill={HEALTH_BAR_TRACK}
                 fillOpacity="0.9"
               />
               <rect
@@ -312,13 +321,13 @@ const BotSvg = React.memo((props: BotProps) => {
                 x={-16}
                 y={16}
                 fillOpacity="0.9"
-                // Color shifts blue (full) -> orange (drained), and the width
-                // animates, so the slow collision bleed reads as visible motion
-                // instead of imperceptible per-tick steps. See healthColor.
-                fill={healthColor(props.health)}
+                // Fixed team-colored fill, no color change; only the width
+                // animates as health drains, so the slow collision bleed reads as
+                // visible motion instead of imperceptible per-tick steps.
+                fill={healthBarFill(props.appIndex)}
                 style={{
                   width: 32 * (Math.max(0, props.health) / 100),
-                  transition: 'width 300ms linear, fill 300ms linear',
+                  transition: 'width 300ms linear',
                 }}
               />
             </g>
