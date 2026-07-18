@@ -10,7 +10,10 @@ import {
   FaPauseCircle,
   FaPlayCircle,
   FaShareAlt,
+  FaVectorSquare,
 } from 'react-icons/fa';
+
+import { useDebugMode, toggleDebugMode } from '../../util/debugMode';
 
 interface EditorToolbarProps {
   isPaused: boolean;
@@ -27,6 +30,9 @@ export default function EditorToolbar(props: EditorToolbarProps) {
   // otherwise stay up (the cursor is still over the button) and cover the "copied"
   // toast that appears just below the toolbar. Hover still opens it normally.
   const [showShareTip, setShowShareTip] = useState(false);
+  // Debug view is a whole-arena preference held in its own store (like the theme
+  // toggle), so this button reads/flips it directly rather than via props.
+  const debugMode = useDebugMode();
   return (
     <>
       <ButtonToolbar style={{ justifyContent: 'flex-end' }}>
@@ -71,6 +77,21 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               onClick={props.doRestart}
             >
               <FaSyncAlt />
+            </Button>
+          </OverlayTrigger>
+
+          <OverlayTrigger
+            placement={'bottom'}
+            overlay={<Tooltip id={`debug`}>Debug view</Tooltip>}
+          >
+            <Button
+              variant="secondary"
+              aria-label="Debug view"
+              aria-pressed={debugMode}
+              onClick={() => toggleDebugMode()}
+              style={{ color: debugMode ? 'var(--accent)' : undefined }}
+            >
+              <FaVectorSquare />
             </Button>
           </OverlayTrigger>
 
