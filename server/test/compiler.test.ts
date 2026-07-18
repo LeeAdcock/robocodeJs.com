@@ -851,6 +851,95 @@ describe('compiler — bot API in a real isolate', () => {
     ctx.run('bot.setOrientation(90).catch(() => {})'); // east
     expect(ctx.bot.orientationTarget).toBe(270);
   });
+
+  // --- Sandbox security contract (negative capabilities) -------------------
+  // These lock the escape-relevant guarantees of the isolate boundary rather
+  // than any single bot API: no host or Node capability leaks into bot scope,
+  // and the host-captured dispatch entry points cannot be hijacked by a bot
+  // reassigning the globals. A failure here means the sandbox boundary
+  // regressed — treat it as a security bug, not a flaky test. See the "exposing
+  // a new bot API" checklist in CLAUDE.md (every new `_bot_*` function must
+  // return copied plain data, never a live host reference).
+
+  it('denies Node and host globals to bot code', () => {
+    // A bare V8 isolate has none of Node's globals, and compiler.ts never
+    // exposes the `ivm` module itself — every Callback/Reference/ExternalCopy is
+    // built host-side. If any of these becomes reachable, untrusted bot code has
+    // a path off the sandbox. `typeof` on an undeclared name is safe (no throw),
+    // so this reads uniformly whether the name is a missing global or absent.
+    for (const name of [
+      'process',
+      'require',
+      'module',
+      'exports',
+      'Buffer',
+      'global',
+      'globalThis.process',
+      'setImmediate',
+      'ivm',
+      '__dirname',
+      '__filename',
+    ]) {
+      expect(ctx.read(`typeof (${name})`)).toBe('undefined');
+    }
+  });
+
+  it('sets Date to undefined so bots cannot read wall-clock time', () => {
+    // Determinism canary: bots must use clock.getTime() (the sim clock), never a
+    // real clock. A non-undefined Date means real time — or true entropy — leaked
+    // into the isolate.
+    expect(ctx.read('typeof Date')).toBe('undefined');
+    expect(ctx.read('clock.getTime()')).toBe(42);
+  });
+
+  it('replaces Math.random with the in-isolate seeded PRNG (no host entropy)', () => {
+    // Math.random is overwritten with a seeded mulberry32 so a fixed arena seed
+    // replays a match. It still returns a finite value in [0, 1); the contract
+    // is only that it is the in-isolate generator, not the host's.
+    const r = ctx.read('Math.random()') as number;
+    expect(typeof r).toBe('number');
+    expect(Number.isFinite(r)).toBe(true);
+    expect(r).toBeGreaterThanOrEqual(0);
+    expect(r).toBeLessThan(1);
+  });
+
+  it('a bot cannot hijack promise settlement by reassigning __settle', async () => {
+    // The host settles parked bot promises through a Reference to __settle it
+    // captured at init, before any bot code runs. A bot that overwrites
+    // globalThis.__settle must NOT intercept settlement: the captured reference
+    // still points at the original function object.
+    ctx.run(`
+      globalThis._settled = null
+      globalThis._hijackSettle = false
+      globalThis.__settle = () => { globalThis._hijackSettle = true }
+      // isRunning() is false in this harness, so the command settles (rejects)
+      // immediately — through the captured reference, not the bot's replacement.
+      bot
+        .setSpeed(3)
+        .then(() => { globalThis._settled = 'ok' })
+        .catch((e) => { globalThis._settled = 'err:' + e })
+    `);
+    await waitUntilRead('globalThis._settled', (v) => v !== null);
+    expect(ctx.read('globalThis._settled')).not.toBeNull();
+    expect(ctx.read('globalThis._hijackSettle')).toBe(false);
+  });
+
+  it('a bot cannot hijack event dispatch by reassigning __dispatch', async () => {
+    // Events reach handlers through a Reference to __dispatch captured at init.
+    // Reassigning globalThis.__dispatch from bot code must not divert dispatch.
+    ctx.run(`
+      globalThis._started = false
+      globalThis._hijackDispatch = false
+      bot.on(Event.START, () => { globalThis._started = true })
+      globalThis.__dispatch = () => { globalThis._hijackDispatch = true }
+    `);
+    // Drive the handler the way the simulation loop does.
+    ctx.bot.handlers[Event.START]();
+    expect(await waitUntilRead('globalThis._started', (v) => v === true)).toBe(
+      true
+    );
+    expect(ctx.read('globalThis._hijackDispatch')).toBe(false);
+  });
 });
 
 describe('compiler.check — dry-run compile (throwaway isolate)', () => {
