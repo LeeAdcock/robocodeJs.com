@@ -203,8 +203,12 @@ const BotSvg = React.memo((props: BotProps) => {
       >
         <g
           key={props.id}
-          opacity={props.health > 0 ? 1 : 0.5}
-          filter={props.health > 0 ? undefined : 'url(#blur)'}
+          // Death eases in via a one-shot CSS animation (see `.bot-dead` in
+          // index.css): crisp → blurred + dimmed over ~800ms. It has to be an
+          // animation, not a transition — dead and living bots render in
+          // separate groups (arena.tsx) so a kill *remounts* this node, and a
+          // transition can't bridge a remount; an on-mount animation can.
+          className={props.health > 0 ? undefined : 'bot-dead'}
           style={props.onOpen ? { cursor: 'pointer' } : undefined}
           onDoubleClick={(e) => {
             if (props.onOpen && props.appId)
@@ -299,39 +303,42 @@ const BotSvg = React.memo((props: BotProps) => {
             radarOn={props.radarOn}
           />
 
-          {props.health > 0 && (
-            <g
+          {/* Health bar fades out on death (`.bot-health-bar-dead` in
+              index.css) over the same ~800ms as the wreck's blur, rather than
+              snapping off. Same remount caveat as the body — animation, not
+              transition. */}
+          <g
+            className={props.health > 0 ? undefined : 'bot-health-bar-dead'}
+            style={{
+              opacity: 0.75,
+              transition: 'transform 200ms linear',
+            }}
+            transform={translate(props.x, props.y)}
+          >
+            <rect
+              width={32}
+              height={4}
+              x={-16}
+              y={16}
+              stroke={'black'}
+              fill={HEALTH_BAR_TRACK}
+              fillOpacity="0.9"
+            />
+            <rect
+              height={4}
+              x={-16}
+              y={16}
+              fillOpacity="0.9"
+              // Fixed team-colored fill, no color change; only the width
+              // animates as health drains, so the slow collision bleed reads as
+              // visible motion instead of imperceptible per-tick steps.
+              fill={healthBarFill(props.appIndex)}
               style={{
-                transition: 'all 200ms linear',
+                width: 32 * (Math.max(0, props.health) / 100),
+                transition: 'width 300ms linear',
               }}
-              opacity={0.75}
-              transform={translate(props.x, props.y)}
-            >
-              <rect
-                width={32}
-                height={4}
-                x={-16}
-                y={16}
-                stroke={'black'}
-                fill={HEALTH_BAR_TRACK}
-                fillOpacity="0.9"
-              />
-              <rect
-                height={4}
-                x={-16}
-                y={16}
-                fillOpacity="0.9"
-                // Fixed team-colored fill, no color change; only the width
-                // animates as health drains, so the slow collision bleed reads as
-                // visible motion instead of imperceptible per-tick steps.
-                fill={healthBarFill(props.appIndex)}
-                style={{
-                  width: 32 * (Math.max(0, props.health) / 100),
-                  transition: 'width 300ms linear',
-                }}
-              />
-            </g>
-          )}
+            />
+          </g>
 
           {props.crashed && (
             // A crisp warning triangle above the bot (outside the dead-bot blur)
