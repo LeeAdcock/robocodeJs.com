@@ -17,6 +17,7 @@ import Environment, { DEPLOY_TICKS } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import { normalizeAngle } from '../src/util/geometry';
 import { Event } from '../src/types/event';
+import { BARREL_LENGTH } from '../src/types/bullet';
 import { logger, LogEvent } from '../src/util/logger';
 
 // Build a real Bot backed by a mock environment. isRunning() returns false so
@@ -287,8 +288,13 @@ describe('BotTurret', () => {
     expect(bot.bullets).toHaveLength(1);
     const bullet = bot.bullets[0];
     expect(bullet.speed).toBe(25);
-    expect(bullet.x).toBe(bot.x);
-    expect(bullet.y).toBe(bot.y);
+    // Spawns at the muzzle: BARREL_LENGTH forward of the hull center along the
+    // shot's heading (bot 0° + turret 30° = 30°), not at the bot center.
+    const rad = (-30 * Math.PI) / 180;
+    expect(bullet.x).toBeCloseTo(bot.x + BARREL_LENGTH * Math.sin(rad));
+    expect(bullet.y).toBeCloseTo(bot.y + BARREL_LENGTH * Math.cos(rad));
+    expect(bullet.origin.x).toBeCloseTo(bullet.x); // origin is the muzzle too
+    expect(bullet.origin.y).toBeCloseTo(bullet.y);
     expect(bullet.orientation).toBe(30); // bot.getOrientation() (0) + turret 30
     expect(bot.turret.loaded).toBe(0);
     expect(bot.stats.shotsFired).toBe(1);

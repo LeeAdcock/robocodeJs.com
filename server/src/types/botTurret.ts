@@ -1,4 +1,4 @@
-import Bullet, { BULLET_SPEED } from './bullet';
+import Bullet, { BULLET_SPEED, BARREL_LENGTH } from './bullet';
 import { randomUUID } from 'node:crypto';
 import { Event } from './event';
 import { Orientated } from './orientated';
@@ -148,16 +148,25 @@ export class BotTurret implements Orientated {
       this.bot.handlers[Event.FIRED]();
     }
 
+    // Spawn at the muzzle, not the hull center: offset from the bot's position
+    // by BARREL_LENGTH along the shot's heading. Same forward vector the sim
+    // moves the bullet with (simulation.ts: sin(-θ)/cos(-θ)), so the muzzle sits
+    // exactly on the flight line. This is where the bullet really is — collision
+    // and the debug view both use it — matching where the sprite draws it.
+    const orientation = this.bot.getOrientation() + this.orientation;
+    const rad = (-orientation * Math.PI) / 180;
+    const muzzleX = this.bot.x + BARREL_LENGTH * Math.sin(rad);
+    const muzzleY = this.bot.y + BARREL_LENGTH * Math.cos(rad);
     const bullet: Bullet = {
       id: randomUUID(),
       exploded: false,
-      x: this.bot.x,
-      y: this.bot.y,
+      x: muzzleX,
+      y: muzzleY,
       origin: {
-        x: this.bot.x,
-        y: this.bot.y,
+        x: muzzleX,
+        y: muzzleY,
       },
-      orientation: this.bot.getOrientation() + this.orientation,
+      orientation,
       speed: BULLET_SPEED,
     };
     this.bot.bullets.push(bullet);
