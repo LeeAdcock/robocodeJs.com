@@ -66,3 +66,46 @@ describe('ArenaToolbar accessible names (#132)', () => {
     }
   });
 });
+
+// The single-tick Step control is a general arena control (not debug-only):
+// shown whenever the arena is paused and a step handler is wired, hidden while
+// running (there's nothing to step past a live tick).
+describe('ArenaToolbar Step control', () => {
+  it('shows Step when paused and a step handler is provided', () => {
+    render(
+      <ArenaToolbar
+        isPaused={true}
+        doPause={noop}
+        doResume={noop}
+        doRestart={noop}
+        doStep={noop}
+      />
+    );
+    expect(screen.getByLabelText('Step one tick')).toBeTruthy();
+  });
+
+  it('hides Step while the arena is running', () => {
+    render(
+      <ArenaToolbar
+        isPaused={false}
+        doPause={noop}
+        doResume={noop}
+        doRestart={noop}
+        doStep={noop}
+      />
+    );
+    expect(screen.queryByLabelText('Step one tick')).toBeNull();
+  });
+
+  it('hides Step when paused but no step handler is wired', () => {
+    render(
+      <ArenaToolbar
+        isPaused={true}
+        doPause={noop}
+        doResume={noop}
+        doRestart={noop}
+      />
+    );
+    expect(screen.queryByLabelText('Step one tick')).toBeNull();
+  });
+});

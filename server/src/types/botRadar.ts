@@ -145,12 +145,6 @@ export class BotRadar implements Orientated {
     if (this.charged < 100) return Promise.reject('Radar not ready');
     this.bot.logger.trace('Scanning');
     this.charged = 0;
-    this.bot.env.emit('event', {
-      type: 'radarScan',
-      time: this.bot.env.getTime(),
-      id: this.bot.id,
-    });
-
     this.bot.stats.scansCompleted += 1;
 
     const found: Array<{
@@ -216,6 +210,17 @@ export class BotRadar implements Orientated {
         }
       });
     });
+    // Broadcast the scan for the UI, now including which bots it detected so the
+    // debug view can draw scanner→target detection lines. Emitted after the sweep
+    // (rather than before) so the detected-id list is available — same tick either
+    // way, since the whole scan runs synchronously within one tick.
+    this.bot.env.emit('event', {
+      type: 'radarScan',
+      time: this.bot.env.getTime(),
+      id: this.bot.id,
+      detected: found.map((f) => f.id),
+    });
+
     if (this.bot.handlers[Event.SCANNED]) {
       this.bot.handlers[Event.SCANNED](found);
     }

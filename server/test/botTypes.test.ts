@@ -382,9 +382,23 @@ describe('BotRadar.scan', () => {
     expect(scanned).toHaveBeenCalledWith(found);
     expect(bot.stats.scansCompleted).toBe(1);
     expect(bot.turret.radar.charged).toBe(0);
+    // The radarScan event carries the detected ids so the debug view can draw
+    // scanner→target lines; here that's the one enemy just found.
     expect(emit).toHaveBeenCalledWith(
       'event',
-      expect.objectContaining({ type: 'radarScan' })
+      expect.objectContaining({ type: 'radarScan', detected: ['enemy'] })
+    );
+  });
+
+  it('emits an empty detected list when the scan finds nothing', async () => {
+    const { bot, env, emit } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    withEnemies(env, [enemy({ x: 100, y: 750 })]); // out of range → no hits
+
+    await expect(bot.turret.radar.scan()).resolves.toHaveLength(0);
+    expect(emit).toHaveBeenCalledWith(
+      'event',
+      expect.objectContaining({ type: 'radarScan', detected: [] })
     );
   });
 

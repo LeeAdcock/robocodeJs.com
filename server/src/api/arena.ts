@@ -331,6 +331,21 @@ const resume = async (req: Request, res: Response) => {
 };
 app.post(dual('/resume'), loadUser, requireOwner, resolveArena, resume);
 
+// Advance the paused simulation by exactly one tick — the debug view's "step"
+// control, for inspecting state transitions frame by frame. A no-op (stepped:
+// false) if the arena is running or a tick is already in flight.
+const step = async (req: Request, res: Response) => {
+  const arena = scopedArena(req);
+  return environmentService
+    .get(arena)
+    .then((env) => env.step())
+    .then((stepped) => {
+      res.status(200);
+      res.send({ stepped });
+    });
+};
+app.post(dual('/step'), loadUser, requireOwner, resolveArena, step);
+
 // Set the simulation speed multiplier. Accepts a positive number (1 = the
 // baseline 10 ticks/s) or "max"/0 for unbounded ("as fast as possible"). This is
 // a tooling/MCP control — the UI adopts the rate but does not set it.

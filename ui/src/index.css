@@ -23,6 +23,16 @@
   --accent: gold;
   /* Red glow behind a bot that just took damage (see arenaBot.tsx BotSvg). */
   --damage-glow-color: #ff2d2d;
+  /* Arena "debug view" (schematic render, arenaDebug.tsx): a flat background, a
+     50px grid, and one hue per vector channel (speed / turret aim / radar aim /
+     bullet). Defined in both themes so the schematic re-themes with the page. */
+  --debug-bg: #f4f6f8;
+  --debug-grid: rgba(30, 41, 59, 0.28);
+  --debug-fg: #334155;
+  --debug-speed: #1f9d55;
+  --debug-turret: #d97706;
+  --debug-radar: #2563eb;
+  --debug-bullet: #dc2626;
   /* Type: Adobe's Source family — Source Sans 3 for UI, Source Code Pro for
      code — a matched superfamily that reads as one system without calling
      attention to itself (a quiet lift off the system stack). Loaded in
@@ -48,6 +58,15 @@ body.dark {
   --rule: #6b4a2b;
   /* Warmer/brighter so it still reads over the night-mode tint. */
   --damage-glow-color: #ff5a3c;
+  /* Debug view (schematic) — a dark drafting surface with brighter vector hues
+     so the grid and aim rays stay legible against it. */
+  --debug-bg: #12151c;
+  --debug-grid: rgba(148, 163, 184, 0.32);
+  --debug-fg: #cbd5e1;
+  --debug-speed: #34d399;
+  --debug-turret: #fbbf24;
+  --debug-radar: #60a5fa;
+  --debug-bullet: #f87171;
   /* Apply the dark page surface + text here (not on plain `body`) so it wins
        over Bootstrap's own `body { color/background-color }`, which is imported
        after this file. Re-point Bootstrap's tokens too so its components

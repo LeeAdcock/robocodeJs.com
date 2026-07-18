@@ -150,7 +150,7 @@ Ownership is enforced by two middlewares (`src/middleware/resource.ts`): **`requ
 `buildServer(user)` registers ~22 user-scoped **tools**:
 
 - **Bots:** `list_bots`, `get_bot_source`, `create_bot`, `set_bot_source`, `compile_bot`, `check_bot_source` (dry-run compile), `reboot_bot`, `delete_bot`. (A bot's name is owned by its code via `bot.setName` — there is no out-of-band rename tool, since it would be overwritten on the next reboot.)
-- **Arenas:** `list_arenas`, `create_arena`, `delete_arena`, `arena_status`, **`match_summary`** (leaderboard / winner / elimination order), `add_bot_to_arena`, `remove_bot_from_arena`, `pause_arena`, `resume_arena`, `restart_arena`, `set_arena_speed`, `set_arena_seed`.
+- **Arenas:** `list_arenas`, `create_arena`, `delete_arena`, `arena_status`, **`match_summary`** (leaderboard / winner / elimination order), `add_bot_to_arena`, `remove_bot_from_arena`, `pause_arena`, `resume_arena`, `restart_arena`, `step_arena` (advance a paused arena one tick / `count` ticks), `set_arena_speed`, `set_arena_seed`.
 - **Observation:** `recent_logs` (filterable), `recent_faults` (structured crash records).
 
 Plus **resources** (`robocodejs://` — the bot docs, `robocode.d.ts`, sample bots, and the error-code reference) and **prompts** (`write_bot`, `debug_bot`, `run_match`). Tools carry behaviour annotations (`readOnlyHint`/`destructiveHint`/`idempotentHint`) and object-returning tools return validated `structuredContent`. The user-facing setup guide is served at `/mcp` (`../ui/public/docs/mcp.md`). The REST caps (`MAX_APPS_PER_ARENA`, etc.) are mirrored by hand in `mcp.ts` — keep them in sync.

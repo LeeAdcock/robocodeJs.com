@@ -22,6 +22,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useArenaStream from './util/useArenaStream';
 import { useDarkMode } from './util/theme';
+import { useDebugMode } from './util/debugMode';
 import { useIsMobile } from './util/useIsMobile';
 import { Emitter } from './util/emitter';
 
@@ -178,6 +179,9 @@ function App() {
   useEffect(() => {
     document.body.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  // Arena "debug view": the schematic render toggled from the arena toolbar.
+  const debugMode = useDebugMode();
 
   // On phone-sized viewports (below the navbar's `expand="sm"` breakpoint) the
   // 50/50 split is unusable, so the arena pane is dropped entirely and the
@@ -485,6 +489,7 @@ function App() {
                 doRestart={() =>
                   axios.post(`/api/user/${user.id}/arena/restart`)
                 }
+                doStep={() => axios.post(`/api/user/${user.id}/arena/step`)}
                 doShare={arena.id ? doShare : undefined}
               />
               {shareNotice && (
@@ -528,6 +533,7 @@ function App() {
           )}
           <ArenaSvg
             darkMode={darkMode}
+            debugMode={debugMode}
             arena={arena}
             time={time}
             onOpenBot={openBot}

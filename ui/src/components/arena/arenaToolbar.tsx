@@ -10,13 +10,20 @@ import {
   FaPauseCircle,
   FaPlayCircle,
   FaShareAlt,
+  FaVectorSquare,
+  FaStepForward,
 } from 'react-icons/fa';
+
+import { useDebugMode, toggleDebugMode } from '../../util/debugMode';
 
 interface EditorToolbarProps {
   isPaused: boolean;
   doPause: React.MouseEventHandler<HTMLElement>;
   doResume: React.MouseEventHandler<HTMLElement>;
   doRestart: React.MouseEventHandler<HTMLElement>;
+  // Advance the paused sim by one tick — a general control shown whenever the
+  // arena is paused (stepping frame by frame to inspect state, in any view).
+  doStep?: React.MouseEventHandler<HTMLElement>;
   // Copy a public /watch/:arenaId link to the clipboard. Absent until the arena
   // snapshot (which carries the arena id) has loaded.
   doShare?: React.MouseEventHandler<HTMLElement>;
@@ -27,6 +34,9 @@ export default function EditorToolbar(props: EditorToolbarProps) {
   // otherwise stay up (the cursor is still over the button) and cover the "copied"
   // toast that appears just below the toolbar. Hover still opens it normally.
   const [showShareTip, setShowShareTip] = useState(false);
+  // Debug view is a whole-arena preference held in its own store (like the theme
+  // toggle), so this button reads/flips it directly rather than via props.
+  const debugMode = useDebugMode();
   return (
     <>
       <ButtonToolbar style={{ justifyContent: 'flex-end' }}>
@@ -61,6 +71,21 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             </OverlayTrigger>
           )}
 
+          {props.isPaused && props.doStep && (
+            <OverlayTrigger
+              placement={'bottom'}
+              overlay={<Tooltip id={`step`}>Step one tick</Tooltip>}
+            >
+              <Button
+                variant="secondary"
+                aria-label="Step one tick"
+                onClick={props.doStep}
+              >
+                <FaStepForward />
+              </Button>
+            </OverlayTrigger>
+          )}
+
           <OverlayTrigger
             placement={'bottom'}
             overlay={<Tooltip id={`reset`}>Reset</Tooltip>}
@@ -71,6 +96,21 @@ export default function EditorToolbar(props: EditorToolbarProps) {
               onClick={props.doRestart}
             >
               <FaSyncAlt />
+            </Button>
+          </OverlayTrigger>
+
+          <OverlayTrigger
+            placement={'bottom'}
+            overlay={<Tooltip id={`debug`}>Debug view</Tooltip>}
+          >
+            <Button
+              variant="secondary"
+              aria-label="Debug view"
+              aria-pressed={debugMode}
+              onClick={() => toggleDebugMode()}
+              style={{ color: debugMode ? 'var(--accent)' : undefined }}
+            >
+              <FaVectorSquare />
             </Button>
           </OverlayTrigger>
 

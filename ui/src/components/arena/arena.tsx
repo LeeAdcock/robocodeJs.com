@@ -8,6 +8,7 @@ import TerrainSvg from './arenaTerrain';
 import BulletSvg from './arenaBullet';
 import BotSvg from './arenaBot';
 import BotPathSvg from './arenaBotPath';
+import DebugArenaSvg from './arenaDebug';
 
 const ArenaStyle = React.memo((props: { width: number; height: number }) => (
   <defs>
@@ -92,6 +93,10 @@ interface ArenaSvgProps {
   arena: Arena;
   darkMode: boolean;
   time: number;
+  // Schematic "debug view": swap the terrain-and-sprites scene for a 50px grid,
+  // circle tanks, motion/aim vectors, and bullet paths (see arenaDebug.tsx).
+  // Optional/defaults off so the spectator page (watchArenaPage) stays scenic.
+  debugMode?: boolean;
   // Open a bot from the arena: double-click → source, shift+double-click → logs.
   onOpenBot?: (appId: string, botIndex: number, shiftKey: boolean) => void;
   // Drop the framing border for an edge-to-edge, full-viewport render (the public
@@ -142,119 +147,141 @@ export default function ArenaSvg(props: ArenaSvgProps) {
       }}
     >
       <ArenaStyle width={props.arena.width} height={props.arena.height} />
-      <rect x="-200%" y="-200%" height="500%" width="500%" fill="url(#ocean)" />
+      {props.debugMode ? (
+        // Schematic background: a flat themed fill (no ocean/terrain), overlaid
+        // by the 50px grid + vectors inside the clip group below.
+        <rect
+          x="-200%"
+          y="-200%"
+          height="500%"
+          width="500%"
+          fill="var(--debug-bg)"
+        />
+      ) : (
+        <rect
+          x="-200%"
+          y="-200%"
+          height="500%"
+          width="500%"
+          fill="url(#ocean)"
+        />
+      )}
       <g clipPath="url(#trim-extra)">
-        <TerrainSvg>
-          <g name="craters">
-            {apps.map((app) =>
-              app.bots.map((bot) =>
-                bot.bullets
-                  .filter((bullet) => bullet.explodedAt)
-                  .map((bullet) => (
-                    <CraterSvg
-                      key={bullet.id}
-                      id={bullet.id}
-                      x={bullet.x}
-                      y={bullet.y}
-                      orientation={bullet.orientation}
-                    />
-                  ))
-              )
-            )}
-          </g>
-          <g name="paths">
-            {apps.map((app) =>
-              app.bots.map((bot) => (
-                <BotPathSvg
-                  id={bot.id}
-                  key={bot.id}
-                  path={bot.path}
-                  pathIndex={bot.pathIndex}
-                  x={bot.x}
-                  y={bot.y}
-                />
-              ))
-            )}
-          </g>
-          <g name="bots">
-            {apps.map((app) => {
-              const appIndex =
-                props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
-              return app.bots.map((bot, botIndex) => {
-                return bot.health <= 0 ? (
-                  <BotSvg
-                    key={bot.id}
-                    botIndex={botIndex}
-                    appIndex={appIndex}
-                    appName={app.name}
-                    id={bot.id}
-                    appId={app.id}
-                    onOpen={props.onOpenBot}
-                    health={bot.health}
-                    crashed={bot.crashed}
-                    faultCode={bot.faultCode}
-                    bodyOrientation={bot.bodyOrientation}
-                    turretOrientation={bot.turretOrientation}
-                    radarOrientation={bot.radarOrientation}
-                    x={bot.x}
-                    y={bot.y}
-                    radarOn={false}
-                  />
-                ) : null;
-              });
-            })}
-            {apps.map((app) => {
-              const appIndex =
-                props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
-              return app.bots.map((bot, botIndex) =>
-                bot.health > 0 ? (
-                  <BotSvg
-                    key={bot.id}
-                    botIndex={botIndex}
-                    appIndex={appIndex}
-                    appName={app.name}
-                    id={bot.id}
-                    appId={app.id}
-                    onOpen={props.onOpenBot}
-                    health={bot.health}
-                    crashed={bot.crashed}
-                    faultCode={bot.faultCode}
-                    bodyOrientation={bot.bodyOrientation}
-                    turretOrientation={bot.turretOrientation}
-                    radarOrientation={bot.radarOrientation}
-                    x={bot.x}
-                    y={bot.y}
-                    radarOn={bot.radarOn}
-                    lastDamagedAt={bot.lastDamagedAt}
-                    lastDamageAmount={bot.lastDamageAmount}
-                  />
-                ) : null
-              );
-            })}
-          </g>
-          <g name="bullets">
-            {apps.map((app, appIndex) =>
-              app.bots.map((bot) => (
-                <g key={bot.id}>
-                  {bot.bullets
-                    .filter((bullet) => !bullet.explodedAt)
+        {props.debugMode ? (
+          <DebugArenaSvg arena={props.arena} onOpenBot={props.onOpenBot} />
+        ) : (
+          <TerrainSvg>
+            <g name="craters">
+              {apps.map((app) =>
+                app.bots.map((bot) =>
+                  bot.bullets
+                    .filter((bullet) => bullet.explodedAt)
                     .map((bullet) => (
-                      <BulletSvg
+                      <CraterSvg
                         key={bullet.id}
-                        appIndex={appIndex}
                         id={bullet.id}
                         x={bullet.x}
                         y={bullet.y}
                         orientation={bullet.orientation}
                       />
-                    ))}
-                </g>
-              ))
-            )}
-          </g>
-        </TerrainSvg>
+                    ))
+                )
+              )}
+            </g>
+            <g name="paths">
+              {apps.map((app) =>
+                app.bots.map((bot) => (
+                  <BotPathSvg
+                    id={bot.id}
+                    key={bot.id}
+                    path={bot.path}
+                    pathIndex={bot.pathIndex}
+                    x={bot.x}
+                    y={bot.y}
+                  />
+                ))
+              )}
+            </g>
+            <g name="bots">
+              {apps.map((app) => {
+                const appIndex =
+                  props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
+                return app.bots.map((bot, botIndex) => {
+                  return bot.health <= 0 ? (
+                    <BotSvg
+                      key={bot.id}
+                      botIndex={botIndex}
+                      appIndex={appIndex}
+                      appName={app.name}
+                      id={bot.id}
+                      appId={app.id}
+                      onOpen={props.onOpenBot}
+                      health={bot.health}
+                      crashed={bot.crashed}
+                      faultCode={bot.faultCode}
+                      bodyOrientation={bot.bodyOrientation}
+                      turretOrientation={bot.turretOrientation}
+                      radarOrientation={bot.radarOrientation}
+                      x={bot.x}
+                      y={bot.y}
+                      radarOn={false}
+                    />
+                  ) : null;
+                });
+              })}
+              {apps.map((app) => {
+                const appIndex =
+                  props.arena?.apps.map((app) => app.id).indexOf(app.id) || 0;
+                return app.bots.map((bot, botIndex) =>
+                  bot.health > 0 ? (
+                    <BotSvg
+                      key={bot.id}
+                      botIndex={botIndex}
+                      appIndex={appIndex}
+                      appName={app.name}
+                      id={bot.id}
+                      appId={app.id}
+                      onOpen={props.onOpenBot}
+                      health={bot.health}
+                      crashed={bot.crashed}
+                      faultCode={bot.faultCode}
+                      bodyOrientation={bot.bodyOrientation}
+                      turretOrientation={bot.turretOrientation}
+                      radarOrientation={bot.radarOrientation}
+                      x={bot.x}
+                      y={bot.y}
+                      radarOn={bot.radarOn}
+                      lastDamagedAt={bot.lastDamagedAt}
+                      lastDamageAmount={bot.lastDamageAmount}
+                    />
+                  ) : null
+                );
+              })}
+            </g>
+            <g name="bullets">
+              {apps.map((app, appIndex) =>
+                app.bots.map((bot) => (
+                  <g key={bot.id}>
+                    {bot.bullets
+                      .filter((bullet) => !bullet.explodedAt)
+                      .map((bullet) => (
+                        <BulletSvg
+                          key={bullet.id}
+                          appIndex={appIndex}
+                          id={bullet.id}
+                          x={bullet.x}
+                          y={bullet.y}
+                          orientation={bullet.orientation}
+                        />
+                      ))}
+                  </g>
+                ))
+              )}
+            </g>
+          </TerrainSvg>
+        )}
       </g>
-      {props.darkMode && (
+      {!props.debugMode && props.darkMode && (
         // Night mode: multiply the whole arena (terrain, padding, and bots) by a
         // cool, near-neutral blue-grey so it reads as a dim moonlit scene rather
         // than a washed-out grey. The channels are kept balanced (blue only

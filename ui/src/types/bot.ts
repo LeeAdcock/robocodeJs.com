@@ -22,6 +22,10 @@ export default interface Bot extends Point {
   radarOrientationTarget: number;
   radarOrientationVelocity: number;
   radarOn: boolean;
+  // Bot ids this bot's most recent radar scan detected (UI-only, transient — set
+  // from the `radarScan` event and cleared ~200ms later alongside radarOn). Drives
+  // the debug view's scanner→target detection lines.
+  detected?: string[];
 
   bullets: Bullet[];
 
