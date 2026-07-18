@@ -1,4 +1,3 @@
-import './App.css';
 import ArenaSvg from './components/arena/arena';
 import ArenaLegend from './components/arena/arenaLegend';
 import {
