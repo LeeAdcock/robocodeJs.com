@@ -11,7 +11,7 @@ the handful of differences that will trip you up if you don't know them.
 | -------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Language       | Java (`extends Robot` / `AdvancedRobot`)                          | JavaScript (no class, an "app" of event handlers)                                                                                                |
 | Program shape  | a `run()` loop + `onX()` event methods                            | register handlers: `bot.on(Event.X, …)`, `clock.on(Event.TICK, …)`                                                                               |
-| You control    | one robot per file                                                | a **team of 5 bots**, all sharing your one app                                                                                                   |
+| You control    | one robot per file                                                | a **team of 5 bots**, all sharing individual runtime instances of a shared app                                                                   |
 | Health         | **energy** `0–100`, spent to fire, gun heat limits fire rate      | **health** `0–100`; no cost to fire, no gun heat, a **reload timer** instead, but a **missed shot** (bullet leaves the field) costs **3 health** |
 | Movement calls | blocking `ahead(100)` / `turnRight(45)` (or `setAhead`+`execute`) | **async** `bot.setSpeed(5)` / `bot.turn(45)` return **Promises**                                                                                 |
 | Heading `0°`   | **North**, clockwise                                              | **North**, clockwise (same)                                                                                                                      |
@@ -52,15 +52,15 @@ Classic movement is distance/blocking (`ahead(100)` drives 100 px then returns).
 RobocodeJs movement is **continuous and asynchronous**: you set a target and get a Promise
 that resolves when it's reached (or rejects if a later command overrides it).
 
-| Classic                    | RobocodeJs                                                                  |
-| -------------------------- | --------------------------------------------------------------------------- |
-| `setAhead(d)` / `ahead(d)` | `bot.setSpeed(0…5)` (a speed, not a distance; `0` stops)                    |
-| `turnRight(deg)`           | `bot.turn(deg)` → Promise (positive = clockwise)                            |
-| `turnGunRight(deg)`        | `bot.turret.turn(deg)` (turret turns relative to the body)                  |
-| `turnRadarRight(deg)`      | `bot.radar.turn(deg)` (radar turns relative to the turret)                  |
-| `fire(power)`              | `bot.turret.fire()` (no power/heat; check `isReady()` / `await onReady()`)  |
-| `getEnergy()`              | `bot.getHealth()` (`100` … `0`)                                             |
-| `getX()` / `getY()`        | `bot.getX()` / `bot.getY()` (and `arena.createMarker(x, y)` for navigation) |
+| Classic                    | RobocodeJs                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `setAhead(d)` / `ahead(d)` | `bot.setSpeed(-5…5)` (a speed, not a distance; `0` stops, negative reverses) |
+| `turnRight(deg)`           | `bot.turn(deg)` → Promise (positive = clockwise)                             |
+| `turnGunRight(deg)`        | `bot.turret.turn(deg)` (turret turns relative to the body)                   |
+| `turnRadarRight(deg)`      | `bot.radar.turn(deg)` (radar turns relative to the turret)                   |
+| `fire(power)`              | `bot.turret.fire()` (no power/heat; check `isReady()` / `await onReady()`)   |
+| `getEnergy()`              | `bot.getHealth()` (`100` … `0`)                                              |
+| `getX()` / `getY()`        | `bot.getX()` / `bot.getY()` (and `arena.createMarker(x, y)` for navigation)  |
 
 Because actions take time, you sequence them with `await` / `.then()` and tidy cancelled
 ones with `.catch(() => {})`. If async-in-JS is new to you, the course covers it in
