@@ -75,9 +75,15 @@ describe('BotSvg health bar (team-colored fill, width-only drain)', () => {
     expect(fillRect(container)!.style.width).toBe('32px');
   });
 
-  it('hides the bar when the bot is dead', () => {
+  it('fades the bar out and drains it to empty when the bot is dead', () => {
     const { container } = renderBot({ health: 0 });
-    expect(fillRect(container)).toBeUndefined();
+    // The bar is no longer unmounted on death; it stays in the tree, drained to
+    // width 0, while the containing group fades out via `.bot-health-bar-dead`
+    // (same ~800ms as the wreck blur) rather than snapping off.
+    const fill = fillRect(container);
+    expect(fill).toBeTruthy();
+    expect(fill!.style.width).toBe('0px');
+    expect(fill!.closest('.bot-health-bar-dead')).toBeTruthy();
   });
 });
 
