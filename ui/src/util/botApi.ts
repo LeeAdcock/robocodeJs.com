@@ -89,9 +89,9 @@ export const EVENTS: ApiEvent[] = [
   },
   {
     name: 'COLLIDED',
-    payload: '{ angle: number; friendly?: boolean }',
+    payload: '{ angle: number; friendly?: boolean; impactSpeed: number }',
     channel: 'bot',
-    doc: 'Fires when you collide with a wall or another bot (you stop). `angle` is the bearing to the thing you hit, relative to your heading (0 = dead ahead). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall.',
+    doc: 'Fires when you collide with a wall or another bot (you stop). `angle` is the bearing to the thing you hit, relative to your heading (0 = dead ahead). `friendly` is `true` for a teammate and `false` for an enemy; it is `undefined` when you hit a wall. `impactSpeed` is how hard you drove into it (a wall: your speed toward the wall; a bot: the closing speed) — never negative, and the same value that scales the collision damage (`0.75 × impactSpeed`). It is `0` when you are only grazing — touching a wall while driving parallel to it, or a contact with nothing closing — which is a free, no-damage contact.',
   },
   {
     name: 'FIRED',

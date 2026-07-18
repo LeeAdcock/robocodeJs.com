@@ -227,6 +227,72 @@ export default {
                 if (distance < BOT_RADIUS * 2) {
                   contacts.add(otherBot.id);
 
+                  // Compute the separation normal and closing speed for this contact
+                  // once, up front, so the COLLIDED event can report the impact speed
+                  // (below) and the deepest-overlap resolution can reuse it.
+                  //
+                  // Unit normal pointing from the other bot toward us (projected
+                  // position), falling back to our pre-move position, then a fixed
+                  // axis, if the two centers coincide exactly (degenerate, but keeps
+                  // the push finite).
+                  let normalX = newX - otherBot.x;
+                  let normalY = newY - otherBot.y;
+                  let normalLength = Math.sqrt(
+                    normalX * normalX + normalY * normalY
+                  );
+                  if (normalLength === 0) {
+                    normalX = startX - otherBot.x;
+                    normalY = startY - otherBot.y;
+                    normalLength = Math.sqrt(
+                      normalX * normalX + normalY * normalY
+                    );
+                  }
+                  if (normalLength === 0) {
+                    normalX = 1;
+                    normalY = 0;
+                    normalLength = 1;
+                  }
+                  const unitX = normalX / normalLength;
+                  const unitY = normalY / normalLength;
+
+                  // Closing speed = how fast the gap is shrinking = the pair's
+                  // relative velocity projected onto the separating axis. Read both
+                  // speeds from the tick-start snapshot so a bot already frictioned
+                  // earlier this tick still contributes its full pre-impact velocity
+                  // here (see `tickStartSpeed`).
+                  const botSpeed = tickStartSpeed.get(bot) ?? bot.speed;
+                  const otherSpeed =
+                    tickStartSpeed.get(otherBot) ?? otherBot.speed;
+                  const velX =
+                    botSpeed * Math.sin(-bot.orientation * (Math.PI / 180));
+                  const velY =
+                    botSpeed * Math.cos(-bot.orientation * (Math.PI / 180));
+                  const otherVelX =
+                    otherSpeed *
+                    Math.sin(-otherBot.orientation * (Math.PI / 180));
+                  const otherVelY =
+                    otherSpeed *
+                    Math.cos(-otherBot.orientation * (Math.PI / 180));
+                  const closingSpeed = -(
+                    (velX - otherVelX) * unitX +
+                    (velY - otherVelY) * unitY
+                  );
+
+                  // Cosine of our heading against the push-away normal: our own
+                  // velocity projected onto the normal, divided by our speed. It is
+                  // negative when we are driving into the other bot; -1 is dead-on, 0
+                  // is a pure sideways graze. Collision friction uses it to absorb
+                  // only the inward (head-on) part of our motion.
+                  const speedMag = Math.sqrt(velX * velX + velY * velY);
+                  const cosNormal =
+                    speedMag > 0 ? (velX * unitX + velY * unitY) / speedMag : 0;
+
+                  // Impact speed reported to the COLLIDED handler: the closing speed,
+                  // never negative (a pair already separating reports 0). Symmetric
+                  // with the wall's impact speed below, and it is the same value that
+                  // scales ram damage, so a bot can predict the hit it just took.
+                  const impactSpeed = Math.max(0, closingSpeed);
+
                   // Fire COLLIDED and count the collision only on the tick the
                   // contact *begins* (a rising edge — this pair wasn't overlapping
                   // last tick), not every tick two bots stay pressed together.
@@ -257,6 +323,7 @@ export default {
                       bot.handlers[Event.COLLIDED]({
                         angle: toRelativeBearing(angle, bot.orientation),
                         friendly,
+                        impactSpeed,
                       });
                     }
                   }
@@ -274,72 +341,15 @@ export default {
                           otherBot.orientation
                         ),
                         friendly,
+                        impactSpeed,
                       });
                     }
                   }
 
-                  // Resolve against the deepest overlap this tick.
+                  // Resolve against the deepest overlap this tick, reusing the
+                  // normal, closing speed, and cosNormal computed above.
                   if (distance < deepestOverlap) {
                     deepestOverlap = distance;
-
-                    // Unit normal pointing from the other bot toward us, falling
-                    // back to our pre-move position, then a fixed axis, if the two
-                    // centers coincide exactly (degenerate, but keeps the push
-                    // finite).
-                    let normalX = newX - otherBot.x;
-                    let normalY = newY - otherBot.y;
-                    let normalLength = Math.sqrt(
-                      normalX * normalX + normalY * normalY
-                    );
-                    if (normalLength === 0) {
-                      normalX = startX - otherBot.x;
-                      normalY = startY - otherBot.y;
-                      normalLength = Math.sqrt(
-                        normalX * normalX + normalY * normalY
-                      );
-                    }
-                    if (normalLength === 0) {
-                      normalX = 1;
-                      normalY = 0;
-                      normalLength = 1;
-                    }
-                    const unitX = normalX / normalLength;
-                    const unitY = normalY / normalLength;
-
-                    // Closing speed = how fast the gap is shrinking = the pair's
-                    // relative velocity projected onto the separating axis. Read
-                    // both speeds from the tick-start snapshot so a bot already
-                    // frictioned earlier this tick still contributes its full
-                    // pre-impact velocity here (see `tickStartSpeed`).
-                    const botSpeed = tickStartSpeed.get(bot) ?? bot.speed;
-                    const otherSpeed =
-                      tickStartSpeed.get(otherBot) ?? otherBot.speed;
-                    const velX =
-                      botSpeed * Math.sin(-bot.orientation * (Math.PI / 180));
-                    const velY =
-                      botSpeed * Math.cos(-bot.orientation * (Math.PI / 180));
-                    const otherVelX =
-                      otherSpeed *
-                      Math.sin(-otherBot.orientation * (Math.PI / 180));
-                    const otherVelY =
-                      otherSpeed *
-                      Math.cos(-otherBot.orientation * (Math.PI / 180));
-                    const closingSpeed = -(
-                      (velX - otherVelX) * unitX +
-                      (velY - otherVelY) * unitY
-                    );
-
-                    // Cosine of our heading against the push-away normal: our own
-                    // velocity projected onto the normal, divided by our speed. It
-                    // is negative when we are driving into the other bot; -1 is
-                    // dead-on, 0 is a pure sideways graze. Collision friction uses
-                    // it to absorb only the inward (head-on) part of our motion.
-                    const speedMag = Math.sqrt(velX * velX + velY * velY);
-                    const cosNormal =
-                      speedMag > 0
-                        ? (velX * unitX + velY * unitY) / speedMag
-                        : 0;
-
                     separation = {
                       // Place us exactly at contact distance along the normal, out
                       // of the overlap. The other bot resolves symmetrically on its
@@ -425,6 +435,7 @@ export default {
           const arenaWidth = env.getArena().getWidth();
           const arenaHeight = env.getArena().getHeight();
           let hitWall = false;
+          let wallImpactSpeed = 0;
           if (
             newX < BOT_RADIUS ||
             newX > arenaWidth - BOT_RADIUS ||
@@ -432,6 +443,34 @@ export default {
             newY > arenaHeight - BOT_RADIUS
           ) {
             hitWall = true;
+
+            // Which boundary/boundaries we crossed: a unit vector pointing at the
+            // wall (west/east on x, north/south on y — both on a corner). It doubles
+            // as the wall's inward normal for the impact-speed projection and as the
+            // bearing reported to the COLLIDED handler.
+            const wallX =
+              newX < BOT_RADIUS ? -1 : newX > arenaWidth - BOT_RADIUS ? 1 : 0;
+            const wallY =
+              newY < BOT_RADIUS ? -1 : newY > arenaHeight - BOT_RADIUS ? 1 : 0;
+
+            // Impact speed = our velocity projected onto that inward normal (not our
+            // raw speed), never negative — so skimming along a wall is 0 and only the
+            // component driving into it counts, exactly as closingSpeed does for a
+            // bot ram. Read the speed from the tick-start snapshot (bot.speed is
+            // zeroed by the stop below); the heading is unchanged this tick. This is
+            // both the value reported to the COLLIDED handler and the value that
+            // scales the impact damage below.
+            const impactVel = tickStartSpeed.get(bot) ?? bot.speed;
+            const wallVelX =
+              impactVel * Math.sin(-bot.orientation * (Math.PI / 180));
+            const wallVelY =
+              impactVel * Math.cos(-bot.orientation * (Math.PI / 180));
+            const wallNormalLen = Math.hypot(wallX, wallY) || 1;
+            wallImpactSpeed = Math.max(
+              0,
+              (wallVelX * wallX + wallVelY * wallY) / wallNormalLen
+            );
+
             // Fire the wall COLLIDED and count it only when the contact begins (a
             // rising edge), mirroring the bot-vs-bot debounce above — a bot held
             // against a wall shouldn't spam the handler or inflate timesCollided
@@ -443,26 +482,17 @@ export default {
               bot.logger.trace('Collided with arena boundary');
             }
             if (!bot.wallContact && bot.handlers[Event.COLLIDED]) {
-              // Point a unit vector at whichever boundary/boundaries we crossed
-              // (west/east on x, north/south on y — both on a corner), then report
-              // the bearing to that wall relative to our heading, exactly as a bot
-              // collision reports the bearing to the other bot. A head-on hit still
-              // yields 0 (dead ahead); a glancing or corner hit is now meaningful.
-              // `friendly` is intentionally omitted for a wall (undefined — the
-              // thing we hit isn't a bot, so it's neither a teammate nor an enemy).
-              const wallX =
-                newX < BOT_RADIUS ? -1 : newX > arenaWidth - BOT_RADIUS ? 1 : 0;
-              const wallY =
-                newY < BOT_RADIUS
-                  ? -1
-                  : newY > arenaHeight - BOT_RADIUS
-                    ? 1
-                    : 0;
+              // Report the bearing to the wall relative to our heading, exactly as a
+              // bot collision reports the bearing to the other bot. A head-on hit
+              // still yields 0 (dead ahead); a glancing or corner hit is meaningful.
+              // `friendly` is intentionally omitted for a wall (undefined — the thing
+              // we hit isn't a bot, so it's neither a teammate nor an enemy).
               const wallAngle = normalizeAngle(
                 Math.atan2(wallY, wallX) * (180 / Math.PI) - 90
               );
               bot.handlers[Event.COLLIDED]({
                 angle: toRelativeBearing(wallAngle, bot.orientation),
+                impactSpeed: wallImpactSpeed,
               });
             }
           }
@@ -481,32 +511,17 @@ export default {
               y: bot.y,
             });
 
-            // Impact damage on the rising edge only, scaled by how fast we drove
-            // into the wall — symmetric with bot-vs-bot ram damage: a graze below
-            // COLLISION_MIN_CLOSING_SPEED is free, a hard crash hurts. The impact
-            // speed is our velocity projected onto the wall's inward normal (not
-            // our raw speed), so skimming along a wall costs nothing and only the
-            // component driving into it counts, exactly as closingSpeed does for a
-            // bot. Read the speed from the tick-start snapshot (bot.speed was just
-            // zeroed by the stop above); the heading is unchanged this tick.
-            // Unattributed like every collision (a wall has no shooter, so null
-            // credits nobody for the death).
-            const impactVel = tickStartSpeed.get(bot) ?? bot.speed;
-            const velX =
-              impactVel * Math.sin(-bot.orientation * (Math.PI / 180));
-            const velY =
-              impactVel * Math.cos(-bot.orientation * (Math.PI / 180));
-            const wallNormalX =
-              newX < BOT_RADIUS ? -1 : newX > arenaWidth - BOT_RADIUS ? 1 : 0;
-            const wallNormalY =
-              newY < BOT_RADIUS ? -1 : newY > arenaHeight - BOT_RADIUS ? 1 : 0;
-            const wallNormalLen = Math.hypot(wallNormalX, wallNormalY) || 1;
-            const impactSpeed = Math.max(
-              0,
-              (velX * wallNormalX + velY * wallNormalY) / wallNormalLen
-            );
-            if (!bot.wallContact && impactSpeed > COLLISION_MIN_CLOSING_SPEED) {
-              damage(bot, impactSpeed * COLLISION_DAMAGE_FACTOR, null);
+            // Impact damage on the rising edge only, scaled by how hard we drove
+            // into the wall (wallImpactSpeed, computed above where we detected the
+            // boundary) — symmetric with bot-vs-bot ram damage: a graze below
+            // COLLISION_MIN_CLOSING_SPEED is free, a hard crash hurts. Unattributed
+            // like every collision (a wall has no shooter, so null credits nobody
+            // for the death).
+            if (
+              !bot.wallContact &&
+              wallImpactSpeed > COLLISION_MIN_CLOSING_SPEED
+            ) {
+              damage(bot, wallImpactSpeed * COLLISION_DAMAGE_FACTOR, null);
               env.emit('event', {
                 type: 'botDamaged',
                 time: env.getTime(),

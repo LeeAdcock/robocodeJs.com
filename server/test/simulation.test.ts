@@ -141,6 +141,9 @@ describe('Simulation.run — collisions', () => {
     run(env);
     expect(collided).toHaveBeenCalled();
     expect(collided.mock.calls[0][0]).not.toHaveProperty('friendly');
+    // The event reports the speed driven into the wall — the same value that
+    // scales the damage below.
+    expect(collided.mock.calls[0][0].impactSpeed).toBeCloseTo(5);
     expect(bot.health).toBeCloseTo(100 - 5 * COLLISION_DAMAGE_FACTOR); // 96.25
     expect(bot.stats.damageTaken).toBeCloseTo(5 * COLLISION_DAMAGE_FACTOR);
     expect(bot.speed).toBe(0);
@@ -165,6 +168,9 @@ describe('Simulation.run — collisions', () => {
     });
     run(makeEnv([makeProcess('a', [bot])]));
     expect(collided).toHaveBeenCalled();
+    // The into-wall component is below the minimum closing speed, so the reported
+    // impact speed is small (well under the ram factor's damage threshold).
+    expect(collided.mock.calls[0][0].impactSpeed).toBeLessThan(1);
     expect(bot.health).toBe(100);
     expect(bot.stats.damageTaken).toBe(0);
   });
@@ -225,7 +231,8 @@ describe('Simulation.run — collisions', () => {
       handlers: { [Event.COLLIDED]: collided },
     });
     run(makeEnv([makeProcess('a', [bot])]));
-    expect(collided).toHaveBeenCalledWith({ angle: 0 });
+    // Head-on at speed 5: the whole speed drives into the wall, so impactSpeed = 5.
+    expect(collided).toHaveBeenCalledWith({ angle: 0, impactSpeed: 5 });
   });
 
   it('reports a corner wall as a diagonal bearing', () => {
@@ -238,7 +245,8 @@ describe('Simulation.run — collisions', () => {
       handlers: { [Event.COLLIDED]: collided },
     });
     run(makeEnv([makeProcess('a', [bot])]));
-    expect(collided).toHaveBeenCalledWith({ angle: 315 });
+    // Lodged in the corner at rest (speed 0), so nothing drives in: impactSpeed 0.
+    expect(collided).toHaveBeenCalledWith({ angle: 315, impactSpeed: 0 });
   });
 
   it('fires COLLIDED on two bots that overlap, flagging friendly teams', () => {
@@ -398,6 +406,50 @@ describe('Simulation.run — collisions', () => {
     run(makeEnv(processes));
     expect(t1.health).toBeCloseTo(92.5, 5);
     expect(t2.health).toBeCloseTo(92.5, 5);
+  });
+
+  it('reports the closing speed as impactSpeed to a rammed bot', () => {
+    // Head-on at ±5 → closing speed 10, reported to both sides. The value matches
+    // the damage each takes (10 * 0.75 = 7.5), and both sides see the same speed.
+    const c1 = vi.fn();
+    const c2 = vi.fn();
+    const t1 = makeBot({
+      id: '1',
+      x: 375,
+      y: 370,
+      speed: 5,
+      speedTarget: 5,
+      handlers: { [Event.COLLIDED]: c1 },
+    });
+    const t2 = makeBot({
+      id: '2',
+      x: 375,
+      y: 400,
+      orientation: 180,
+      speed: 5,
+      speedTarget: 5,
+      handlers: { [Event.COLLIDED]: c2 },
+    });
+    run(makeEnv([makeProcess('a', [t1, t2])]));
+    expect(c1.mock.calls[0][0].impactSpeed).toBeCloseTo(10, 5);
+    expect(c2.mock.calls[0][0].impactSpeed).toBeCloseTo(10, 5);
+  });
+
+  it('reports impactSpeed 0 for a free (non-closing) contact', () => {
+    // Two stationary overlapping bots: the contact is reported but nothing is
+    // closing, so impactSpeed is 0 — a free, no-damage graze, mirroring a bot
+    // that touches a wall while driving parallel to it.
+    const c1 = vi.fn();
+    const t1 = makeBot({
+      id: '1',
+      x: 375,
+      y: 375,
+      handlers: { [Event.COLLIDED]: c1 },
+    });
+    const t2 = makeBot({ id: '2', x: 385, y: 375 });
+    run(makeEnv([makeProcess('a', [t1, t2])]));
+    expect(c1).toHaveBeenCalled();
+    expect(c1.mock.calls[0][0].impactSpeed).toBe(0);
   });
 
   it('sheds the inward speed of a head-on collision (friction, not ice)', () => {
