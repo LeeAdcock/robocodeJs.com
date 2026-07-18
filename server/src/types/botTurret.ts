@@ -61,7 +61,8 @@ export class BotTurret implements Orientated {
         !this.bot.env.isRunning() ||
         this.orientationTarget !== target % 360 ||
         this.bot.health <= 0,
-      'Turret orientation change cancelled'
+      'Turret orientation change cancelled',
+      this.bot
     );
   }
 
@@ -102,7 +103,8 @@ export class BotTurret implements Orientated {
         !this.bot.env.isRunning() ||
         this.orientationTarget !== target ||
         this.bot.health <= 0,
-      'Turret turn cancelled'
+      'Turret turn cancelled',
+      this.bot
     );
   }
 
@@ -128,7 +130,8 @@ export class BotTurret implements Orientated {
           this.loaded < peakValue
         );
       },
-      'Turret already fired'
+      'Turret already fired',
+      this.bot
     );
   }
 

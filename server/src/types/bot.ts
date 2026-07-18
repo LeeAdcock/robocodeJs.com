@@ -100,8 +100,13 @@ export const waitUntil = (
   env: Environment,
   successCondition: () => boolean,
   failureCondition: (() => boolean) | null = null,
-  msg: string | null = null
-) => env.waitForCondition(successCondition, failureCondition, msg);
+  msg: string | null = null,
+  // The bot that issued the command. Lets the environment drop (not settle) the
+  // bot's parked commands if it is shed from the roster while they wait — its
+  // isolate context is released at that point, so they must never settle into
+  // it. Every bot/turret/radar command passes its bot.
+  owner: Bot | null = null
+) => env.waitForCondition(successCondition, failureCondition, msg, owner);
 
 // Coerce a bot-supplied numeric command argument, returning null when it is not
 // a finite number. Bot code is untrusted and weakly typed, so `bot.setSpeed(NaN)`,
@@ -457,7 +462,8 @@ export default class Bot implements Point, Orientated {
         !this.env.isRunning() ||
         this.orientationTarget !== target ||
         this.health <= 0,
-      'Orientation change cancelled'
+      'Orientation change cancelled',
+      this
     );
   }
 
@@ -501,7 +507,8 @@ export default class Bot implements Point, Orientated {
         !this.env.isRunning() ||
         this.orientationTarget !== target ||
         this.health <= 0,
-      'Turn cancelled'
+      'Turn cancelled',
+      this
     );
   }
 
@@ -543,7 +550,8 @@ export default class Bot implements Point, Orientated {
         !this.env.isRunning() ||
         this.speedTarget !== target ||
         this.health <= 0,
-      'Speed change cancelled'
+      'Speed change cancelled',
+      this
     );
   }
 

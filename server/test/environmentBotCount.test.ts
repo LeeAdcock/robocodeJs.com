@@ -29,22 +29,50 @@ import Bot from '../src/types/bot';
 import Environment, { Process } from '../src/types/environment';
 import Arena from '../src/types/arena';
 import compiler from '../src/util/compiler';
+import Simulation, { applyEliminations } from '../src/util/simulation';
+import { Event } from '../src/types/event';
+import Bullet from '../src/types/bullet';
 
 interface ArenaEvent {
   type: string;
   id?: string;
   botCount?: number;
+  retired?: boolean;
 }
+
+const quietLogger = {
+  trace: () => undefined,
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
 
 const makeEnv = (teamSizes: number[]) => {
   const env = new Environment(new Arena('a', 'u'));
   teamSizes.forEach((size, i) => {
     const process = new Process(`app${i + 1}`);
-    for (let b = 0; b < size; b++) process.bots.push(new Bot(env, process));
+    for (let b = 0; b < size; b++) {
+      const bot = new Bot(env, process);
+      bot.logger = quietLogger;
+      process.bots.push(bot);
+    }
     env.getProcesses().push(process);
   });
   return env;
 };
+
+// A bullet in flight, aimed along `orientation` (270 = toward +x).
+const makeBullet = (x: number, y: number, orientation: number): Bullet => ({
+  id: `bullet-${x}-${y}`,
+  exploded: false,
+  x,
+  y,
+  origin: { x, y },
+  orientation,
+  speed: 25,
+  callback: vi.fn(),
+});
 
 const collectEvents = (env: Environment) => {
   const events: ArenaEvent[] = [];
@@ -112,6 +140,152 @@ describe('Environment.setBotCount', () => {
     const env = makeEnv([5, 1]);
     await env.setBotCount(3);
     expect(env.getProcesses().map((p) => p.bots.length)).toEqual([3, 3]);
+  });
+
+  it('sheds dead bots first, keeping living ones', async () => {
+    const env = makeEnv([5]);
+    const p = env.getProcesses()[0];
+    // The three oldest are corpses; the two survivors sit at the array tail —
+    // exactly the layout where shedding by position would remove the app's
+    // only living bots and falsely end the match.
+    p.bots[0].health = 0;
+    p.bots[1].health = 0;
+    p.bots[2].health = 0;
+    const survivors = [p.bots[3].id, p.bots[4].id];
+
+    await env.setBotCount(2);
+
+    expect(p.bots.map((b) => b.id)).toEqual(survivors);
+    expect(p.bots.every((b) => b.health > 0)).toBe(true);
+  });
+
+  it('sheds living bots (newest first) only when there are not enough dead ones', async () => {
+    const env = makeEnv([5]);
+    const p = env.getProcesses()[0];
+    p.bots[1].health = 0;
+    const expected = [p.bots[0].id, p.bots[2].id];
+
+    await env.setBotCount(2);
+
+    // The one corpse goes first, then the newest living bots; the two oldest
+    // living bots remain.
+    expect(p.bots.map((b) => b.id)).toEqual(expected);
+  });
+
+  it('keeps a shed bot’s in-flight bullets flying until they land, still crediting the kill', async () => {
+    const env = makeEnv([2, 1]);
+    const [a, b] = env.getProcesses();
+    const events = collectEvents(env);
+    const shooter = a.bots[1];
+    const victim = b.bots[0];
+    a.bots[0].x = 100;
+    a.bots[0].y = 100;
+    shooter.x = 200;
+    shooter.y = 200;
+    victim.x = 500;
+    victim.y = 500;
+    victim.health = 20; // The bullet in flight will be the killing blow.
+    const bullet = makeBullet(400, 500, 270); // 100 short of the victim, closing
+    shooter.bullets.push(bullet);
+
+    await env.setBotCount(1);
+
+    // The shooter left the roster but is parked with its live bullet; the
+    // fire() callback is cleared (its promise lives in the released context)
+    // and the removal is announced as retired so clients keep the bullet.
+    expect(a.bots.map((bot) => bot.id)).toEqual([a.bots[0].id]);
+    expect(a.retiredBots).toEqual([shooter]);
+    expect(bullet.callback).toBeUndefined();
+    expect(
+      events.find((e) => e.type === 'arenaRemoveBot' && e.id === shooter.id)
+        ?.retired
+    ).toBe(true);
+
+    // The bullet keeps flying tick by tick...
+    Simulation.run(env);
+    expect(bullet.x).toBe(425);
+    expect(a.retiredBots).toEqual([shooter]);
+    Simulation.run(env);
+    Simulation.run(env);
+    expect(bullet.x).toBe(475);
+
+    // ...lands (distance 25 < 32), damages the victim, credits the shooter,
+    // and the retired bot is dropped now that its last bullet has resolved.
+    Simulation.run(env);
+    expect(bullet.exploded).toBe(true);
+    expect(victim.health).toBeLessThanOrEqual(0);
+    expect(victim.lastDamagedBy).toBe(shooter);
+    expect(shooter.stats.shotsHit).toBe(1);
+    applyEliminations(env.getProcesses(), 1);
+    expect(shooter.stats.kills).toBe(1);
+    expect(a.retiredBots).toEqual([]);
+  });
+
+  it('removes a shed bot’s bullet that leaves the arena, then drops the bot', async () => {
+    const env = makeEnv([2, 1]);
+    const [a] = env.getProcesses();
+    const events = collectEvents(env);
+    const shooter = a.bots[1];
+    const bullet = makeBullet(740, 500, 270); // heading off the +x edge
+    shooter.bullets.push(bullet);
+
+    await env.setBotCount(1);
+    expect(a.retiredBots).toEqual([shooter]);
+
+    Simulation.run(env); // 740 -> 765, still inside the +32 margin
+    expect(a.retiredBots).toEqual([shooter]);
+    Simulation.run(env); // 790 is out: removed
+    expect(events.some((e) => e.type === 'bulletRemoved')).toBe(true);
+    expect(shooter.bullets).toEqual([]);
+    expect(a.retiredBots).toEqual([]);
+  });
+
+  it('sheds without bullets in flight are removed outright, not retired', async () => {
+    const env = makeEnv([2]);
+    const events = collectEvents(env);
+    const shed = env.getProcesses()[0].bots[1];
+
+    await env.setBotCount(1);
+
+    expect(env.getProcesses()[0].retiredBots).toEqual([]);
+    expect(
+      events.find((e) => e.type === 'arenaRemoveBot' && e.id === shed.id)
+        ?.retired
+    ).toBe(false);
+  });
+
+  it('tears a shed bot down: parked commands dropped, handlers and timers cleared', async () => {
+    const env = makeEnv([2, 1]);
+    // Park commands for real: the failure conditions check isRunning().
+    (env as unknown as { running: boolean }).running = true;
+    const [a, b] = env.getProcesses();
+    const shed = a.bots[1];
+    const kept = b.bots[0];
+
+    let shedSettled = false;
+    shed.setSpeed(3).then(
+      () => (shedSettled = true),
+      () => (shedSettled = true)
+    );
+    let keptRejected = false;
+    kept.setSpeed(3).then(undefined, () => (keptRejected = true));
+    shed.handlers[Event.TICK] = () => undefined;
+    shed.timers.intervalMap[1] = {} as never;
+
+    await env.setBotCount(1);
+
+    // The shed bot's dispatch surface is gone...
+    expect(Object.keys(shed.handlers)).toEqual([]);
+    expect(shed.timers.size()).toBe(0);
+
+    // ...and its parked command was dropped, not settled: stopping the arena
+    // rejects the kept bot's command (its failure condition fires) while the
+    // shed bot's promise never settles into the released context.
+    (env as unknown as { running: boolean }).running = false;
+    expect(env.settlePendingCommands()).toBe(1);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(keptRejected).toBe(true);
+    expect(shedSettled).toBe(false);
   });
 
   it('addApp fields the configured quantity', async () => {

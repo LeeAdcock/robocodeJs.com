@@ -162,6 +162,55 @@ export default {
     // each side is notified at most once per tick even when both drive in together.
     const collisionsReported = new Set<string>();
 
+    // Advance one bot's bullets, removing (and penalizing) any that leave the
+    // arena. Shared by the roster pass below and the retired-bot pass at the
+    // end, so a shed bot's already-fired bullets keep flying exactly like a
+    // live (or dead) bot's.
+    const moveBullets = (bot: Bot) => {
+      bot.bullets.forEach((bullet, bulletIndex, bullets) => {
+        if (!bullet.exploded) {
+          const newX =
+            bullet.x +
+            bullet.speed * Math.sin(-bullet.orientation * (Math.PI / 180));
+          const newY =
+            bullet.y +
+            bullet.speed * Math.cos(-bullet.orientation * (Math.PI / 180));
+          if (
+            newX > -32 &&
+            newX < env.getArena().getWidth() + 32 &&
+            newY > -32 &&
+            newY < env.getArena().getHeight() + 32
+          ) {
+            bullet.x = newX;
+            bullet.y = newY;
+          } else {
+            // Went outside the arena without hitting anyone — the shooter is
+            // penalized 3 health for the missed shot, then the bullet is
+            // removed. (Elimination at health <= 0 is handled in
+            // Environment.tick, so a miss can be a self-inflicted killing blow.)
+            // Self-inflicted, so nobody is credited. This runs for dead bots too
+            // — their bullets stay in flight — but `damage` freezes a dead bot's
+            // attribution, so a corpse's stray miss can't rob its killer.
+            damage(bot, BULLET_MISS_PENALTY, null);
+            env.emit('event', {
+              type: 'bulletRemoved',
+              time: env.getTime(),
+              id: bullet.id,
+              botId: bot.id,
+            });
+            env.emit('event', {
+              type: 'botDamaged',
+              id: bot.id,
+              time: env.getTime(),
+              health: bot.health,
+            });
+            if (bullet.callback) bullet.callback({});
+            bullets.splice(bulletIndex, 1);
+          }
+        }
+      });
+    };
+
     // Then handle movement and interactions
     env.getProcesses().forEach((process) => {
       process.bots.forEach((bot) => {
@@ -366,69 +415,77 @@ export default {
             })
           );
 
-          // Detect if we have been hit by another bot's bullets
+          // Detect if we have been hit by another bot's bullets. Retired bots
+          // (shed from the roster by a bots-per-app decrease, gone from
+          // `bots`) keep their already-fired bullets in flight — the same
+          // invariant that keeps dead bots in the array — so their bullets are
+          // checked too, and still credit the shooter's kill.
+          // (`?? []` keeps the established lightweight-mock-process test
+          // pattern working — real Process instances always carry the array.)
           env.getProcesses().forEach((otherProcess) =>
-            otherProcess.bots.forEach((otherBot) => {
-              if (otherBot.id !== bot.id) {
-                otherBot.bullets
-                  .filter((bullet) => !bullet.exploded)
-                  .forEach((bullet) => {
-                    const distance = Math.sqrt(
-                      Math.pow(bullet.x - bot.x, 2) +
-                        Math.pow(bullet.y - bot.y, 2)
-                    );
-                    const angle: number = normalizeAngle(
-                      Math.atan2(
-                        bot.y - bullet.origin.y,
-                        bot.x - bullet.origin.x
-                      ) *
-                        (180 / Math.PI) -
-                        90
-                    );
+            [...otherProcess.bots, ...(otherProcess.retiredBots ?? [])].forEach(
+              (otherBot) => {
+                if (otherBot.id !== bot.id) {
+                  otherBot.bullets
+                    .filter((bullet) => !bullet.exploded)
+                    .forEach((bullet) => {
+                      const distance = Math.sqrt(
+                        Math.pow(bullet.x - bot.x, 2) +
+                          Math.pow(bullet.y - bot.y, 2)
+                      );
+                      const angle: number = normalizeAngle(
+                        Math.atan2(
+                          bot.y - bullet.origin.y,
+                          bot.x - bullet.origin.x
+                        ) *
+                          (180 / Math.PI) -
+                          90
+                      );
 
-                    // A bullet lands anywhere within one tank width (two
-                    // radii) of the target's center.
-                    if (distance < BOT_RADIUS * 2) {
-                      // We have a hit
-                      if (bot.handlers[Event.HIT]) {
-                        bot.handlers[Event.HIT]({
-                          angle: toRelativeBearing(
-                            normalizeAngle(angle + 180),
-                            bot.orientation
-                          ),
+                      // A bullet lands anywhere within one tank width (two
+                      // radii) of the target's center.
+                      if (distance < BOT_RADIUS * 2) {
+                        // We have a hit
+                        if (bot.handlers[Event.HIT]) {
+                          bot.handlers[Event.HIT]({
+                            angle: toRelativeBearing(
+                              normalizeAngle(angle + 180),
+                              bot.orientation
+                            ),
+                          });
+                        }
+
+                        // The last-hit rule: whoever landed this shot is on the hook
+                        // for the kill if the bot doesn't recover. Friendly fire is
+                        // recorded here too — it really happened — but applyEliminations
+                        // refuses to credit it as a kill.
+                        const dealt = damage(bot, BULLET_DAMAGE, otherBot);
+                        bot.stats.timesHit += 1;
+                        otherBot.stats.shotsHit += 1;
+                        otherBot.stats.damageDealt += dealt;
+
+                        bullet.exploded = true;
+                        if (bullet.callback) bullet.callback({ id: bot.id });
+
+                        env.emit('event', {
+                          type: 'botDamaged',
+                          id: bot.id,
+                          time: env.getTime(),
+                          health: bot.health,
+                        });
+                        env.emit('event', {
+                          type: 'bulletExploded',
+                          time: env.getTime(),
+                          id: bullet.id,
+                          botId: bot.id,
+                          x: bullet.x,
+                          y: bullet.y,
                         });
                       }
-
-                      // The last-hit rule: whoever landed this shot is on the hook
-                      // for the kill if the bot doesn't recover. Friendly fire is
-                      // recorded here too — it really happened — but applyEliminations
-                      // refuses to credit it as a kill.
-                      const dealt = damage(bot, BULLET_DAMAGE, otherBot);
-                      bot.stats.timesHit += 1;
-                      otherBot.stats.shotsHit += 1;
-                      otherBot.stats.damageDealt += dealt;
-
-                      bullet.exploded = true;
-                      if (bullet.callback) bullet.callback({ id: bot.id });
-
-                      env.emit('event', {
-                        type: 'botDamaged',
-                        id: bot.id,
-                        time: env.getTime(),
-                        health: bot.health,
-                      });
-                      env.emit('event', {
-                        type: 'bulletExploded',
-                        time: env.getTime(),
-                        id: bullet.id,
-                        botId: bot.id,
-                        x: bullet.x,
-                        y: bullet.y,
-                      });
-                    }
-                  });
+                    });
+                }
               }
-            })
+            )
           );
 
           // Detect if we are at the edge of the arena
@@ -668,49 +725,19 @@ export default {
         }
 
         // Move our bullets
-        bot.bullets.forEach((bullet, bulletIndex, bullets) => {
-          if (!bullet.exploded) {
-            const newX =
-              bullet.x +
-              bullet.speed * Math.sin(-bullet.orientation * (Math.PI / 180));
-            const newY =
-              bullet.y +
-              bullet.speed * Math.cos(-bullet.orientation * (Math.PI / 180));
-            if (
-              newX > -32 &&
-              newX < env.getArena().getWidth() + 32 &&
-              newY > -32 &&
-              newY < env.getArena().getHeight() + 32
-            ) {
-              bullet.x = newX;
-              bullet.y = newY;
-            } else {
-              // Went outside the arena without hitting anyone — the shooter is
-              // penalized 3 health for the missed shot, then the bullet is
-              // removed. (Elimination at health <= 0 is handled in
-              // Environment.tick, so a miss can be a self-inflicted killing blow.)
-              // Self-inflicted, so nobody is credited. This runs for dead bots too
-              // — their bullets stay in flight — but `damage` freezes a dead bot's
-              // attribution, so a corpse's stray miss can't rob its killer.
-              damage(bot, BULLET_MISS_PENALTY, null);
-              env.emit('event', {
-                type: 'bulletRemoved',
-                time: env.getTime(),
-                id: bullet.id,
-                botId: bot.id,
-              });
-              env.emit('event', {
-                type: 'botDamaged',
-                id: bot.id,
-                time: env.getTime(),
-                health: bot.health,
-              });
-              if (bullet.callback) bullet.callback({});
-              bullets.splice(bulletIndex, 1);
-            }
-          }
-        });
+        moveBullets(bot);
       });
+    });
+
+    // Keep retired bots' bullets flying, then drop each retired bot whose last
+    // bullet has resolved (exploded on a hit, or removed at the arena edge) —
+    // nothing about it remains in the simulation after that.
+    env.getProcesses().forEach((process) => {
+      if (!process.retiredBots || process.retiredBots.length === 0) return;
+      process.retiredBots.forEach((bot) => moveBullets(bot));
+      process.retiredBots = process.retiredBots.filter((bot) =>
+        bot.bullets.some((bullet) => !bullet.exploded)
+      );
     });
   },
 };

@@ -72,7 +72,8 @@ export class BotRadar implements Orientated {
       () => this.orientation === target % 360,
       () =>
         !this.bot.env.isRunning() || this.orientationTarget !== target % 360,
-      'Radar orientation change cancelled'
+      'Radar orientation change cancelled',
+      this.bot
     );
   }
 
@@ -113,7 +114,8 @@ export class BotRadar implements Orientated {
         !this.bot.env.isRunning() ||
         this.orientationTarget !== target ||
         this.bot.health <= 0,
-      'Radar turn chancelled'
+      'Radar turn chancelled',
+      this.bot
     );
   }
 
@@ -132,7 +134,8 @@ export class BotRadar implements Orientated {
           this.charged < peakValue
         );
       },
-      'Radar already scanned'
+      'Radar already scanned',
+      this.bot
     );
   }
 

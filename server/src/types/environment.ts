@@ -45,11 +45,26 @@ interface PendingCommand {
   resolve: () => void;
   reject: (reason?: unknown) => void;
   msg: string | null;
+  // The bot that issued the command, so a bot shed from the roster
+  // (setBotCount decrease) can have its parked commands dropped rather than
+  // left to settle into its released isolate context. Null when the command
+  // has no single owning bot.
+  owner: Bot | null;
 }
 
 export class Process {
   public appId: AppId;
   public bots: Bot[] = [];
+
+  // Bots shed from the roster by a bots-per-app decrease (setBotCount) whose
+  // fired bullets are still in flight. The engine's invariant is that a fired
+  // bullet keeps flying, can still land, and still credits its shooter's kill —
+  // dead bots stay in `bots` for exactly this reason — so a shed bot with live
+  // bullets parks here instead of vanishing. Simulation keeps moving these
+  // bullets (and only the bullets: no handlers, timers, physics, or status for
+  // a retired bot) and drops each bot once its last bullet resolves. The bot's
+  // isolate context is already released when it arrives here.
+  public retiredBots: Bot[] = [];
 
   // Whether this process has a backing `app` row in the database. True for every
   // real arena/ladder process (its appId is a real uuid). False only for the
@@ -117,6 +132,9 @@ export class Process {
   dispose() {
     this.bots.forEach((bot) => bot.getContext().release());
     this.bots = [];
+    // Retired bots' contexts were released when they were shed; their bullets
+    // die with the process.
+    this.retiredBots = [];
     this.disposeSandbox();
   }
 }
@@ -264,7 +282,11 @@ export default class Environment {
     const deltas: Partial<Record<keyof BotStats, number>> = {};
     let any = false;
     for (const process of this.processes) {
-      for (const bot of process.bots) {
+      // Retired bots (shed with bullets still in flight) can still accrue stats
+      // — a landing bullet records shotsHit/damageDealt/kills on its shooter —
+      // so their deltas are banked too until Simulation drops them. (`?? []`
+      // keeps mock-process tests working; real Processes carry the array.)
+      for (const bot of [...process.bots, ...(process.retiredBots ?? [])]) {
         for (const key of STAT_KEYS) {
           const delta = bot.stats[key] - bot.flushedStats[key];
           if (delta > 0) {
@@ -486,17 +508,27 @@ export default class Environment {
 
   // Set how many bots each app fields (clamped to 1–MAX_BOT_COUNT). Applied
   // live: every process immediately spawns its shortfall (new bots load the
-  // app's code and fire START like any other late join) or sheds its newest
-  // bots — removed outright, mirroring Process.dispose's per-bot cleanup, with
-  // no death or elimination recorded. The setting also drives restart() and
-  // addApp(), so future matches and newly added apps field the same quantity.
+  // app's code and fire START like any other late join) or sheds its excess —
+  // removed outright, with no death or elimination recorded. The setting also
+  // drives restart() and addApp(), so future matches and newly added apps
+  // field the same quantity.
   setBotCount(count: number): Promise<unknown> {
-    this.botCount = Math.min(
+    const next = Math.min(
       Environment.MAX_BOT_COUNT,
       Math.max(1, Math.floor(count))
     );
+    // Idempotent: re-selecting the current quantity does no work — no
+    // arenaBotCount broadcast to every SSE client, no roster walk.
+    if (next === this.botCount) return Promise.resolve();
+    this.botCount = next;
     this.emit('event', { type: 'arenaBotCount', botCount: this.botCount });
 
+    return this.applyBotCount();
+  }
+
+  // Bring every process's roster to the configured size: shed the excess or
+  // spawn the shortfall.
+  private applyBotCount(): Promise<unknown> {
     // Bank cumulative stats before any bots vanish (same reasoning as
     // removeApp: settling every app's deltas early is harmless).
     if (this.processes.some((p) => p.bots.length > this.botCount)) {
@@ -505,17 +537,20 @@ export default class Environment {
 
     return Promise.all(
       this.processes.map((process) => {
-        while (process.bots.length > this.botCount) {
-          const [bot] = process.bots.splice(process.bots.length - 1, 1);
-          this.emitter.emit('event', {
-            type: 'arenaRemoveBot',
-            id: bot.id,
-            appId: process.getAppId(),
-          });
-          // Release the bot's isolate context (the process-shared isolate stays
-          // alive for its remaining siblings). Timers need no explicit stop:
-          // they live on the Bot itself, which nothing references once spliced.
-          bot.getContext().release();
+        const excess = process.bots.length - this.botCount;
+        if (excess > 0) {
+          // Shed dead bots first — removing a corpse can't change the fight —
+          // and living bots only when there aren't enough dead ones, newest
+          // first within each group. Shedding purely by array position could
+          // splice an app's only living bots while keeping its corpses,
+          // silently knocking the app out of the match (and ending the match
+          // on the next tick's app-health check if it was the last app with
+          // living bots).
+          const dead = process.bots.filter((bot) => bot.health <= 0);
+          const alive = process.bots.filter((bot) => bot.health > 0);
+          [...dead.reverse(), ...alive.reverse()]
+            .slice(0, excess)
+            .forEach((bot) => this.shedBot(process, bot));
         }
         const spawns: Promise<unknown>[] = [];
         while (process.bots.length < this.botCount) {
@@ -524,6 +559,49 @@ export default class Environment {
         return Promise.all(spawns);
       })
     );
+  }
+
+  // Remove one bot from a live roster (setBotCount decrease), with the same
+  // teardown discipline restart() applies before releasing isolate contexts —
+  // minus anything that would read as a death (no damage, no elimination):
+  // - its parked commands are dropped, NOT settled — settling would apply the
+  //   __settle reference into the released context — so no parked handler
+  //   continuation can resume and keep running (or streaming console output to
+  //   the SSE /logs feed) for a bot that has left the arena;
+  // - its handler table and timers are cleared, so no host path can dispatch
+  //   into it again;
+  // - its already-fired bullets keep flying (see Process.retiredBots): if any
+  //   are in flight the bot is parked there for Simulation to finish them. The
+  //   bullets' fire() callbacks are cleared for the same reason the commands
+  //   are dropped — the promise awaiting them lives in the released context.
+  private shedBot(process: Process, bot: Bot) {
+    const index = process.bots.indexOf(bot);
+    if (index < 0) return;
+    process.bots.splice(index, 1);
+
+    this.pendingCommands = this.pendingCommands.filter(
+      (command) => command.owner !== bot
+    );
+    bot.handlers = {};
+    bot.timers.reset();
+    bot.bullets.forEach((bullet) => {
+      bullet.callback = undefined;
+    });
+
+    const retiring = bot.bullets.some((bullet) => !bullet.exploded);
+    this.emitter.emit('event', {
+      type: 'arenaRemoveBot',
+      id: bot.id,
+      appId: process.getAppId(),
+      // Tells clients this bot's in-flight bullets remain live — the client
+      // keeps them animating until each one's bulletExploded/bulletRemoved
+      // arrives, instead of dropping them with the bot.
+      retired: retiring,
+    });
+    // Release the bot's isolate context (the process-shared isolate stays
+    // alive for its remaining siblings).
+    bot.getContext().release();
+    if (retiring) process.retiredBots.push(bot);
   }
 
   // --- Deterministic bot execution ---------------------------------------
@@ -545,12 +623,20 @@ export default class Environment {
   waitForCondition = (
     success: () => boolean,
     failure: (() => boolean) | null,
-    msg: string | null
+    msg: string | null,
+    owner: Bot | null = null
   ): Promise<void> =>
     new Promise<void>((resolve, reject) => {
       if (success()) return resolve();
       if (failure && failure()) return reject(msg);
-      this.pendingCommands.push({ success, failure, resolve, reject, msg });
+      this.pendingCommands.push({
+        success,
+        failure,
+        resolve,
+        reject,
+        msg,
+        owner,
+      });
     });
 
   // Settle every pending command whose success/failure condition now holds.
