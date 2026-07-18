@@ -9,88 +9,37 @@ _June 9, 2026_
   style="border-radius: 50%; object-fit: cover; float: right; margin: 0.25rem 0 1rem 1.5rem; max-width: 40%;"
 />
 
-The first time I typed something like "cut a release and ship it" to an AI assistant and
-then watched a deploy roll out to the real server that real people use, my stomach did a
-little flip. Production is production. There's a version of this sentence that ends with a
-horror story, and I'd read plenty of them.
+The first time I typed something like "cut a release and ship it" to an AI assistant and then watched a deploy roll out to the real server that real people use, my stomach did a little flip. Production is production. There's a version of this sentence that ends with a horror story, and I'd read plenty of them.
 
-It didn't end that way, and the reason it didn't is that the scary part, "AI pushes to
-prod," is the least interesting part of the setup. The interesting part is the
-plumbing around it, which I'd built long before an AI ever touched it, specifically so
-that no single actor, human or otherwise, could do something irreversible by accident.
+It didn't end that way, and the reason it didn't is that the scary part, "AI pushes to prod," is the least interesting part of the setup. The interesting part is the plumbing around it, which I'd built long before an AI ever touched it, specifically so that no single actor, human or otherwise, could do something irreversible by accident.
 
-The moment that converted me came right after I first gave an assistant access to the
-AWS account. I expected it to run the deploy and report back. Instead it went reading
-first: combed through the server logs, turned up configuration errors I didn't know I
-had, fixed them, and then set up monitoring alerts so I'd hear about that class of
-problem before it hurt anyone. It didn't just do the chore. It noticed things, and then
-it made sure future problems would come find me. That's when "AI in production" stopped
-being a stunt in my head and started being staffing.
+The moment that converted me came right after I first gave an assistant access to the AWS account. I expected it to run the deploy and report back. Instead it went reading first: combed through the server logs, turned up configuration errors I didn't know I had, fixed them, and then set up monitoring alerts so I'd hear about that class of problem before it hurt anyone. It didn't just do the chore. It noticed things, and then it made sure future problems would come find me. That's when "AI in production" stopped being a stunt in my head and started being staffing.
 
 ## What "shipping" actually is here
 
-RobocodeJs runs on AWS Elastic Beanstalk on a small instance. But deploying doesn't mean
-copying files onto the server and crossing your fingers. A deploy is a chain of steps,
-each of which is boring on purpose:
+RobocodeJs runs on AWS Elastic Beanstalk on a small instance. But deploying doesn't mean copying files onto the server and crossing your fingers. A deploy is a chain of steps, each of which is boring on purpose:
 
-- **Cut the release.** One script builds the UI and the server, bumps the version, and
-  regenerates the lockfile. Same steps, same order, every time.
-- **Main is always releasable.** This is still CI/CD in the honest sense: every merge is
-  built, linted, and tested, so `main` stays in a shippable state at all times. What a
-  merge doesn't do is pick the release moment.
-- **Deploys are triggered by a version tag.** Production updates when someone pushes a
-  `vX.Y.Z` git tag, and the pipeline watches for that tag and nothing else. Sometimes a
-  tag ships one change, sometimes it collects a couple of enhancements that make sense to
-  release together. Continuous integration keeps the door always open; the tag decides
-  when to walk through it.
-- **Immutable deploys with a health check.** New instances come up alongside the old ones
-  and have to pass a `/health` check before traffic moves. If the new version can't stand
-  up, the old one keeps serving. Zero downtime, and a bad build doesn't take the site
-  down. It just fails to replace the good one.
+- **Cut the release.** One script builds the UI and the server, bumps the version, and regenerates the lockfile. Same steps, same order, every time.
+- **Main is always releasable.** This is still CI/CD in the honest sense: every merge is built, linted, and tested, so `main` stays in a shippable state at all times. What a merge doesn't do is pick the release moment.
+- **Deploys are triggered by a version tag.** Production updates when someone pushes a `vX.Y.Z` git tag, and the pipeline watches for that tag and nothing else. Sometimes a tag ships one change, sometimes it collects a couple of enhancements that make sense to release together. Continuous integration keeps the door always open; the tag decides when to walk through it.
+- **Immutable deploys with a health check.** New instances come up alongside the old ones and have to pass a `/health` check before traffic moves. If the new version can't stand up, the old one keeps serving. Zero downtime, and a bad build doesn't take the site down. It just fails to replace the good one.
 
-So "let the AI ship" really means: let the AI run the boring, well-defined command and,
-if I choose, push the tag that the whole safety net is built around.
+So "let the AI ship" really means: let the AI run the boring, well-defined command and, if I choose, push the tag that the whole safety net is built around.
 
 ## The guardrail is that a human pushes the tag
 
 Let me lay out the boundary I drew, and why.
 
-An AI assistant is very good at the parts that are procedure. It'll build, run the
-package step, tell me the new version number, write the commit, and lay out exactly what
-would happen next. That's real work and it removes real friction. What I keep for myself
-is the single irreversible act: **pushing the release tag.** That one keystroke is the
-thing that moves production, and I want a human deciding, in that specific second, that
-this is the moment.
+An AI assistant is very good at the parts that are procedure. It'll build, run the package step, tell me the new version number, write the commit, and lay out exactly what would happen next. That's real work and it removes real friction. What I keep for myself is the single irreversible act: **pushing the release tag.** That one keystroke is the thing that moves production, and I want a human deciding, in that specific second, that this is the moment.
 
-I do trust the tools. But the tag push is the one step designed to be the point of no
-return, so it's the one step where a human pausing for two seconds is worth the friction.
-Everything upstream of it (the build, the version bump, the summary of what's about to
-change) is fair game to hand off, because none of it deploys anything. And everything
-downstream (the immutable rollout, the `/health` gate) is automated so that even a
-mistake at the tag has a floor under it.
+I do trust the tools. But the tag push is the one step designed to be the point of no return, so it's the one step where a human pausing for two seconds is worth the friction. Everything upstream of it (the build, the version bump, the summary of what's about to change) is fair game to hand off, because none of it deploys anything. And everything downstream (the immutable rollout, the `/health` gate) is automated so that even a mistake at the tag has a floor under it.
 
-For scale, here's what a release used to look like when it was all me: build the UI,
-build the server, run the packaging script, commit the version bump it produces, tag the
-release, push the tag, and then sit there refreshing the AWS console until the health
-check went green. None of it hard, all of it fussy, every step an opportunity to do
-things slightly out of order and spend the evening figuring out what I'd done. The
-checklist never scared me. My ability to follow a checklist at 11pm did.
+For scale, here's what a release used to look like when it was all me: build the UI, build the server, run the packaging script, commit the version bump it produces, tag the release, push the tag, and then sit there refreshing the AWS console until the health check went green. None of it hard, all of it fussy, every step an opportunity to do things slightly out of order and spend the evening figuring out what I'd done. The checklist never scared me. My ability to follow a checklist at 11pm did.
 
 ## Where it helps, and where it doesn't
 
-Where it helps: the tedium. Remembering the exact convention for the bump commit message.
-Not fat-fingering the version number. Catching that I forgot to build the UI before
-packaging. These are exactly the small, repetitive, easy-to-botch things that cause
-outages precisely because they're beneath your attention.
+Where it helps: the tedium. Remembering the exact convention for the bump commit message. Not fat-fingering the version number. Catching that I forgot to build the UI before packaging. These are exactly the small, repetitive, easy-to-botch things that cause outages precisely because they're beneath your attention.
 
-Where it doesn't: judgment about _whether_ to ship. An assistant will happily tell me a
-release is ready when the only thing it checked is that the build passed. It doesn't know
-that I promised myself I'd never deploy on a Friday afternoon, or that there's a known
-flaky thing I want to eyeball first. That judgment stays mine, and I think it should.
+Where it doesn't: judgment about _whether_ to ship. An assistant will happily tell me a release is ready when the only thing it checked is that the build passed. It doesn't know that I promised myself I'd never deploy on a Friday afternoon, or that there's a known flaky thing I want to eyeball first. That judgment stays mine, and I think it should.
 
-So no, I didn't hand production to a machine. I handed it the checklist, kept the one
-button that matters, and built the whole system so that even the button has a safety net
-under it. That's the version of "AI in production" I can sleep next to. If you're
-curious how the AI reaches into RobocodeJs itself, that's a different door,
-[the MCP setup](/mcp), but the deploy pipeline is the part I was most nervous to open,
-and it turned out to be the part I trust the most.
+So no, I didn't hand production to a machine. I handed it the checklist, kept the one button that matters, and built the whole system so that even the button has a safety net under it. That's the version of "AI in production" I can sleep next to. If you're curious how the AI reaches into RobocodeJs itself, that's a different door, [the MCP setup](/mcp), but the deploy pipeline is the part I was most nervous to open, and it turned out to be the part I trust the most.

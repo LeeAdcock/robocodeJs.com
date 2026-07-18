@@ -9,19 +9,15 @@
 
 ## The idea
 
-Sometimes you don't want something _every_ tick. You want a **rhythm**, like "turn a
-little every 10 ticks." Two tools do this:
+Sometimes you don't want something _every_ tick. You want a **rhythm**, like "turn a little every 10 ticks." Two tools do this:
 
 - `setInterval(fn, 10)` runs `fn` **every** 10 ticks, over and over.
 - `setTimeout(fn, 30)` runs `fn` **once**, 30 ticks from now.
 
 Two important notes:
 
-1. The number is in **game ticks** (the clock's heartbeat), **not** seconds. There's no
-   real-world clock here. The game runs on its own time. (If you ever want the current
-   tick number, ask `clock.getTime()`.)
-2. **Create timers inside START.** START runs once, so you set up your rhythms a single
-   time. (If you made them in TICK, you'd start a brand-new timer every heartbeat!)
+1. The number is in **game ticks** (the clock's heartbeat), **not** seconds. There's no real-world clock here. The game runs on its own time. (If you ever want the current tick number, ask `clock.getTime()`.)
+2. **Create timers inside START.** START runs once, so you set up your rhythms a single time. (If you made them in TICK, you'd start a brand-new timer every heartbeat!)
 
 ## Try it
 
@@ -43,13 +39,11 @@ bot.on(Event.START, () => {
 });
 ```
 
-Press **Deploy**. Rusty moves in a steady, rhythmic pattern, turning constantly and
-dashing forward every so often.
+Press **Deploy**. Rusty moves in a steady, rhythmic pattern, turning constantly and dashing forward every so often.
 
 ## Stopping a timer
 
-`setInterval` hands back an **id** (a ticket) you can use to cancel it later with
-`clearInterval`. Store the id in lasting memory (`this`) so other handlers can reach it:
+`setInterval` hands back an **id** (a ticket) you can use to cancel it later with `clearInterval`. Store the id in lasting memory (`this`) so other handlers can reach it:
 
 ```
 bot.on(Event.START, () => {
@@ -67,24 +61,16 @@ bot.on(Event.HIT, () => {
 ## Experiment
 
 - Change the `10` in the first interval to `5` (turns more often) or `30` (lazier).
-- Add a one-shot to START: `setTimeout(() => bot.setName('Warmed up!'), 30);` and the name
-  changes after 30 ticks.
-- Combine with the spin example: stop the turret spin on HIT, and notice it stays put
-  afterward.
+- Add a one-shot to START: `setTimeout(() => bot.setName('Warmed up!'), 30);` and the name changes after 30 ticks.
+- Combine with the spin example: stop the turret spin on HIT, and notice it stays put afterward.
 
 ## Common questions
 
-**Is `10` ten seconds?**
-No, ten **ticks**. The clock ticks many times a second. Timers count ticks so the game
-can pause and resume cleanly. There is no `Date` here on purpose; use `clock.getTime()`
-for the tick count.
+**Is `10` ten seconds?** No, ten **ticks**. The clock ticks many times a second. Timers count ticks so the game can pause and resume cleanly. There is no `Date` here on purpose; use `clock.getTime()` for the tick count.
 
-**Why must timers go in START?**
-START runs once. If you create a timer in TICK, you'd create a new one every tick and end
-up with hundreds piling up. Set rhythms up once, in START.
+**Why must timers go in START?** START runs once. If you create a timer in TICK, you'd create a new one every tick and end up with hundreds piling up. Set rhythms up once, in START.
 
-**What's the id from `setInterval` for?**
-It's a handle to that specific timer so you can `clearInterval(id)` to stop it later.
+**What's the id from `setInterval` for?** It's a handle to that specific timer so you can `clearInterval(id)` to stop it later.
 
 ## You learned
 
