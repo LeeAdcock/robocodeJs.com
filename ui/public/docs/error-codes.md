@@ -62,14 +62,14 @@ Another common trigger: calling a contact method on a **received** contact. A br
 // Triggers E013: a contact sent via bot.send arrives without its methods,
 // so .getIntercept is not a function
 bot.on(Event.RECEIVED, (message) => {
-  const aim = message.getIntercept(bot.turret.bulletSpeed)
+  const aim = message.getIntercept(bot.turret.BULLET_SPEED)
 })
 ```
 
 ```
 // Fixed: rebuild the full contact from the serialized data first
 bot.on(Event.RECEIVED, (message) => {
-  const aim = arena.createContact(message).getIntercept(bot.turret.bulletSpeed)
+  const aim = arena.createContact(message).getIntercept(bot.turret.BULLET_SPEED)
   if (aim) bot.turret.turnTowards(aim.getX(), aim.getY())
 })
 ```

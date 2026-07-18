@@ -164,14 +164,14 @@ describe('compiler — bot API in a real isolate', () => {
   it('mirrors the physics constants as plain data properties with the engine values', () => {
     // Interpolated at init via compiler's num(), so these assert the sandbox
     // copies match the real engine values.
-    expect(ctx.read('bot.radius')).toBe(16);
-    expect(ctx.read('bot.maxSpeed')).toBe(5);
-    expect(ctx.read('bot.acceleration')).toBe(2);
-    expect(ctx.read('bot.turnRate')).toBe(10);
-    expect(ctx.read('bot.turret.turnRate')).toBe(4);
-    expect(ctx.read('bot.turret.bulletSpeed')).toBe(25);
-    expect(ctx.read('bot.turret.bulletDamage')).toBe(25);
-    expect(ctx.read('bot.radar.turnRate')).toBe(4);
+    expect(ctx.read('bot.RADIUS')).toBe(16);
+    expect(ctx.read('bot.MAX_SPEED')).toBe(5);
+    expect(ctx.read('bot.ACCELERATION')).toBe(2);
+    expect(ctx.read('bot.TURN_RATE')).toBe(10);
+    expect(ctx.read('bot.turret.TURN_RATE')).toBe(4);
+    expect(ctx.read('bot.turret.BULLET_SPEED')).toBe(25);
+    expect(ctx.read('bot.turret.BULLET_DAMAGE')).toBe(25);
+    expect(ctx.read('bot.radar.TURN_RATE')).toBe(4);
   });
 
   // The fixture arena is deliberately non-square (750×600) so these fail

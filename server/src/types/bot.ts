@@ -51,11 +51,11 @@ export const commandBudgetRejected = (): Promise<never> =>
 
 // A tank's collision radius (half its width): bots contact a wall when their
 // center comes within one radius of it, and contact bots/bullets within two.
-// Mirrored into the sandbox as the bot.radius attribute (compiler.ts).
+// Mirrored into the sandbox as the bot.RADIUS attribute (compiler.ts).
 export const BOT_RADIUS = 16;
 // Degrees the body turns per tick, units/tick² toward the speed target, and
 // the body's top speed. Mirrored into the sandbox as the
-// bot.turnRate/acceleration/maxSpeed attributes (compiler.ts); BOT_TURN_SPEED
+// bot.TURN_RATE/ACCELERATION/MAX_SPEED attributes (compiler.ts); BOT_TURN_SPEED
 // also seeds the per-instance orientationVelocity runtime field below.
 export const BOT_TURN_SPEED = 10;
 export const BOT_ACCELERATION = 2;

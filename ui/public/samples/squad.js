@@ -39,7 +39,7 @@ clock.on(Event.TICK, () => {
     // Lead the shot: getIntercept solves where to aim from OUR position so a
     // bullet meets the target, falling back to its last known spot when no
     // interception is possible.
-    const aim = this.targetContact.getIntercept(bot.turret.bulletSpeed);
+    const aim = this.targetContact.getIntercept(bot.turret.BULLET_SPEED);
     const x = aim ? aim.getX() : this.targetContact.getX();
     const y = aim ? aim.getY() : this.targetContact.getY();
     bot.turret.turnTowards(x, y).catch(() => {});

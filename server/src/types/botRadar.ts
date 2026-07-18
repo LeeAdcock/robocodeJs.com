@@ -8,7 +8,7 @@ import {
 } from '../util/geometry';
 
 // Degrees the radar turns per tick (seeds the per-instance runtime field and
-// is mirrored into the sandbox as the bot.radar.turnRate attribute), and
+// is mirrored into the sandbox as the bot.radar.TURN_RATE attribute), and
 // charge added per tick toward the 100 full-charge threshold.
 export const RADAR_TURN_SPEED = 4;
 export const RADAR_CHARGE_RATE = 10;

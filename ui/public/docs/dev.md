@@ -98,7 +98,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 - `bot.getId() : string` Returns a unique identifier (a UUID string).
 - `bot.getHealth() : number` Returns the bot's health from 100 (full) down to 0 (unfortunately dead).
 - `bot.dropMarker() : marker` Returns a marker object for the bot's current location. Markers are serializable, so `bot.send(bot.dropMarker())` is the easy way to broadcast your position.
-- `bot.radius : number` The bot's collision radius (half its width). A wall is hit when the bot's center comes within one radius of an arena edge, and bots or bullets connect within two radii, useful for planning how much room a turn or a stop needs.
+- `bot.RADIUS : number` The bot's collision radius (half its width). A wall is hit when the bot's center comes within one radius of an arena edge, and bots or bullets connect within two radii, useful for planning how much room a turn or a stop needs.
 
 ## Bot events
 
@@ -152,14 +152,14 @@ bot.setOrientation(90).then(() => {
 - `bot.isTurning() : boolean` Returns if the bot is actively turning.
 - `bot.turn(number) : Promise` Turns the bot the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turnTowards(x, y) : Promise` Turns the bot towards the provided coordinates. Returns a promise that resolves when the turn is complete.
-- `bot.turnRate : number` How many degrees the body turns per clock tick. Divide an angle by this to know how long a turn will take.
+- `bot.TURN_RATE : number` How many degrees the body turns per clock tick. Divide an angle by this to know how long a turn will take.
 
 ### Speed
 
 - `bot.setSpeed(number) : Promise` Sets the bot's target speed as an integer between -5 and 5. Returns a promise that resolves when the speed is reached, or that is rejected if the target speed is altered before being achieved.
 - `bot.getSpeed() : number` Returns the speed.
-- `bot.maxSpeed : number` The fastest the bot can travel, in feet per clock tick.
-- `bot.acceleration : number` How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance.
+- `bot.MAX_SPEED : number` The fastest the bot can travel, in feet per clock tick.
+- `bot.ACCELERATION : number` How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance.
 
 ### Communications
 
@@ -180,7 +180,7 @@ The turret takes time to reload after firing, and methods let you check when it 
 - `bot.turret.isTurning() : boolean` Returns if the turret is actively turning.
 - `bot.turret.turn(number) : Promise` Turns the turret the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.turret.turnTowards(x, y) : Promise` Turns the turret towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
-- `bot.turret.turnRate : number` How many degrees the turret turns per clock tick.
+- `bot.turret.TURN_RATE : number` How many degrees the turret turns per clock tick.
 
 ### Firing
 
@@ -189,8 +189,8 @@ At the start of every match there is a short **deployment window** (the first 10
 - `bot.turret.onReady(): Promise` Returns a promise that resolves when the turret is ready to fire. If the turret fires through another thread while this promise is pending, the promise will be rejected.
 - `bot.turret.isReady(): boolean` Returns a boolean indicating whether the turret is ready to fire.
 - `bot.turret.fire() : Promise` Fires the turret, returning a promise that resolves with an object. If another bot is hit, the object is of the format `{id:string}` with the identifier for the struck bot. If nothing was hit, the object resolves with `{}` once the bullet leaves the arena, and the shooter loses **3 health** for the missed shot. If the turret is not ready to fire, the Promise is rejected.
-- `bot.turret.bulletSpeed : number` How far a bullet travels per clock tick. Divide a target's distance by this to know the flight time when leading a shot.
-- `bot.turret.bulletDamage : number` Health an enemy loses when your bullet hits.
+- `bot.turret.BULLET_SPEED : number` How far a bullet travels per clock tick. Divide a target's distance by this to know the flight time when leading a shot.
+- `bot.turret.BULLET_DAMAGE : number` Health an enemy loses when your bullet hits.
 
 ## Radar
 
@@ -213,7 +213,7 @@ The radar takes time to recharge after each scan, and methods let you check when
 - `bot.radar.isTurning() : boolean` Returns if the radar is actively turning.
 - `bot.radar.turn(number) : Promise` Turns the radar the provided number of degrees, positive values turn clockwise and negative values counter-clockwise.
 - `bot.radar.turnTowards(x, y) : Promise` Turns the radar towards the provided arena coordinates. Returns a promise that resolves when the turn is complete.
-- `bot.radar.turnRate : number` How many degrees the radar turns per clock tick.
+- `bot.radar.TURN_RATE : number` How many degrees the radar turns per clock tick.
 
 ### Scanning
 
@@ -234,7 +234,7 @@ The scan's own readings are available as methods too, so the whole surface is co
 - `contact.getOrientation() : number` Its body heading, absolute compass, 0 = north (which way **it** is facing, unlike `getBearing()`, which is the direction from you to it).
 - `contact.isFriendly() : boolean` Whether it is on your team.
 - `contact.getHealth() : number` Its health at the moment of the scan (0–100).
-- `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `bot.turret.bulletSpeed` to lead a shot (`bot.turret.turnTowards(m.getX(), m.getY())` aims it), or pass `bot.maxSpeed` to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
+- `contact.getIntercept(speed) : marker | null` Returns a marker at the point where something leaving **your** position at the given speed would meet this bot, assuming it holds its current heading and speed. Pass `bot.turret.BULLET_SPEED` to lead a shot (`bot.turret.turnTowards(m.getX(), m.getY())` aims it), or pass `bot.MAX_SPEED` to work out where to drive to cut the bot off. The calculation accounts for any ticks that have passed since the scan. Returns `null` when no interception is possible (for example, the bot is running away faster than the speed you gave).
 
 The raw readings also remain as plain properties, `{ id, speed, orientation, distance, angle, friendly, health }`, exactly as scans have always reported them, plus the frame-independent `x`, `y` (the detected bot's arena coordinates at the moment of the scan) and `time` (the clock tick of the capture).
 
@@ -253,7 +253,7 @@ bot.on(Event.SCANNED, (contacts) => {
 bot.on(Event.RECEIVED, (message) => {
   if (typeof message?.x !== 'number') return; // not a contact broadcast
   const target = arena.createContact(message);
-  const aim = target.getIntercept(bot.turret.bulletSpeed);
+  const aim = target.getIntercept(bot.turret.BULLET_SPEED);
   if (aim) bot.turret.turnTowards(aim.getX(), aim.getY());
 });
 ```
@@ -262,7 +262,7 @@ bot.on(Event.RECEIVED, (message) => {
 bot.on(Event.SCANNED, (contacts) => {
   const enemy = contacts.find((c) => !c.isFriendly());
   if (!enemy) return;
-  const aim = enemy.getIntercept(bot.turret.bulletSpeed);
+  const aim = enemy.getIntercept(bot.turret.BULLET_SPEED);
   if (aim) bot.turret.turnTowards(aim.getX(), aim.getY());
 });
 ```

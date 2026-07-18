@@ -79,7 +79,7 @@ Reading the key idea: steps 2 and 3 build an `(x, y)` for the **future** positio
 
 - **See the difference.** Temporarily aim at the _current_ spot instead by using `enemyX`/`enemyY` in the final `atan2`, and watch the misses against a fast mover. Then switch back to `futureX`/`futureY`.
 - **Only lead when it helps.** A still target needs no lead. Try skipping the prediction when `enemy.speed === 0`.
-- **Sharpen the guess.** The bullet's flight time really depends on the _future_ distance, not the current one. Run the whole calculation **twice**, feeding the first prediction's distance back into step 1. The second answer is closer. Then compare both answers to `enemy.getIntercept(bot.turret.bulletSpeed)` (see **The shortcut** below): the helper solves exactly the equation your two-pass loop is converging toward.
+- **Sharpen the guess.** The bullet's flight time really depends on the _future_ distance, not the current one. Run the whole calculation **twice**, feeding the first prediction's distance back into step 1. The second answer is closer. Then compare both answers to `enemy.getIntercept(bot.turret.BULLET_SPEED)` (see **The shortcut** below): the helper solves exactly the equation your two-pass loop is converging toward.
 
 ## Common questions
 
@@ -104,14 +104,14 @@ bot.on(Event.SCANNED, (targets) => {
   const enemy = targets.find((t) => !t.isFriendly());
   if (!enemy) { bot.turn(15); return; }
 
-  const aim = enemy.getIntercept(bot.turret.bulletSpeed); // = 25
+  const aim = enemy.getIntercept(bot.turret.BULLET_SPEED); // = 25
   if (!aim) return; // no shot can catch it
   bot.turret.turnTowards(aim.getX(), aim.getY());
   if (bot.turret.isReady()) bot.turret.fire();
 });
 ```
 
-`getIntercept(bot.turret.bulletSpeed)` solves the meet-up equation exactly (it's your "run it twice" experiment taken to its limit) and even accounts for ticks that passed since the scan. It returns `null` when no interception is possible, and because the answer is a marker, `turnTowards` aims at it directly. Understanding **why** it works is what this lesson was for; now you get to use the short version with a clear conscience.
+`getIntercept(bot.turret.BULLET_SPEED)` solves the meet-up equation exactly (it's your "run it twice" experiment taken to its limit) and even accounts for ticks that passed since the scan. It returns `null` when no interception is possible, and because the answer is a marker, `turnTowards` aims at it directly. Understanding **why** it works is what this lesson was for; now you get to use the short version with a clear conscience.
 
 One more trick for later: a contact is serializable, so a teammate can broadcast one with `bot.send(enemy)` and you can rebuild it (`getIntercept` and all, solved from **your** position) with `arena.createContact(message)`. That's the heart of team fire-control, and it's where [the last lesson](/learn/teamwork) ends up.
 

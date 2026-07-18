@@ -67,7 +67,7 @@ bot.on(Event.SCANNED, (targets) => {
   // Every scan result is a contact (a marker that also knows the target's
   // speed and heading), and getIntercept solves the lead exactly for our
   // bullet speed. (The Leading lesson derives this answer by hand.)
-  const aim = target.getIntercept(bot.turret.bulletSpeed);
+  const aim = target.getIntercept(bot.turret.BULLET_SPEED);
   if (!aim) return; // nothing we fire can catch it, keep tracking instead
   const aimBearing = aim.getBearing();
   bot.turret.setOrientation(aimBearing).catch(() => {});
