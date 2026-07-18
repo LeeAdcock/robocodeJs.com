@@ -65,6 +65,11 @@ so the game can run it every tick. You'll write many functions as you go.
 `bot` is your robot. `clock` is the game's timer. You ask `clock` to tell you _when_ to
 act, and you tell `bot` _what_ to do.
 
+**What if I register two handlers for the same event?**
+The second one **replaces** the first, it doesn't add to it. Each event type holds just
+one handler, so the most recent `on(...)` wins and earlier ones stop running. Put
+everything you want to happen on a tick inside a single handler.
+
 ## You learned
 
 - An **event** is something that happens; a **handler** is the code you run when it does.
