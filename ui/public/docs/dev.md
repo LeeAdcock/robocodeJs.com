@@ -6,37 +6,17 @@ The in-browser code editor offers **autocomplete** for the whole bot API: type `
 
 See also the [game rules & physics](/rules) for exact speeds, turn rates, reload times, and damage values, the [FAQ](/faq) for quick answers to common questions, and, if you've used the classic Java Robocode, [Coming from classic Robocode](/classic). Brand new to coding? Try the [Learn course](/learn).
 
-- [Arena](#arena)
-- [Clock](#clock)
-- [Bot events](#bot-events)
-- [Bot movement](#movement)
-- [Bot turret](#turret)
-- [Bot radar](#radar)
+- [Events overview](#events-overview)
+- [Bot](#bot)
+  - [Events](#bot-events)
+  - [Movement](#movement)
+  - [Turret](#turret)
+  - [Radar & contacts](#radar)
+  - [Communications](#communications)
+- [Arena & markers](#arena)
+- [Clock & timers](#clock)
+- [Coding tips](#coding-tips)
 - [Type definitions](#type-definitions)
-
-# Arena
-
-The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Every angle in the API — headings, bearings, and turret and radar orientation — is in degrees, never radians (JavaScript's `Math.atan2`/`sin`/`cos` use radians, so convert with `× 180 / Math.PI`). Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
-
-- `arena.getWidth() : number` Returns the arena's width in feet.
-- `arena.getHeight() : number` Returns the arena's height in feet.
-- `arena.contains(x, y) : boolean` Returns whether the coordinate lies inside the arena (between 0 and the width/height, edges inclusive).
-- `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary. `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 feet before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
-
-You can create virtual markers in the arena to simplify calculations of angles and distance. A marker is dropped either at the bot's current location or at a coordinate you specify.
-
-- `arena.createMarker(x, y) : marker` Creates a marker at the provided arena coordinates.
-- `arena.createContact(data) : contact` Rebuilds a full [contact](#contacts) from its serialized data, typically a contact a teammate broadcast, since a contact serializes as its plain data properties (methods are not serialized). `data` needs numeric `x`, `y`, `speed`, and `orientation`; a `time` (the capture tick) lets `getIntercept` account for staleness and defaults to now; any other fields (`id`, `health`, `friendly`, …) carry through as data. The rebuilt contact's methods are measured from **your** position.
-
-The `marker` object returned has several convenience methods:
-
-- `marker.getX() : number` Returns the marker's x coordinate.
-- `marker.getY() : number` Returns the marker's y coordinate.
-- `marker.getDistance() : number` Returns the distance from the bot to the marker.
-- `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading. `bot.turn(marker.getBearing())` faces it.
-- `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena, the same check as `arena.contains(marker.getX(), marker.getY())`.
-
-A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable. It can be passed to `bot.send` (or through JSON) and travels as just its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`. In particular, `bot.send(bot.dropMarker())` is the recommended way to broadcast your own position to teammates.
 
 # Events Overview
 
@@ -81,13 +61,6 @@ clock.on(Event.TICK, async () => {
 })
 ```
 
-# Clock
-
-The `clock` object gives you the current "simulation time". Register a handler for clock ticks to run logic at a set frequency; for logic that runs at other frequencies, see the JavaScript timers below. A clock tick is the smallest increment of time within the simulation.
-
-- `clock.getTime() : number` Returns the number of clock ticks elapsed in the current match.
-- `clock.on(Event.TICK, () => {} )` Registers a callback that is executed every clock tick.
-
 # Bot
 
 The `bot` object is how you control the bot's capabilities: navigation, radar, fire control, and communications. Its methods trigger behaviors, while callbacks let you react to events that occur on the bot.
@@ -111,10 +84,6 @@ A few basic methods exist for setting and retrieving information about the bot.
 - `bot.on(Event.HIT, (object) => {})` Registers a callback that is executed when the bot is hit. An object is provided to the handler that is of the format `{angle:number}`, where the angle is the bearing the shot came from, relative to your heading.
 - `bot.on(Event.DETECTED, () => {})` Registers a callback that is executed when the bot is detected by another bot's radar.
 - `bot.on(Event.START, () => {})` Registers a callback that is executed when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does not re-fire it (see [State and the START event](#state-and-the-start-event)).
-
-## Communications events
-
-- `bot.on(Event.RECEIVED, (message, from) => {})` Registers a callback that is executed when another bot broadcasts a message (via `bot.send`). This fires for messages from **any** bot in the arena, including enemies. `message` is the payload sent, a primitive (number, string, boolean, or null) or a nested array/object of primitives. `from` is `{ distance: number }`: how far away the sender was when it broadcast (a range, not a bearing; the same value is given to teammates and eavesdropping enemies).
 
 ## Movement
 
@@ -160,10 +129,6 @@ bot.setOrientation(90).then(() => {
 - `bot.getSpeed() : number` Returns the speed.
 - `bot.MAX_SPEED : number` The fastest the bot can travel, in feet per clock tick.
 - `bot.ACCELERATION : number` How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance.
-
-### Communications
-
-- `bot.send(message)` Broadcasts a message that every other bot in the arena (teammates **and** enemies) can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them. A message that isn't JSON data, is larger than 4,096 characters once encoded, or nests more than 8 levels deep is rejected. `send` throws (code `E023`). A bot may also broadcast at most 50 messages per clock tick; sends past that budget are silently dropped (code `E024`). See the [error code reference](/error-codes).
 
 ## Turret
 
@@ -267,6 +232,67 @@ bot.on(Event.SCANNED, (contacts) => {
 });
 ```
 
+## Communications
+
+Bots coordinate by broadcast: `bot.send` transmits a message, and every bot in the arena can react to it through the `RECEIVED` event.
+
+- `bot.send(message)` Broadcasts a message that every other bot in the arena (teammates **and** enemies) can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them. A message that isn't JSON data, is larger than 4,096 characters once encoded, or nests more than 8 levels deep is rejected. `send` throws (code `E023`). A bot may also broadcast at most 50 messages per clock tick; sends past that budget are silently dropped (code `E024`). See the [error code reference](/error-codes).
+- `bot.on(Event.RECEIVED, (message, from) => {})` Registers a callback that is executed when another bot broadcasts a message (via `bot.send`). This fires for messages from **any** bot in the arena, including enemies. `message` is the payload sent, a primitive (number, string, boolean, or null) or a nested array/object of primitives. `from` is `{ distance: number }`: how far away the sender was when it broadcast (a range, not a bearing; the same value is given to teammates and eavesdropping enemies).
+
+# Arena
+
+The arena where bots live is a square. Headings are specified in degrees on a compass, with 0 degrees being north, 90 east, 180 south, and 270 west, increasing clockwise. Every angle in the API — headings, bearings, and turret and radar orientation — is in degrees, never radians (JavaScript's `Math.atan2`/`sin`/`cos` use radians, so convert with `× 180 / Math.PI`). Bearings reported to you (scan/hit/collision angles and `marker.getBearing()`) are relative to your own heading. Terrain and other arena elements do not affect gameplay. See [game rules & physics](/rules) for the full compass diagram.
+
+- `arena.getWidth() : number` Returns the arena's width in feet.
+- `arena.getHeight() : number` Returns the arena's height in feet.
+- `arena.contains(x, y) : boolean` Returns whether the coordinate lies inside the arena (between 0 and the width/height, edges inclusive).
+- `arena.getNearestWall() : marker` Returns a marker at the nearest point on the arena boundary. `getDistance()` tells you how far the wall is, `getBearing()` which way. Note that your bot collides about 16 feet before the wall itself (see [game rules & physics](/rules)), so the distance never quite reaches 0.
+
+You can create virtual markers in the arena to simplify calculations of angles and distance. A marker is dropped either at the bot's current location or at a coordinate you specify.
+
+- `arena.createMarker(x, y) : marker` Creates a marker at the provided arena coordinates.
+- `arena.createContact(data) : contact` Rebuilds a full [contact](#contacts) from its serialized data, typically a contact a teammate broadcast, since a contact serializes as its plain data properties (methods are not serialized). `data` needs numeric `x`, `y`, `speed`, and `orientation`; a `time` (the capture tick) lets `getIntercept` account for staleness and defaults to now; any other fields (`id`, `health`, `friendly`, …) carry through as data. The rebuilt contact's methods are measured from **your** position.
+
+The `marker` object returned has several convenience methods:
+
+- `marker.getX() : number` Returns the marker's x coordinate.
+- `marker.getY() : number` Returns the marker's y coordinate.
+- `marker.getDistance() : number` Returns the distance from the bot to the marker.
+- `marker.getBearing() : number` Returns the bearing from the bot to the marker (0 to 359), relative to your heading. `bot.turn(marker.getBearing())` faces it.
+- `marker.isInBounds() : boolean` Returns whether the marker lies inside the arena, the same check as `arena.contains(marker.getX(), marker.getY())`.
+
+A marker's coordinates are also plain properties, `marker.x` and `marker.y`, which makes a marker serializable. It can be passed to `bot.send` (or through JSON) and travels as just its coordinates, since methods are not serialized. A receiver rebuilds it with `arena.createMarker(message.x, message.y)`. In particular, `bot.send(bot.dropMarker())` is the recommended way to broadcast your own position to teammates.
+
+# Clock
+
+The `clock` object gives you the current "simulation time". Register a handler for clock ticks to run logic at a set frequency; for logic that runs at other frequencies, see the JavaScript timers below. A clock tick is the smallest increment of time within the simulation.
+
+- `clock.getTime() : number` Returns the number of clock ticks elapsed in the current match.
+- `clock.on(Event.TICK, () => {} )` Registers a callback that is executed every clock tick.
+
+## JavaScript Timers
+
+Any timers or intervals you create are cleaned up automatically when a bot is removed from the arena, and they pause and resume with the game. Create them inside an event handler such as `START` (shown below) rather than at the root of your app, so you don't end up with duplicate timers each time the app is recompiled and reinitialized.
+
+```
+bot.on(Event.START, () => {
+  // Turn every 10 ticks (about once a second at default speed)
+  this.turnIntervalTimer = setInterval(() =>
+    bot.turn(15)
+  , 10)
+})
+```
+
+Timers operate in "simulated time" instead of real-world time. The interval you pass to `setInterval` and `setTimeout` is a number of simulated clock ticks, not the traditional number of milliseconds. At the default speed a tick is about 100 ms, so an interval of `10` fires roughly once a second.
+
+A bot may hold at most **64** active timers (`setInterval` and `setTimeout` combined). Registrations past the cap are ignored. The call returns `-1` and the callback never fires (code `E021`, non-fatal).
+
+A `TICK` handler that returns a promise is not called again until that promise resolves, but this does not affect your active timers — they keep firing on their own schedule. As a result, the number of times your tick handler runs can look out of step with how often your timers fire.
+
+## Date.now()
+
+Because the game runs in "simulated time" instead of real-world time, the `Date` class and related methods are not available. The `clock` instance can be used for measuring the current time within the simulation.
+
 # Coding Tips
 
 ## Code guard rails
@@ -345,29 +371,6 @@ A `logger` instance is also available for outputting messages with the various `
 logger.warn('low health, retreating', bot.getHealth())
 logger.error('unexpected scan', results)
 ```
-
-## JavaScript Timers
-
-Any timers or intervals you create are cleaned up automatically when a bot is removed from the arena, and they pause and resume with the game. Create them inside an event handler such as `START` (shown below) rather than at the root of your app, so you don't end up with duplicate timers each time the app is recompiled and reinitialized.
-
-```
-bot.on(Event.START, () => {
-  // Turn every 10 ticks (about once a second at default speed)
-  this.turnIntervalTimer = setInterval(() =>
-    bot.turn(15)
-  , 10)
-})
-```
-
-Timers operate in "simulated time" instead of real-world time. The interval you pass to `setInterval` and `setTimeout` is a number of simulated clock ticks, not the traditional number of milliseconds. At the default speed a tick is about 100 ms, so an interval of `10` fires roughly once a second.
-
-A bot may hold at most **64** active timers (`setInterval` and `setTimeout` combined). Registrations past the cap are ignored. The call returns `-1` and the callback never fires (code `E021`, non-fatal).
-
-A `TICK` handler that returns a promise is not called again until that promise resolves, but this does not affect your active timers — they keep firing on their own schedule. As a result, the number of times your tick handler runs can look out of step with how often your timers fire.
-
-## Date.now()
-
-Because the game runs in "simulated time" instead of real-world time, the `Date` class and related methods are not available. The `clock` instance can be used for measuring the current time within the simulation.
 
 # Type definitions
 
