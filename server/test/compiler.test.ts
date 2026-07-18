@@ -151,6 +151,16 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.read('clock.getTime()')).toBe(42);
   });
 
+  // Determinism (R4): a bot must have no source of real wall-clock time or true
+  // entropy, so a seeded match replays identically. Date is removed, and so is
+  // Intl — otherwise Intl.DateTimeFormat().format() would leak the current time.
+  it('removes wall-clock time sources (Date and Intl) from the isolate', () => {
+    expect(ctx.read('typeof Date')).toBe('undefined');
+    expect(ctx.read('typeof Intl')).toBe('undefined');
+    // The determinism the removal protects: bots read the sim clock instead.
+    expect(ctx.read('clock.getTime()')).toBe(42);
+  });
+
   it('mirrors the physics constants as plain data properties with the engine values', () => {
     // Interpolated at init via compiler's num(), so these assert the sandbox
     // copies match the real engine values.
