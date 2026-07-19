@@ -3,7 +3,7 @@
     "slug": "the-debug-view",
     "title": "See the arena the way the simulation does",
     "date": "2027-05-11",
-    "summary": "A toggle in the toolbar strips the arena down to the physics: a measurement grid, collision-circle tanks, and every heading, aim, and radar sweep drawn as a vector. Click a tank for exact telemetry, watch radar detection lines, and step the match one tick at a time."
+    "summary": "Most bot bugs aren't crashes; they're your bot quietly doing the wrong thing. The arena's debug view closes the gap between what you think it's doing and what the simulation actually sees, so you can debug your radar, your aim, and your timing by watching instead of guessing."
   },
   {
     "slug": "the-tidy-button",
