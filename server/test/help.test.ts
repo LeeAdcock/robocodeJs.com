@@ -68,6 +68,16 @@ describe('GET /api/ask', () => {
     expect(await ask('my bot stopped working')).toBe('/error-codes');
   });
 
+  it('routes compute/performance worries to the thinking-time section', async () => {
+    expect(await ask('cpu cycles')).toBe('/learn/docs#thinking-time');
+    expect(await ask('will heavy logic run out of cycles?')).toBe(
+      '/learn/docs#thinking-time'
+    );
+    expect(await ask('is my bot too slow with expensive computation?')).toBe(
+      '/learn/docs#thinking-time'
+    );
+  });
+
   it('routes a console/logs search (docs when signed out)', async () => {
     expect(await ask('where does console.log go?')).toBe(
       '/learn/docs#console-logging'

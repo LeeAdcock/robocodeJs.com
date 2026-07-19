@@ -145,6 +145,26 @@ const KEYWORD_ROUTES: {
     keywords: ['promise', 'promises', 'async', 'await', 'wait', 'waiting'],
   },
   {
+    // "Will heavy logic run out of CPU / slow me down?" -> the turn-based
+    // execution-model explainer. Distinctive compute vocabulary; deliberately
+    // NOT bare "tick"/"timeout" (those belong to the clock/timers route below).
+    answer: '/learn/docs#thinking-time',
+    keywords: [
+      'cpu',
+      'cpu cycles',
+      'cycles',
+      'compute',
+      'computation',
+      'performance',
+      'expensive',
+      'too slow',
+      'thinking time',
+      'run out of cycles',
+      'out of cycles',
+      'processing power',
+    ],
+  },
+  {
     // Damage & health numbers -> the combat table. Must sit after Survival
     // ("low health" is a strategy question, bare "health" a rules question)
     // and before the turret route so "bullet damage" gets the numbers.
