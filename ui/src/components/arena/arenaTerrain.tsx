@@ -1,8 +1,11 @@
-import { generateTerrain } from '../../util/terraformer';
-import { useState } from 'react';
 import React from 'react';
 
 interface TerrainProps {
+  // The two terrain layers (below-bots, above-bots) from `generateTerrain`.
+  // Passed in — rather than generated here — so the random layout is owned by
+  // the always-mounted ArenaSvg and survives the debug-view toggle, which
+  // unmounts and remounts this component. See ArenaSvg for why.
+  terrain: React.ReactNode[][];
   children: React.ReactNode;
 }
 
@@ -18,13 +21,11 @@ const TerrainLayer = React.memo((props: TerrainLayerProps) => (
 ));
 
 const TerrainSvg = (props: TerrainProps) => {
-  const [terrain] = useState(() => generateTerrain());
-
   return (
     <>
-      <TerrainLayer tiles={terrain[0]} />
+      <TerrainLayer tiles={props.terrain[0]} />
       <g>{props.children}</g>
-      <TerrainLayer tiles={terrain[1]} />
+      <TerrainLayer tiles={props.terrain[1]} />
     </>
   );
 };
