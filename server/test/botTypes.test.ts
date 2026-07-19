@@ -266,6 +266,42 @@ describe('Bot', () => {
     bot.health = 50;
     expect(bot.getHealth()).toBe(50);
   });
+
+  // The re-entry guard is TICK-only: a discrete notification (RECEIVED, HIT,
+  // COLLIDED, ...) must run for every occurrence even while a previous invocation
+  // is still parked mid multi-tick await. TICK, the one self-repeating event, still
+  // drops a re-fire so a fresh tick can't stack on a parked handler. Guards the
+  // multi-party message loss from GitHub #308.
+  it('delivers every RECEIVED even while a prior handler is still parked', () => {
+    const { bot } = makeRealBot();
+    const calls: unknown[] = [];
+    // A handler stub matching the compiler's dispatch shape: `done` never settles
+    // (the handler stays parked), so under a type-keyed guard the second call would
+    // be dropped.
+    bot.on(Event.RECEIVED, (...args) => {
+      calls.push(args[0]);
+      return { parked: Promise.resolve(), done: new Promise(() => {}) };
+    });
+
+    bot.handlers[Event.RECEIVED]('first');
+    bot.handlers[Event.RECEIVED]('second'); // prior still parked
+
+    expect(calls).toEqual(['first', 'second']);
+  });
+
+  it('still drops a re-fired TICK while its handler is parked', () => {
+    const { bot } = makeRealBot();
+    let count = 0;
+    bot.on(Event.TICK, () => {
+      count += 1;
+      return { parked: Promise.resolve(), done: new Promise(() => {}) };
+    });
+
+    bot.handlers[Event.TICK]();
+    bot.handlers[Event.TICK](); // parked -> dropped by the backpressure guard
+
+    expect(count).toBe(1);
+  });
 });
 
 describe('BotTurret', () => {
