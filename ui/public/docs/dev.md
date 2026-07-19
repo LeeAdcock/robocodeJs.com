@@ -270,6 +270,12 @@ The `clock` object gives you the current "simulation time". Register a handler f
 - `clock.getTime() : number` Returns the number of clock ticks elapsed in the current match.
 - `clock.on(Event.TICK, () => {} )` Registers a callback that is executed every clock tick.
 
+## Thinking time
+
+The game is **turn-based**: it does not advance to the next tick until every bot has finished the current one, so your handler always runs to completion before the world moves. A slow, careful decision and a quick one land on the **same tick** — there is no compute or "cycle" budget that drains as you think, and no advantage to deciding faster. Spend as much computation per tick as you need.
+
+In practice your handlers should finish in **milliseconds** — the point is just that you never have to trade away good logic to save time. The only cutoff is a safety net for code that never returns: an infinite loop is stopped as a runaway (code `E013`, or `E020` for a timer). What actually costs you is counted in **ticks**, not thought — maneuvers take game-ticks to play out, and per tick a bot may issue at most 100 commands (`E026`) and 50 `bot.send`s (`E024`).
+
 ## JavaScript Timers
 
 Any timers or intervals you create are cleaned up automatically when a bot is removed from the arena, and they pause and resume with the game. Create them inside an event handler such as `START` (shown below) rather than at the root of your app, so you don't end up with duplicate timers each time the app is recompiled and reinitialized.

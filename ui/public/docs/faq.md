@@ -8,6 +8,10 @@ Quick answers to the questions bot authors ask most, each with a link to the ful
 
 No. Bot code runs in a secure sandbox that is plain JavaScript plus the game API. There is no network access, no module system, and no browser or Node APIs. Everything a bot can use (`bot`, `arena`, `clock`, `Event`, `console`, `logger`, timers, `Math`, `Promise`) is described in the [API reference](/learn/docs); anything not listed there doesn't exist inside the sandbox. See [code guard rails](/learn/docs#coding-tips).
 
+## Does heavier logic use up a compute budget or slow my bot down?
+
+No. The game is turn-based: it waits for every bot to finish its work for a tick before the world advances, so a careful, expensive decision lands on the **same tick** a quick one would. There is no CPU or "cycle" budget that drains as you think, and no edge to deciding faster — so run the search, do the trig, plan ahead freely. In practice your handlers finish in milliseconds; the only cutoff is a safety net that stops code which never returns (an infinite loop, code `E013`). What actually costs you is measured in **ticks**, not thought: your maneuvers take game-ticks to play out, and a bot may issue at most 100 commands and 50 `bot.send`s per tick. See [thinking time](/learn/docs#thinking-time).
+
 ## Do my five bots share variables?
 
 No. Each of your five bots runs its own private copy of your program. Top-level variables and `this` are per-bot, and one bot can't read another's state. The only way bots share anything is by broadcasting messages with `bot.send(...)`, which every bot in the arena (enemies included) can receive. See [messages & your five bots](/rules#messages--your-five-bots).

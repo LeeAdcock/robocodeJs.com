@@ -106,6 +106,8 @@ To keep the shared server fast and fair for everyone, a few limits apply. These 
 
 Going over the timer limit surfaces code **E021** in the bot's console and the extra `setInterval`/`setTimeout` is ignored. It isn't fatal. (Timers are counted per bot, and each app fields five bots.)
 
+**There's no limit on how much your code can _think_ each tick.** The game is tick-based and waits for every bot to finish before the world advances, so heavier logic never costs you a turn — there is no compute or "cycle" budget that drains as you decide. The one compute limit is a safety timeout: any single handler (or timer callback) must return within about **5 seconds** of real time, or the bot is stopped as a runaway (code **E013**, or **E020** for a timer). What costs you is measured in ticks and actions, not thought — see [thinking time](/learn/docs#thinking-time). Per tick a bot may also issue at most **100 commands** (code **E026**) and **50** `bot.send`s (code **E024**).
+
 ## Rate limits
 
 The API is also **rate limited**. If requests arrive too quickly, the server replies with **HTTP 429** and error code **E022**, and the action is skipped. That can happen when you sign in, save/check/deploy code, create apps and arenas, or drive your bots through an AI assistant (MCP). Wait a moment and retry; if a script is driving the API, add a small delay between calls. Typical budgets (per account, or per IP address for sign-in):
