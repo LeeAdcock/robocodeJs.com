@@ -427,6 +427,36 @@ describe('sandbox + simulation integration', () => {
     expect(receiver.speed).toBe(3);
   });
 
+  it('delivers every concurrent broadcast, not just one sender per round (#308)', async () => {
+    // Five bots each broadcast a unique tag in the same tick and record the set of
+    // distinct senders they hear. The old type-keyed re-entry guard held a single
+    // RECEIVED slot per receiver until the (async) handler settled, so all but the
+    // first concurrent message was silently dropped and every bot observed exactly
+    // one sender. Each bot should hear all four of the others.
+    const tags = ['a', 'b', 'c', 'd', 'e'];
+    const bots = tags.map((tag, i) =>
+      world.addBot(
+        `bot.scope.seen = []
+         bot.on(Event.START, () => bot.send('${tag}'))
+         bot.on(Event.RECEIVED, (msg) => {
+           if (!bot.scope.seen.includes(msg)) bot.scope.seen.push(msg)
+         })`,
+        'app-' + tag,
+        { x: 150 + i * 100, y: 300 } // spread out so nobody collides
+      )
+    );
+
+    await world.tick(4);
+
+    bots.forEach((bot, i) => {
+      const seen: string[] = JSON.parse(
+        bot.getContext().evalSync('JSON.stringify(bot.scope.seen)')
+      );
+      // Every tag except its own — four distinct senders.
+      expect(seen.sort()).toEqual(tags.filter((t) => t !== tags[i]).sort());
+    });
+  });
+
   it('lets a bot read the advancing clock via clock.getTime()', async () => {
     world.setClock(0); // this test asserts on absolute clock values, not combat
     const bot = world.addBot(
