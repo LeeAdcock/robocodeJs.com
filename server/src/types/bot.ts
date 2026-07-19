@@ -264,12 +264,24 @@ export default class Bot implements Point, Orientated {
       Promise<unknown>
     >();
 
+    // TICK is the only self-repeating event: it fires unconditionally every tick,
+    // so if its handler parks on a multi-tick command we must drop the re-fire —
+    // otherwise a fresh TICK would stack on the parked one every tick. Every other
+    // event is a discrete notification (a received message, a hit, a collision, a
+    // scan result), and each occurrence is its own thing that must be delivered.
+    // Several can legitimately arrive in a single tick — e.g. four teammates all
+    // broadcasting — and the old type-keyed guard dropped every one after the
+    // first (its slot stays held until the async handler fully settles), so a bot
+    // only ever observed one sender per round even though delivery counts were
+    // high. That silent multi-party message loss was GitHub #308.
+    const backpressured = event === Event.TICK;
+
     this.handlers[event] = (...args: unknown[]) => {
-      // Backpressure: ignore a new invocation while the previous one is still in
-      // flight (a handler parked mid multi-tick await). Same semantics as before,
-      // now without the wall-clock setTimeout(0) indirection so the tick loop can
-      // await the dispatch deterministically.
-      if (eventPromiseMap.get(event)) return;
+      // Backpressure (TICK only): ignore a new invocation while the previous one is
+      // still in flight (a handler parked mid multi-tick await). Done without the
+      // wall-clock setTimeout(0) indirection so the tick loop can await the
+      // dispatch deterministically.
+      if (backpressured && eventPromiseMap.get(event)) return;
 
       if (event !== Event.TICK) {
         if (args.length)
@@ -295,11 +307,15 @@ export default class Bot implements Point, Orientated {
       if (!dispatch) return;
 
       const { parked, done } = dispatch;
-      // `done` resolves only when the handler fully completes (possibly many ticks
-      // later); hold the slot until then so re-entry stays dropped.
-      eventPromiseMap.set(event, done);
+      // For TICK, `done` resolves only when the handler fully completes (possibly
+      // many ticks later); hold the slot until then so re-entry stays dropped.
+      // Non-backpressured events don't occupy the slot — each occurrence dispatches
+      // independently — but we still observe `done` to surface any rejection.
+      if (backpressured) eventPromiseMap.set(event, done);
       done
-        .then(() => eventPromiseMap.delete(event))
+        .then(() => {
+          if (backpressured) eventPromiseMap.delete(event);
+        })
         .catch((e: unknown) => {
           // An uncaught rejection from a handler's promise is NOT fatal. It is
           // almost always a command the bot didn't .catch() being superseded by a
@@ -310,7 +326,7 @@ export default class Bot implements Point, Orientated {
           // and the fire-and-forget settle path in compiler.ts, both of which
           // log-and-continue rather than killing the bot.
           this.logger.warn(`${ErrorCodes.E019}: ${e}`);
-          eventPromiseMap.delete(event);
+          if (backpressured) eventPromiseMap.delete(event);
         });
       // `parked` resolves when the handler reaches its next await; the tick loop
       // awaits it (via drainBotWork) so the bot has run before the next tick.
