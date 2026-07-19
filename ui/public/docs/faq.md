@@ -10,7 +10,7 @@ No. Bot code runs in a secure sandbox that is plain JavaScript plus the game API
 
 ## Does heavier logic use up a compute budget or slow my bot down?
 
-No. The game is turn-based: it waits for every bot to finish its work for a tick before the world advances, so a careful, expensive decision lands on the **same tick** a quick one would. There is no CPU or "cycle" budget that drains as you think, and no edge to deciding faster — so run the search, do the trig, plan ahead freely. The only limit is a **~5-second-per-handler safety timeout** to catch infinite loops (code `E013`), which is far more than any real decision needs. What actually costs you is measured in **ticks**, not thought: your maneuvers take game-ticks to play out, and a bot may issue at most 100 commands and 50 `bot.send`s per tick. See [thinking time](/learn/docs#thinking-time).
+No. The game is turn-based: it waits for every bot to finish its work for a tick before the world advances, so a careful, expensive decision lands on the **same tick** a quick one would. There is no CPU or "cycle" budget that drains as you think, and no edge to deciding faster — so run the search, do the trig, plan ahead freely. In practice your handlers finish in milliseconds; the only cutoff is a safety net that stops code which never returns (an infinite loop, code `E013`). What actually costs you is measured in **ticks**, not thought: your maneuvers take game-ticks to play out, and a bot may issue at most 100 commands and 50 `bot.send`s per tick. See [thinking time](/learn/docs#thinking-time).
 
 ## Do my five bots share variables?
 

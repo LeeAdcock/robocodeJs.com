@@ -274,7 +274,7 @@ The `clock` object gives you the current "simulation time". Register a handler f
 
 The game is **turn-based**: it does not advance to the next tick until every bot has finished the current one, so your handler always runs to completion before the world moves. A slow, careful decision and a quick one land on the **same tick** — there is no compute or "cycle" budget that drains as you think, and no advantage to deciding faster. Spend as much computation per tick as you need.
 
-The only ceiling is a safety timeout: a handler (or timer callback) must return within about **5 seconds** of real time, or the bot is stopped as a runaway (code `E013`, or `E020` for a timer). What actually costs you is counted in **ticks**, not thought — maneuvers take game-ticks to play out, and per tick a bot may issue at most 100 commands (`E026`) and 50 `bot.send`s (`E024`).
+In practice your handlers should finish in **milliseconds** — the point is just that you never have to trade away good logic to save time. The only cutoff is a safety net for code that never returns: an infinite loop is stopped as a runaway (code `E013`, or `E020` for a timer). What actually costs you is counted in **ticks**, not thought — maneuvers take game-ticks to play out, and per tick a bot may issue at most 100 commands (`E026`) and 50 `bot.send`s (`E024`).
 
 ## JavaScript Timers
 
