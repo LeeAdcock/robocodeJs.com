@@ -350,24 +350,28 @@ const DebugBot = (props: {
           {getBotId(appIndex, botIndex)}
         </text>
 
-        {/* Compact health bar under the circle. */}
-        <g
-          transform={`translate(${-BOT_RADIUS},${BOT_RADIUS + 3})`}
-          pointerEvents="none"
-        >
-          <rect
-            width={BOT_RADIUS * 2}
-            height={3}
-            fill={HEALTH_BAR_TRACK}
-            fillOpacity={0.6}
-          />
-          <rect
-            width={BOT_RADIUS * 2 * (Math.max(0, bot.health) / 100)}
-            height={3}
-            fill={healthBarFill(appIndex)}
-            style={{ transition: 'width 300ms linear' }}
-          />
-        </g>
+        {/* Compact health bar under the circle. Dead bots (dashed, dimmed)
+            drop the bar entirely — an empty track reads as "0 health" rather
+            than "eliminated". */}
+        {alive && (
+          <g
+            transform={`translate(${-BOT_RADIUS},${BOT_RADIUS + 3})`}
+            pointerEvents="none"
+          >
+            <rect
+              width={BOT_RADIUS * 2}
+              height={3}
+              fill={HEALTH_BAR_TRACK}
+              fillOpacity={0.6}
+            />
+            <rect
+              width={BOT_RADIUS * 2 * (Math.max(0, bot.health) / 100)}
+              height={3}
+              fill={healthBarFill(appIndex)}
+              style={{ transition: 'width 300ms linear' }}
+            />
+          </g>
+        )}
       </g>
     </OverlayTrigger>
   );
