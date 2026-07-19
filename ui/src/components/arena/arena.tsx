@@ -1,7 +1,13 @@
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 import Arena from '../../types/arena';
 import { getMotionSnap, subscribeMotionSnap } from '../../util/motionSnap';
+import { generateTerrain } from '../../util/terraformer';
 
 import CraterSvg from './arenaCrater';
 import TerrainSvg from './arenaTerrain';
@@ -113,6 +119,13 @@ export default function ArenaSvg(props: ArenaSvgProps) {
   // the discontinuous jump doesn't animate as a physics-defying glide.
   const snapping = useSyncExternalStore(subscribeMotionSnap, getMotionSnap);
 
+  // The decorative ground/roads/trees are randomly generated once and held for
+  // the life of this component. Generating here (rather than inside TerrainSvg)
+  // keeps the layout stable when the debug-view toggle swaps TerrainSvg out and
+  // back in — ArenaSvg itself stays mounted across the toggle, so the memo
+  // survives and the background no longer reshuffles on every switch.
+  const terrain = useMemo(() => generateTerrain(), []);
+
   // Deployment countdown visibility. `counting` is true while ticks remain before
   // deploy; when it flips false we keep the node mounted for one real-time beat so
   // the CSS fade-out (index.css .arena-countdown) can play out. The unmount is
@@ -170,7 +183,7 @@ export default function ArenaSvg(props: ArenaSvgProps) {
         {props.debugMode ? (
           <DebugArenaSvg arena={props.arena} onOpenBot={props.onOpenBot} />
         ) : (
-          <TerrainSvg>
+          <TerrainSvg terrain={terrain}>
             <g name="craters">
               {apps.map((app) =>
                 app.bots.map((bot) =>
