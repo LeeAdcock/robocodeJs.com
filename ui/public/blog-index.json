@@ -1,5 +1,11 @@
 [
   {
+    "slug": "the-debug-view",
+    "title": "See the arena the way the simulation does",
+    "date": "2027-05-11",
+    "summary": "Most bot bugs aren't crashes; they're your bot quietly doing the wrong thing. The arena's debug view closes the gap between what you think it's doing and what the simulation actually sees, so you can debug your radar, your aim, and your timing by watching instead of guessing."
+  },
+  {
     "slug": "the-tidy-button",
     "title": "The tidy button",
     "date": "2027-04-13",
