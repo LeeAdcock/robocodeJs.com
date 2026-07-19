@@ -95,7 +95,7 @@ const getBotId = (appIndex: number, botIndex: number) =>
 const HEALTH_BAR_FILL_BY_TEAM: Record<string, string> = {
   blue: '#286389', // #419FDD
   dark: '#3b3a35', // #5F5D55
-  sand: '#988c70', // #F5E1B4
+  sand: '#6f6448', // #F5E1B4
   red: '#8f2f25', // #E74C3C
   green: '#186d3c', // #27AF60
 };
