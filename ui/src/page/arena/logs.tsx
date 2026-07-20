@@ -237,11 +237,11 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   };
 
   // The rows currently rendered, captured during render for the copy button
-  // and the row-jumping navigation.
+  // and the match navigation. (There is deliberately no error navigation —
+  // the ERROR level chip already filters straight to error lines.)
   visibleRows: LogRow[] = [];
-  // Row-jump cursors (position within the matching row set). -1 = before the
+  // Match-jump cursor (position within the matching row set). -1 = before the
   // first, so the first "next" lands on the first match.
-  errorCursor = -1;
   matchCursor = -1;
   flashTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
@@ -249,22 +249,18 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     clearTimeout(this.flashTimer);
   }
 
-  // Jump the viewport to the next/previous row satisfying `matches`, wrapping
+  // Jump the viewport to the next/previous highlight-mode match, wrapping
   // around. Index-based (the virtualized list doesn't keep off-screen rows in
   // the DOM); the landing row is briefly outlined via `flashId`.
-  jumpTo(
-    matches: (row: LogRow) => boolean,
-    dir: 1 | -1,
-    cursor: 'errorCursor' | 'matchCursor'
-  ) {
+  jumpToMatch(dir: 1 | -1) {
     const indices = this.visibleRows
-      .map((row, i) => (matches(row) ? i : -1))
+      .map((row, i) => (this.isMatchRow(row) ? i : -1))
       .filter((i) => i >= 0);
     if (indices.length === 0) return;
-    this[cursor] =
-      (((this[cursor] + dir) % indices.length) + indices.length) %
+    this.matchCursor =
+      (((this.matchCursor + dir) % indices.length) + indices.length) %
       indices.length;
-    const rowIndex = indices[this[cursor]];
+    const rowIndex = indices[this.matchCursor];
     this.listApi?.scrollToRow({ index: rowIndex, align: 'center' });
     const flashId = this.visibleRows[rowIndex].record.id;
     this.setState({ flashId });
@@ -278,28 +274,14 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     );
   }
 
-  isErrorRow = (row: LogRow) =>
-    !row.record.marker && row.record.levelName === 'error';
   isMatchRow = (row: LogRow) =>
     !row.record.marker &&
     this.state.highlight &&
     this.state.search.length > 0 &&
     matchesSearch(row.record, this.state.search);
 
-  nextError = () => this.jumpTo(this.isErrorRow, 1, 'errorCursor');
-  prevError = () => this.jumpTo(this.isErrorRow, -1, 'errorCursor');
-  nextMatch = () => this.jumpTo(this.isMatchRow, 1, 'matchCursor');
-  prevMatch = () => this.jumpTo(this.isMatchRow, -1, 'matchCursor');
-
-  // n / p jump between error lines (the most common movement while
-  // debugging). Attached to the scroll area, so typing in the filter box or
-  // other inputs never triggers it.
-  onKeyDown = (e: React.KeyboardEvent) => {
-    const tag = (e.target as HTMLElement).tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-    if (e.key === 'n') this.nextError();
-    else if (e.key === 'p') this.prevError();
-  };
+  nextMatch = () => this.jumpToMatch(1);
+  prevMatch = () => this.jumpToMatch(-1);
 
   // Copy what's on screen (after all filters), one line per rendered row —
   // ready to paste into an issue or an AI conversation.
@@ -534,9 +516,6 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       !record.marker &&
       matchesSearch(record, this.state.search);
     const matchCount = rows.filter(({ record }) => isMatch(record)).length;
-    const hasErrors = rows.some(
-      ({ record }) => !record.marker && record.levelName === 'error'
-    );
 
     // Team chip for a log line: the app's arena color swatch (the same mini tank
     // sprite the navbar/roster use) plus its name, so a line reads as its team at
@@ -760,40 +739,6 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             </Button>
           )}
 
-          {/* Jump between ERROR lines — also on the n/p keys. */}
-          <ButtonGroup>
-            <OverlayTrigger
-              placement="bottom"
-              overlay={
-                <Tooltip id="log-prev-error">Previous error (p)</Tooltip>
-              }
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                aria-label="Previous error"
-                onClick={this.prevError}
-                disabled={!hasErrors}
-              >
-                <FaAngleUp />
-              </Button>
-            </OverlayTrigger>
-            <OverlayTrigger
-              placement="bottom"
-              overlay={<Tooltip id="log-next-error">Next error (n)</Tooltip>}
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                aria-label="Next error"
-                onClick={this.nextError}
-                disabled={!hasErrors}
-              >
-                <FaAngleDown />
-              </Button>
-            </OverlayTrigger>
-          </ButtonGroup>
-
           <Form.Control
             value={this.state.search}
             onChange={(e) => this.setState({ search: e.target.value })}
@@ -833,24 +778,40 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
               <Button variant="secondary" size="sm" disabled>
                 {matchCount} match{matchCount === 1 ? '' : 'es'}
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                aria-label="Previous match"
-                onClick={this.prevMatch}
-                disabled={matchCount === 0}
-              >
-                <FaAngleUp />
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                aria-label="Next match"
-                onClick={this.nextMatch}
-                disabled={matchCount === 0}
-              >
-                <FaAngleDown />
-              </Button>
+              {/* The prev/next pair only appears once there is something to
+                  jump to (disabled buttons also swallow their tooltips). */}
+              {matchCount > 0 && (
+                <>
+                  <OverlayTrigger
+                    placement="bottom"
+                    overlay={
+                      <Tooltip id="log-prev-match">Previous match</Tooltip>
+                    }
+                  >
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-label="Previous match"
+                      onClick={this.prevMatch}
+                    >
+                      <FaAngleUp />
+                    </Button>
+                  </OverlayTrigger>
+                  <OverlayTrigger
+                    placement="bottom"
+                    overlay={<Tooltip id="log-next-match">Next match</Tooltip>}
+                  >
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-label="Next match"
+                      onClick={this.nextMatch}
+                    >
+                      <FaAngleDown />
+                    </Button>
+                  </OverlayTrigger>
+                </>
+              )}
             </ButtonGroup>
           )}
 
@@ -930,7 +891,6 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             flashId={this.state.flashId}
             setListApi={this.setListApi}
             onScroll={this.onScroll}
-            onKeyDown={this.onKeyDown}
             renderRow={({ record, count }) =>
               record.marker ? (
                 // Lifecycle divider content: a labeled rule in the stream
@@ -1090,7 +1050,6 @@ function VirtualLogList(props: {
   renderRow: (row: LogRow) => React.ReactNode;
   setListApi: (api: ListImperativeAPI | null) => void;
   onScroll: React.UIEventHandler<HTMLDivElement>;
-  onKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
 }) {
   const rowHeight = useDynamicRowHeight({
     defaultRowHeight: Math.max(14, Math.round(props.fontSize * 1.5)),
@@ -1110,8 +1069,6 @@ function VirtualLogList(props: {
       }}
       listRef={props.setListApi}
       onScroll={props.onScroll}
-      onKeyDown={props.onKeyDown}
-      tabIndex={0}
       overscanCount={10}
       // Pre-measure fallback height (also what jsdom tests render with, since
       // they have no ResizeObserver).

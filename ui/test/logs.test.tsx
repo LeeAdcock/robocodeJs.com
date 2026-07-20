@@ -469,30 +469,40 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('×2')).toBeNull();
   });
 
-  it('next/previous error jumps between ERROR rows', () => {
+  it('highlight mode offers next/previous match jumps (no error-nav buttons)', () => {
     const { container } = render(
       <Logs
         bots={bots}
         playbackTime={Number.POSITIVE_INFINITY}
         logEntries={{
           logs: [
-            entry({ msg: 'fine', levelName: 'info', time: 1 }),
-            entry({ msg: 'boom one', levelName: 'error', time: 2 }),
-            entry({ msg: 'fine again', levelName: 'info', time: 3 }),
-            entry({ msg: 'boom two', levelName: 'error', time: 4 }),
+            entry({ msg: 'boom one', levelName: 'error', time: 1 }),
+            entry({ msg: 'fine', levelName: 'info', time: 2 }),
+            entry({ msg: 'boom two', levelName: 'error', time: 3 }),
           ],
-          index: 4,
+          index: 3,
         }}
       />
     );
-    fireEvent.click(screen.getByLabelText('Next error'));
+    // No dedicated error navigation — the ERROR chip filter covers that.
+    expect(screen.queryByLabelText('Next error')).toBeNull();
+
+    const search = container.querySelector(
+      'input[type="search"]'
+    ) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'boom' } });
+    fireEvent.click(
+      screen.getByLabelText('Highlight matches instead of filtering')
+    );
+
+    fireEvent.click(screen.getByLabelText('Next match'));
     const flashed = () =>
       Array.from(container.querySelectorAll('.log-jump')).map(
         (el) => el.textContent
       );
     expect(flashed()[0]).toContain('boom one');
 
-    fireEvent.click(screen.getByLabelText('Next error'));
+    fireEvent.click(screen.getByLabelText('Next match'));
     expect(flashed().some((t) => t?.includes('boom two'))).toBe(true);
   });
 
