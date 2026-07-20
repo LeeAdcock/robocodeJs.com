@@ -333,6 +333,132 @@ svg.motion-snap * {
   padding: 4px 8px;
 }
 
+/* Clickable filter targets inside a log line (the team chip and the bot id
+   narrow the filter on click — GitHub #316): underline on hover so they read
+   as interactive. */
+.logs .team[role='button']:hover,
+.logs .name[role='button']:hover {
+  text-decoration: underline;
+}
+
+/* Level filter chips in the log toolbar: a quiet themed surface (instead of
+   the solid gray action buttons) carrying muted theme-aligned level hues —
+   dark red / gold / dark blue on light, the debug-palette brights on dark.
+   The console's own level colors (pure red/yellow/blue) are tuned for the
+   dark log background and jar against the toolbar. */
+.log-level-chip.btn.btn-secondary {
+  --bs-btn-bg: #e9ecef;
+  --bs-btn-border-color: #ced4da;
+  --bs-btn-color: #495057;
+  --bs-btn-hover-bg: #dde1e5;
+  --bs-btn-hover-border-color: #c2c8ce;
+  --bs-btn-hover-color: #343a40;
+  --bs-btn-active-bg: #d4d9dd;
+  --bs-btn-active-border-color: #b9c0c7;
+  --bs-btn-active-color: #343a40;
+}
+body.dark .log-level-chip.btn.btn-secondary {
+  --bs-btn-bg: #31353f;
+  --bs-btn-border-color: #4a4f5a;
+  --bs-btn-color: #c6c1b6;
+  --bs-btn-hover-bg: #3a3f4b;
+  --bs-btn-hover-border-color: #565c68;
+  --bs-btn-hover-color: #d6d6d6;
+  --bs-btn-active-bg: #434956;
+  --bs-btn-active-border-color: #5f6572;
+  --bs-btn-active-color: #d6d6d6;
+}
+.log-level-chip .log-level-error {
+  color: #b02a37;
+}
+.log-level-chip .log-level-warn {
+  color: #b8860b;
+}
+.log-level-chip .log-level-info {
+  color: #2e7d32;
+}
+.log-level-chip .log-level-debug {
+  color: #2c5aa0;
+}
+.log-level-chip .log-level-trace {
+  color: #6c757d;
+}
+/* Dark theme: the same hues as the arena debug view's vector palette, bright
+   enough to read on the elevated dark chip surface. */
+body.dark .log-level-chip .log-level-error {
+  color: #f87171;
+}
+body.dark .log-level-chip .log-level-warn {
+  color: #fbbf24;
+}
+body.dark .log-level-chip .log-level-info {
+  color: #34d399;
+}
+body.dark .log-level-chip .log-level-debug {
+  color: #60a5fa;
+}
+body.dark .log-level-chip .log-level-trace {
+  color: #9aa4b2;
+}
+
+/* Match-lifecycle dividers in the log stream (restart / elimination / sudden
+   death — GitHub #318): a labeled rule so the scroll has narrative structure. */
+.logs .log-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9aa4b2;
+  margin: 3px 0;
+  font-style: italic;
+}
+.logs .log-divider::before,
+.logs .log-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid #3a3f4b;
+}
+
+/* ERROR rows pop while scrolling fast — a subtle tint beyond the level token. */
+.logs .log-error-row {
+  background: rgba(255, 90, 90, 0.12);
+}
+
+/* Landing cue for the next/prev error and match navigation. */
+.logs .log-jump {
+  outline: 1px solid #ffd54f;
+  outline-offset: -1px;
+}
+
+/* Collapsed-duplicate counter (×N) on a row standing for a run of identical
+   lines. */
+.logs .log-repeat {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #3a3f4b;
+  color: #d6d6d6;
+  font-size: 0.85em;
+}
+
+/* Find-style highlight (search in highlight mode) on the dark console. */
+.logs mark {
+  background: #ffd54f;
+  color: #15171c;
+  padding: 0 1px;
+}
+
+/* Error-code links inside log messages point at /error-codes; keep them
+   readable on the dark background. */
+.logs a {
+  color: #7cb2ff;
+}
+
+/* The console scroller is focusable for the n/p error-jump keys; the browser
+   focus ring reads as noise on a full-pane console. */
+.logs:focus {
+  outline: none;
+}
+
 /* The doc h1 sits on a light grass-tile background image that doesn't respond
    to the theme. In night mode, layer a translucent dark overlay over the tile
    (via a two-stop gradient stacked on the same background) so the header reads

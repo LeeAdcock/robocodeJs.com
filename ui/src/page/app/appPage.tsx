@@ -8,6 +8,7 @@ import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Toolbar from './appEditorToolbar';
 import SaveIndicator, { SaveState } from './appSaveIndicator';
+import AppLogsDock from './appLogsDock';
 import * as prettier from 'prettier/standalone';
 import babel from 'prettier/plugins/babel';
 import estree from 'prettier/plugins/estree';
@@ -304,8 +305,21 @@ export default function AppPage(props: AppPageProps) {
   };
 
   return (
-    <>
-      <Container fluid style={{ marginTop: '10px', marginBottom: '10px' }}>
+    // A flex column filling the content pane: header row on top, then the
+    // editor + docked console splitting whatever remains. Sized with flex
+    // (not a hard-coded header offset) so the collapsed console bar is
+    // always visible at the bottom of the pane, never below the fold.
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Container
+        fluid
+        style={{ marginTop: '10px', marginBottom: '10px', flexShrink: 0 }}
+      >
         <Row>
           <Col
             style={{
@@ -403,24 +417,50 @@ export default function AppPage(props: AppPageProps) {
           {notice}
         </Alert>
       )}
-      <Editor
-        code={code}
-        onChange={(value) => {
-          setCode(value);
-          // Editing invalidates a prior server fault marker.
-          setFaultAnnotation(null);
+      {/* Editor + docked log console share the pane below the header: the
+          editor takes whatever the (collapsible) console leaves. */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
         }}
-        faultAnnotation={faultAnnotation}
-        clearMarkersSignal={clearMarkers}
-        doExecute={doExecute}
-        doReboot={doReboot}
-        doClean={doClean}
-        doCheck={doCheck}
-        fontSize={fontSize}
-        doZoomIn={zoomIn}
-        doZoomOut={zoomOut}
-        doZoomReset={zoomReset}
-      />
-    </>
+      >
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <Editor
+            code={code}
+            onChange={(value) => {
+              setCode(value);
+              // Editing invalidates a prior server fault marker.
+              setFaultAnnotation(null);
+            }}
+            faultAnnotation={faultAnnotation}
+            clearMarkersSignal={clearMarkers}
+            doExecute={doExecute}
+            doReboot={doReboot}
+            doClean={doClean}
+            doCheck={doCheck}
+            fontSize={fontSize}
+            doZoomIn={zoomIn}
+            doZoomOut={zoomOut}
+            doZoomReset={zoomReset}
+            height="100%"
+          />
+        </div>
+        {userId && appId && (
+          <AppLogsDock
+            userId={userId}
+            appId={appId}
+            arena={props.arena}
+            emitter={props.emitter}
+            // A fault row click reuses the banner's gutter+scroll path.
+            onJumpToLine={(line, message) =>
+              setFaultAnnotation({ line, message })
+            }
+          />
+        )}
+      </div>
+    </div>
   );
 }

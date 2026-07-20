@@ -6,7 +6,24 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import Form from 'react-bootstrap/Form';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
-import { FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
+import {
+  FaAngleDown,
+  FaAngleUp,
+  FaCopy,
+  FaHighlighter,
+  FaPause,
+  FaPlay,
+  FaSearchMinus,
+  FaSearchPlus,
+  FaTextWidth,
+} from 'react-icons/fa';
+import { Link } from 'react-router-dom';
+import {
+  List,
+  useDynamicRowHeight,
+  type ListImperativeAPI,
+  type RowComponentProps,
+} from 'react-window';
 import { colors } from '../../util/colors';
 import { titleCase } from '../../util/titleCase';
 
@@ -25,6 +42,17 @@ interface LogEntry {
   levelName: string;
   msg: string;
   time: number;
+  // Synthetic match-lifecycle rows ('restart' | 'eliminated' | 'suddenDeath')
+  // injected by useLogsStream.addLogMarker: rendered as divider rows, exempt
+  // from the bot/level/search filters (only the playback hold-back applies).
+  marker?: string;
+}
+
+// A rendered console row: a log record plus how many consecutive identical
+// lines (same bot + level + message) it stands for.
+interface LogRow {
+  record: LogEntry;
+  count: number;
 }
 
 interface LogsProps {
@@ -36,6 +64,11 @@ interface LogsProps {
   // logs — and, if selectedBot is also set, only that one bot instance.
   selectedApp?: string;
   selectedBot?: number;
+  // Hard-scope the console to one application (the editor dock): other apps'
+  // lines don't exist here — not listed in the Bots filter, not reachable by
+  // clearing filters. Unlike selectedApp (a removable filter seed), this is a
+  // boundary. Lifecycle dividers still show; they narrate the whole match.
+  scopeToApp?: string;
   // The tick the arena has played up to. Log lines stamped later than this are
   // held back so they surface in step with the (buffered) on-screen motion.
   playbackTime?: number;
@@ -43,6 +76,11 @@ interface LogsProps {
     logs: (LogEntry | null)[];
     index: number;
   };
+  // Reflect filter state (search, hidden levels/bots) into the page URL via
+  // replaceState, and seed it back on load — so a filtered view survives reload
+  // and can be shared. Only the standalone logs page opts in; embedded uses
+  // (the editor dock) leave the URL alone.
+  persistFiltersToUrl?: boolean;
 }
 
 interface LogsState {
@@ -53,23 +91,61 @@ interface LogsState {
   hideBots: string[];
   // Console font size, persisted so the preference survives reloads.
   fontSize: number;
+  // Whether the view is attached to the live tail. Scrolling up detaches (new
+  // lines stop moving the viewport); scrolling back to the bottom — or clicking
+  // the "new lines" pill — re-attaches.
+  follow: boolean;
+  // A frozen copy of the log buffer taken when the user hit Pause, or null when
+  // live. While set, the display renders this snapshot; the real buffer keeps
+  // filling behind it.
+  pausedLogs: { logs: (LogEntry | null)[]; index: number } | null;
+  // Lines that arrived while detached and/or paused — the pill's "N new lines"
+  // count and the held-line badge on the Pause button. Reset when the view is
+  // both attached and unpaused again.
+  newSince: number;
+  // Find-style search: matches are highlighted in place (with next/prev
+  // navigation) instead of filtering the stream — so the context around a
+  // match stays visible.
+  highlight: boolean;
+  // Whether long lines wrap (default) or are clipped to one line.
+  wrap: boolean;
+  // Row id briefly outlined after a next/prev error or match jump, so the
+  // landing row is findable in the stream.
+  flashId: string | null;
 }
 
 // Identify one bot in the hide set.
 const botKey = (appId: string, botIndex: number) => `${appId}:${botIndex}`;
 
+// Severity-first order for the toolbar level chips ("do I have errors?" reads
+// left to right).
+const LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
+
 export default class Logs extends React.Component<LogsProps, LogsState> {
   constructor(props: LogsProps) {
     super(props);
     const savedFont = Number(localStorage.getItem('logFontSize'));
+    // On the standalone page, restore filter state from the URL (written back
+    // by syncUrl below) so a reloaded or shared link reopens the same view.
+    const params = props.persistFiltersToUrl
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams();
+    const list = (key: string) =>
+      (params.get(key) ?? '').split(',').filter(Boolean);
     this.state = {
-      search: '',
-      hideLevels: [],
-      hideBots: [],
+      search: params.get('q') ?? '',
+      hideLevels: list('hideLevels'),
+      hideBots: list('hideBots'),
       fontSize:
         savedFont >= LOG_FONT_MIN && savedFont <= LOG_FONT_MAX
           ? savedFont
           : LOG_FONT_DEFAULT,
+      follow: true,
+      pausedLogs: null,
+      newSince: 0,
+      highlight: false,
+      wrap: true,
+      flashId: null,
     };
   }
 
@@ -79,8 +155,12 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     this.setState({ fontSize });
   }
 
-  logRef: React.RefObject<HTMLDivElement | null> =
-    React.createRef<HTMLDivElement>();
+  // Imperative handle for the virtualized list (react-window): row scrolling
+  // plus the underlying scroll element.
+  listApi: ListImperativeAPI | null = null;
+  setListApi = (api: ListImperativeAPI | null) => {
+    this.listApi = api;
+  };
 
   // Which URL selection (app[:bot]) we've already seeded the filter from, so a
   // shift-double-click applies once but the user's later toggles are preserved.
@@ -88,23 +168,180 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
 
   componentDidMount() {
     this.applySelection();
+    this.pinToTail();
   }
 
-  componentDidUpdate() {
+  // Scroll the virtualized list to its newest row.
+  pinToTail() {
+    if (this.visibleRows.length === 0) return;
+    this.listApi?.scrollToRow({
+      index: this.visibleRows.length - 1,
+      align: 'end',
+    });
+  }
+
+  componentDidUpdate(prevProps: LogsProps, prevState: LogsState) {
     // Once the bot list has loaded, reflect a shift-double-click selection in the
     // Bots filter itself (hide everything except the chosen app / bot), so the
     // dropdown matches what's shown and the user can toggle others back on.
     this.applySelection();
 
-    // Pin to the bottom of the scroll area
-    const el = this.logRef.current;
-    if (!el) return;
-    const parentHeight = (el.children[0] as HTMLElement).offsetHeight;
-    const height = el.offsetHeight;
-    const scrollTop = el.scrollTop;
-    if (Math.abs(scrollTop - (parentHeight - height)) < 200) {
-      el.scrollTo({ top: parentHeight });
+    // Mirror filter changes into the URL (replaceState — no history spam).
+    if (
+      this.props.persistFiltersToUrl &&
+      (prevState.search !== this.state.search ||
+        prevState.hideLevels !== this.state.hideLevels ||
+        prevState.hideBots !== this.state.hideBots)
+    ) {
+      this.syncUrl();
     }
+
+    // Count lines arriving while the user isn't watching the tail (detached
+    // and/or paused) — the ring index only moves when an entry lands, so the
+    // wrapped delta is the number of arrivals.
+    const len = this.props.logEntries.logs.length;
+    const delta =
+      len > 0
+        ? (this.props.logEntries.index - prevProps.logEntries.index + len) % len
+        : 0;
+    if (delta > 0 && (this.state.pausedLogs || !this.state.follow)) {
+      this.setState((s) => ({ newSince: s.newSince + delta }));
+    }
+
+    // Attached and live: keep the viewport pinned to the newest line.
+    if (this.state.follow && !this.state.pausedLogs) {
+      this.pinToTail();
+    }
+  }
+
+  // Scroll position is the follow/detach control: scrolling up detaches the
+  // tail, scrolling back to the bottom re-attaches it. Only real scroll events
+  // land here (content growth doesn't fire `scroll`), so the programmatic pin
+  // above can't fight the user.
+  onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+    if (atBottom && !this.state.follow) {
+      this.setState((s) => ({
+        follow: true,
+        // Keep the held-line count while paused — those lines are still unseen.
+        newSince: s.pausedLogs ? s.newSince : 0,
+      }));
+    } else if (!atBottom && this.state.follow) {
+      this.setState({ follow: false });
+    }
+  };
+
+  // The "N new lines" pill: jump to the bottom and re-attach.
+  resumeFollow = () => {
+    this.pinToTail();
+    this.setState((s) => ({
+      follow: true,
+      newSince: s.pausedLogs ? s.newSince : 0,
+    }));
+  };
+
+  // The rows currently rendered, captured during render for the copy button
+  // and the match navigation. (There is deliberately no error navigation —
+  // the ERROR level chip already filters straight to error lines.)
+  visibleRows: LogRow[] = [];
+  // Match-jump cursor (position within the matching row set). -1 = before the
+  // first, so the first "next" lands on the first match.
+  matchCursor = -1;
+  flashTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+
+  componentWillUnmount() {
+    clearTimeout(this.flashTimer);
+  }
+
+  // Jump the viewport to the next/previous highlight-mode match, wrapping
+  // around. Index-based (the virtualized list doesn't keep off-screen rows in
+  // the DOM); the landing row is briefly outlined via `flashId`.
+  jumpToMatch(dir: 1 | -1) {
+    const indices = this.visibleRows
+      .map((row, i) => (this.isMatchRow(row) ? i : -1))
+      .filter((i) => i >= 0);
+    if (indices.length === 0) return;
+    this.matchCursor =
+      (((this.matchCursor + dir) % indices.length) + indices.length) %
+      indices.length;
+    const rowIndex = indices[this.matchCursor];
+    this.listApi?.scrollToRow({ index: rowIndex, align: 'center' });
+    const flashId = this.visibleRows[rowIndex].record.id;
+    this.setState({ flashId });
+    clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(
+      () =>
+        this.setState((s) =>
+          s.flashId === flashId ? { flashId: null } : null
+        ),
+      800
+    );
+  }
+
+  isMatchRow = (row: LogRow) =>
+    !row.record.marker &&
+    this.state.highlight &&
+    this.state.search.length > 0 &&
+    matchesSearch(row.record, this.state.search);
+
+  nextMatch = () => this.jumpToMatch(1);
+  prevMatch = () => this.jumpToMatch(-1);
+
+  // Copy what's on screen (after all filters), one line per rendered row —
+  // ready to paste into an issue or an AI conversation.
+  copyVisible = () => {
+    const text = this.visibleRows
+      .map(({ record, count }) =>
+        record.marker
+          ? `── ${record.msg} ──`
+          : `[${record.time}] [${record.levelName.toUpperCase()}] ${
+              record.name
+            } ${record.msg}${count > 1 ? ` ×${count}` : ''}`
+      )
+      .join('\n');
+    navigator.clipboard?.writeText(text).catch(() => undefined);
+  };
+
+  // Pause freezes the display on a snapshot of the buffer (the buffer itself
+  // keeps filling — the button shows how many lines are being held). Note the
+  // client ring buffer is finite: a long pause under heavy logging can evict
+  // the oldest held lines before they're ever revealed.
+  togglePause = () => {
+    if (this.state.pausedLogs) {
+      this.setState((s) => ({
+        pausedLogs: null,
+        newSince: s.follow ? 0 : s.newSince,
+      }));
+    } else {
+      this.setState({
+        pausedLogs: {
+          logs: [...this.props.logEntries.logs],
+          index: this.props.logEntries.index,
+        },
+      });
+    }
+  };
+
+  // Write the current filter state into the query string. Empty filters are
+  // dropped so an unfiltered view keeps a clean URL. The one-shot `app`/`bot`
+  // seed params (from shift-double-clicking a bot) are removed once any filter
+  // state is written — `hideBots` captures the same selection fully.
+  syncUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const setOrDelete = (key: string, value: string) =>
+      value ? params.set(key, value) : params.delete(key);
+    setOrDelete('q', this.state.search);
+    setOrDelete('hideLevels', this.state.hideLevels.join(','));
+    setOrDelete('hideBots', this.state.hideBots.join(','));
+    params.delete('app');
+    params.delete('bot');
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
+    );
   }
 
   applySelection() {
@@ -133,18 +370,24 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   }
 
   render() {
+    // Hard app boundary for embedded uses (the editor dock).
+    const scope = this.props.scopeToApp;
+
     // The applications (and their bot counts) the filter offers: the arena's
     // current bots, plus any that have logged but aren't listed (e.g. removed
-    // mid-match), so nothing vanishes from the filter.
+    // mid-match), so nothing vanishes from the filter. When scoped, only the
+    // scoped app is offered.
     const appMap = new Map<
       string,
       { name: string; botCount: number; index?: number }
     >();
-    this.props.bots.forEach((b) =>
-      appMap.set(b.id, { name: b.name, botCount: b.botCount, index: b.index })
-    );
+    this.props.bots.forEach((b) => {
+      if (scope && b.id !== scope) return;
+      appMap.set(b.id, { name: b.name, botCount: b.botCount, index: b.index });
+    });
     this.props.logEntries.logs.forEach((entry) => {
-      if (!entry) return;
+      if (!entry || entry.marker) return;
+      if (scope && entry.appId !== scope) return;
       const cur = appMap.get(entry.appId);
       if (!cur)
         appMap.set(entry.appId, {
@@ -191,6 +434,20 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       this.setState({ hideBots: [...next] });
     };
 
+    // Click-to-filter from a log line: the team chip narrows to that app's
+    // bots, the bot id to that one instance (a key is `${appId}:${botIndex}`,
+    // so the app is everything before the last colon).
+    const filterToApp = (appId: string) =>
+      this.setState({
+        hideBots: allBotKeys.filter(
+          (k) => k.slice(0, k.lastIndexOf(':')) !== appId
+        ),
+      });
+    const filterToBot = (appId: string, botIndex: number) =>
+      this.setState({
+        hideBots: allBotKeys.filter((k) => k !== botKey(appId, botIndex)),
+      });
+
     const levelColors: Record<string, string> = {
       trace: 'lightgrey',
       error: 'red',
@@ -199,12 +456,87 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       info: 'green',
     };
 
+    // The buffer in arrival order — the true stream order. The ring's oldest
+    // entry sits at `index` (the next overwrite position), so walking from
+    // there is chronological without a sort; sorting by tick time would
+    // interleave matches across a restart, where the clock resets to 0.
+    const { logs, index } = this.state.pausedLogs ?? this.props.logEntries;
+    const ordered: LogEntry[] = [];
+    for (let k = 0; k < logs.length; k++) {
+      const record = logs[(index + k) % logs.length];
+      if (record) ordered.push(record);
+    }
+
+    // In highlight mode the search stops filtering (matches are marked in
+    // place instead, so their context stays visible).
+    const searchFilters = this.state.search.length > 0 && !this.state.highlight;
+    const searchHighlights =
+      this.state.search.length > 0 && this.state.highlight;
+
+    // Everything except the level filter, shared by the visible-line filter and
+    // the per-level chip counts (a chip counts what toggling it would affect).
+    // Lifecycle dividers bypass every filter except the playback hold-back.
+    const passesBase = (record: LogEntry): boolean =>
+      record.time <= (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
+      (!!record.marker ||
+        ((!scope || record.appId === scope) &&
+          !hidden.has(botKey(record.appId, record.botIndex)) &&
+          // Free-text search matches what the user can actually see — the
+          // message and the bot name — not the serialized record (which would
+          // hit internal ids, levels, and timestamps).
+          (!searchFilters || matchesSearch(record, this.state.search))));
+
+    const levelCounts: Record<string, number> = {};
+    LEVELS.forEach((level) => (levelCounts[level] = 0));
+    ordered.forEach((record) => {
+      if (!record.marker && passesBase(record)) {
+        const level = record.levelName.toUpperCase();
+        levelCounts[level] = (levelCounts[level] ?? 0) + 1;
+      }
+    });
+
+    // Visible rows, with consecutive identical lines (same bot + level +
+    // message — the norm for bots logging inside TICK handlers) collapsed into
+    // one ×N row. Dividers never merge.
+    const rows: LogRow[] = [];
+    for (const record of ordered) {
+      if (!passesBase(record)) continue;
+      if (
+        !record.marker &&
+        this.state.hideLevels.includes(record.levelName.toUpperCase())
+      )
+        continue;
+      const last = rows[rows.length - 1];
+      if (
+        last &&
+        !record.marker &&
+        !last.record.marker &&
+        last.record.appId === record.appId &&
+        last.record.botIndex === record.botIndex &&
+        last.record.levelName === record.levelName &&
+        last.record.msg === record.msg
+      ) {
+        last.count++;
+      } else {
+        rows.push({ record, count: 1 });
+      }
+    }
+    this.visibleRows = rows;
+
+    const isMatch = (record: LogEntry) =>
+      searchHighlights &&
+      !record.marker &&
+      matchesSearch(record, this.state.search);
+    const matchCount = rows.filter(({ record }) => isMatch(record)).length;
+
     // Team chip for a log line: the app's arena color swatch (the same mini tank
     // sprite the navbar/roster use) plus its name, so a line reads as its team at
     // a glance rather than only from the internal `<id>` — which is kept after it
     // to disambiguate a team's five bots (GitHub #253). An app with no live arena
     // index (logged then removed mid-match) gets a muted neutral swatch and no
     // name (its only "name" would be the raw id, already implied by `<id>`).
+    // Clicking the chip narrows the filter to that app (GitHub #316) — except
+    // in a scoped console, where there is only one app to show.
     const teamChip = (appId: string) => {
       const app = appMap.get(appId);
       const index = app?.index;
@@ -214,7 +546,16 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
           : '/sprites/tank_dark.png';
       const name = app && app.name !== appId ? titleCase(app.name) : '';
       return (
-        <span className="team" style={{ marginRight: '5px' }}>
+        <span
+          className="team"
+          role={scope ? undefined : 'button'}
+          title={scope ? undefined : "Show only this app's logs"}
+          onClick={scope ? undefined : () => filterToApp(appId)}
+          style={{
+            marginRight: '5px',
+            cursor: scope ? undefined : 'pointer',
+          }}
+        >
           <img
             src={src}
             alt=""
@@ -302,25 +643,32 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             <Dropdown.Menu>
               {apps.map((app) => (
                 <React.Fragment key={app.id}>
-                  <Dropdown.Item
-                    as="button"
-                    // Toggle the whole application (all of its bots).
-                    onClick={() => setHidden(botsOf(app), appShown(app))}
-                  >
-                    <Form.Check
-                      checked={appShown(app)}
-                      readOnly
-                      inline
-                      type="checkbox"
-                      id={`bot-${app.id}`}
-                    />
-                    <strong>{app.name}</strong>
-                  </Dropdown.Item>
+                  {/* In a scoped console there is only this one app, and
+                      unchecking it would just show nothing — offer only its
+                      individual bots. */}
+                  {!scope && (
+                    <Dropdown.Item
+                      as="button"
+                      // Toggle the whole application (all of its bots).
+                      onClick={() => setHidden(botsOf(app), appShown(app))}
+                    >
+                      <Form.Check
+                        checked={appShown(app)}
+                        readOnly
+                        inline
+                        type="checkbox"
+                        id={`bot-${app.id}`}
+                      />
+                      <strong>{app.name}</strong>
+                    </Dropdown.Item>
+                  )}
                   {botsOf(app).map((key, i) => (
                     <Dropdown.Item
                       as="button"
                       key={key}
-                      style={{ paddingLeft: '2.5em' }}
+                      // Indented under the app row — unless scoped, where
+                      // there is no app row to indent under.
+                      style={scope ? undefined : { paddingLeft: '2.5em' }}
                       // Toggle just this bot.
                       onClick={() => setHidden([key], !hidden.has(key))}
                     >
@@ -352,119 +700,456 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             </Dropdown.Menu>
           </Dropdown>
 
-          <Dropdown as={ButtonGroup} autoClose="outside">
-            <Dropdown.Toggle variant="secondary" size="sm" id="levels-filter">
-              Levels
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              {['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'].map((level) => (
-                <Dropdown.Item
-                  as="button"
+          {/* Level chips: one per level with a live count of matching lines —
+              an at-a-glance health readout ("do I have errors?") that toggles
+              the level on click. Replaces the old Levels dropdown. */}
+          <ButtonGroup>
+            {LEVELS.map((level) => {
+              const isHidden = this.state.hideLevels.includes(level);
+              return (
+                <OverlayTrigger
                   key={level}
-                  // Toggle this log level in the log display.
-                  onClick={() =>
-                    this.setState((s) => ({
-                      hideLevels: s.hideLevels.includes(level)
-                        ? s.hideLevels.filter((l) => l !== level)
-                        : [...s.hideLevels, level],
-                    }))
+                  placement="bottom"
+                  overlay={
+                    <Tooltip id={`level-chip-${level}`}>
+                      {isHidden ? `Show ${level} logs` : `Hide ${level} logs`}
+                    </Tooltip>
                   }
                 >
-                  <Form.Check
-                    checked={!this.state.hideLevels.includes(level)}
-                    readOnly
-                    inline
-                    type="checkbox"
-                    id={`level-${level}`}
-                  />
-                  {level}
-                </Dropdown.Item>
-              ))}
-            </Dropdown.Menu>
-          </Dropdown>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="log-level-chip"
+                    aria-label={`Toggle ${level} logs`}
+                    aria-pressed={!isHidden}
+                    onClick={() =>
+                      this.setState((s) => ({
+                        hideLevels: isHidden
+                          ? s.hideLevels.filter((l) => l !== level)
+                          : [...s.hideLevels, level],
+                      }))
+                    }
+                    style={{
+                      opacity: isHidden ? 0.45 : 1,
+                      textDecoration: isHidden ? 'line-through' : 'none',
+                    }}
+                  >
+                    {/* The colored token is the label; the count sits after
+                        it. Chip hues are themed in index.css — muted, per
+                        theme — not the console's own level colors (those are
+                        tuned for the dark log background and jar on the
+                        toolbar). */}
+                    <span className={`log-level-${level.toLowerCase()}`}>
+                      {level}
+                    </span>{' '}
+                    {levelCounts[level]}
+                  </Button>
+                </OverlayTrigger>
+              );
+            })}
+          </ButtonGroup>
+
+          {/* One-click way back to the unfiltered view once a click-to-filter
+              (or any Bots toggle) has narrowed the stream. */}
+          {this.state.hideBots.length > 0 && (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              aria-label="Show all bots"
+              onClick={() => this.setState({ hideBots: [] })}
+            >
+              All bots ×
+            </Button>
+          )}
 
           <Form.Control
             value={this.state.search}
             onChange={(e) => this.setState({ search: e.target.value })}
             type="search"
-            placeholder="Filter"
+            placeholder={this.state.highlight ? 'Find' : 'Filter'}
             size="sm"
             style={{ maxWidth: '12em' }}
           />
+
+          {/* Find-style toggle: highlight matches in place (keeping their
+              context) instead of filtering the stream down to them. */}
+          <OverlayTrigger
+            placement="bottom"
+            overlay={
+              <Tooltip id="log-highlight">
+                {this.state.highlight
+                  ? 'Filter to matches'
+                  : 'Highlight matches in place'}
+              </Tooltip>
+            }
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Highlight matches instead of filtering"
+              aria-pressed={this.state.highlight}
+              onClick={() =>
+                this.setState((s) => ({ highlight: !s.highlight }))
+              }
+              style={{ opacity: this.state.highlight ? 1 : 0.6 }}
+            >
+              <FaHighlighter />
+            </Button>
+          </OverlayTrigger>
+          {searchHighlights && (
+            <ButtonGroup aria-label="Match navigation">
+              <Button variant="secondary" size="sm" disabled>
+                {matchCount} match{matchCount === 1 ? '' : 'es'}
+              </Button>
+              {/* The prev/next pair only appears once there is something to
+                  jump to (disabled buttons also swallow their tooltips). */}
+              {matchCount > 0 && (
+                <>
+                  <OverlayTrigger
+                    placement="bottom"
+                    overlay={
+                      <Tooltip id="log-prev-match">Previous match</Tooltip>
+                    }
+                  >
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-label="Previous match"
+                      onClick={this.prevMatch}
+                    >
+                      <FaAngleUp />
+                    </Button>
+                  </OverlayTrigger>
+                  <OverlayTrigger
+                    placement="bottom"
+                    overlay={<Tooltip id="log-next-match">Next match</Tooltip>}
+                  >
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-label="Next match"
+                      onClick={this.nextMatch}
+                    >
+                      <FaAngleDown />
+                    </Button>
+                  </OverlayTrigger>
+                </>
+              )}
+            </ButtonGroup>
+          )}
+
+          <ButtonGroup>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={
+                <Tooltip id="log-wrap">
+                  {this.state.wrap
+                    ? 'Keep long lines on one line'
+                    : 'Wrap long lines'}
+                </Tooltip>
+              }
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Toggle line wrapping"
+                aria-pressed={this.state.wrap}
+                onClick={() => this.setState((s) => ({ wrap: !s.wrap }))}
+              >
+                <FaTextWidth />
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={
+                <Tooltip id="log-copy">Copy visible logs to clipboard</Tooltip>
+              }
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Copy visible logs"
+                onClick={this.copyVisible}
+              >
+                <FaCopy />
+              </Button>
+            </OverlayTrigger>
+          </ButtonGroup>
+
+          <OverlayTrigger
+            placement="bottom"
+            overlay={
+              <Tooltip id="log-pause">
+                {this.state.pausedLogs
+                  ? 'Resume log output'
+                  : 'Pause log output'}
+              </Tooltip>
+            }
+          >
+            <Button
+              variant={this.state.pausedLogs ? 'warning' : 'secondary'}
+              size="sm"
+              aria-label={
+                this.state.pausedLogs ? 'Resume log output' : 'Pause log output'
+              }
+              onClick={this.togglePause}
+            >
+              {this.state.pausedLogs ? <FaPlay /> : <FaPause />}
+              {this.state.pausedLogs && this.state.newSince > 0 && (
+                <span style={{ marginLeft: '5px' }}>{this.state.newSince}</span>
+              )}
+            </Button>
+          </OverlayTrigger>
         </ButtonToolbar>
 
-        {/* Log list — fills the remaining height and scrolls on its own. */}
-        <div
-          className="logs"
-          ref={this.logRef}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            fontFamily:
-              'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-            fontSize: `${this.state.fontSize}px`,
-          }}
-        >
-          <div>
-            {this.props.logEntries.logs
-              .filter(
-                (record) =>
-                  record &&
-                  record.time <=
-                    (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-                  !hidden.has(botKey(record.appId, record.botIndex)) &&
-                  !this.state.hideLevels.includes(
-                    record.levelName.toUpperCase()
-                  ) &&
-                  (this.state.search?.length === 0
-                    ? true
-                    : JSON.stringify(record).includes(this.state.search))
-              )
-              .sort((a, b) => (a !== null && b !== null ? a.time - b.time : 0))
-              .map(
-                (record) =>
-                  record && (
-                    <span key={record.id}>
-                      <span
-                        style={{
-                          marginRight: '5px',
-                        }}
-                      >
-                        [<span className="date">{record.time}</span>]
-                      </span>
-                      <span
-                        style={{
-                          marginRight: '5px',
-                        }}
-                      >
-                        [
-                        <span
-                          style={{
-                            color: levelColors[record.levelName] || 'white',
-                          }}
-                        >
-                          {record.levelName.toUpperCase()}
-                        </span>
-                        ]
-                      </span>
-                      {teamChip(record.appId)}
-                      <span
-                        className="name"
-                        style={{
-                          marginRight: '5px',
-                        }}
-                      >
-                        {record.name}
-                      </span>
-                      <span className="message">{record.msg}</span>
-                      <br />
+        {/* Log list — a react-window virtualized list (only on-screen rows are
+            mounted, so a full 1500-entry buffer scrolls smoothly). The wrapper
+            is the positioning context for the floating "new lines" pill so it
+            stays put while the list scrolls under it. */}
+        <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+          <VirtualLogList
+            rows={rows}
+            fontSize={this.state.fontSize}
+            wrap={this.state.wrap}
+            flashId={this.state.flashId}
+            setListApi={this.setListApi}
+            onScroll={this.onScroll}
+            renderRow={({ record, count }) =>
+              record.marker ? (
+                // Lifecycle divider content: a labeled rule in the stream
+                // (match restarted / bot eliminated / sudden death).
+                record.msg
+              ) : (
+                <>
+                  <span
+                    style={{
+                      marginRight: '5px',
+                    }}
+                  >
+                    [<span className="date">{record.time}</span>]
+                  </span>
+                  <span
+                    style={{
+                      marginRight: '5px',
+                    }}
+                  >
+                    [
+                    <span
+                      style={{
+                        color: levelColors[record.levelName] || 'white',
+                      }}
+                    >
+                      {record.levelName.toUpperCase()}
                     </span>
-                  )
-              )}
-          </div>
+                    ]
+                  </span>
+                  {teamChip(record.appId)}
+                  <span
+                    className="name"
+                    role="button"
+                    title="Show only this bot's logs"
+                    onClick={() => filterToBot(record.appId, record.botIndex)}
+                    style={{
+                      marginRight: '5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {record.name}
+                  </span>
+                  <span className="message">
+                    {renderMessage(
+                      record.msg,
+                      searchHighlights ? this.state.search : ''
+                    )}
+                  </span>
+                  {count > 1 && (
+                    // DevTools-style repeat counter for collapsed duplicates.
+                    <span className="log-repeat" title={`Repeated ${count}×`}>
+                      ×{count}
+                    </span>
+                  )}
+                </>
+              )
+            }
+          />
+
+          {/* Detached from the tail: a floating pill offers the way back down,
+              with a live count of the lines that have arrived meanwhile. Hidden
+              while paused — the Pause button carries the held count then. */}
+          {!this.state.follow && !this.state.pausedLogs && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={this.resumeFollow}
+              aria-label="Scroll to latest logs"
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                borderRadius: '1em',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ↓{' '}
+              {this.state.newSince > 0
+                ? `${this.state.newSince} new line${
+                    this.state.newSince === 1 ? '' : 's'
+                  }`
+                : 'Latest'}
+            </Button>
+          )}
         </div>
       </div>
     );
   }
+}
+
+const LOG_FONT_FAMILY =
+  'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace';
+
+// Props threaded to every virtualized row (react-window `rowProps`).
+interface LogRowViewProps {
+  rows: LogRow[];
+  wrap: boolean;
+  flashId: string | null;
+  renderRow: (row: LogRow) => React.ReactNode;
+}
+
+// One virtualized row. react-window positions it via `style`; everything else
+// (content, dividers, error tint, jump flash) comes from the row data.
+function LogRowView({
+  index,
+  style,
+  ariaAttributes,
+  rows,
+  wrap,
+  flashId,
+  renderRow,
+}: RowComponentProps<LogRowViewProps>) {
+  const row = rows[index];
+  if (!row) return null;
+  const { record } = row;
+  const className =
+    [
+      record.marker ? 'log-divider' : undefined,
+      !record.marker && record.levelName === 'error'
+        ? 'log-error-row'
+        : undefined,
+      record.id === flashId ? 'log-jump' : undefined,
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
+  return (
+    <div
+      {...ariaAttributes}
+      className={className}
+      data-marker={record.marker || undefined}
+      style={{
+        ...style,
+        whiteSpace: wrap ? 'normal' : 'nowrap',
+        // Without wrapping, clip overlong lines (the row is absolutely
+        // positioned by the virtualizer, so it can't widen the scroll area).
+        overflow: wrap ? undefined : 'hidden',
+        textOverflow: wrap ? undefined : 'ellipsis',
+      }}
+    >
+      {renderRow(row)}
+    </div>
+  );
+}
+
+// The virtualized console body. A function component so it can use
+// react-window's hooks; the class passes state down and receives the
+// imperative list API (scroll-to-row) back via `setListApi`. Row heights are
+// measured (useDynamicRowHeight) because wrapped lines vary; the cache is
+// keyed on font size + wrap so either change re-measures.
+function VirtualLogList(props: {
+  rows: LogRow[];
+  fontSize: number;
+  wrap: boolean;
+  flashId: string | null;
+  renderRow: (row: LogRow) => React.ReactNode;
+  setListApi: (api: ListImperativeAPI | null) => void;
+  onScroll: React.UIEventHandler<HTMLDivElement>;
+}) {
+  const rowHeight = useDynamicRowHeight({
+    defaultRowHeight: Math.max(14, Math.round(props.fontSize * 1.5)),
+    key: `${props.fontSize}:${props.wrap}`,
+  });
+  return (
+    <List
+      className="logs"
+      rowComponent={LogRowView}
+      rowCount={props.rows.length}
+      rowHeight={rowHeight}
+      rowProps={{
+        rows: props.rows,
+        wrap: props.wrap,
+        flashId: props.flashId,
+        renderRow: props.renderRow,
+      }}
+      listRef={props.setListApi}
+      onScroll={props.onScroll}
+      overscanCount={10}
+      // Pre-measure fallback height (also what jsdom tests render with, since
+      // they have no ResizeObserver).
+      defaultHeight={400}
+      style={{
+        height: '100%',
+        fontFamily: LOG_FONT_FAMILY,
+        fontSize: `${props.fontSize}px`,
+      }}
+    />
+  );
+}
+
+// Case-insensitive match against the fields a log line actually displays.
+function matchesSearch(record: LogEntry, search: string): boolean {
+  const q = search.toLowerCase();
+  return (
+    (record.msg ?? '').toLowerCase().includes(q) ||
+    (record.name ?? '').toLowerCase().includes(q)
+  );
+}
+
+// Wrap case-insensitive occurrences of `query` in <mark> (find-style
+// highlight). Plain text in, React nodes out.
+function highlightMatches(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const lower = text.toLowerCase();
+  const q = query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let from = 0;
+  for (let at = lower.indexOf(q); at >= 0; at = lower.indexOf(q, from)) {
+    if (at > from) parts.push(text.slice(from, at));
+    from = at + q.length;
+    parts.push(<mark key={`m-${at}`}>{text.slice(at, from)}</mark>);
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
+// Render a log message: error codes (E0xx) become links to their /error-codes
+// section, and — in highlight mode — search matches are marked in place.
+function renderMessage(msg: string, highlightQuery: string): React.ReactNode {
+  const text = msg ?? '';
+  const segments = text.split(/(E0\d{2})/);
+  if (segments.length === 1) return highlightMatches(text, highlightQuery);
+  return segments.map((segment, i) =>
+    /^E0\d{2}$/.test(segment) ? (
+      <Link
+        key={`c-${i}`}
+        to={`/error-codes#${segment.toLowerCase()}`}
+        title={`What ${segment} means`}
+      >
+        {segment}
+      </Link>
+    ) : (
+      <React.Fragment key={`t-${i}`}>
+        {highlightMatches(segment, highlightQuery)}
+      </React.Fragment>
+    )
+  );
 }

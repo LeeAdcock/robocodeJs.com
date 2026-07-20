@@ -41,8 +41,21 @@ import AppPage from '../src/page/app/appPage';
 const emitter = { addListener: vi.fn(), removeListener: vi.fn() } as any;
 const arena = { clock: { time: 0 }, apps: [] } as any;
 
+// The docked log console subscribes to the shared /arena/logs SSE stream.
+class FakeEventSource {
+  url: string;
+  onmessage: ((e: { data: string }) => void) | null = null;
+  constructor(url: string) {
+    this.url = url;
+  }
+  close() {
+    /* no-op */
+  }
+}
+
 describe('AppPage (bot editor)', () => {
   beforeEach(() => {
+    vi.stubGlobal('EventSource', FakeEventSource);
     localStorage.clear();
     vi.clearAllMocks();
     vi.mocked(axios.put).mockResolvedValue({ data: {} } as never);
@@ -53,7 +66,10 @@ describe('AppPage (bot editor)', () => {
         : (Promise.resolve({ data: { id: 'a1', name: 'My Bot' } }) as never)
     );
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   const renderPage = () =>
     render(
