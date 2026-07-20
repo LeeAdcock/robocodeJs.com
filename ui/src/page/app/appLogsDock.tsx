@@ -227,9 +227,11 @@ export default function AppLogsDock(props: AppLogsDockProps) {
             </div>
           )}
           <div style={{ flex: 1, minHeight: 0 }}>
+            {/* Hard-scoped (not just pre-filtered) to the app being edited:
+                other apps' logs aren't reachable from the editor's console. */}
             <Logs
               bots={bots}
-              selectedApp={props.appId}
+              scopeToApp={props.appId}
               logEntries={logEntries}
               playbackTime={playbackTime}
             />

@@ -64,6 +64,11 @@ interface LogsProps {
   // logs — and, if selectedBot is also set, only that one bot instance.
   selectedApp?: string;
   selectedBot?: number;
+  // Hard-scope the console to one application (the editor dock): other apps'
+  // lines don't exist here — not listed in the Bots filter, not reachable by
+  // clearing filters. Unlike selectedApp (a removable filter seed), this is a
+  // boundary. Lifecycle dividers still show; they narrate the whole match.
+  scopeToApp?: string;
   // The tick the arena has played up to. Log lines stamped later than this are
   // held back so they surface in step with the (buffered) on-screen motion.
   playbackTime?: number;
@@ -365,18 +370,24 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   }
 
   render() {
+    // Hard app boundary for embedded uses (the editor dock).
+    const scope = this.props.scopeToApp;
+
     // The applications (and their bot counts) the filter offers: the arena's
     // current bots, plus any that have logged but aren't listed (e.g. removed
-    // mid-match), so nothing vanishes from the filter.
+    // mid-match), so nothing vanishes from the filter. When scoped, only the
+    // scoped app is offered.
     const appMap = new Map<
       string,
       { name: string; botCount: number; index?: number }
     >();
-    this.props.bots.forEach((b) =>
-      appMap.set(b.id, { name: b.name, botCount: b.botCount, index: b.index })
-    );
+    this.props.bots.forEach((b) => {
+      if (scope && b.id !== scope) return;
+      appMap.set(b.id, { name: b.name, botCount: b.botCount, index: b.index });
+    });
     this.props.logEntries.logs.forEach((entry) => {
-      if (!entry) return;
+      if (!entry || entry.marker) return;
+      if (scope && entry.appId !== scope) return;
       const cur = appMap.get(entry.appId);
       if (!cur)
         appMap.set(entry.appId, {
@@ -468,7 +479,8 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     const passesBase = (record: LogEntry): boolean =>
       record.time <= (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
       (!!record.marker ||
-        (!hidden.has(botKey(record.appId, record.botIndex)) &&
+        ((!scope || record.appId === scope) &&
+          !hidden.has(botKey(record.appId, record.botIndex)) &&
           // Free-text search matches what the user can actually see — the
           // message and the bot name — not the serialized record (which would
           // hit internal ids, levels, and timestamps).
@@ -523,7 +535,8 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     // to disambiguate a team's five bots (GitHub #253). An app with no live arena
     // index (logged then removed mid-match) gets a muted neutral swatch and no
     // name (its only "name" would be the raw id, already implied by `<id>`).
-    // Clicking the chip narrows the filter to that app (GitHub #316).
+    // Clicking the chip narrows the filter to that app (GitHub #316) — except
+    // in a scoped console, where there is only one app to show.
     const teamChip = (appId: string) => {
       const app = appMap.get(appId);
       const index = app?.index;
@@ -535,10 +548,13 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       return (
         <span
           className="team"
-          role="button"
-          title="Show only this app's logs"
-          onClick={() => filterToApp(appId)}
-          style={{ marginRight: '5px', cursor: 'pointer' }}
+          role={scope ? undefined : 'button'}
+          title={scope ? undefined : "Show only this app's logs"}
+          onClick={scope ? undefined : () => filterToApp(appId)}
+          style={{
+            marginRight: '5px',
+            cursor: scope ? undefined : 'pointer',
+          }}
         >
           <img
             src={src}

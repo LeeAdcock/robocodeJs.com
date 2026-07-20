@@ -113,6 +113,22 @@ describe('AppLogsDock (editor-docked console)', () => {
     expect(screen.queryByLabelText(/unread problems/)).toBeNull();
   });
 
+  it('the console is hard-scoped: only this app in the Bots filter, no clear chip', () => {
+    renderDock();
+    push({ appId: 'a1', name: '<11>', msg: 'mine' });
+    push({ appId: 'a2', name: '<21>', msg: 'theirs' });
+    fireEvent.click(screen.getByLabelText('Open console'));
+
+    // No escape hatch to other apps' logs: the clear-filter chip isn't shown
+    // (the scope is a boundary, not a removable filter)...
+    expect(screen.queryByLabelText('Show all bots')).toBeNull();
+
+    // ...and the Bots filter offers only this app's bots.
+    fireEvent.click(screen.getByText('Bots'));
+    expect(screen.getByText('alpha')).toBeTruthy();
+    expect(screen.queryByText('beta')).toBeNull();
+  });
+
   it('a bot fault shows a clickable row that jumps the editor to the line', () => {
     const emitter = new Emitter();
     const onJumpToLine = vi.fn();
