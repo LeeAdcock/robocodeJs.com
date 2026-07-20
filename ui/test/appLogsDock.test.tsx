@@ -123,9 +123,12 @@ describe('AppLogsDock (editor-docked console)', () => {
     // (the scope is a boundary, not a removable filter)...
     expect(screen.queryByLabelText('Show all bots')).toBeNull();
 
-    // ...and the Bots filter offers only this app's bots.
+    // ...and the Bots filter offers only this app's individual bots — no
+    // app-level checkbox row (unchecking the only app would show nothing) and
+    // no other apps.
     fireEvent.click(screen.getByText('Bots'));
-    expect(screen.getByText('alpha')).toBeTruthy();
+    expect(screen.getByText('Bot 11')).toBeTruthy();
+    expect(screen.queryByText('alpha')).toBeNull();
     expect(screen.queryByText('beta')).toBeNull();
   });
 

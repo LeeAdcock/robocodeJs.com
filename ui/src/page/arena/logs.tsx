@@ -643,25 +643,32 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             <Dropdown.Menu>
               {apps.map((app) => (
                 <React.Fragment key={app.id}>
-                  <Dropdown.Item
-                    as="button"
-                    // Toggle the whole application (all of its bots).
-                    onClick={() => setHidden(botsOf(app), appShown(app))}
-                  >
-                    <Form.Check
-                      checked={appShown(app)}
-                      readOnly
-                      inline
-                      type="checkbox"
-                      id={`bot-${app.id}`}
-                    />
-                    <strong>{app.name}</strong>
-                  </Dropdown.Item>
+                  {/* In a scoped console there is only this one app, and
+                      unchecking it would just show nothing — offer only its
+                      individual bots. */}
+                  {!scope && (
+                    <Dropdown.Item
+                      as="button"
+                      // Toggle the whole application (all of its bots).
+                      onClick={() => setHidden(botsOf(app), appShown(app))}
+                    >
+                      <Form.Check
+                        checked={appShown(app)}
+                        readOnly
+                        inline
+                        type="checkbox"
+                        id={`bot-${app.id}`}
+                      />
+                      <strong>{app.name}</strong>
+                    </Dropdown.Item>
+                  )}
                   {botsOf(app).map((key, i) => (
                     <Dropdown.Item
                       as="button"
                       key={key}
-                      style={{ paddingLeft: '2.5em' }}
+                      // Indented under the app row — unless scoped, where
+                      // there is no app row to indent under.
+                      style={scope ? undefined : { paddingLeft: '2.5em' }}
                       // Toggle just this bot.
                       onClick={() => setHidden([key], !hidden.has(key))}
                     >
