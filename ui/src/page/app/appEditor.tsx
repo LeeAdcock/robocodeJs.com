@@ -37,6 +37,10 @@ interface CodeEditorProps {
   faultAnnotation?: { line: number; message: string } | null;
   // Increment to clear all gutter markers (e.g. after a clean recompile).
   clearMarkersSignal?: number;
+  // CSS height of the editor. Defaults to the historical full-pane sizing;
+  // the app page passes '100%' now that it sizes the editor via a flex row
+  // shared with the docked log console.
+  height?: string;
   doClean: () => void;
   doCheck: () => void;
   doExecute: () => void;
@@ -188,7 +192,7 @@ export default function CodeEditor(props: CodeEditorProps) {
       showGutter={true}
       highlightActiveLine={true}
       value={props.code}
-      height="calc(100% - 51px)"
+      height={props.height ?? 'calc(100% - 51px)'}
       width="100%"
       setOptions={{
         enableBasicAutocompletion: true,
