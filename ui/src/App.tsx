@@ -240,7 +240,10 @@ function App() {
   }, [darkMode]);
 
   // Arena "debug view": the schematic render toggled from the arena toolbar.
-  const debugMode = useDebugMode();
+  // Signed out, the arena shows the public demo and the toolbar (with the
+  // toggle) isn't rendered — so the persisted preference must not leak in:
+  // the demo always gets the normal terrain render.
+  const debugMode = useDebugMode() && !!user;
 
   // On phone-sized viewports (below the navbar's `expand="sm"` breakpoint) the
   // 50/50 split is unusable, so the arena pane is dropped entirely and the

@@ -9,6 +9,7 @@ vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 import axios from 'axios';
 import App from '../src/App';
 import { setDarkMode } from '../src/util/theme';
+import { setDebugMode } from '../src/util/debugMode';
 
 class FakeEventSource {
   url: string;
@@ -42,6 +43,7 @@ describe('App', () => {
     cleanup();
     vi.unstubAllGlobals();
     setDarkMode(false);
+    setDebugMode(false);
     document.body.classList.remove('dark');
   });
 
@@ -49,6 +51,18 @@ describe('App', () => {
     const { container } = render(<App />);
     // The arena SVG renders regardless of auth state.
     expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('never shows the signed-out demo arena in debug view, whatever the saved preference', () => {
+    // A prior signed-in session left the schematic preference on; the demo
+    // (signed-out) arena must ignore it and render the scenic view.
+    setDebugMode(true);
+    const { container } = render(<App />);
+    expect(container.querySelector('svg')).toBeTruthy();
+    // The debug view's flat background is its unconditional tell (it renders
+    // even for an empty arena); the ocean rect marks the normal scene.
+    expect(container.querySelector('[fill="var(--debug-bg)"]')).toBeNull();
+    expect(container.querySelector('[fill="url(#ocean)"]')).toBeTruthy();
   });
 
   it('reflects the theme preference on the document body', () => {
