@@ -6,7 +6,7 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import Form from 'react-bootstrap/Form';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
-import { FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
+import { FaPause, FaPlay, FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
 import { colors } from '../../util/colors';
 import { titleCase } from '../../util/titleCase';
 
@@ -53,6 +53,18 @@ interface LogsState {
   hideBots: string[];
   // Console font size, persisted so the preference survives reloads.
   fontSize: number;
+  // Whether the view is attached to the live tail. Scrolling up detaches (new
+  // lines stop moving the viewport); scrolling back to the bottom — or clicking
+  // the "new lines" pill — re-attaches.
+  follow: boolean;
+  // A frozen copy of the log buffer taken when the user hit Pause, or null when
+  // live. While set, the display renders this snapshot; the real buffer keeps
+  // filling behind it.
+  pausedLogs: { logs: (LogEntry | null)[]; index: number } | null;
+  // Lines that arrived while detached and/or paused — the pill's "N new lines"
+  // count and the held-line badge on the Pause button. Reset when the view is
+  // both attached and unpaused again.
+  newSince: number;
 }
 
 // Identify one bot in the hide set.
@@ -70,6 +82,9 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
         savedFont >= LOG_FONT_MIN && savedFont <= LOG_FONT_MAX
           ? savedFont
           : LOG_FONT_DEFAULT,
+      follow: true,
+      pausedLogs: null,
+      newSince: 0,
     };
   }
 
@@ -90,22 +105,79 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     this.applySelection();
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps: LogsProps) {
     // Once the bot list has loaded, reflect a shift-double-click selection in the
     // Bots filter itself (hide everything except the chosen app / bot), so the
     // dropdown matches what's shown and the user can toggle others back on.
     this.applySelection();
 
-    // Pin to the bottom of the scroll area
-    const el = this.logRef.current;
-    if (!el) return;
-    const parentHeight = (el.children[0] as HTMLElement).offsetHeight;
-    const height = el.offsetHeight;
-    const scrollTop = el.scrollTop;
-    if (Math.abs(scrollTop - (parentHeight - height)) < 200) {
-      el.scrollTo({ top: parentHeight });
+    // Count lines arriving while the user isn't watching the tail (detached
+    // and/or paused) — the ring index only moves when an entry lands, so the
+    // wrapped delta is the number of arrivals.
+    const len = this.props.logEntries.logs.length;
+    const delta =
+      len > 0
+        ? (this.props.logEntries.index - prevProps.logEntries.index + len) % len
+        : 0;
+    if (delta > 0 && (this.state.pausedLogs || !this.state.follow)) {
+      this.setState((s) => ({ newSince: s.newSince + delta }));
+    }
+
+    // Attached and live: keep the viewport pinned to the newest line.
+    if (this.state.follow && !this.state.pausedLogs) {
+      const el = this.logRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight });
     }
   }
+
+  // Scroll position is the follow/detach control: scrolling up detaches the
+  // tail, scrolling back to the bottom re-attaches it. Only real scroll events
+  // land here (content growth doesn't fire `scroll`), so the programmatic pin
+  // above can't fight the user.
+  onScroll = () => {
+    const el = this.logRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+    if (atBottom && !this.state.follow) {
+      this.setState((s) => ({
+        follow: true,
+        // Keep the held-line count while paused — those lines are still unseen.
+        newSince: s.pausedLogs ? s.newSince : 0,
+      }));
+    } else if (!atBottom && this.state.follow) {
+      this.setState({ follow: false });
+    }
+  };
+
+  // The "N new lines" pill: jump to the bottom and re-attach.
+  resumeFollow = () => {
+    const el = this.logRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight });
+    this.setState((s) => ({
+      follow: true,
+      newSince: s.pausedLogs ? s.newSince : 0,
+    }));
+  };
+
+  // Pause freezes the display on a snapshot of the buffer (the buffer itself
+  // keeps filling — the button shows how many lines are being held). Note the
+  // client ring buffer is finite: a long pause under heavy logging can evict
+  // the oldest held lines before they're ever revealed.
+  togglePause = () => {
+    if (this.state.pausedLogs) {
+      this.setState((s) => ({
+        pausedLogs: null,
+        newSince: s.follow ? 0 : s.newSince,
+      }));
+    } else {
+      this.setState({
+        pausedLogs: {
+          logs: [...this.props.logEntries.logs],
+          index: this.props.logEntries.index,
+        },
+      });
+    }
+  };
 
   applySelection() {
     const { selectedApp, selectedBot, bots } = this.props;
@@ -391,80 +463,150 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             size="sm"
             style={{ maxWidth: '12em' }}
           />
+
+          <OverlayTrigger
+            placement="bottom"
+            overlay={
+              <Tooltip id="log-pause">
+                {this.state.pausedLogs
+                  ? 'Resume log output'
+                  : 'Pause log output'}
+              </Tooltip>
+            }
+          >
+            <Button
+              variant={this.state.pausedLogs ? 'warning' : 'secondary'}
+              size="sm"
+              aria-label={
+                this.state.pausedLogs ? 'Resume log output' : 'Pause log output'
+              }
+              onClick={this.togglePause}
+            >
+              {this.state.pausedLogs ? <FaPlay /> : <FaPause />}
+              {this.state.pausedLogs && this.state.newSince > 0 && (
+                <span style={{ marginLeft: '5px' }}>{this.state.newSince}</span>
+              )}
+            </Button>
+          </OverlayTrigger>
         </ButtonToolbar>
 
-        {/* Log list — fills the remaining height and scrolls on its own. */}
-        <div
-          className="logs"
-          ref={this.logRef}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            fontFamily:
-              'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-            fontSize: `${this.state.fontSize}px`,
-          }}
-        >
-          <div>
-            {this.props.logEntries.logs
-              .filter(
-                (record) =>
-                  record &&
-                  record.time <=
-                    (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-                  !hidden.has(botKey(record.appId, record.botIndex)) &&
-                  !this.state.hideLevels.includes(
-                    record.levelName.toUpperCase()
-                  ) &&
-                  (this.state.search?.length === 0
-                    ? true
-                    : JSON.stringify(record).includes(this.state.search))
-              )
-              .sort((a, b) => (a !== null && b !== null ? a.time - b.time : 0))
-              .map(
-                (record) =>
-                  record && (
-                    <span key={record.id}>
-                      <span
-                        style={{
-                          marginRight: '5px',
-                        }}
-                      >
-                        [<span className="date">{record.time}</span>]
-                      </span>
-                      <span
-                        style={{
-                          marginRight: '5px',
-                        }}
-                      >
-                        [
+        {/* Log list — fills the remaining height and scrolls on its own. The
+            wrapper is the positioning context for the floating "new lines"
+            pill so it stays put while the list scrolls under it. */}
+        <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+          <div
+            className="logs"
+            ref={this.logRef}
+            onScroll={this.onScroll}
+            style={{
+              height: '100%',
+              overflowY: 'auto',
+              fontFamily:
+                'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
+              fontSize: `${this.state.fontSize}px`,
+            }}
+          >
+            <div>
+              {(this.state.pausedLogs ?? this.props.logEntries).logs
+                .filter(
+                  (record) =>
+                    record &&
+                    record.time <=
+                      (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
+                    !hidden.has(botKey(record.appId, record.botIndex)) &&
+                    !this.state.hideLevels.includes(
+                      record.levelName.toUpperCase()
+                    ) &&
+                    // Free-text search matches what the user can actually see —
+                    // the message and the bot name — not the serialized record
+                    // (which would hit internal ids, levels, and timestamps).
+                    (this.state.search.length === 0 ||
+                      matchesSearch(record, this.state.search))
+                )
+                .sort((a, b) =>
+                  a !== null && b !== null ? a.time - b.time : 0
+                )
+                .map(
+                  (record) =>
+                    record && (
+                      <span key={record.id}>
                         <span
                           style={{
-                            color: levelColors[record.levelName] || 'white',
+                            marginRight: '5px',
                           }}
                         >
-                          {record.levelName.toUpperCase()}
+                          [<span className="date">{record.time}</span>]
                         </span>
-                        ]
+                        <span
+                          style={{
+                            marginRight: '5px',
+                          }}
+                        >
+                          [
+                          <span
+                            style={{
+                              color: levelColors[record.levelName] || 'white',
+                            }}
+                          >
+                            {record.levelName.toUpperCase()}
+                          </span>
+                          ]
+                        </span>
+                        {teamChip(record.appId)}
+                        <span
+                          className="name"
+                          style={{
+                            marginRight: '5px',
+                          }}
+                        >
+                          {record.name}
+                        </span>
+                        <span className="message">{record.msg}</span>
+                        <br />
                       </span>
-                      {teamChip(record.appId)}
-                      <span
-                        className="name"
-                        style={{
-                          marginRight: '5px',
-                        }}
-                      >
-                        {record.name}
-                      </span>
-                      <span className="message">{record.msg}</span>
-                      <br />
-                    </span>
-                  )
-              )}
+                    )
+                )}
+            </div>
           </div>
+
+          {/* Detached from the tail: a floating pill offers the way back down,
+              with a live count of the lines that have arrived meanwhile. Hidden
+              while paused — the Pause button carries the held count then. */}
+          {!this.state.follow && !this.state.pausedLogs && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={this.resumeFollow}
+              aria-label="Scroll to latest logs"
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                borderRadius: '1em',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ↓{' '}
+              {this.state.newSince > 0
+                ? `${this.state.newSince} new line${
+                    this.state.newSince === 1 ? '' : 's'
+                  }`
+                : 'Latest'}
+            </Button>
+          )}
         </div>
       </div>
     );
   }
+}
+
+// Case-insensitive match against the fields a log line actually displays.
+function matchesSearch(record: LogEntry, search: string): boolean {
+  const q = search.toLowerCase();
+  return (
+    (record.msg ?? '').toLowerCase().includes(q) ||
+    (record.name ?? '').toLowerCase().includes(q)
+  );
 }

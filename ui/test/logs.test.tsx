@@ -182,6 +182,116 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.getByText('Bot B')).toBeTruthy();
   });
 
+  it('search matches the visible message/name, not the serialized record', () => {
+    const { container } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ msg: 'Enemy Spotted', levelName: 'info' }),
+            entry({ msg: 'turning left', levelName: 'info' }),
+          ],
+          index: 2,
+        }}
+      />
+    );
+    const search = container.querySelector(
+      'input[type="search"]'
+    ) as HTMLInputElement;
+
+    // "info" appears in every record's levelName (and appId-ish internals used
+    // to match too) — but in no visible message, so nothing should match.
+    fireEvent.change(search, { target: { value: 'info' } });
+    expect(screen.queryByText('Enemy Spotted')).toBeNull();
+    expect(screen.queryByText('turning left')).toBeNull();
+
+    // Message text matches case-insensitively.
+    fireEvent.change(search, { target: { value: 'enemy spotted' } });
+    expect(screen.queryByText('Enemy Spotted')).toBeTruthy();
+    expect(screen.queryByText('turning left')).toBeNull();
+
+    // The bot name (the visible <id>) matches too.
+    fireEvent.change(search, { target: { value: '<11>' } });
+    expect(screen.queryByText('Enemy Spotted')).toBeTruthy();
+  });
+
+  it('pause freezes the display, counts held lines, and resume reveals them', () => {
+    const first = entry({ msg: 'before pause' });
+    const ring = (entries: Entry[]) => ({
+      // A fixed-capacity ring like the real page's, so the held-line count can
+      // be derived from the index delta.
+      logs: [...entries, ...new Array(10 - entries.length).fill(null)],
+      index: entries.length,
+    });
+    const { rerender } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={ring([first])}
+      />
+    );
+    expect(screen.queryByText('before pause')).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText('Pause log output'));
+
+    // Two more lines land while paused: display frozen, held count on the button.
+    const second = entry({ msg: 'while paused 1' });
+    const third = entry({ msg: 'while paused 2' });
+    rerender(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={ring([first, second, third])}
+      />
+    );
+    expect(screen.queryByText('while paused 1')).toBeNull();
+    const resume = screen.getByLabelText('Resume log output');
+    expect(resume.textContent).toContain('2');
+
+    // Resume reveals everything logged in between.
+    fireEvent.click(resume);
+    expect(screen.queryByText('while paused 1')).toBeTruthy();
+    expect(screen.queryByText('while paused 2')).toBeTruthy();
+  });
+
+  it('scrolling up detaches the tail and shows a new-lines pill that re-attaches', () => {
+    const first = entry({ msg: 'line one' });
+    const ring = (entries: Entry[]) => ({
+      logs: [...entries, ...new Array(10 - entries.length).fill(null)],
+      index: entries.length,
+    });
+    const { container, rerender } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={ring([first])}
+      />
+    );
+    const scroller = container.querySelector('.logs') as HTMLDivElement;
+
+    // jsdom has no layout — fake a scrolled-up viewport (tall content, at top).
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1000 });
+    Object.defineProperty(scroller, 'clientHeight', { value: 100 });
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+
+    // Detached: no pill yet (nothing new)... until a line arrives.
+    rerender(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={ring([first, entry({ msg: 'line two' })])}
+      />
+    );
+    const pill = screen.getByLabelText('Scroll to latest logs');
+    expect(pill.textContent).toContain('1 new line');
+
+    // Clicking the pill re-attaches and clears the count.
+    fireEvent.click(pill);
+    expect(screen.queryByLabelText('Scroll to latest logs')).toBeNull();
+  });
+
   it('can hide an individual bot (labelled by its bot id) within an application', () => {
     render(
       <Logs
