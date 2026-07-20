@@ -717,6 +717,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                   <Button
                     variant="secondary"
                     size="sm"
+                    className="log-level-chip"
                     aria-label={`Toggle ${level} logs`}
                     aria-pressed={!isHidden}
                     onClick={() =>
@@ -731,10 +732,12 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                       textDecoration: isHidden ? 'line-through' : 'none',
                     }}
                   >
-                    <span
-                      style={{ color: levelColors[level.toLowerCase()] }}
-                      // The colored token is the label; the count sits after it.
-                    >
+                    {/* The colored token is the label; the count sits after
+                        it. Chip hues are themed in index.css — muted, per
+                        theme — not the console's own level colors (those are
+                        tuned for the dark log background and jar on the
+                        toolbar). */}
+                    <span className={`log-level-${level.toLowerCase()}`}>
                       {level}
                     </span>{' '}
                     {levelCounts[level]}

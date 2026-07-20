@@ -341,6 +341,66 @@ svg.motion-snap * {
   text-decoration: underline;
 }
 
+/* Level filter chips in the log toolbar: a quiet themed surface (instead of
+   the solid gray action buttons) carrying muted theme-aligned level hues —
+   dark red / gold / dark blue on light, the debug-palette brights on dark.
+   The console's own level colors (pure red/yellow/blue) are tuned for the
+   dark log background and jar against the toolbar. */
+.log-level-chip.btn.btn-secondary {
+  --bs-btn-bg: #e9ecef;
+  --bs-btn-border-color: #ced4da;
+  --bs-btn-color: #495057;
+  --bs-btn-hover-bg: #dde1e5;
+  --bs-btn-hover-border-color: #c2c8ce;
+  --bs-btn-hover-color: #343a40;
+  --bs-btn-active-bg: #d4d9dd;
+  --bs-btn-active-border-color: #b9c0c7;
+  --bs-btn-active-color: #343a40;
+}
+body.dark .log-level-chip.btn.btn-secondary {
+  --bs-btn-bg: #31353f;
+  --bs-btn-border-color: #4a4f5a;
+  --bs-btn-color: #c6c1b6;
+  --bs-btn-hover-bg: #3a3f4b;
+  --bs-btn-hover-border-color: #565c68;
+  --bs-btn-hover-color: #d6d6d6;
+  --bs-btn-active-bg: #434956;
+  --bs-btn-active-border-color: #5f6572;
+  --bs-btn-active-color: #d6d6d6;
+}
+.log-level-chip .log-level-error {
+  color: #b02a37;
+}
+.log-level-chip .log-level-warn {
+  color: #b8860b;
+}
+.log-level-chip .log-level-info {
+  color: #2e7d32;
+}
+.log-level-chip .log-level-debug {
+  color: #2c5aa0;
+}
+.log-level-chip .log-level-trace {
+  color: #6c757d;
+}
+/* Dark theme: the same hues as the arena debug view's vector palette, bright
+   enough to read on the elevated dark chip surface. */
+body.dark .log-level-chip .log-level-error {
+  color: #f87171;
+}
+body.dark .log-level-chip .log-level-warn {
+  color: #fbbf24;
+}
+body.dark .log-level-chip .log-level-info {
+  color: #34d399;
+}
+body.dark .log-level-chip .log-level-debug {
+  color: #60a5fa;
+}
+body.dark .log-level-chip .log-level-trace {
+  color: #9aa4b2;
+}
+
 /* Match-lifecycle dividers in the log stream (restart / elimination / sudden
    death — GitHub #318): a labeled rule so the scroll has narrative structure. */
 .logs .log-divider {
