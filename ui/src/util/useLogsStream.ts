@@ -23,6 +23,10 @@ export interface LogEntry {
   levelName: string;
   msg: string;
   time: number;
+  // Set on synthetic lifecycle rows injected by addLogMarker ('restart',
+  // 'eliminated', 'suddenDeath'): rendered as divider rows in the console, not
+  // log lines, and exempt from the bot/level/search filters.
+  marker?: string;
 }
 
 export interface LogEntries {
@@ -75,13 +79,38 @@ function open(userId: string) {
   source.onmessage = (message) => {
     const entry = JSON.parse(message.data) as LogEntry;
     if (!entry.id || heldIds.has(entry.id)) return;
-    const evicted = state.logs[state.index];
-    if (evicted) heldIds.delete(evicted.id);
-    heldIds.add(entry.id);
-    state.logs[state.index] = entry;
-    state = { logs: state.logs, index: (state.index + 1) % state.logs.length };
-    notify();
+    append(entry);
   };
+}
+
+// Append an entry to the ring in arrival position, evicting the oldest.
+function append(entry: LogEntry) {
+  const evicted = state.logs[state.index];
+  if (evicted) heldIds.delete(evicted.id);
+  if (entry.id) heldIds.add(entry.id);
+  state.logs[state.index] = entry;
+  state = { logs: state.logs, index: (state.index + 1) % state.logs.length };
+  notify();
+}
+
+// Interleave a match-lifecycle divider ("Match restarted", "… eliminated",
+// sudden death) into the stream at the current position. `time` is the tick
+// the moment belongs to, so the console's playback hold-back reveals the
+// divider in step with the on-screen motion it describes. App.tsx injects
+// these from the arena events stream (GitHub #318).
+let markerSeq = 0;
+export function addLogMarker(kind: string, label: string, time: number) {
+  append({
+    id: `marker-${++markerSeq}`,
+    marker: kind,
+    msg: label,
+    time,
+    appId: '',
+    botIndex: 0,
+    level: 0,
+    levelName: '',
+    name: '',
+  });
 }
 
 // Subscribe this component to the (shared) log stream for the given user's

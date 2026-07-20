@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/react';
 import Logs from '../src/page/arena/logs';
 
@@ -16,6 +16,8 @@ interface Entry {
   levelName: string;
   msg: string;
   time: number;
+  // Lifecycle divider rows (see useLogsStream.addLogMarker).
+  marker?: string;
 }
 let seq = 0;
 const entry = (over: Partial<Entry> = {}): Entry => ({
@@ -410,6 +412,146 @@ describe('Logs (per-bot filtering)', () => {
       screen.getByLabelText('Toggle ERROR logs').getAttribute('aria-pressed')
     ).toBe('false');
     window.history.replaceState(null, '', '/');
+  });
+
+  it('renders lifecycle markers as dividers that bypass the bot/level filters', () => {
+    render(
+      <Logs
+        bots={bots}
+        // Filtered to app a1 only — the divider must still show.
+        selectedApp="a1"
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ appId: 'a1', msg: 'before' }),
+            entry({
+              marker: 'restart',
+              msg: 'Match restarted',
+              appId: '',
+              botIndex: 0,
+              levelName: '',
+              name: '',
+            }),
+            entry({ appId: 'a1', msg: 'after' }),
+          ],
+          index: 3,
+        }}
+      />
+    );
+    const divider = screen.getByText('Match restarted');
+    expect(divider.className).toContain('log-divider');
+    // Arrival order: before → divider → after.
+    expect(screen.queryByText('before')).toBeTruthy();
+    expect(screen.queryByText('after')).toBeTruthy();
+  });
+
+  it('collapses consecutive duplicate lines into one ×N row', () => {
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ msg: 'scanning', time: 1 }),
+            entry({ msg: 'scanning', time: 2 }),
+            entry({ msg: 'scanning', time: 3 }),
+            entry({ msg: 'firing', time: 4 }),
+            entry({ msg: 'scanning', time: 5 }),
+          ],
+          index: 5,
+        }}
+      />
+    );
+    // The run of three renders once, with a ×3 counter; the later, non-adjacent
+    // 'scanning' stays its own row.
+    expect(screen.getAllByText('scanning').length).toBe(2);
+    expect(screen.getByText('×3')).toBeTruthy();
+    expect(screen.queryByText('×2')).toBeNull();
+  });
+
+  it('next/previous error jumps between ERROR rows', () => {
+    const { container } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ msg: 'fine', levelName: 'info', time: 1 }),
+            entry({ msg: 'boom one', levelName: 'error', time: 2 }),
+            entry({ msg: 'fine again', levelName: 'info', time: 3 }),
+            entry({ msg: 'boom two', levelName: 'error', time: 4 }),
+          ],
+          index: 4,
+        }}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Next error'));
+    const flashed = () =>
+      Array.from(container.querySelectorAll('.log-jump')).map(
+        (el) => el.textContent
+      );
+    expect(flashed()[0]).toContain('boom one');
+
+    fireEvent.click(screen.getByLabelText('Next error'));
+    expect(flashed().some((t) => t?.includes('boom two'))).toBe(true);
+  });
+
+  it('highlight mode marks matches in place instead of filtering', () => {
+    const { container } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ msg: 'the needle is here', time: 1 }),
+            entry({ msg: 'plain line', time: 2 }),
+          ],
+          index: 2,
+        }}
+      />
+    );
+    const search = container.querySelector(
+      'input[type="search"]'
+    ) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'needle' } });
+    // Filtering (default): the non-matching line is gone.
+    expect(screen.queryByText('plain line')).toBeNull();
+
+    fireEvent.click(
+      screen.getByLabelText('Highlight matches instead of filtering')
+    );
+    // Highlighting: both lines visible, the match marked, a count shown.
+    expect(screen.queryByText('plain line')).toBeTruthy();
+    expect(container.querySelector('mark')?.textContent).toBe('needle');
+    expect(screen.getByText('1 match')).toBeTruthy();
+  });
+
+  it('copies the visible (filtered) lines to the clipboard', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ msg: 'kept', levelName: 'info', time: 1 }),
+            entry({ msg: 'kept', levelName: 'info', time: 2 }),
+            entry({ msg: 'hidden', levelName: 'debug', time: 3 }),
+          ],
+          index: 3,
+        }}
+      />
+    );
+    // Hide DEBUG, then copy: only the collapsed 'kept' row should be present.
+    fireEvent.click(screen.getByLabelText('Toggle DEBUG logs'));
+    fireEvent.click(screen.getByLabelText('Copy visible logs'));
+    const text = writeText.mock.calls[0][0] as string;
+    expect(text).toContain('kept ×2');
+    expect(text).not.toContain('hidden');
   });
 
   it('can hide an individual bot (labelled by its bot id) within an application', () => {

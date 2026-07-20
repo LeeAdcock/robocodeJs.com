@@ -651,6 +651,16 @@ export default class Environment {
     Simulation.run(this);
     this.clock.time = this.clock.time + 1;
 
+    // Sudden death just began — tell connected UIs (the log console renders a
+    // lifecycle divider for it). Fires once per match: restart() resets the
+    // clock, so the next match crosses the threshold again.
+    if (this.clock.time === SUDDEN_DEATH_TIME) {
+      this.emitter.emit('event', {
+        type: 'arenaSuddenDeath',
+        time: this.clock.time,
+      });
+    }
+
     // Health decays after sudden death time
     if (this.clock.time > SUDDEN_DEATH_TIME && this.clock.time % 50 === 0) {
       this.processes.forEach((process) => {

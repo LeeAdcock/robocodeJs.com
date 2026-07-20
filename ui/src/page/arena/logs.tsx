@@ -6,7 +6,18 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import Form from 'react-bootstrap/Form';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
-import { FaPause, FaPlay, FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
+import {
+  FaAngleDown,
+  FaAngleUp,
+  FaCopy,
+  FaHighlighter,
+  FaPause,
+  FaPlay,
+  FaSearchMinus,
+  FaSearchPlus,
+  FaTextWidth,
+} from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 import { colors } from '../../util/colors';
 import { titleCase } from '../../util/titleCase';
 
@@ -25,6 +36,17 @@ interface LogEntry {
   levelName: string;
   msg: string;
   time: number;
+  // Synthetic match-lifecycle rows ('restart' | 'eliminated' | 'suddenDeath')
+  // injected by useLogsStream.addLogMarker: rendered as divider rows, exempt
+  // from the bot/level/search filters (only the playback hold-back applies).
+  marker?: string;
+}
+
+// A rendered console row: a log record plus how many consecutive identical
+// lines (same bot + level + message) it stands for.
+interface LogRow {
+  record: LogEntry;
+  count: number;
 }
 
 interface LogsProps {
@@ -70,6 +92,13 @@ interface LogsState {
   // count and the held-line badge on the Pause button. Reset when the view is
   // both attached and unpaused again.
   newSince: number;
+  // Find-style search: matches are highlighted in place (with next/prev
+  // navigation) instead of filtering the stream — so the context around a
+  // match stays visible.
+  highlight: boolean;
+  // Whether long lines wrap (default) or stay on one line with a horizontal
+  // scroll.
+  wrap: boolean;
 }
 
 // Identify one bot in the hide set.
@@ -101,6 +130,8 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       follow: true,
       pausedLogs: null,
       newSince: 0,
+      highlight: false,
+      wrap: true,
     };
   }
 
@@ -183,6 +214,60 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       follow: true,
       newSince: s.pausedLogs ? s.newSince : 0,
     }));
+  };
+
+  // The rows currently rendered, captured during render for the copy button
+  // and the row-jumping navigation.
+  visibleRows: LogRow[] = [];
+  // Row-jump cursors (index into the matching row set). -1 = before the first,
+  // so the first "next" lands on the first match.
+  errorCursor = -1;
+  matchCursor = -1;
+
+  // Jump the viewport to the next/previous row carrying `attr` (data-log-error
+  // / data-log-match), wrapping around, with a brief outline so the landing
+  // row is findable.
+  jumpTo(attr: string, dir: 1 | -1, cursor: 'errorCursor' | 'matchCursor') {
+    const el = this.logRef.current;
+    if (!el) return;
+    const nodes = el.querySelectorAll<HTMLElement>(`[${attr}]`);
+    if (nodes.length === 0) return;
+    this[cursor] =
+      (((this[cursor] + dir) % nodes.length) + nodes.length) % nodes.length;
+    const node = nodes[this[cursor]];
+    node.scrollIntoView?.({ block: 'center' });
+    node.classList.add('log-jump');
+    setTimeout(() => node.classList.remove('log-jump'), 800);
+  }
+
+  nextError = () => this.jumpTo('data-log-error', 1, 'errorCursor');
+  prevError = () => this.jumpTo('data-log-error', -1, 'errorCursor');
+  nextMatch = () => this.jumpTo('data-log-match', 1, 'matchCursor');
+  prevMatch = () => this.jumpTo('data-log-match', -1, 'matchCursor');
+
+  // n / p jump between error lines (the most common movement while
+  // debugging). Attached to the scroll area, so typing in the filter box or
+  // other inputs never triggers it.
+  onKeyDown = (e: React.KeyboardEvent) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'n') this.nextError();
+    else if (e.key === 'p') this.prevError();
+  };
+
+  // Copy what's on screen (after all filters), one line per rendered row —
+  // ready to paste into an issue or an AI conversation.
+  copyVisible = () => {
+    const text = this.visibleRows
+      .map(({ record, count }) =>
+        record.marker
+          ? `── ${record.msg} ──`
+          : `[${record.time}] [${record.levelName.toUpperCase()}] ${
+              record.name
+            } ${record.msg}${count > 1 ? ` ×${count}` : ''}`
+      )
+      .join('\n');
+    navigator.clipboard?.writeText(text).catch(() => undefined);
   };
 
   // Pause freezes the display on a snapshot of the buffer (the buffer itself
@@ -332,27 +417,80 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       info: 'green',
     };
 
+    // The buffer in arrival order — the true stream order. The ring's oldest
+    // entry sits at `index` (the next overwrite position), so walking from
+    // there is chronological without a sort; sorting by tick time would
+    // interleave matches across a restart, where the clock resets to 0.
+    const { logs, index } = this.state.pausedLogs ?? this.props.logEntries;
+    const ordered: LogEntry[] = [];
+    for (let k = 0; k < logs.length; k++) {
+      const record = logs[(index + k) % logs.length];
+      if (record) ordered.push(record);
+    }
+
+    // In highlight mode the search stops filtering (matches are marked in
+    // place instead, so their context stays visible).
+    const searchFilters = this.state.search.length > 0 && !this.state.highlight;
+    const searchHighlights =
+      this.state.search.length > 0 && this.state.highlight;
+
     // Everything except the level filter, shared by the visible-line filter and
     // the per-level chip counts (a chip counts what toggling it would affect).
-    const source = (this.state.pausedLogs ?? this.props.logEntries).logs;
-    const passesBase = (record: LogEntry | null): record is LogEntry =>
-      !!record &&
+    // Lifecycle dividers bypass every filter except the playback hold-back.
+    const passesBase = (record: LogEntry): boolean =>
       record.time <= (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-      !hidden.has(botKey(record.appId, record.botIndex)) &&
-      // Free-text search matches what the user can actually see — the message
-      // and the bot name — not the serialized record (which would hit internal
-      // ids, levels, and timestamps).
-      (this.state.search.length === 0 ||
-        matchesSearch(record, this.state.search));
+      (!!record.marker ||
+        (!hidden.has(botKey(record.appId, record.botIndex)) &&
+          // Free-text search matches what the user can actually see — the
+          // message and the bot name — not the serialized record (which would
+          // hit internal ids, levels, and timestamps).
+          (!searchFilters || matchesSearch(record, this.state.search))));
 
     const levelCounts: Record<string, number> = {};
     LEVELS.forEach((level) => (levelCounts[level] = 0));
-    source.forEach((record) => {
-      if (passesBase(record)) {
+    ordered.forEach((record) => {
+      if (!record.marker && passesBase(record)) {
         const level = record.levelName.toUpperCase();
         levelCounts[level] = (levelCounts[level] ?? 0) + 1;
       }
     });
+
+    // Visible rows, with consecutive identical lines (same bot + level +
+    // message — the norm for bots logging inside TICK handlers) collapsed into
+    // one ×N row. Dividers never merge.
+    const rows: LogRow[] = [];
+    for (const record of ordered) {
+      if (!passesBase(record)) continue;
+      if (
+        !record.marker &&
+        this.state.hideLevels.includes(record.levelName.toUpperCase())
+      )
+        continue;
+      const last = rows[rows.length - 1];
+      if (
+        last &&
+        !record.marker &&
+        !last.record.marker &&
+        last.record.appId === record.appId &&
+        last.record.botIndex === record.botIndex &&
+        last.record.levelName === record.levelName &&
+        last.record.msg === record.msg
+      ) {
+        last.count++;
+      } else {
+        rows.push({ record, count: 1 });
+      }
+    }
+    this.visibleRows = rows;
+
+    const isMatch = (record: LogEntry) =>
+      searchHighlights &&
+      !record.marker &&
+      matchesSearch(record, this.state.search);
+    const matchCount = rows.filter(({ record }) => isMatch(record)).length;
+    const hasErrors = rows.some(
+      ({ record }) => !record.marker && record.levelName === 'error'
+    );
 
     // Team chip for a log line: the app's arena color swatch (the same mini tank
     // sprite the navbar/roster use) plus its name, so a line reads as its team at
@@ -573,14 +711,137 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             </Button>
           )}
 
+          {/* Jump between ERROR lines — also on the n/p keys. */}
+          <ButtonGroup>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={
+                <Tooltip id="log-prev-error">Previous error (p)</Tooltip>
+              }
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Previous error"
+                onClick={this.prevError}
+                disabled={!hasErrors}
+              >
+                <FaAngleUp />
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={<Tooltip id="log-next-error">Next error (n)</Tooltip>}
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Next error"
+                onClick={this.nextError}
+                disabled={!hasErrors}
+              >
+                <FaAngleDown />
+              </Button>
+            </OverlayTrigger>
+          </ButtonGroup>
+
           <Form.Control
             value={this.state.search}
             onChange={(e) => this.setState({ search: e.target.value })}
             type="search"
-            placeholder="Filter"
+            placeholder={this.state.highlight ? 'Find' : 'Filter'}
             size="sm"
             style={{ maxWidth: '12em' }}
           />
+
+          {/* Find-style toggle: highlight matches in place (keeping their
+              context) instead of filtering the stream down to them. */}
+          <OverlayTrigger
+            placement="bottom"
+            overlay={
+              <Tooltip id="log-highlight">
+                {this.state.highlight
+                  ? 'Filter to matches'
+                  : 'Highlight matches in place'}
+              </Tooltip>
+            }
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Highlight matches instead of filtering"
+              aria-pressed={this.state.highlight}
+              onClick={() =>
+                this.setState((s) => ({ highlight: !s.highlight }))
+              }
+              style={{ opacity: this.state.highlight ? 1 : 0.6 }}
+            >
+              <FaHighlighter />
+            </Button>
+          </OverlayTrigger>
+          {searchHighlights && (
+            <ButtonGroup aria-label="Match navigation">
+              <Button variant="secondary" size="sm" disabled>
+                {matchCount} match{matchCount === 1 ? '' : 'es'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Previous match"
+                onClick={this.prevMatch}
+                disabled={matchCount === 0}
+              >
+                <FaAngleUp />
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Next match"
+                onClick={this.nextMatch}
+                disabled={matchCount === 0}
+              >
+                <FaAngleDown />
+              </Button>
+            </ButtonGroup>
+          )}
+
+          <ButtonGroup>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={
+                <Tooltip id="log-wrap">
+                  {this.state.wrap
+                    ? 'Keep long lines on one line'
+                    : 'Wrap long lines'}
+                </Tooltip>
+              }
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Toggle line wrapping"
+                aria-pressed={this.state.wrap}
+                onClick={() => this.setState((s) => ({ wrap: !s.wrap }))}
+              >
+                <FaTextWidth />
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="bottom"
+              overlay={
+                <Tooltip id="log-copy">Copy visible logs to clipboard</Tooltip>
+              }
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Copy visible logs"
+                onClick={this.copyVisible}
+              >
+                <FaCopy />
+              </Button>
+            </OverlayTrigger>
+          </ButtonGroup>
 
           <OverlayTrigger
             placement="bottom"
@@ -616,72 +877,98 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             className="logs"
             ref={this.logRef}
             onScroll={this.onScroll}
+            onKeyDown={this.onKeyDown}
+            tabIndex={0}
             style={{
               height: '100%',
               overflowY: 'auto',
+              overflowX: this.state.wrap ? 'hidden' : 'auto',
               fontFamily:
                 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
               fontSize: `${this.state.fontSize}px`,
             }}
           >
             <div>
-              {source
-                .filter(
-                  (record) =>
-                    passesBase(record) &&
-                    !this.state.hideLevels.includes(
-                      record.levelName.toUpperCase()
-                    )
-                )
-                .sort((a, b) =>
-                  a !== null && b !== null ? a.time - b.time : 0
-                )
-                .map(
-                  (record) =>
-                    record && (
-                      <span key={record.id}>
-                        <span
-                          style={{
-                            marginRight: '5px',
-                          }}
-                        >
-                          [<span className="date">{record.time}</span>]
-                        </span>
-                        <span
-                          style={{
-                            marginRight: '5px',
-                          }}
-                        >
-                          [
-                          <span
-                            style={{
-                              color: levelColors[record.levelName] || 'white',
-                            }}
-                          >
-                            {record.levelName.toUpperCase()}
-                          </span>
-                          ]
-                        </span>
-                        {teamChip(record.appId)}
-                        <span
-                          className="name"
-                          role="button"
-                          title="Show only this bot's logs"
-                          onClick={() =>
-                            filterToBot(record.appId, record.botIndex)
-                          }
-                          style={{
-                            marginRight: '5px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {record.name}
-                        </span>
-                        <span className="message">{record.msg}</span>
-                        <br />
+              {rows.map(({ record, count }) =>
+                record.marker ? (
+                  // Lifecycle divider: a labeled rule in the stream (match
+                  // restarted / bot eliminated / sudden death).
+                  <div
+                    key={record.id}
+                    className="log-divider"
+                    data-marker={record.marker}
+                  >
+                    {record.msg}
+                  </div>
+                ) : (
+                  <div
+                    key={record.id}
+                    // Anchors for the error / match jump navigation.
+                    data-log-error={
+                      record.levelName === 'error' ? 'true' : undefined
+                    }
+                    data-log-match={isMatch(record) ? 'true' : undefined}
+                    className={
+                      record.levelName === 'error' ? 'log-error-row' : undefined
+                    }
+                    style={{
+                      whiteSpace: this.state.wrap ? 'normal' : 'nowrap',
+                      // Let the browser skip rendering off-screen rows — the
+                      // buffer holds up to 1500 lines.
+                      contentVisibility: 'auto',
+                      containIntrinsicSize: 'auto 1.4em',
+                    }}
+                  >
+                    <span
+                      style={{
+                        marginRight: '5px',
+                      }}
+                    >
+                      [<span className="date">{record.time}</span>]
+                    </span>
+                    <span
+                      style={{
+                        marginRight: '5px',
+                      }}
+                    >
+                      [
+                      <span
+                        style={{
+                          color: levelColors[record.levelName] || 'white',
+                        }}
+                      >
+                        {record.levelName.toUpperCase()}
                       </span>
-                    )
-                )}
+                      ]
+                    </span>
+                    {teamChip(record.appId)}
+                    <span
+                      className="name"
+                      role="button"
+                      title="Show only this bot's logs"
+                      onClick={() => filterToBot(record.appId, record.botIndex)}
+                      style={{
+                        marginRight: '5px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {record.name}
+                    </span>
+                    <span className="message">
+                      {renderMessage(
+                        record.msg,
+                        searchHighlights ? this.state.search : ''
+                      )}
+                    </span>
+                    {count > 1 && (
+                      // DevTools-style repeat counter for collapsed duplicates.
+                      <span className="log-repeat" title={`Repeated ${count}×`}>
+                        ×{count}
+                      </span>
+                    )}
+                  </div>
+                )
+              )}
             </div>
           </div>
 
@@ -724,5 +1011,45 @@ function matchesSearch(record: LogEntry, search: string): boolean {
   return (
     (record.msg ?? '').toLowerCase().includes(q) ||
     (record.name ?? '').toLowerCase().includes(q)
+  );
+}
+
+// Wrap case-insensitive occurrences of `query` in <mark> (find-style
+// highlight). Plain text in, React nodes out.
+function highlightMatches(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const lower = text.toLowerCase();
+  const q = query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let from = 0;
+  for (let at = lower.indexOf(q); at >= 0; at = lower.indexOf(q, from)) {
+    if (at > from) parts.push(text.slice(from, at));
+    from = at + q.length;
+    parts.push(<mark key={`m-${at}`}>{text.slice(at, from)}</mark>);
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
+// Render a log message: error codes (E0xx) become links to their /error-codes
+// section, and — in highlight mode — search matches are marked in place.
+function renderMessage(msg: string, highlightQuery: string): React.ReactNode {
+  const text = msg ?? '';
+  const segments = text.split(/(E0\d{2})/);
+  if (segments.length === 1) return highlightMatches(text, highlightQuery);
+  return segments.map((segment, i) =>
+    /^E0\d{2}$/.test(segment) ? (
+      <Link
+        key={`c-${i}`}
+        to={`/error-codes#${segment.toLowerCase()}`}
+        title={`What ${segment} means`}
+      >
+        {segment}
+      </Link>
+    ) : (
+      <React.Fragment key={`t-${i}`}>
+        {highlightMatches(segment, highlightQuery)}
+      </React.Fragment>
+    )
   );
 }

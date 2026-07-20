@@ -21,6 +21,9 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useArenaStream from './util/useArenaStream';
+import { addLogMarker } from './util/useLogsStream';
+import { getPlaybackTime } from './util/playbackClock';
+import { titleCase } from './util/titleCase';
 import { useDarkMode } from './util/theme';
 import { useDebugMode } from './util/debugMode';
 import { useIsMobile } from './util/useIsMobile';
@@ -171,6 +174,51 @@ function App() {
       fallback();
     }
   };
+
+  // Match-lifecycle dividers for the log console (GitHub #318): restart,
+  // eliminations, and sudden death arrive on the arena events stream — mirror
+  // them into the shared log store as marker rows so the log stream reads as a
+  // match narrative ("all this spam was before the restart").
+  const arenaForMarkersRef = useRef(arena);
+  arenaForMarkersRef.current = arena;
+  useEffect(() => {
+    // Latch eliminations per bot per match: decay keeps emitting botDamaged at
+    // zero health, and a restart fields the same bots again.
+    const eliminated = new Set<string>();
+    const onRestart = () => {
+      eliminated.clear();
+      // The restart resets the clock, so time 0 shows the divider immediately.
+      addLogMarker('restart', 'Match restarted', 0);
+    };
+    const onDamaged = (event: unknown) => {
+      const e = event as { id: string; health: number; time?: number };
+      if (e.health > 0 || eliminated.has(e.id)) return;
+      eliminated.add(e.id);
+      const app = arenaForMarkersRef.current.apps.find((a) =>
+        a.bots.some((bot) => bot.id === e.id)
+      );
+      addLogMarker(
+        'eliminated',
+        `${app ? titleCase(app.name) : 'A'} bot eliminated`,
+        e.time ?? getPlaybackTime()
+      );
+    };
+    const onSuddenDeath = (event: unknown) => {
+      addLogMarker(
+        'suddenDeath',
+        'Sudden death — health decays until a winner remains',
+        (event as { time?: number }).time ?? getPlaybackTime()
+      );
+    };
+    emitter.addListener('arenaRestart', onRestart);
+    emitter.addListener('botDamaged', onDamaged);
+    emitter.addListener('arenaSuddenDeath', onSuddenDeath);
+    return () => {
+      emitter.removeListener('arenaRestart', onRestart);
+      emitter.removeListener('botDamaged', onDamaged);
+      emitter.removeListener('arenaSuddenDeath', onSuddenDeath);
+    };
+  }, []);
 
   // Whole-app theme: reflect the preference onto <body> so CSS (variables under
   // `body.dark`) re-themes the page, docs, and log console; the boolean is also
