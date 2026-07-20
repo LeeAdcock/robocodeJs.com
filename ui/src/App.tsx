@@ -194,12 +194,23 @@ function App() {
       const e = event as { id: string; health: number; time?: number };
       if (e.health > 0 || eliminated.has(e.id)) return;
       eliminated.add(e.id);
-      const app = arenaForMarkersRef.current.apps.find((a) =>
+      // Name the specific bot instance, not just its app — an app fields
+      // several bots, and "My First Bot eliminated" reads as the whole team
+      // being out. "<12>" is the same readable id every log line shows:
+      // (app position + 1) * 10 + bot position + 1.
+      const apps = arenaForMarkersRef.current.apps;
+      const appIndex = apps.findIndex((a) =>
         a.bots.some((bot) => bot.id === e.id)
       );
+      const app = apps[appIndex];
+      const botIndex = app ? app.bots.findIndex((bot) => bot.id === e.id) : -1;
       addLogMarker(
         'eliminated',
-        `${app ? titleCase(app.name) : 'A'} bot eliminated`,
+        app
+          ? `${titleCase(app.name)} <${
+              (appIndex + 1) * 10 + botIndex + 1
+            }> eliminated`
+          : 'Bot eliminated',
         e.time ?? getPlaybackTime()
       );
     };
