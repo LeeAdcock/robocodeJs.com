@@ -333,6 +333,14 @@ svg.motion-snap * {
   padding: 4px 8px;
 }
 
+/* Clickable filter targets inside a log line (the team chip and the bot id
+   narrow the filter on click — GitHub #316): underline on hover so they read
+   as interactive. */
+.logs .team[role='button']:hover,
+.logs .name[role='button']:hover {
+  text-decoration: underline;
+}
+
 /* The doc h1 sits on a light grass-tile background image that doesn't respond
    to the theme. In night mode, layer a translucent dark overlay over the tile
    (via a two-stop gradient stacked on the same background) so the header reads

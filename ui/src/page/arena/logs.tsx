@@ -43,6 +43,11 @@ interface LogsProps {
     logs: (LogEntry | null)[];
     index: number;
   };
+  // Reflect filter state (search, hidden levels/bots) into the page URL via
+  // replaceState, and seed it back on load — so a filtered view survives reload
+  // and can be shared. Only the standalone logs page opts in; embedded uses
+  // (the editor dock) leave the URL alone.
+  persistFiltersToUrl?: boolean;
 }
 
 interface LogsState {
@@ -70,14 +75,25 @@ interface LogsState {
 // Identify one bot in the hide set.
 const botKey = (appId: string, botIndex: number) => `${appId}:${botIndex}`;
 
+// Severity-first order for the toolbar level chips ("do I have errors?" reads
+// left to right).
+const LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
+
 export default class Logs extends React.Component<LogsProps, LogsState> {
   constructor(props: LogsProps) {
     super(props);
     const savedFont = Number(localStorage.getItem('logFontSize'));
+    // On the standalone page, restore filter state from the URL (written back
+    // by syncUrl below) so a reloaded or shared link reopens the same view.
+    const params = props.persistFiltersToUrl
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams();
+    const list = (key: string) =>
+      (params.get(key) ?? '').split(',').filter(Boolean);
     this.state = {
-      search: '',
-      hideLevels: [],
-      hideBots: [],
+      search: params.get('q') ?? '',
+      hideLevels: list('hideLevels'),
+      hideBots: list('hideBots'),
       fontSize:
         savedFont >= LOG_FONT_MIN && savedFont <= LOG_FONT_MAX
           ? savedFont
@@ -105,11 +121,21 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     this.applySelection();
   }
 
-  componentDidUpdate(prevProps: LogsProps) {
+  componentDidUpdate(prevProps: LogsProps, prevState: LogsState) {
     // Once the bot list has loaded, reflect a shift-double-click selection in the
     // Bots filter itself (hide everything except the chosen app / bot), so the
     // dropdown matches what's shown and the user can toggle others back on.
     this.applySelection();
+
+    // Mirror filter changes into the URL (replaceState — no history spam).
+    if (
+      this.props.persistFiltersToUrl &&
+      (prevState.search !== this.state.search ||
+        prevState.hideLevels !== this.state.hideLevels ||
+        prevState.hideBots !== this.state.hideBots)
+    ) {
+      this.syncUrl();
+    }
 
     // Count lines arriving while the user isn't watching the tail (detached
     // and/or paused) — the ring index only moves when an entry lands, so the
@@ -178,6 +204,27 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       });
     }
   };
+
+  // Write the current filter state into the query string. Empty filters are
+  // dropped so an unfiltered view keeps a clean URL. The one-shot `app`/`bot`
+  // seed params (from shift-double-clicking a bot) are removed once any filter
+  // state is written — `hideBots` captures the same selection fully.
+  syncUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const setOrDelete = (key: string, value: string) =>
+      value ? params.set(key, value) : params.delete(key);
+    setOrDelete('q', this.state.search);
+    setOrDelete('hideLevels', this.state.hideLevels.join(','));
+    setOrDelete('hideBots', this.state.hideBots.join(','));
+    params.delete('app');
+    params.delete('bot');
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
+    );
+  }
 
   applySelection() {
     const { selectedApp, selectedBot, bots } = this.props;
@@ -263,6 +310,20 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       this.setState({ hideBots: [...next] });
     };
 
+    // Click-to-filter from a log line: the team chip narrows to that app's
+    // bots, the bot id to that one instance (a key is `${appId}:${botIndex}`,
+    // so the app is everything before the last colon).
+    const filterToApp = (appId: string) =>
+      this.setState({
+        hideBots: allBotKeys.filter(
+          (k) => k.slice(0, k.lastIndexOf(':')) !== appId
+        ),
+      });
+    const filterToBot = (appId: string, botIndex: number) =>
+      this.setState({
+        hideBots: allBotKeys.filter((k) => k !== botKey(appId, botIndex)),
+      });
+
     const levelColors: Record<string, string> = {
       trace: 'lightgrey',
       error: 'red',
@@ -271,12 +332,35 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       info: 'green',
     };
 
+    // Everything except the level filter, shared by the visible-line filter and
+    // the per-level chip counts (a chip counts what toggling it would affect).
+    const source = (this.state.pausedLogs ?? this.props.logEntries).logs;
+    const passesBase = (record: LogEntry | null): record is LogEntry =>
+      !!record &&
+      record.time <= (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
+      !hidden.has(botKey(record.appId, record.botIndex)) &&
+      // Free-text search matches what the user can actually see — the message
+      // and the bot name — not the serialized record (which would hit internal
+      // ids, levels, and timestamps).
+      (this.state.search.length === 0 ||
+        matchesSearch(record, this.state.search));
+
+    const levelCounts: Record<string, number> = {};
+    LEVELS.forEach((level) => (levelCounts[level] = 0));
+    source.forEach((record) => {
+      if (passesBase(record)) {
+        const level = record.levelName.toUpperCase();
+        levelCounts[level] = (levelCounts[level] ?? 0) + 1;
+      }
+    });
+
     // Team chip for a log line: the app's arena color swatch (the same mini tank
     // sprite the navbar/roster use) plus its name, so a line reads as its team at
     // a glance rather than only from the internal `<id>` — which is kept after it
     // to disambiguate a team's five bots (GitHub #253). An app with no live arena
     // index (logged then removed mid-match) gets a muted neutral swatch and no
     // name (its only "name" would be the raw id, already implied by `<id>`).
+    // Clicking the chip narrows the filter to that app (GitHub #316).
     const teamChip = (appId: string) => {
       const app = appMap.get(appId);
       const index = app?.index;
@@ -286,7 +370,13 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
           : '/sprites/tank_dark.png';
       const name = app && app.name !== appId ? titleCase(app.name) : '';
       return (
-        <span className="team" style={{ marginRight: '5px' }}>
+        <span
+          className="team"
+          role="button"
+          title="Show only this app's logs"
+          onClick={() => filterToApp(appId)}
+          style={{ marginRight: '5px', cursor: 'pointer' }}
+        >
           <img
             src={src}
             alt=""
@@ -424,36 +514,64 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             </Dropdown.Menu>
           </Dropdown>
 
-          <Dropdown as={ButtonGroup} autoClose="outside">
-            <Dropdown.Toggle variant="secondary" size="sm" id="levels-filter">
-              Levels
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              {['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'].map((level) => (
-                <Dropdown.Item
-                  as="button"
+          {/* Level chips: one per level with a live count of matching lines —
+              an at-a-glance health readout ("do I have errors?") that toggles
+              the level on click. Replaces the old Levels dropdown. */}
+          <ButtonGroup>
+            {LEVELS.map((level) => {
+              const isHidden = this.state.hideLevels.includes(level);
+              return (
+                <OverlayTrigger
                   key={level}
-                  // Toggle this log level in the log display.
-                  onClick={() =>
-                    this.setState((s) => ({
-                      hideLevels: s.hideLevels.includes(level)
-                        ? s.hideLevels.filter((l) => l !== level)
-                        : [...s.hideLevels, level],
-                    }))
+                  placement="bottom"
+                  overlay={
+                    <Tooltip id={`level-chip-${level}`}>
+                      {isHidden ? `Show ${level} logs` : `Hide ${level} logs`}
+                    </Tooltip>
                   }
                 >
-                  <Form.Check
-                    checked={!this.state.hideLevels.includes(level)}
-                    readOnly
-                    inline
-                    type="checkbox"
-                    id={`level-${level}`}
-                  />
-                  {level}
-                </Dropdown.Item>
-              ))}
-            </Dropdown.Menu>
-          </Dropdown>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label={`Toggle ${level} logs`}
+                    aria-pressed={!isHidden}
+                    onClick={() =>
+                      this.setState((s) => ({
+                        hideLevels: isHidden
+                          ? s.hideLevels.filter((l) => l !== level)
+                          : [...s.hideLevels, level],
+                      }))
+                    }
+                    style={{
+                      opacity: isHidden ? 0.45 : 1,
+                      textDecoration: isHidden ? 'line-through' : 'none',
+                    }}
+                  >
+                    <span
+                      style={{ color: levelColors[level.toLowerCase()] }}
+                      // The colored token is the label; the count sits after it.
+                    >
+                      {level}
+                    </span>{' '}
+                    {levelCounts[level]}
+                  </Button>
+                </OverlayTrigger>
+              );
+            })}
+          </ButtonGroup>
+
+          {/* One-click way back to the unfiltered view once a click-to-filter
+              (or any Bots toggle) has narrowed the stream. */}
+          {this.state.hideBots.length > 0 && (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              aria-label="Show all bots"
+              onClick={() => this.setState({ hideBots: [] })}
+            >
+              All bots ×
+            </Button>
+          )}
 
           <Form.Control
             value={this.state.search}
@@ -507,21 +625,13 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
             }}
           >
             <div>
-              {(this.state.pausedLogs ?? this.props.logEntries).logs
+              {source
                 .filter(
                   (record) =>
-                    record &&
-                    record.time <=
-                      (this.props.playbackTime ?? Number.POSITIVE_INFINITY) &&
-                    !hidden.has(botKey(record.appId, record.botIndex)) &&
+                    passesBase(record) &&
                     !this.state.hideLevels.includes(
                       record.levelName.toUpperCase()
-                    ) &&
-                    // Free-text search matches what the user can actually see —
-                    // the message and the bot name — not the serialized record
-                    // (which would hit internal ids, levels, and timestamps).
-                    (this.state.search.length === 0 ||
-                      matchesSearch(record, this.state.search))
+                    )
                 )
                 .sort((a, b) =>
                   a !== null && b !== null ? a.time - b.time : 0
@@ -555,8 +665,14 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                         {teamChip(record.appId)}
                         <span
                           className="name"
+                          role="button"
+                          title="Show only this bot's logs"
+                          onClick={() =>
+                            filterToBot(record.appId, record.botIndex)
+                          }
                           style={{
                             marginRight: '5px',
+                            cursor: 'pointer',
                           }}
                         >
                           {record.name}

@@ -106,6 +106,7 @@ export default function ArenaLogsPage() {
         selectedApp={selectedApp}
         selectedBot={selectedBot}
         playbackTime={playbackTime}
+        persistFiltersToUrl
       />
     </>
   );

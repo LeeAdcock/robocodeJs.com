@@ -292,6 +292,126 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByLabelText('Scroll to latest logs')).toBeNull();
   });
 
+  it('level chips show live counts and toggle their level on click', () => {
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ msg: 'ok one', levelName: 'info' }),
+            entry({ msg: 'ok two', levelName: 'info' }),
+            entry({ msg: 'boom', levelName: 'error' }),
+          ],
+          index: 3,
+        }}
+      />
+    );
+    const errorChip = screen.getByLabelText('Toggle ERROR logs');
+    const infoChip = screen.getByLabelText('Toggle INFO logs');
+    expect(errorChip.textContent).toContain('1');
+    expect(infoChip.textContent).toContain('2');
+
+    // Toggle ERROR off: the error line hides, the chip reads pressed=false.
+    fireEvent.click(errorChip);
+    expect(screen.queryByText('boom')).toBeNull();
+    expect(screen.queryByText('ok one')).toBeTruthy();
+    expect(errorChip.getAttribute('aria-pressed')).toBe('false');
+
+    // ...and back on.
+    fireEvent.click(errorChip);
+    expect(screen.queryByText('boom')).toBeTruthy();
+  });
+
+  it('clicking a team chip filters to that app; "All bots ×" clears it', () => {
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ appId: 'a1', name: '<11>', msg: 'from A' }),
+            entry({ appId: 'a2', name: '<21>', msg: 'from B' }),
+          ],
+          index: 2,
+        }}
+      />
+    );
+    // Click the team chip on A's line.
+    const chips = screen.getAllByTitle("Show only this app's logs");
+    fireEvent.click(chips[0]);
+    expect(screen.queryByText('from A')).toBeTruthy();
+    expect(screen.queryByText('from B')).toBeNull();
+
+    // The clear chip restores the unfiltered view.
+    fireEvent.click(screen.getByLabelText('Show all bots'));
+    expect(screen.queryByText('from B')).toBeTruthy();
+  });
+
+  it('clicking a bot id filters to that one bot instance', () => {
+    render(
+      <Logs
+        bots={[{ id: 'a1', name: 'Bot A', botCount: 2, index: 0 }]}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{
+          logs: [
+            entry({ appId: 'a1', botIndex: 1, name: '<11>', msg: 'bot one' }),
+            entry({ appId: 'a1', botIndex: 2, name: '<12>', msg: 'bot two' }),
+          ],
+          index: 2,
+        }}
+      />
+    );
+    fireEvent.click(screen.getByText('<12>'));
+    expect(screen.queryByText('bot two')).toBeTruthy();
+    expect(screen.queryByText('bot one')).toBeNull();
+  });
+
+  it('persists filters to the URL and restores them on load', () => {
+    window.history.replaceState(null, '', '/user/u1/arena/logs');
+    const logEntries = {
+      logs: [
+        entry({ msg: 'needle in here', levelName: 'info' }),
+        entry({ msg: 'boom', levelName: 'error' }),
+      ],
+      index: 2,
+    };
+    const { container, unmount } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={logEntries}
+        persistFiltersToUrl
+      />
+    );
+    const search = container.querySelector(
+      'input[type="search"]'
+    ) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'needle' } });
+    fireEvent.click(screen.getByLabelText('Toggle ERROR logs'));
+    expect(window.location.search).toContain('q=needle');
+    expect(window.location.search).toContain('hideLevels=ERROR');
+    unmount();
+
+    // A fresh mount (reload) seeds the same view back from the URL.
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={logEntries}
+        persistFiltersToUrl
+      />
+    );
+    const restored = document.querySelector(
+      'input[type="search"]'
+    ) as HTMLInputElement;
+    expect(restored.value).toBe('needle');
+    expect(
+      screen.getByLabelText('Toggle ERROR logs').getAttribute('aria-pressed')
+    ).toBe('false');
+    window.history.replaceState(null, '', '/');
+  });
+
   it('can hide an individual bot (labelled by its bot id) within an application', () => {
     render(
       <Logs
