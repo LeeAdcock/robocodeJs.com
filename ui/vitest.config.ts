@@ -7,6 +7,8 @@ export default defineConfig({
     // a `// @vitest-environment jsdom` docblock at the top of the file.
     environment: 'node',
     include: ['test/**/*.test.{ts,tsx}'],
+    // Environment shims (ResizeObserver for the virtualized log list).
+    setupFiles: ['test/setup.ts'],
     coverage: {
       provider: 'v8',
       // `json-summary` is consumed by the root combined-coverage gate

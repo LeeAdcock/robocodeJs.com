@@ -18,6 +18,12 @@ import {
   FaTextWidth,
 } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import {
+  List,
+  useDynamicRowHeight,
+  type ListImperativeAPI,
+  type RowComponentProps,
+} from 'react-window';
 import { colors } from '../../util/colors';
 import { titleCase } from '../../util/titleCase';
 
@@ -96,9 +102,11 @@ interface LogsState {
   // navigation) instead of filtering the stream — so the context around a
   // match stays visible.
   highlight: boolean;
-  // Whether long lines wrap (default) or stay on one line with a horizontal
-  // scroll.
+  // Whether long lines wrap (default) or are clipped to one line.
   wrap: boolean;
+  // Row id briefly outlined after a next/prev error or match jump, so the
+  // landing row is findable in the stream.
+  flashId: string | null;
 }
 
 // Identify one bot in the hide set.
@@ -132,6 +140,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       newSince: 0,
       highlight: false,
       wrap: true,
+      flashId: null,
     };
   }
 
@@ -141,8 +150,12 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
     this.setState({ fontSize });
   }
 
-  logRef: React.RefObject<HTMLDivElement | null> =
-    React.createRef<HTMLDivElement>();
+  // Imperative handle for the virtualized list (react-window): row scrolling
+  // plus the underlying scroll element.
+  listApi: ListImperativeAPI | null = null;
+  setListApi = (api: ListImperativeAPI | null) => {
+    this.listApi = api;
+  };
 
   // Which URL selection (app[:bot]) we've already seeded the filter from, so a
   // shift-double-click applies once but the user's later toggles are preserved.
@@ -150,6 +163,16 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
 
   componentDidMount() {
     this.applySelection();
+    this.pinToTail();
+  }
+
+  // Scroll the virtualized list to its newest row.
+  pinToTail() {
+    if (this.visibleRows.length === 0) return;
+    this.listApi?.scrollToRow({
+      index: this.visibleRows.length - 1,
+      align: 'end',
+    });
   }
 
   componentDidUpdate(prevProps: LogsProps, prevState: LogsState) {
@@ -182,8 +205,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
 
     // Attached and live: keep the viewport pinned to the newest line.
     if (this.state.follow && !this.state.pausedLogs) {
-      const el = this.logRef.current;
-      if (el) el.scrollTo({ top: el.scrollHeight });
+      this.pinToTail();
     }
   }
 
@@ -191,9 +213,8 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   // tail, scrolling back to the bottom re-attaches it. Only real scroll events
   // land here (content growth doesn't fire `scroll`), so the programmatic pin
   // above can't fight the user.
-  onScroll = () => {
-    const el = this.logRef.current;
-    if (!el) return;
+  onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
     if (atBottom && !this.state.follow) {
       this.setState((s) => ({
@@ -208,8 +229,7 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
 
   // The "N new lines" pill: jump to the bottom and re-attach.
   resumeFollow = () => {
-    const el = this.logRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight });
+    this.pinToTail();
     this.setState((s) => ({
       follow: true,
       newSince: s.pausedLogs ? s.newSince : 0,
@@ -219,31 +239,57 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
   // The rows currently rendered, captured during render for the copy button
   // and the row-jumping navigation.
   visibleRows: LogRow[] = [];
-  // Row-jump cursors (index into the matching row set). -1 = before the first,
-  // so the first "next" lands on the first match.
+  // Row-jump cursors (position within the matching row set). -1 = before the
+  // first, so the first "next" lands on the first match.
   errorCursor = -1;
   matchCursor = -1;
+  flashTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
-  // Jump the viewport to the next/previous row carrying `attr` (data-log-error
-  // / data-log-match), wrapping around, with a brief outline so the landing
-  // row is findable.
-  jumpTo(attr: string, dir: 1 | -1, cursor: 'errorCursor' | 'matchCursor') {
-    const el = this.logRef.current;
-    if (!el) return;
-    const nodes = el.querySelectorAll<HTMLElement>(`[${attr}]`);
-    if (nodes.length === 0) return;
-    this[cursor] =
-      (((this[cursor] + dir) % nodes.length) + nodes.length) % nodes.length;
-    const node = nodes[this[cursor]];
-    node.scrollIntoView?.({ block: 'center' });
-    node.classList.add('log-jump');
-    setTimeout(() => node.classList.remove('log-jump'), 800);
+  componentWillUnmount() {
+    clearTimeout(this.flashTimer);
   }
 
-  nextError = () => this.jumpTo('data-log-error', 1, 'errorCursor');
-  prevError = () => this.jumpTo('data-log-error', -1, 'errorCursor');
-  nextMatch = () => this.jumpTo('data-log-match', 1, 'matchCursor');
-  prevMatch = () => this.jumpTo('data-log-match', -1, 'matchCursor');
+  // Jump the viewport to the next/previous row satisfying `matches`, wrapping
+  // around. Index-based (the virtualized list doesn't keep off-screen rows in
+  // the DOM); the landing row is briefly outlined via `flashId`.
+  jumpTo(
+    matches: (row: LogRow) => boolean,
+    dir: 1 | -1,
+    cursor: 'errorCursor' | 'matchCursor'
+  ) {
+    const indices = this.visibleRows
+      .map((row, i) => (matches(row) ? i : -1))
+      .filter((i) => i >= 0);
+    if (indices.length === 0) return;
+    this[cursor] =
+      (((this[cursor] + dir) % indices.length) + indices.length) %
+      indices.length;
+    const rowIndex = indices[this[cursor]];
+    this.listApi?.scrollToRow({ index: rowIndex, align: 'center' });
+    const flashId = this.visibleRows[rowIndex].record.id;
+    this.setState({ flashId });
+    clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(
+      () =>
+        this.setState((s) =>
+          s.flashId === flashId ? { flashId: null } : null
+        ),
+      800
+    );
+  }
+
+  isErrorRow = (row: LogRow) =>
+    !row.record.marker && row.record.levelName === 'error';
+  isMatchRow = (row: LogRow) =>
+    !row.record.marker &&
+    this.state.highlight &&
+    this.state.search.length > 0 &&
+    matchesSearch(row.record, this.state.search);
+
+  nextError = () => this.jumpTo(this.isErrorRow, 1, 'errorCursor');
+  prevError = () => this.jumpTo(this.isErrorRow, -1, 'errorCursor');
+  nextMatch = () => this.jumpTo(this.isMatchRow, 1, 'matchCursor');
+  prevMatch = () => this.jumpTo(this.isMatchRow, -1, 'matchCursor');
 
   // n / p jump between error lines (the most common movement while
   // debugging). Attached to the scroll area, so typing in the filter box or
@@ -869,108 +915,77 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
           </OverlayTrigger>
         </ButtonToolbar>
 
-        {/* Log list — fills the remaining height and scrolls on its own. The
-            wrapper is the positioning context for the floating "new lines"
-            pill so it stays put while the list scrolls under it. */}
+        {/* Log list — a react-window virtualized list (only on-screen rows are
+            mounted, so a full 1500-entry buffer scrolls smoothly). The wrapper
+            is the positioning context for the floating "new lines" pill so it
+            stays put while the list scrolls under it. */}
         <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-          <div
-            className="logs"
-            ref={this.logRef}
+          <VirtualLogList
+            rows={rows}
+            fontSize={this.state.fontSize}
+            wrap={this.state.wrap}
+            flashId={this.state.flashId}
+            setListApi={this.setListApi}
             onScroll={this.onScroll}
             onKeyDown={this.onKeyDown}
-            tabIndex={0}
-            style={{
-              height: '100%',
-              overflowY: 'auto',
-              overflowX: this.state.wrap ? 'hidden' : 'auto',
-              fontFamily:
-                'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-              fontSize: `${this.state.fontSize}px`,
-            }}
-          >
-            <div>
-              {rows.map(({ record, count }) =>
-                record.marker ? (
-                  // Lifecycle divider: a labeled rule in the stream (match
-                  // restarted / bot eliminated / sudden death).
-                  <div
-                    key={record.id}
-                    className="log-divider"
-                    data-marker={record.marker}
-                  >
-                    {record.msg}
-                  </div>
-                ) : (
-                  <div
-                    key={record.id}
-                    // Anchors for the error / match jump navigation.
-                    data-log-error={
-                      record.levelName === 'error' ? 'true' : undefined
-                    }
-                    data-log-match={isMatch(record) ? 'true' : undefined}
-                    className={
-                      record.levelName === 'error' ? 'log-error-row' : undefined
-                    }
+            renderRow={({ record, count }) =>
+              record.marker ? (
+                // Lifecycle divider content: a labeled rule in the stream
+                // (match restarted / bot eliminated / sudden death).
+                record.msg
+              ) : (
+                <>
+                  <span
                     style={{
-                      whiteSpace: this.state.wrap ? 'normal' : 'nowrap',
-                      // Let the browser skip rendering off-screen rows — the
-                      // buffer holds up to 1500 lines.
-                      contentVisibility: 'auto',
-                      containIntrinsicSize: 'auto 1.4em',
+                      marginRight: '5px',
                     }}
                   >
+                    [<span className="date">{record.time}</span>]
+                  </span>
+                  <span
+                    style={{
+                      marginRight: '5px',
+                    }}
+                  >
+                    [
                     <span
                       style={{
-                        marginRight: '5px',
+                        color: levelColors[record.levelName] || 'white',
                       }}
                     >
-                      [<span className="date">{record.time}</span>]
+                      {record.levelName.toUpperCase()}
                     </span>
-                    <span
-                      style={{
-                        marginRight: '5px',
-                      }}
-                    >
-                      [
-                      <span
-                        style={{
-                          color: levelColors[record.levelName] || 'white',
-                        }}
-                      >
-                        {record.levelName.toUpperCase()}
-                      </span>
-                      ]
-                    </span>
-                    {teamChip(record.appId)}
-                    <span
-                      className="name"
-                      role="button"
-                      title="Show only this bot's logs"
-                      onClick={() => filterToBot(record.appId, record.botIndex)}
-                      style={{
-                        marginRight: '5px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {record.name}
-                    </span>
-                    <span className="message">
-                      {renderMessage(
-                        record.msg,
-                        searchHighlights ? this.state.search : ''
-                      )}
-                    </span>
-                    {count > 1 && (
-                      // DevTools-style repeat counter for collapsed duplicates.
-                      <span className="log-repeat" title={`Repeated ${count}×`}>
-                        ×{count}
-                      </span>
+                    ]
+                  </span>
+                  {teamChip(record.appId)}
+                  <span
+                    className="name"
+                    role="button"
+                    title="Show only this bot's logs"
+                    onClick={() => filterToBot(record.appId, record.botIndex)}
+                    style={{
+                      marginRight: '5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {record.name}
+                  </span>
+                  <span className="message">
+                    {renderMessage(
+                      record.msg,
+                      searchHighlights ? this.state.search : ''
                     )}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
+                  </span>
+                  {count > 1 && (
+                    // DevTools-style repeat counter for collapsed duplicates.
+                    <span className="log-repeat" title={`Repeated ${count}×`}>
+                      ×{count}
+                    </span>
+                  )}
+                </>
+              )
+            }
+          />
 
           {/* Detached from the tail: a floating pill offers the way back down,
               with a live count of the lines that have arrived meanwhile. Hidden
@@ -1003,6 +1018,108 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
       </div>
     );
   }
+}
+
+const LOG_FONT_FAMILY =
+  'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace';
+
+// Props threaded to every virtualized row (react-window `rowProps`).
+interface LogRowViewProps {
+  rows: LogRow[];
+  wrap: boolean;
+  flashId: string | null;
+  renderRow: (row: LogRow) => React.ReactNode;
+}
+
+// One virtualized row. react-window positions it via `style`; everything else
+// (content, dividers, error tint, jump flash) comes from the row data.
+function LogRowView({
+  index,
+  style,
+  ariaAttributes,
+  rows,
+  wrap,
+  flashId,
+  renderRow,
+}: RowComponentProps<LogRowViewProps>) {
+  const row = rows[index];
+  if (!row) return null;
+  const { record } = row;
+  const className =
+    [
+      record.marker ? 'log-divider' : undefined,
+      !record.marker && record.levelName === 'error'
+        ? 'log-error-row'
+        : undefined,
+      record.id === flashId ? 'log-jump' : undefined,
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
+  return (
+    <div
+      {...ariaAttributes}
+      className={className}
+      data-marker={record.marker || undefined}
+      style={{
+        ...style,
+        whiteSpace: wrap ? 'normal' : 'nowrap',
+        // Without wrapping, clip overlong lines (the row is absolutely
+        // positioned by the virtualizer, so it can't widen the scroll area).
+        overflow: wrap ? undefined : 'hidden',
+        textOverflow: wrap ? undefined : 'ellipsis',
+      }}
+    >
+      {renderRow(row)}
+    </div>
+  );
+}
+
+// The virtualized console body. A function component so it can use
+// react-window's hooks; the class passes state down and receives the
+// imperative list API (scroll-to-row) back via `setListApi`. Row heights are
+// measured (useDynamicRowHeight) because wrapped lines vary; the cache is
+// keyed on font size + wrap so either change re-measures.
+function VirtualLogList(props: {
+  rows: LogRow[];
+  fontSize: number;
+  wrap: boolean;
+  flashId: string | null;
+  renderRow: (row: LogRow) => React.ReactNode;
+  setListApi: (api: ListImperativeAPI | null) => void;
+  onScroll: React.UIEventHandler<HTMLDivElement>;
+  onKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
+}) {
+  const rowHeight = useDynamicRowHeight({
+    defaultRowHeight: Math.max(14, Math.round(props.fontSize * 1.5)),
+    key: `${props.fontSize}:${props.wrap}`,
+  });
+  return (
+    <List
+      className="logs"
+      rowComponent={LogRowView}
+      rowCount={props.rows.length}
+      rowHeight={rowHeight}
+      rowProps={{
+        rows: props.rows,
+        wrap: props.wrap,
+        flashId: props.flashId,
+        renderRow: props.renderRow,
+      }}
+      listRef={props.setListApi}
+      onScroll={props.onScroll}
+      onKeyDown={props.onKeyDown}
+      tabIndex={0}
+      overscanCount={10}
+      // Pre-measure fallback height (also what jsdom tests render with, since
+      // they have no ResizeObserver).
+      defaultHeight={400}
+      style={{
+        height: '100%',
+        fontFamily: LOG_FONT_FAMILY,
+        fontSize: `${props.fontSize}px`,
+      }}
+    />
+  );
 }
 
 // Case-insensitive match against the fields a log line actually displays.
