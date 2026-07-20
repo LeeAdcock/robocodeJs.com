@@ -74,6 +74,18 @@ describe('toCounterDeltas', () => {
   it('drops zero counters so an idle flush sends nothing', () => {
     expect(toCounterDeltas({ shotsFired: 0, kills: 0 })).toEqual({});
   });
+
+  it('rounds fractional counters so the bigint column never sees a fraction', () => {
+    // distanceTraveled sums per-tick sqrt() displacements and so is genuinely
+    // fractional; user_counter.value is a bigint, and Postgres rejects a fractional
+    // bind (22P02) rather than coercing — the "ladder achievement award failed"
+    // prod fault. Round at this flush boundary, after the sum.
+    expect(
+      toCounterDeltas({ distanceTraveled: 688.3231929800518, shotsFired: 4 })
+    ).toEqual({ distanceTraveled: 688, shotsFired: 4 });
+    // A sub-half total rounds to zero and drops out like any other no-op.
+    expect(toCounterDeltas({ distanceTraveled: 0.4 })).toEqual({});
+  });
 });
 
 describe('recordSandboxStats', () => {

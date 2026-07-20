@@ -38,14 +38,25 @@ const COMBAT_COUNTERS = [
   'messagesSent',
 ] as const satisfies readonly (keyof BotStats & CounterKey)[];
 
-// Keep only the BotStats keys that map to a lifetime counter.
+// Keep only the BotStats keys that map to a lifetime counter, rounded to a whole
+// number. The lifetime counters are stored in a bigint column (user_counter.value),
+// which Postgres will not accept a fractional value into — it rejects the bind with
+// 22P02 rather than coercing. Most counters are already integral, but
+// distanceTraveled is a sum of per-tick sqrt() displacements and so is genuinely
+// fractional (unlike damage, which is made integral at its source in simulation.ts,
+// this one can't be — distance is continuous). Rounding at this persistence boundary,
+// after the per-tick sum, keeps the running total faithful while the stored value
+// stays a clean integer. A delta that rounds to zero drops out like any other no-op.
 export const toCounterDeltas = (
   stats: Partial<Record<keyof BotStats, number>>
 ): Partial<Record<CounterKey, number>> => {
   const deltas: Partial<Record<CounterKey, number>> = {};
   for (const key of COMBAT_COUNTERS) {
     const value = stats[key];
-    if (typeof value === 'number' && value > 0) deltas[key] = value;
+    if (typeof value === 'number') {
+      const rounded = Math.round(value);
+      if (rounded > 0) deltas[key] = rounded;
+    }
   }
   return deltas;
 };
