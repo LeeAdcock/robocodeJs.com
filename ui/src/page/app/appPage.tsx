@@ -305,8 +305,21 @@ export default function AppPage(props: AppPageProps) {
   };
 
   return (
-    <>
-      <Container fluid style={{ marginTop: '10px', marginBottom: '10px' }}>
+    // A flex column filling the content pane: header row on top, then the
+    // editor + docked console splitting whatever remains. Sized with flex
+    // (not a hard-coded header offset) so the collapsed console bar is
+    // always visible at the bottom of the pane, never below the fold.
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Container
+        fluid
+        style={{ marginTop: '10px', marginBottom: '10px', flexShrink: 0 }}
+      >
         <Row>
           <Col
             style={{
@@ -408,7 +421,8 @@ export default function AppPage(props: AppPageProps) {
           editor takes whatever the (collapsible) console leaves. */}
       <div
         style={{
-          height: 'calc(100% - 51px)',
+          flex: 1,
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -447,6 +461,6 @@ export default function AppPage(props: AppPageProps) {
           />
         )}
       </div>
-    </>
+    </div>
   );
 }

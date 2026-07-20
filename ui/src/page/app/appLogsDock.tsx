@@ -170,7 +170,7 @@ export default function AppLogsDock(props: AppLogsDockProps) {
         }}
       >
         <FaTerminal aria-hidden />
-        Console
+        Log Console
         {collapsed && unread > 0 && (
           <Badge bg="danger" aria-label={`${unread} unread problems`}>
             {unread}
