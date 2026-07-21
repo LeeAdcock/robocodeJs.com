@@ -220,24 +220,36 @@ export const buildServer = (user: User): McpServer => {
       version: '1.0.0',
     },
     {
-      // Surfaced to the client at connect time. The one thing a model can't infer
-      // from the tool list alone is that the human on the other end has a live,
-      // browser-based visualization of every arena — so point it at the shareable
-      // watch page and encourage offering it. Every arena-scoped tool result also
-      // carries a concrete `watchUrl`, but stating the pattern here means the
-      // model can build one for ANY arena (e.g. after a control action) and knows
-      // watching is a first-class thing to offer.
+      // Surfaced to the client at connect time, so keep it to high-leverage
+      // orientation a model can't get from the tool list alone — vocabulary, the
+      // reference-first workflow, the multi-seed gotcha, and the live watch view.
+      // Per-tool detail lives in each tool's description; deep reference lives in
+      // the resources/prompts. Every arena-scoped result also carries a concrete
+      // `watchUrl`, but stating the pattern here lets a model build one for ANY
+      // arena (e.g. after a control action).
       instructions:
-        'The user is a human working alongside you, and RobocodeJs has a live, ' +
-        'animated arena view they can open in a browser. Every arena has a ' +
-        'public spectator page at ' +
+        'RobocodeJs is a game where you write JavaScript tank AIs that battle in ' +
+        'a live arena.\n\n' +
+        'Vocabulary: an "app" is the program you edit; running it fields up to ' +
+        'five "bots" (live tank instances) per arena; an "arena" is a persistent, ' +
+        'running battle. Tools address apps/arenas by `appId`/`arenaId`.\n\n' +
+        'Writing bots: read the reference before writing code — the ' +
+        '`robocode.d.ts` type definitions, the bot-API docs, and the sample-bot ' +
+        'resources (and the `write_app`/`debug_app` prompts) describe the real ' +
+        'API. Validate a draft with `check_app_source` before you save it with ' +
+        '`set_app_source`; don’t invent methods.\n\n' +
+        'Judging strength: bot spawn placement is random per match seed and is ' +
+        'outcome-deciding, so a single match is noise. To compare bots, run ' +
+        'several seeds (`set_arena_seed`, or a `run_match` sweep) and aggregate, ' +
+        'or read the global Elo `leaderboard` — the stable signal.\n\n' +
+        'Watching: the user is a human with a live, animated arena view in their ' +
+        'browser. Every arena has a public spectator page at ' +
         `${watchUrl('<arenaId>')} ` +
-        '(no sign-in needed) that plays the running match in real time. ' +
-        'Arena-scoped tool results include a ready-made `watchUrl`; when a match ' +
-        'is worth seeing — you just started one, ran a match, or the user asks ' +
-        'what’s happening — proactively offer them the link to watch. The ' +
-        'user’s primary ("default") arena is the first one returned by ' +
-        '`list_arenas`.',
+        '(no sign-in needed) that plays the match in real time, and every ' +
+        'arena-scoped result includes a ready-made `watchUrl`. When a match is ' +
+        'worth seeing — you just started one, ran a match, or the user asks ' +
+        'what’s happening — proactively offer the link. The user’s primary ' +
+        '("default") arena is the first one returned by `list_arenas`.',
     }
   );
 
