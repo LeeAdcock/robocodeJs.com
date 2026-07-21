@@ -100,7 +100,7 @@ Reserve a short comment for each non-obvious step of a calculation (the Marksman
 RobocodeJs bots are reactive: you register handlers and the game calls them. Idioms that keep that readable:
 
 - **One responsibility per handler.** `TICK` charges and fires the radar; `SCANNED` does the aiming; `HIT` reacts to damage. Don't cram the whole bot into `TICK`.
-- **Return the Promise from an async handler** so the engine waits before re-firing it. This prevents the same handler stacking up in parallel. See the events section of the API reference (`robocodejs://docs/dev`).
+- **Return the Promise from an async `TICK` handler** so the engine skips the ticks it is still working through, rather than stacking runs up. Only `TICK` works that way — every other handler is called again for each new event even while an earlier run is awaiting, so write those to tolerate overlapping. See the events section of the API reference (`robocodejs://docs/dev`).
 - **Stash state on `this`**, set it in `START`, and give it a clear name (`this.targetId`, `this.mode`) so the reader knows what the bot remembers between ticks.
 - **Guard before you act** (`if (bot.turret.isReady())` before firing), and let the guard read as the precondition it is.
 

@@ -28,9 +28,11 @@ bot.on(Event.DETECTED, () => {
 })
 ```
 
-If an event handler returns nothing, it will be called each time the event occurs. This can at times result in unintended side effects if multiple events happen in quick succession and the handler is executing multiple times in parallel.
+A handler runs every time its event occurs. Because the slow actions are asynchronous, one run can still be parked on an `await` when the next event arrives, leaving two runs of the same handler in flight at once. Design for that: keep the work in a handler short, and if overlapping runs would fight each other, guard the body with a flag on `this`.
 
-To account for this, if the registered event handler returns a Promise, that Promise must resolve before the event handler will be called again for the same event type. Events can return Promises as demonstrated below with a traditional `return` statement, the abbreviated arrow syntax, or through using `async...await`.
+`TICK` is the exception, because it is the one event that repeats on its own. If a `TICK` handler returns a Promise, the ticks that arrive while that Promise is pending are skipped, and the handler runs again on the first tick after it settles. Every other event — `SCANNED`, `HIT`, `COLLIDED`, `RECEIVED` and the rest — is a discrete notification, and each occurrence is delivered on its own whether or not an earlier run has finished. That is what lets several bots broadcast in the same tick and have every one of those messages reach you.
+
+Events can return Promises as demonstrated below with a traditional `return` statement, the abbreviated arrow syntax, or through using `async...await`.
 
 Define a chain of behaviors when an event occurs:
 
@@ -63,7 +65,7 @@ clock.on(Event.TICK, async () => {
 
 # Bot
 
-The `bot` object is how you control the bot's capabilities: navigation, radar, fire control, and communications. Its methods trigger behaviors, while callbacks let you react to events that occur on the bot.
+The `bot` object is how you control the bot's capabilities: navigation, radar, fire control, and communications. Its methods trigger behaviors, while handlers let you react to events that occur on the bot.
 
 A few basic methods exist for setting and retrieving information about the bot.
 
@@ -75,9 +77,9 @@ A few basic methods exist for setting and retrieving information about the bot.
 
 ## Bot events
 
-- `bot.on(Event.FIRED, () => {})` Registers a callback that is executed when the turret is fired.
-- `bot.on(Event.SCANNED, (contact[]) => {})` Registers a callback that is executed when the radar performs a scan. The handler is given an array of [contacts](#contacts) — the same objects `bot.radar.scan()` resolves with — one for each bot the scan detected. Each carries the readings `{ id, speed, orientation, distance, angle, friendly, health }` as both properties and accessor methods, plus marker and intercept methods; [Contacts](#contacts) describes them all.
-- `bot.on(Event.COLLIDED, (object) => {})` Registers a callback that is executed when the bot collides with the edge of the arena, or with another bot. The handler is given an object of the format `{angle:number, friendly:boolean, impactSpeed:number}` — see [Collisions](#collisions) below.
+- `bot.on(Event.FIRED, () => {})` Registers a handler that is executed when the turret is fired.
+- `bot.on(Event.SCANNED, (contact[]) => {})` Registers a handler that is executed when the radar performs a scan. The handler is given an array of [contacts](#contacts) — the same objects `bot.radar.scan()` resolves with — one for each bot the scan detected. Each carries the readings `{ id, speed, orientation, distance, angle, friendly, health }` as both properties and accessor methods, plus marker and intercept methods; [Contacts](#contacts) describes them all.
+- `bot.on(Event.COLLIDED, (object) => {})` Registers a handler that is executed when the bot collides with the edge of the arena, or with another bot. The handler is given an object of the format `{angle:number, friendly:boolean, impactSpeed:number}` — see [Collisions](#collisions) below.
 
 ### Collisions
 
@@ -87,13 +89,13 @@ The `angle` is the direction of the bot or arena edge you hit, relative to your 
 
 `impactSpeed` is how hard you drove into the thing you hit: against a wall, your speed toward the wall; against a bot, the closing speed between the two of you. It is never negative, and it is the same number that scales the collision damage (`0.75 × impactSpeed`), so it tells you how bad the hit was. An `impactSpeed` of `0` is a graze — touching a wall while driving parallel to it, or a contact with nothing closing — and costs you no health.
 
-Take care returning a Promise from a `COLLIDED` handler that may itself cause another collision: the handler is not called again for that second collision until the first Promise has settled.
+Take care with a `COLLIDED` handler that awaits, and that may itself cause another collision: a second contact is delivered while the first run is still awaiting, so the two runs overlap and the later one can override the escape the earlier one was in the middle of. Keeping the handler short, or ignoring a new contact while an escape is in progress, avoids that.
 
 ## Environment events
 
-- `bot.on(Event.HIT, (object) => {})` Registers a callback that is executed when the bot is hit. An object is provided to the handler that is of the format `{angle:number}`, where the angle is the bearing the shot came from, relative to your heading.
-- `bot.on(Event.DETECTED, () => {})` Registers a callback that is executed when the bot is detected by another bot's radar.
-- `bot.on(Event.START, () => {})` Registers a callback that is executed when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does not re-fire it (see [State and the START event](#state-and-the-start-event)).
+- `bot.on(Event.HIT, (object) => {})` Registers a handler that is executed when the bot is hit. An object is provided to the handler that is of the format `{angle:number}`, where the angle is the bearing the shot came from, relative to your heading.
+- `bot.on(Event.DETECTED, () => {})` Registers a handler that is executed when the bot is detected by another bot's radar.
+- `bot.on(Event.START, () => {})` Registers a handler that is executed when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does not re-fire it (see [State and the START event](#state-and-the-start-event)).
 
 ## Movement
 
@@ -253,7 +255,7 @@ bot.on(Event.SCANNED, (contacts) => {
 Bots coordinate by broadcast: `bot.send` transmits a message, and every bot in the arena can react to it through the `RECEIVED` event.
 
 - `bot.send(message)` Broadcasts a message that every other bot in the arena (teammates **and** enemies) can receive via the `RECEIVED` event. `message` can be a primitive (number, string, boolean, null) or a nested array/object of those primitives (functions, class instances, and other non-JSON values cannot be sent). There are no private channels: to coordinate a team, tag your messages with something teammates recognize and validate incoming messages before acting on them. A message that isn't JSON data, is larger than 4,096 characters once encoded, or nests more than 8 levels deep is rejected. `send` throws (code `E023`). A bot may also broadcast at most 50 messages per clock tick; sends past that budget are silently dropped (code `E024`). See the [error code reference](/error-codes).
-- `bot.on(Event.RECEIVED, (message, from) => {})` Registers a callback that is executed when another bot broadcasts a message (via `bot.send`). This fires for messages from **any** bot in the arena, including enemies. `message` is the payload sent, a primitive (number, string, boolean, or null) or a nested array/object of primitives. `from` is `{ distance: number }`: how far away the sender was when it broadcast (a range, not a bearing; the same value is given to teammates and eavesdropping enemies).
+- `bot.on(Event.RECEIVED, (message, from) => {})` Registers a handler that is executed when another bot broadcasts a message (via `bot.send`). This fires for messages from **any** bot in the arena, including enemies. `message` is the payload sent, a primitive (number, string, boolean, or null) or a nested array/object of primitives. `from` is `{ distance: number }`: how far away the sender was when it broadcast (a range, not a bearing; the same value is given to teammates and eavesdropping enemies). Every message is delivered on its own, so when several bots broadcast in the same tick your handler is called once per message, even if an earlier call is still awaiting.
 
 # Arena
 
@@ -284,7 +286,7 @@ A marker's coordinates are also plain properties, `marker.x` and `marker.y`, whi
 The `clock` object gives you the current "simulation time". Register a handler for clock ticks to run logic at a set frequency; for logic that runs at other frequencies, see the JavaScript timers below. A clock tick is the smallest increment of time within the simulation.
 
 - `clock.getTime() : number` Returns the number of clock ticks elapsed in the current match.
-- `clock.on(Event.TICK, () => {} )` Registers a callback that is executed every clock tick.
+- `clock.on(Event.TICK, () => {} )` Registers a handler that is executed every clock tick.
 
 ## Thinking time
 
@@ -325,7 +327,7 @@ App code runs in [strict mode](https://developer.mozilla.org/en-US/docs/Web/Java
 
 All app code runs in a sandbox that gives each application 8 MB of memory, shared by all of that application's bots. When several applications run in the arena at once, each gets its own 8 MB. Exceeding the limit terminates every bot running that application.
 
-Callback functions are limited to 5 seconds of runtime, and exceeding that terminates the bot. For long-running work, return a Promise rather than blocking.
+Every entry into your code — loading the app, an event handler, a timer callback — is limited to 5 seconds of runtime, and exceeding that terminates the bot. For long-running work, return a Promise rather than blocking.
 
 A synchronous syntax or runtime error in your code terminates the bot, whether it happens as the match begins or at any point while it is running.
 
