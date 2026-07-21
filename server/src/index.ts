@@ -12,6 +12,7 @@ import {
   type BlogEntry,
 } from './util/seo';
 import { buildSitemap } from './util/sitemap';
+import { PUBLIC_ORIGIN } from './util/publicOrigin';
 
 import auth from './middleware/auth';
 import securityHeaders from './middleware/securityHeaders';
@@ -147,9 +148,6 @@ app.use(arenaEndpoints);
 // homepage, docs, lessons, and blog. We compute per-route metadata from the
 // shared blog manifest and the markdown, and inject it into the shell.
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
-const PUBLIC_ORIGIN = (
-  process.env.PUBLIC_ORIGIN || 'https://robocodejs.com'
-).replace(/\/+$/, '');
 const OG_IMAGE = PUBLIC_ORIGIN + '/og-card.png';
 
 const readPublic = (rel: string): string | null => {

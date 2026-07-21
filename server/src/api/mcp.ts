@@ -39,6 +39,7 @@ import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
 import { VERSION } from '../util/version';
 import { collectMetrics } from '../util/metrics';
+import { watchUrl } from '../util/publicOrigin';
 
 const app = express();
 
@@ -213,10 +214,44 @@ const logMatch = (
 // :userId argument): the bearer token already identifies the actor. Exported so
 // tests can drive the tools over an in-memory transport.
 export const buildServer = (user: User): McpServer => {
-  const server = new McpServer({
-    name: 'robocodejs',
-    version: '1.0.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'robocodejs',
+      version: '1.0.0',
+    },
+    {
+      // Surfaced to the client at connect time, so keep it to high-leverage
+      // orientation a model can't get from the tool list alone — vocabulary, the
+      // reference-first workflow, the multi-seed gotcha, and the live watch view.
+      // Per-tool detail lives in each tool's description; deep reference lives in
+      // the resources/prompts. Every arena-scoped result also carries a concrete
+      // `watchUrl`, but stating the pattern here lets a model build one for ANY
+      // arena (e.g. after a control action).
+      instructions:
+        'RobocodeJs is a game where you write JavaScript tank AIs that battle in ' +
+        'a live arena.\n\n' +
+        'Vocabulary: an "app" is the program you edit; running it fields up to ' +
+        'five "bots" (live tank instances) per arena; an "arena" is a persistent, ' +
+        'running battle. Tools address apps/arenas by `appId`/`arenaId`.\n\n' +
+        'Writing bots: read the reference before writing code — the ' +
+        '`robocode.d.ts` type definitions, the bot-API docs, and the sample-bot ' +
+        'resources (and the `write_app`/`debug_app` prompts) describe the real ' +
+        'API. Validate a draft with `check_app_source` before you save it with ' +
+        '`set_app_source`; don’t invent methods.\n\n' +
+        'Judging strength: bot spawn placement is random per match seed and is ' +
+        'outcome-deciding, so a single match is noise. To compare bots, run ' +
+        'several seeds (`set_arena_seed`, or a `run_match` sweep) and aggregate, ' +
+        'or read the global Elo `leaderboard` — the stable signal.\n\n' +
+        'Watching: the user is a human with a live, animated arena view in their ' +
+        'browser. Every arena has a public spectator page at ' +
+        `${watchUrl('<arenaId>')} ` +
+        '(no sign-in needed) that plays the match in real time, and every ' +
+        'arena-scoped result includes a ready-made `watchUrl`. When a match is ' +
+        'worth seeing — you just started one, ran a match, or the user asks ' +
+        'what’s happening — proactively offer the link. The user’s primary ' +
+        '("default") arena is the first one returned by `list_arenas`.',
+    }
+  );
 
   // Completion logging for every tool. logMcpRequest already emits an
   // `event=mcp.tool` audit line BEFORE a tool runs; this wraps each handler to
@@ -546,13 +581,25 @@ export const buildServer = (user: User): McpServer => {
     'list_arenas',
     {
       title: 'List arenas',
-      description: "List the authenticated user's arenas (arenaIds).",
+      description:
+        "List the authenticated user's arenas. Each carries a `watchUrl` — the " +
+        'public browser page where the user can watch that arena live — and ' +
+        '`isDefault` marks their primary arena (the one the website shows, and ' +
+        'the first by creation time).',
       inputSchema: {},
       annotations: READ_ONLY,
     },
     async () => {
       const arenas = await arenaService.getForUser(user.getId());
-      return ok(arenas.map((a) => ({ arenaId: a.getId() })));
+      // getForUser is ordered by creation time, so the first arena is the user's
+      // default (mirrors the REST default-arena resolution in resource.ts).
+      return ok(
+        arenas.map((a, i) => ({
+          arenaId: a.getId(),
+          watchUrl: watchUrl(a.getId()),
+          isDefault: i === 0,
+        }))
+      );
     }
   );
 
@@ -560,9 +607,11 @@ export const buildServer = (user: User): McpServer => {
     'create_arena',
     {
       title: 'Create arena',
-      description: `Create a new arena (up to ${MAX_ARENAS_PER_USER} per user).`,
+      description:
+        `Create a new arena (up to ${MAX_ARENAS_PER_USER} per user). Returns a ` +
+        '`watchUrl` — the public browser page where the user can watch it live.',
       inputSchema: {},
-      outputSchema: { arenaId: z.string() },
+      outputSchema: { arenaId: z.string(), watchUrl: z.string() },
       annotations: WRITE,
     },
     async () => {
@@ -571,7 +620,7 @@ export const buildServer = (user: User): McpServer => {
         return fail(`Arena limit reached (${MAX_ARENAS_PER_USER}).`);
       }
       const arena = await arenaService.create(user.getId());
-      return ok({ arenaId: arena.getId() });
+      return ok({ arenaId: arena.getId(), watchUrl: watchUrl(arena.getId()) });
     }
   );
 
@@ -617,7 +666,10 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
-      return ok(await buildArenaStatus(env, members));
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        ...(await buildArenaStatus(env, members)),
+      });
     }
   );
 
@@ -648,7 +700,10 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
-      return ok(await buildMatchSummary(env, members));
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        ...(await buildMatchSummary(env, members)),
+      });
     }
   );
 
@@ -678,7 +733,10 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
-      return ok(await buildMatchStatus(env, members));
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        ...(await buildMatchStatus(env, members)),
+      });
     }
   );
 
@@ -1037,7 +1095,11 @@ export const buildServer = (user: User): McpServer => {
         Date.now() - startedAt,
         summary
       );
-      return ok({ timedOut: !summary.match.decided, ...summary });
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        timedOut: !summary.match.decided,
+        ...summary,
+      });
     }
   );
 
