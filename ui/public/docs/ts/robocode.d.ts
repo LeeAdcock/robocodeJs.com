@@ -194,8 +194,8 @@ interface Bot {
   RADIUS: number;
   /** Sets the bot's display name. */
   setName(name: string): void;
-  /** Broadcasts a message to every bot in the arena, enemies included, received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y). */
-  send(message: BotMessage): void;
+  /** Broadcasts a message to every bot in the arena, enemies included, received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y). Returns a promise that resolves once the broadcast has gone out, or that is rejected (code E024) if you have already spent this tick’s budget of 50 sends, in which case the message was NOT delivered to anyone. Await it, or .catch() it, when it matters that a message actually left. */
+  send(message: BotMessage): Promise<void>;
   /** Returns a marker at the bot's current location. Markers are serializable, so bot.send(bot.dropMarker()) is the easy way to broadcast your position. A receiver rebuilds it with arena.createMarker(message.x, message.y). */
   dropMarker(): Marker;
 }

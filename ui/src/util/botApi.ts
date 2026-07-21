@@ -585,8 +585,8 @@ export const INTERFACES: ApiInterface[] = [
         name: 'send',
         kind: 'method',
         params: [{ name: 'message', type: 'BotMessage' }],
-        type: 'void',
-        doc: 'Broadcasts a message to every bot in the arena, enemies included, received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y).',
+        type: 'Promise<void>',
+        doc: 'Broadcasts a message to every bot in the arena, enemies included, received via Event.RECEIVED. The message can be a primitive (number, string, boolean, null) or nested arrays/objects of primitives. Contacts and Markers are serializable, so they can be sent directly: what transmits is their plain data properties (methods are not serialized), and the receiver rebuilds the object with arena.createContact(message) or arena.createMarker(message.x, message.y). Returns a promise that resolves once the broadcast has gone out, or that is rejected (code E024) if you have already spent this tick’s budget of 50 sends, in which case the message was NOT delivered to anyone. Await it, or .catch() it, when it matters that a message actually left.',
       },
       {
         name: 'dropMarker',

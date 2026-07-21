@@ -577,7 +577,11 @@ export default class Bot implements Point, Orientated {
     return this.y;
   }
 
-  send(message: JsonValue) {
+  // Returns true when the broadcast was accepted, false when it was dropped for
+  // exceeding the per-tick budget. The bot-facing bot.send wrapper turns that
+  // into a resolved/rejected Promise (compiler.ts), so an author can await the
+  // send and learn that it did not go out instead of silently losing it.
+  send(message: JsonValue): boolean {
     // Enforce the per-tick send budget before doing any O(bots) fan-out work.
     // The window is the current sim tick; when it advances, reset the counter.
     const now = this.env.getTime();
@@ -607,7 +611,7 @@ export default class Bot implements Point, Orientated {
           'bot exceeded per-tick send budget; dropping further broadcasts'
         );
       }
-      return;
+      return false;
     }
     this.sendCount += 1;
 
@@ -632,5 +636,6 @@ export default class Bot implements Point, Orientated {
           }
         });
     });
+    return true;
   }
 }
