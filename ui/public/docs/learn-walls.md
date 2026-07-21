@@ -9,7 +9,7 @@
 
 ## The idea
 
-When your robot runs into a wall or another robot, it **stops** and an event fires: **COLLIDED**. We can handle that event to back out of trouble.
+When your robot runs into a wall or another robot, an event fires: **COLLIDED**. Hitting a **wall** stops you dead. Hitting another **robot** shoves the two of you apart instead, so you keep rolling. Either way the bump costs you a little health, so we want to handle that event and back out of trouble.
 
 This event hands our handler some information. It comes as an **object**: a bundle of labeled values. We read a value with a dot and its label:
 
@@ -37,20 +37,20 @@ bot.on(Event.COLLIDED, (info) => {
 });
 ```
 
-Press **Deploy**. Now when Rusty hits a wall it spins around and keeps going instead of getting stuck.
+Press **Reboot**. Now when Rusty hits a wall it turns away and keeps going instead of sitting there. Watch closely and you'll see it bump the same wall a few more times on the way out: that turn takes around 15 ticks, and `bot.setSpeed(3)` is pushing into the wall for every one of them. Getting free costs a little health. It still beats being stuck.
 
 What's happening:
 
 - `(info) => { ... }`: the handler receives the `info` object. (You can name it anything; `info` is just a friendly label.)
 - `if (info.friendly) { ... } else { ... }`: chooses an action based on a true/false value.
-- We call `bot.setSpeed(3)` again because **hitting something sets your speed to 0**.
+- We call `bot.setSpeed(3)` again because **hitting a wall sets your speed to 0**. A bump with another robot doesn't stop you, so there the line is simply harmless.
 
 ## Experiment
 
 - Add `console.log('bumped, friendly?', info.friendly);` as the first line of the handler, then watch the log when Rusty hits a wall (a wall is **not** friendly).
 - Change the `else` turn from `180` to `150` so it doesn't retrace its exact path.
-- Delete the `bot.setSpeed(3)` line and Deploy. Rusty gets stuck after the first bump, that's why we re-start it!
-- See the wall coming **before** you hit it: add `console.log('wall in', arena.getNearestWall().getDistance());` inside the COLLIDED handler and watch how close "close" is. (Robots stop a little before the wall itself.)
+- Delete the `bot.setSpeed(3)` line and Reboot. Rusty gets stuck against the wall after its first bump, that's why we re-start it!
+- See the wall coming **before** you hit it: put `console.log('wall in', arena.getNearestWall().getDistance());` in a `clock.on(Event.TICK, ...)` handler and watch the number shrink as Rusty closes in. It bottoms out around 16, because robots stop a little before the wall itself.
 
 ## Common questions
 

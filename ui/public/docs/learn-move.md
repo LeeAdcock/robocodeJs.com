@@ -33,7 +33,9 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Deploy**. Rusty drives forward, and the log shows two numbers that keep changing.
+Press **Reboot** (or `Ctrl-Shift-S`). Rusty drives forward, and the log shows two numbers that keep changing.
+
+This is the lesson where Deploy stops being enough. Deploy hands your robot new code while it carries on doing whatever it was already doing, so it never goes back to the beginning and never runs START again. Your robot would just sit there, with nothing in the log to tell you why. Reboot starts it over, and starting over is what runs START.
 
 Those numbers come from **questions you ask the robot**:
 
@@ -46,16 +48,16 @@ Notice some instructions **do** something (`setSpeed`) and others **answer** som
 
 ## Experiment
 
-- Change `bot.setSpeed(3)` to `bot.setSpeed(5)`, full speed. Then try `0` (it stops) and `-3` (it backs up).
+- Change `bot.setSpeed(3)` to `bot.setSpeed(5)`, full speed. Then try `0` (it stops) and `-3` (it backs up). Reboot after each change, so START runs with the new number.
 - Add this line inside START to see the arena size: `console.log('arena is', arena.getWidth(), 'x', arena.getHeight());`
 
 ## Common questions
 
-**My robot drove to the edge and stopped. Why?** It bumped into the wall! Hitting something stops you. We'll learn to react to that in the next lesson.
+**My robot drove to the edge and stopped. Why?** It bumped into the wall! Hitting a wall stops you dead, and it costs you a little health — the faster you drove in, the more it hurts. We'll learn to react to that in the next lesson.
 
-**What's the difference between `setSpeed` and `getX`?** `setSpeed` is a command: it changes something. `getX` is a question: it gives you an answer back. Commands often end in `set...`, questions often start with `get...`.
+**What's the difference between `setSpeed` and `getX`?** `setSpeed` is a command: it changes something. `getX` is a question: it gives you an answer back. Commands often start with `set...`, questions often start with `get...`.
 
-**Why put `setSpeed` in START instead of TICK?** START runs once, which is perfect for "start driving." If you put it in TICK it would run every heartbeat, usually unnecessary, though not harmful here.
+**Why put `setSpeed` in START instead of TICK?** START runs once, which is perfect for "start driving." In TICK it would run every heartbeat, which is usually just wasteful — but once your robot is up against a wall it turns harmful: it keeps driving into the wall over and over, and each shove costs health until it destroys itself.
 
 ## You learned
 
