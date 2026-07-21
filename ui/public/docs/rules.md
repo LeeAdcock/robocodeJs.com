@@ -69,7 +69,7 @@ Bot centers keep a **16-foot margin** from every wall. A bot touching a wall sit
 | --- | --- | --- |
 | Health | **100 → 0** | `bot.getHealth()`; `100` is full, `0` is dead |
 | Bullet damage | **−25** | a clean hit removes a quarter of full health |
-| Bullet hit radius | **16 feet** | a bullet is a point, so it connects within a single bot radius of a center — the shot has to reach the hull; the whole path it swept during the tick is tested, so a fast shot can't skip past |
+| Bullet hit radius | **16 feet** | a bullet is a point, so it connects within a single bot radius of a center — the shot has to reach the hull |
 | Bot collision | **32 feet** | two bots collide when their centers are within 32 feet |
 | Wall collision | **0.75 × impact speed** | driving into an arena edge stops you dead (speed → 0) and costs damage scaled by how fast you drove in; a gentle graze is free, and skimming along a wall costs nothing |
 | Bot ram | **0.75 × closing speed** | a hard bump hurts once per contact (a gentle touch is free); the two bots are shoved apart but keep their speed, not stopped |
