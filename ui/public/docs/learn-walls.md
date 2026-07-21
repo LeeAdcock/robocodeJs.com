@@ -9,12 +9,12 @@
 
 ## The idea
 
-When your robot runs into a wall or another robot, an event fires: **COLLIDED**. Hitting a **wall** stops you dead. Hitting another **robot** shoves the two of you apart instead, so you keep rolling. Either way the bump costs you a little health, so we want to handle that event and back out of trouble.
+When your robot runs into a wall or another robot, an event fires: **COLLIDED**. Hitting a **wall** stops you dead. Hitting another **robot** shoves the two of you apart instead, so you keep rolling. Either way the bump costs you **health** — the faster you were moving, the more it hurts (a slow graze is free) — so a robot that keeps grinding into a wall slowly wears itself down with no enemy anywhere in sight. That's why we want to handle this event and back out of trouble.
 
 This event hands our handler some information. It comes as an **object**: a bundle of labeled values. We read a value with a dot and its label:
 
 - `info.angle`: the direction the thing we hit is in, relative to your heading (`0` is straight ahead)
-- `info.friendly`: `true` for a teammate and `false` for an enemy. A **wall** isn't a robot, so it has no `friendly` at all (`undefined`), which still counts as "not true"
+- `info.friendly`: `true` for a teammate and `false` for an enemy. Remember from [Lesson 1](/learn/hello) that your app fields a team of five, so with only your code in the arena the robots you bump _are_ your own teammates — that's why `friendly` comes back `true`. A **wall** isn't a robot, so it has no `friendly` at all (`undefined`), which still counts as "not true"
 
 `true`/`false` values are called **booleans**, and they let us make **decisions** with `if` and `else`: "**if** this is true, do one thing, **else** do another."
 
@@ -59,6 +59,8 @@ What's happening:
 **The dot in `bot.turn` and the dot in `info.angle` look the same, are they?** Same idea: the dot reaches **into** something. `bot.turn` reaches into `bot` for an action; `info.angle` reaches into `info` for a value.
 
 **Does COLLIDED fire for walls or only robots?** Both, any time you run into something. `info.friendly` tells them apart: `true` is a teammate, `false` is an enemy, and a wall has no `friendly` at all (`undefined`).
+
+**Why is my health dropping when nobody is shooting?** Collisions. Every bump into a wall or another robot costs a little health, scaled by how fast you hit — so a team left to drive into walls and each other will slowly lose health, and a robot that gets wedged against a wall can even bump itself to death, all with no bullet ever fired. Handling COLLIDED to steer away, like the code above, is what keeps that from happening.
 
 ## You learned
 

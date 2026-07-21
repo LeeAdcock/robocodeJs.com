@@ -66,6 +66,19 @@ Reading the tricky line: `closest === null || target.distance < closest.distance
 - Make Rusty face the enemy with its whole body **instead** of its turret: swap `bot.turret.setOrientation(closest.angle);` for `bot.turn(closest.angle);`. It is `turn` and not `setOrientation` because `closest.angle` is measured from where you are already facing, so you turn _by_ it — the turret takes it as-is, since the turret is aimed relative to the body. Aim one or the other, never both with the same bearing: the turret rides on the body, so turning the body swings the gun along with it and you end up pointing at twice the angle.
 - Log your target: `console.log('targeting one', closest.distance, 'away');`
 - Change `<` to `>` to aim at the **farthest** enemy instead. (Compare the difference!)
+- **Don't shoot your own team.** A bullet flies straight along your aim, so a teammate sitting between you and your target takes the hit. Before firing, look through the same scan list for a **friendly at nearly the same bearing** but **nearer** than your target, and hold fire if you find one. Replace the fire line with:
+
+  ```
+  if (closest !== null) {
+    bot.turret.setOrientation(closest.angle);
+    const blocked = targets.some(
+      (t) => t.friendly && Math.abs(t.angle - closest.angle) < 10 && t.distance < closest.distance
+    );
+    if (!blocked && bot.turret.isReady()) bot.turret.fire();
+  }
+  ```
+
+  `targets.some((t) => ...)` is `true` if **any** item in the list matches — here, any friendly close to your line of fire. This is the piece your capstone team will need most: five bots crowded together shoot each other constantly without it.
 
 ## Common questions
 
