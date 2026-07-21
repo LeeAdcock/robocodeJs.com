@@ -17,7 +17,7 @@ Think of it like a recipe. A recipe is a list of steps in order, and if you foll
 
 1. Look at the menu bar at the top. Click **Apps**, then **Create new application**.
 2. A code editor opens. This is where your robot's recipe lives.
-3. You'll see some starter code. Select it all and delete it so we can start fresh.
+3. The editor opens empty. A blank page, waiting for your first instruction.
 
 ## Try it
 
@@ -40,13 +40,13 @@ The semicolon `;` at the end marks the end of the instruction, like a period end
 ## Experiment
 
 - Change `'Rusty'` to your own robot's name and press Deploy again. Watch the name update.
-- What happens if you remove the quotes and just write `bot.setName(Rusty);`? Deploy and peek at the **log panel**. You'll likely see an error. Quotes matter! Put them back.
+- What happens if you remove the quotes and just write `bot.setName(Rusty);`? Deploy and peek at the console below the editor. You'll see an error, and your robots stop running — without the quotes, `Rusty` isn't text any more, it's the name of something you never created. Put the quotes back and Deploy, then use **Arena → Restart** to put your robots back on the field. Quotes matter!
 
 ## Common questions
 
 **Nothing changed when I deployed.** Look at the indicator next to your bot's name. If it says **Unsaved changes**, your code hasn't reached the arena yet. Press **Deploy**. If it says **Saved and Deployed**, your bots are running this code, so check that your bot was added to the arena. New bots are added automatically when you create them.
 
-**What's the difference between Deploy and Reboot?** **Deploy** loads your new code while your robot keeps doing what it was doing. **Reboot** reloads your code _and_ restarts your robot from the beginning. For now, Deploy is all you need.
+**What's the difference between Deploy and Reboot?** **Deploy** loads your new code while your robot keeps doing what it was doing. **Reboot** reloads your code _and_ restarts your robot from the beginning. Deploy is all you need for now — but from [Lesson 3](/learn/move) onward your code has a startup step, and Reboot is what runs it again.
 
 **Do I have to call it `bot`?** Yes, `bot` is the name the game gives your robot. It's always there for you to use.
 

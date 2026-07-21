@@ -27,7 +27,7 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Deploy**, then open the **log panel** (menu: **Arena → View Logs**). You'll see `tick!` printed over and over, once per heartbeat.
+Press **Deploy**, then look at the console below the editor. You'll see `tick!` printed over and over, once per heartbeat. (There's a fuller log panel at **Arena → View Logs** too, but the console right under your code is the one you'll live in.)
 
 Let's break down the new line:
 

@@ -41,7 +41,9 @@ clock.on(Event.TICK, () => {
 });
 ```
 
-Press **Deploy**. Rusty drives in circles!
+Press **Reboot**. Rusty drives in circles!
+
+Reboot again, not Deploy — the speed still comes from START, so a plain Deploy would leave Rusty running at whatever speed you last left it at while it turns.
 
 The new pieces:
 
@@ -53,7 +55,7 @@ The new pieces:
 - Change `bot.turn(20)` to `bot.turn(5)` (wide, lazy circle) or `bot.turn(90)` (sharp).
 - Try a negative turn like `bot.turn(-20)`. Rusty loops the other way.
 - Add this to your TICK handler to see the direction: `console.log('facing', bot.getOrientation());`
-- Replace the loop with a fixed heading: put `bot.setOrientation(0);` in START to drive straight north.
+- Drive a fixed heading instead: delete the whole `if (!bot.isTurning())` block from TICK, and put `bot.setOrientation(0);` in START to head straight north. (Leave the turning block in and the two fight each other — each new turn cancels the heading you asked for.)
 
 ## Common questions
 
@@ -61,7 +63,7 @@ The new pieces:
 
 **What's the difference between `turn` and `setOrientation`?** `turn` is **relative** ("turn 20 more from here"). `setOrientation` is **absolute** ("face exactly this way"). Use whichever is easier for what you want.
 
-**The robot turns slowly. Is that a bug?** No. Robots turn at a limited speed, just like real machines. A big turn takes a little time to finish.
+**The robot turns slowly. Is that a bug?** No. Robots turn at a limited speed, just like real machines: **10 degrees per tick**, which the game also hands you as `bot.TURN_RATE`. So a half-turn of 180 degrees takes 18 ticks, a little under two seconds. Big turns cost real time, and that becomes worth planning for once you're being shot at.
 
 ## You learned
 
