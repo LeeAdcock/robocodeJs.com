@@ -36,13 +36,25 @@ import { normalizeAngle, toRelativeBearing } from './geometry';
 // Once a bot is dead its attribution is frozen, which is exactly what "the last hit
 // that took it to <= 0" means.
 //
-// The health arithmetic itself is deliberately left untouched (it still runs for a
-// dead bot, and still goes negative): match ranking sums totalHealth, so changing
-// it would change match outcomes.
+// `amount` is rounded to a whole number here, at the one place health is ever
+// reduced: bullet damage is already integral, but collision damage is a speed
+// times COLLISION_DAMAGE_FACTOR and so arrives fractional. Rounding it keeps
+// `health` — and therefore the `damageDealt`/`damageTaken` totals derived from it
+// — a clean integer everywhere, which is the invariant the rest of the system
+// (health gauge, match ranking, the bigint achievement counters) expects. It does
+// shift match outcomes very slightly versus fractional damage, but ranking already
+// sums integral health, so this only makes the numbers honest.
+//
+// Health still runs for a dead bot and still goes negative — the enclosing
+// `health > 0` checks are made once per tick and a dead bot's bullets keep flying
+// and penalizing it — so the `wasAlive` guard below stays: without it a hit on an
+// already-dead bot would over-count damage and overwrite lastDamagedBy, stealing
+// the kill from whoever landed the killing blow. Once dead, attribution is frozen.
 const damage = (bot: Bot, amount: number, source: Bot | null): number => {
+  const rounded = Math.round(amount);
   const wasAlive = bot.health > 0;
-  const dealt = wasAlive ? Math.min(amount, bot.health) : 0;
-  bot.health -= amount;
+  const dealt = wasAlive ? Math.min(rounded, bot.health) : 0;
+  bot.health -= rounded;
   if (wasAlive) {
     bot.stats.damageTaken += dealt;
     bot.lastDamagedBy = source;

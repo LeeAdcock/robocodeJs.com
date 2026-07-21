@@ -142,10 +142,11 @@ describe('Simulation.run — collisions', () => {
     expect(collided).toHaveBeenCalled();
     expect(collided.mock.calls[0][0]).not.toHaveProperty('friendly');
     // The event reports the speed driven into the wall — the same value that
-    // scales the damage below.
+    // scales the damage below. Damage is rounded to keep health integral:
+    // 5 * 0.75 = 3.75 -> 4.
     expect(collided.mock.calls[0][0].impactSpeed).toBeCloseTo(5);
-    expect(bot.health).toBeCloseTo(100 - 5 * COLLISION_DAMAGE_FACTOR); // 96.25
-    expect(bot.stats.damageTaken).toBeCloseTo(5 * COLLISION_DAMAGE_FACTOR);
+    expect(bot.health).toBe(100 - Math.round(5 * COLLISION_DAMAGE_FACTOR)); // 96
+    expect(bot.stats.damageTaken).toBe(Math.round(5 * COLLISION_DAMAGE_FACTOR));
     expect(bot.speed).toBe(0);
     expect(bot.y).toBe(740); // movement not applied on collision
     expect(env.emit).toHaveBeenCalledWith(
@@ -190,7 +191,9 @@ describe('Simulation.run — collisions', () => {
     expect(collided).toHaveBeenCalledTimes(1);
     expect(bot.speed).toBe(0);
     const healthAfterFirst = bot.health;
-    expect(healthAfterFirst).toBeCloseTo(100 - 5 * COLLISION_DAMAGE_FACTOR);
+    expect(healthAfterFirst).toBe(
+      100 - Math.round(5 * COLLISION_DAMAGE_FACTOR)
+    );
 
     // The wall zeroed our speedTarget. Re-command movement straight back in: the
     // very next tick we're stopped and sitting just clear of the boundary (a gap
@@ -386,7 +389,7 @@ describe('Simulation.run — collisions', () => {
   });
 
   it('applies impact damage once per contact, scaled by closing speed', () => {
-    // Head-on at ±5 → closing speed 10 → 10 * 0.75 = 7.5 damage, once.
+    // Head-on at ±5 → closing speed 10 → 10 * 0.75 = 7.5 damage, rounded to 8, once.
     const t1 = makeBot({ id: '1', x: 375, y: 370, speed: 5, speedTarget: 5 });
     const t2 = makeBot({
       id: '2',
@@ -398,14 +401,42 @@ describe('Simulation.run — collisions', () => {
     });
     const processes = [makeProcess('a', [t1, t2])];
     run(makeEnv(processes));
-    expect(t1.health).toBeCloseTo(92.5, 5);
-    expect(t2.health).toBeCloseTo(92.5, 5);
+    const impact = Math.round(10 * COLLISION_DAMAGE_FACTOR); // 8
+    expect(t1.health).toBe(100 - impact);
+    expect(t2.health).toBe(100 - impact);
 
     // Still pressed together next tick — the contact is not fresh, so no further
     // impact damage lands (a sustained shove is not a grind).
     run(makeEnv(processes));
-    expect(t1.health).toBeCloseTo(92.5, 5);
-    expect(t2.health).toBeCloseTo(92.5, 5);
+    expect(t1.health).toBe(100 - impact);
+    expect(t2.health).toBe(100 - impact);
+  });
+
+  it('keeps health integral even when the raw impact damage is fractional', () => {
+    // Closing speed 7 → 7 * 0.75 = 5.25, which without rounding would leave a
+    // fractional health (and a fractional damageDealt total, the bigint-counter
+    // fault this guards). Head-on at ±3.5 gives closing speed 7.
+    const t1 = makeBot({
+      id: '1',
+      x: 375,
+      y: 370,
+      speed: 3.5,
+      speedTarget: 3.5,
+    });
+    const t2 = makeBot({
+      id: '2',
+      x: 375,
+      y: 400,
+      orientation: 180,
+      speed: 3.5,
+      speedTarget: 3.5,
+    });
+    run(makeEnv([makeProcess('a', [t1, t2])]));
+    expect(t1.health).toBe(100 - Math.round(7 * COLLISION_DAMAGE_FACTOR)); // 95
+    expect(Number.isInteger(t1.health)).toBe(true);
+    expect(Number.isInteger(t2.health)).toBe(true);
+    expect(Number.isInteger(t1.stats.damageTaken)).toBe(true);
+    expect(Number.isInteger(t2.stats.damageTaken)).toBe(true);
   });
 
   it('reports the closing speed as impactSpeed to a rammed bot', () => {
