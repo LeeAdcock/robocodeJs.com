@@ -62,7 +62,7 @@ New pieces:
 
 - Watch the brain work: add `console.log('mode:', this.mode);` at the top of your TICK.
 - Add a third mode. In SCANNED, if there are no enemies but you were attacking, set `this.mode = 'SEARCH'`. Try adding a `FLEE` mode you switch to later (next lesson!).
-- Make ATTACK chase: inside the `enemies.length > 0` block, add `bot.turn(enemies[0].angle);` (`turn`, not `setOrientation` — an enemy's `angle` is measured from your own heading, so you turn _by_ it).
+- Make ATTACK chase: inside the `enemies.length > 0` block, add `bot.turn(enemies[0].angle);` (`turn`, not `setOrientation` — an enemy's `angle` is measured from your own heading, so you turn _by_ it). Then drop the `bot.turret.setOrientation(target.angle)` line from `aimAndFire`, because the body is now doing that job: leave both in and the gun swings by the bearing twice, walking further off target every tick instead of settling on it.
 
 ## Common questions
 
@@ -70,7 +70,7 @@ New pieces:
 
 **Do my five robots share this memory?** No, each robot gets its **own** private notebook. When one bot sets `this.mode`, the other four don't see it, and a top-level `let` variable is private to a single bot too (they run the same code, but each keeps its own copy). To share something across your team, you **send a message**. That's [Lesson 15](/learn/teamwork).
 
-**What happens to my variables when I Save?** Saving **reloads your code**: it runs again from the top. So a top-level `let value = 123` is set right back to `123` on every Save, losing whatever it had grown to. But `this.value` lives on the notebook that _survives_ a reload, so it keeps its value across Saves. That's the real reason to reach for `this` for anything your robot needs to remember while you keep tweaking its code mid-match. (A **Reboot** is the exception: it wipes the notebook too and re-runs `START` from scratch.)
+**What happens to my variables when I Save?** Saving **reloads your code**: it runs again from the top. So a top-level `let value = 123` is set right back to `123` on every Save, losing whatever it had grown to. But `this.value` lives on the notebook that _survives_ a reload, so it keeps its value across Saves. That's the real reason to reach for `this` for anything your robot needs to remember while you keep tweaking its code mid-match. (A **Reboot** re-runs `START` from scratch, but your notebook survives that too — only a fresh match clears it.)
 
 **What does `filter` do (vs `forEach`)?** `forEach` _visits_ every item. `filter` _builds a new shorter list_ of just the items that match (here, the enemies).
 

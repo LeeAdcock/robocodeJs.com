@@ -40,7 +40,9 @@ bot.on(Event.FIRED, () => {
 });
 ```
 
-Press **Deploy**. Rusty stands still and fires whenever the cannon is loaded. The log prints `boom!` on every shot.
+Press **Reboot**. Rusty stands still and fires whenever the cannon is loaded. The log prints `boom!` on every shot.
+
+Two things worth expecting. Nothing happens for the first ten seconds of a fresh match: robots deploy with their turrets held, so `isReady()` stays `false` until they are in position. And once the shooting starts, blind fire is genuinely dangerous to your own side — your robots begin the match near each other, and a shot that connects does not care whose robot it hit. That is the problem the next two lessons solve.
 
 ## Experiment
 
