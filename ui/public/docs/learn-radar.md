@@ -16,6 +16,7 @@ When a scan finishes, the **SCANNED** event fires and hands you a **list** of ev
 - `target.distance`: how far away it is
 - `target.angle`: the bearing to it, relative to your heading (you'll use this to aim)
 - `target.friendly`: `true` if it's a teammate
+- `target.health`: how much life it has left, handy for picking off the weakest
 - (also `target.id`, `target.speed`, `target.orientation`)
 
 To look at every item in a list, we use **`forEach`**: "for each item, do this."
@@ -42,13 +43,13 @@ bot.on(Event.SCANNED, (targets) => {
 });
 ```
 
-Press **Deploy** and watch the log. Whenever the radar sweeps over another robot, you'll see a line about it. If nothing is in view, the list is empty and nothing prints.
+Press **Reboot** and watch the log. Whenever another robot crosses the radar's beam, you'll see a line about it. If nothing is in view, the list is empty and nothing prints — and that will be most of the time here, because nothing in this code points the radar anywhere. The beam does not swing around on its own; it looks wherever the robot happens to be facing. The last Experiment below fixes that, and from here on it is the difference between a robot that finds enemies and one that never sees a thing.
 
 ## Experiment
 
 - Only report **enemies**: wrap the `console.log` in `if (!target.friendly) { ... }`.
 - Print how many robots a scan saw with `console.log('saw', targets.length, 'robots');` inside the SCANNED handler (before the `forEach`). `.length` is the size of a list.
-- The radar points the same way your turret/body points. Add `bot.turret.turn(15);` in your TICK to sweep the radar around and spot robots in other directions.
+- Sweep the beam so it finds robots in other directions: add `bot.radar.turn(15);` in your TICK. Watch how many more sightings you get. The radar sits on the turret, which sits on the body, so turning either of those swings the radar too — but the radar can also turn on its own, and that is usually what you want, since the next lesson gives the turret a job of its own.
 
 ## Common questions
 

@@ -31,7 +31,7 @@ bot.on(Event.START, () => {
 
 clock.on(Event.TICK, async () => {
   // Wait until the radar is charged, then scan and wait for the results.
-  const targets = await bot.radar.onReady().then(bot.radar.scan);
+  const targets = await bot.radar.onReady().then(bot.radar.scan).catch(() => []);
 
   if (targets.length > 0 && !targets[0].friendly) {
     await bot.turret.onReady(); // wait until the cannon is loaded
@@ -45,20 +45,20 @@ bot.on(Event.COLLIDED, () => {
 });
 ```
 
-Press **Deploy**. Rusty roams and fires cleanly. The `await`s make each step wait for the one before it, so it fires _after_ the cannon is actually ready.
+Press **Reboot**. Rusty roams and fires cleanly. The `await`s make each step wait for the one before it, so it fires _after_ the cannon is actually ready.
 
 New pieces:
 
 - `async () => { ... }`: a handler that's allowed to `await`.
 - `bot.radar.onReady()`: a Promise that finishes when the radar is charged. Nicer than checking `isReady()` over and over.
 - `.then(bot.radar.scan)`: when ready, run the scan.
-- `.catch(() => {})`: ignore a cancelled action so it doesn't clutter your log.
+- `.catch(() => {})` and `.catch(() => [])`: ignore an action that got cancelled, so it doesn't clutter your log. The radar chain needs one because a scan can be cancelled mid-charge, and it hands back an empty list so the line below still has something to count.
 
 ## Experiment
 
-- Add aiming from Lesson 8 before firing: `await bot.turret.setOrientation(targets[0].angle);` then `bot.turret.fire();`. Now it waits to finish aiming, _then_ shoots, much more accurate.
+- Add aiming from Lesson 8 before firing: `await bot.turret.setOrientation(targets[0].angle);` then `bot.turret.fire();`. Now it finishes aiming before it shoots. Notice what that costs: while the turret is turning, this TICK handler is parked, so you stop scanning, and a moving target can be somewhere else by the time the gun arrives. Waiting to aim wins against slow or nearby enemies; against quick ones, a rougher shot taken sooner can do better.
 - Remove the `await` before `bot.turret.onReady()` and see how the behavior gets sloppier.
-- Delete the `.catch(() => {})` on the COLLIDED turn, bump a wall a few times, and watch the log fill with "cancelled" messages. Put it back to silence them.
+- See a cancellation for yourself. Rewrite the COLLIDED handler to wait on its turn instead of chaining: `bot.on(Event.COLLIDED, async () => { await bot.turn(120); bot.setSpeed(3); });`, then bump a wall a few times. Each new bump cancels the turn still in progress, and because nothing catches it any more, a "cancelled" message reaches your log. That is the rule worth keeping: a rejection only surfaces when something is waiting on it.
 
 ## Common questions
 

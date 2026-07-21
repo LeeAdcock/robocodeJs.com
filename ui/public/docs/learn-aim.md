@@ -33,6 +33,7 @@ bot.on(Event.START, () => {
 });
 
 clock.on(Event.TICK, () => {
+  bot.radar.turn(20); // keep the beam sweeping, or it never finds anyone
   if (bot.radar.isReady()) bot.radar.scan();
 });
 
@@ -54,13 +55,15 @@ bot.on(Event.SCANNED, (targets) => {
 });
 ```
 
-Press **Deploy**. Rusty tracks the nearest enemy with its turret and fires when loaded.
+Press **Reboot**. Rusty tracks the nearest enemy with its turret and fires when loaded.
+
+That `bot.radar.turn(20)` is doing more work than it looks. Rusty is parked, so its body never rotates, and the radar is a narrow beam rather than a circle of vision — without something turning it, the beam stays frozen on whatever direction Rusty happened to spawn facing, and a sniper that scans a hundred times can still never see a soul.
 
 Reading the tricky line: `closest === null || target.distance < closest.distance` means "if I haven't picked anyone yet, **or** this one is closer than my current pick, choose this one." (`||` means "or.")
 
 ## Experiment
 
-- Make Rusty face the enemy with its whole body too: add `bot.turn(closest.angle);` inside the `if (closest !== null)` block. It is `turn` and not `setOrientation` because `closest.angle` is measured from where you are already facing, so you turn _by_ it — the turret takes it as-is, since the turret is aimed relative to the body.
+- Make Rusty face the enemy with its whole body **instead** of its turret: swap `bot.turret.setOrientation(closest.angle);` for `bot.turn(closest.angle);`. It is `turn` and not `setOrientation` because `closest.angle` is measured from where you are already facing, so you turn _by_ it — the turret takes it as-is, since the turret is aimed relative to the body. Aim one or the other, never both with the same bearing: the turret rides on the body, so turning the body swings the gun along with it and you end up pointing at twice the angle.
 - Log your target: `console.log('targeting one', closest.distance, 'away');`
 - Change `<` to `>` to aim at the **farthest** enemy instead. (Compare the difference!)
 
@@ -70,7 +73,7 @@ Reading the tricky line: `closest === null || target.distance < closest.distance
 
 **What is `null`?** "Nothing here yet." We start `closest` at `null`, then replace it once we find a target. We check `closest !== null` ("is not nothing") before aiming.
 
-**My turret seems a step behind the target.** Turning takes a moment, and we fire the same instant we start aiming. The next lesson teaches how to **wait** for the aim to finish before firing.
+**My turret seems a step behind the target.** Turning takes a moment, and we fire the same instant we start aiming. It matters more than you'd think: a bullet has to reach the enemy's hull, a window of about 16 feet, which at long range is only a couple of degrees of aim. The next lesson teaches how to **wait** for the aim to finish before firing.
 
 ## You learned
 
