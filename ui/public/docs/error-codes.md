@@ -176,7 +176,7 @@ bot.send({ target: { x: this.target.x, y: this.target.y } })
 
 ## E024
 
-**Send limit reached: non-fatal.** Your bot called `bot.send(...)` more than the per-tick limit of **50** times in a single simulation tick. Each broadcast is re-delivered to every other bot in the arena, so an unbounded stream of sends can flood the match; the extra calls this tick are ignored (they simply don't send) and the bot keeps playing. Sends past the cap don't throw, unlike a malformed message ([E023](#e023)). This almost always means `bot.send` is being called in a tight loop. Fix: send at most a handful of messages per clock tick. Coordinate with a compact payload rather than a stream of them, and avoid calling `send` inside an unbounded loop. The budget resets every tick.
+**Send limit reached: non-fatal.** Your bot called `bot.send(...)` more than the per-tick limit of **50** times in a single simulation tick. Each broadcast is re-delivered to every other bot in the arena, so an unbounded stream of sends can flood the match; the extra calls this tick do not go out, and the bot keeps playing. `bot.send` returns a Promise, and an over-budget send **rejects** with this code — so `await bot.send(...)` throws, and a bare `bot.send(...)` you never await fails silently. That is the way to tell a dropped broadcast from a delivered one. A malformed message is different: it _throws_ ([E023](#e023)) rather than rejecting. This almost always means `bot.send` is being called in a tight loop. Fix: send at most a handful of messages per clock tick. Coordinate with a compact payload rather than a stream of them, and avoid calling `send` inside an unbounded loop. The budget resets every tick.
 
 ```
 // Triggers E024: one send per queued item can exceed 50 in a single tick

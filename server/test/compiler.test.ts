@@ -7,7 +7,7 @@ vi.mock('../src/util/db', () => ({
 }));
 
 import compiler from '../src/util/compiler';
-import Bot, { BOT_MAX_SPEED } from '../src/types/bot';
+import Bot, { BOT_MAX_SPEED, MAX_SENDS_PER_TICK } from '../src/types/bot';
 import { Process } from '../src/types/environment';
 import { Event } from '../src/types/event';
 import { timerTick } from '../src/util/scheduleFactory';
@@ -867,6 +867,45 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.bot.orientationTarget).toBe(270);
   });
 
+  // bot.send is the one command whose failure is decided synchronously (the
+  // budget check happens before any fan-out), so its promise is already settled
+  // when the bot receives it. These lock both settlements, because the whole
+  // point of the promise is telling a delivered broadcast from a dropped one.
+  it('resolves the promise from a send inside the per-tick budget', async () => {
+    ctx.run(`
+      globalThis.__sent = 'pending'
+      bot.send('hello').then(() => { __sent = 'resolved' }, (e) => { __sent = String(e) })
+    `);
+    expect(await waitUntilRead('__sent', (v) => v !== 'pending')).toBe(
+      'resolved'
+    );
+    expect(ctx.bot.stats.messagesSent).toBe(1);
+  });
+
+  it('rejects with E024 once the per-tick send budget is spent', async () => {
+    // One more than the budget, all within a single tick (the mock clock does
+    // not advance), so exactly the last one must be refused.
+    ctx.run(`
+      globalThis.__results = []
+      for (let i = 0; i <= ${MAX_SENDS_PER_TICK}; i++) {
+        bot.send('m' + i).then(
+          () => __results.push('ok'),
+          (e) => __results.push(String(e))
+        )
+      }
+    `);
+    const results = (await waitUntilRead(
+      '__results',
+      (v) => Array.isArray(v) && v.length > MAX_SENDS_PER_TICK
+    )) as string[];
+
+    expect(results).toHaveLength(MAX_SENDS_PER_TICK + 1);
+    expect(results.filter((r) => r === 'ok')).toHaveLength(MAX_SENDS_PER_TICK);
+    expect(results[results.length - 1]).toContain('E024');
+    // Dropped means dropped: the over-budget message was never broadcast.
+    expect(ctx.bot.stats.messagesSent).toBe(MAX_SENDS_PER_TICK);
+  });
+
   // --- Sandbox security contract (negative capabilities) -------------------
   // These lock the escape-relevant guarantees of the isolate boundary rather
   // than any single bot API: no host or Node capability leaks into bot scope,
@@ -902,6 +941,19 @@ describe('compiler — bot API in a real isolate', () => {
     expect(types).toEqual(
       Object.fromEntries(names.map((n) => [n, 'undefined']))
     );
+  });
+
+  it('hands bot.send only copied plain data, never a host reference', () => {
+    // _bot_send now has a return value, which makes it subject to the copy
+    // boundary rule: what comes back must be plain data the isolate owns. A
+    // boolean that still carried host-backed machinery (an ivm Reference, or an
+    // object with host methods on it) would be a path off the sandbox.
+    expect(ctx.read('typeof _bot_send("\\"probe\\"")')).toBe('object');
+    expect(ctx.read('typeof _bot_send("\\"probe\\"").copy()')).toBe('boolean');
+    // The wrapper the bot actually calls yields a real in-isolate Promise, not
+    // something bridged back to the host.
+    expect(ctx.read('bot.send("probe") instanceof Promise')).toBe(true);
+    expect(ctx.read('typeof bot.send("probe").then')).toBe('function');
   });
 
   it('sets Date to undefined so bots cannot read wall-clock time', () => {

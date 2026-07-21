@@ -3,6 +3,7 @@ import Bot, {
   BOT_TURN_SPEED,
   BOT_ACCELERATION,
   BOT_MAX_SPEED,
+  MAX_SENDS_PER_TICK,
 } from '../types/bot';
 import { TURRET_TURN_SPEED } from '../types/botTurret';
 import { RADAR_TURN_SPEED } from '../types/botRadar';
@@ -481,12 +482,25 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
   // bot-side wrapper stringifies it and the host parses + validates it
   // (parseMessage) before broadcasting. JSON is the whitelist, so functions,
   // class instances, Dates, Maps/Sets, and host references can never be sent.
-  bot.getContext().global.setSync('_bot_send', (json: unknown) => {
-    bot.send(parseMessage(json));
-  });
+  // It returns a Promise, like every other failable bot command: resolved once
+  // the broadcast has gone out, rejected with E024 when the per-tick send budget
+  // was already spent and the message was therefore dropped. Whether a send is
+  // accepted is known synchronously (no fan-out happens later), so this needs
+  // none of the __pending/__settle machinery — the wrapper builds an
+  // already-settled promise in-isolate from a copied boolean, and only plain
+  // data ever crosses the boundary.
+  bot
+    .getContext()
+    .global.setSync(
+      '_bot_send',
+      (json: unknown) => new ivm.ExternalCopy(bot.send(parseMessage(json)))
+    );
   isolate
     .compileScriptSync(
-      `bot.send = (message) => _bot_send(JSON.stringify(message))`
+      `bot.send = (message) =>
+         _bot_send(JSON.stringify(message)).copy()
+           ? Promise.resolve()
+           : Promise.reject('${ErrorCodes.E024}: send limit reached (${MAX_SENDS_PER_TICK} per tick). This broadcast was not sent.')`
     )
     .runSync(bot.getContext(), {});
 
