@@ -46,7 +46,7 @@ Once connected, these tools are available (all scoped to your account, except th
 
 **Arenas**
 
-- `list_arenas` / `create_arena` / `delete_arena`
+- `list_arenas` / `create_arena` / `delete_arena` — `list_arenas` also flags your default arena (`isDefault`) and, like `create_arena` and every read tool below, returns a `watchUrl`
 - `arena_status`: full snapshot (size, running state, clock, and every app's bots: position, orientation, health, bullets)
 - `match_summary`: outcome view with leaderboard, winner, per-bot accuracy/damage/ survival, and elimination order (most useful once a match is decided)
 - `match_status`: the cheap-to-poll companion. It returns just `decided`, the `winner`, and a coarse standings list (rank, bots alive, total health), with no per-bot stat blocks or per-bot positions. Use it to watch a running match ("is it decided yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
@@ -66,6 +66,8 @@ Once connected, these tools are available (all scoped to your account, except th
 - `leaderboard`: the global bot ladder, the top-rated apps across all users by Elo (name, owner, rating, games, win rate). Public ranking data, the one tool that isn't scoped to your account
 
 Arena tools take a required `arenaId` — arena state, logs, and faults are all arena-specific, so you name the arena deliberately. Use `list_arenas` to look up your arena ids (or `create_arena` to make one).
+
+Every arena-scoped result carries a **`watchUrl`** — a public, sign-in-free spectator page (`/watch/<arenaId>`) that plays the live match in your browser, the same link the editor's "Share" button copies. It's how the AI can hand you a link to watch a match unfold rather than only describing it.
 
 **Resources**
 

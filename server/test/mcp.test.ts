@@ -429,7 +429,13 @@ describe('mcp tools', () => {
     })) as never;
 
     expect(arenaService.get).toHaveBeenCalledWith('ar2');
-    expect(JSON.parse(textOf(res))).toEqual({ running: true });
+    // The snapshot is returned alongside a watchUrl (the public spectator page)
+    // so the caller can offer the user a link to watch. PUBLIC_ORIGIN is unset
+    // under test, so the origin is the production default.
+    expect(JSON.parse(textOf(res))).toEqual({
+      watchUrl: 'https://robocodejs.com/watch/ar2',
+      running: true,
+    });
   });
 
   it('pause_arena refuses an arena owned by someone else (writes stay owner-only)', async () => {
@@ -459,6 +465,7 @@ describe('mcp tools', () => {
 
     expect(arenaService.get).toHaveBeenCalledWith('ar1');
     expect(JSON.parse(textOf(res))).toEqual({
+      watchUrl: 'https://robocodejs.com/watch/ar1',
       match: { decided: true, winner: { id: 'a1' } },
     });
   });
@@ -479,8 +486,54 @@ describe('mcp tools', () => {
 
     expect(arenaService.get).toHaveBeenCalledWith('ar1');
     expect(JSON.parse(textOf(res))).toEqual({
+      watchUrl: 'https://robocodejs.com/watch/ar1',
       match: { decided: false, winner: null },
       standings: [],
+    });
+  });
+
+  it('list_arenas returns a watchUrl per arena and flags the default (first) one', async () => {
+    // getForUser is ordered by creation time, so the first arena is the user's
+    // default. Each row carries the public spectator link.
+    vi.mocked(arenaService.getForUser).mockResolvedValue([
+      { getId: () => 'ar1', getUserId: () => 'u1' },
+      { getId: () => 'ar2', getUserId: () => 'u1' },
+    ] as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'list_arenas',
+      arguments: {},
+    })) as never;
+
+    expect(JSON.parse(textOf(res))).toEqual([
+      {
+        arenaId: 'ar1',
+        watchUrl: 'https://robocodejs.com/watch/ar1',
+        isDefault: true,
+      },
+      {
+        arenaId: 'ar2',
+        watchUrl: 'https://robocodejs.com/watch/ar2',
+        isDefault: false,
+      },
+    ]);
+  });
+
+  it('create_arena returns the new arenaId and its watchUrl', async () => {
+    vi.mocked(arenaService.getForUser).mockResolvedValue([] as never);
+    vi.mocked(arenaService.create).mockResolvedValue({
+      getId: () => 'arNew',
+      getUserId: () => 'u1',
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'create_arena',
+      arguments: {},
+    })) as never;
+
+    expect(JSON.parse(textOf(res))).toEqual({
+      arenaId: 'arNew',
+      watchUrl: 'https://robocodejs.com/watch/arNew',
     });
   });
 
@@ -617,6 +670,8 @@ describe('mcp tools', () => {
     const out = JSON.parse(textOf(res));
     expect(out.timedOut).toBe(false);
     expect(out.match.winner.id).toBe('a1');
+    // The result carries a watchUrl so the agent can offer to show this combat.
+    expect(out.watchUrl).toBe('https://robocodejs.com/watch/ar1');
   });
 
   it('run_match refuses cleanly when a match is already running in the arena', async () => {

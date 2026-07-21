@@ -39,6 +39,7 @@ import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
 import { VERSION } from '../util/version';
 import { collectMetrics } from '../util/metrics';
+import { watchUrl } from '../util/publicOrigin';
 
 const app = express();
 
@@ -213,10 +214,32 @@ const logMatch = (
 // :userId argument): the bearer token already identifies the actor. Exported so
 // tests can drive the tools over an in-memory transport.
 export const buildServer = (user: User): McpServer => {
-  const server = new McpServer({
-    name: 'robocodejs',
-    version: '1.0.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'robocodejs',
+      version: '1.0.0',
+    },
+    {
+      // Surfaced to the client at connect time. The one thing a model can't infer
+      // from the tool list alone is that the human on the other end has a live,
+      // browser-based visualization of every arena — so point it at the shareable
+      // watch page and encourage offering it. Every arena-scoped tool result also
+      // carries a concrete `watchUrl`, but stating the pattern here means the
+      // model can build one for ANY arena (e.g. after a control action) and knows
+      // watching is a first-class thing to offer.
+      instructions:
+        'The user is a human working alongside you, and RobocodeJs has a live, ' +
+        'animated arena view they can open in a browser. Every arena has a ' +
+        'public spectator page at ' +
+        `${watchUrl('<arenaId>')} ` +
+        '(no sign-in needed) that plays the running match in real time. ' +
+        'Arena-scoped tool results include a ready-made `watchUrl`; when a match ' +
+        'is worth seeing — you just started one, ran a match, or the user asks ' +
+        'what’s happening — proactively offer them the link to watch. The ' +
+        'user’s primary ("default") arena is the first one returned by ' +
+        '`list_arenas`.',
+    }
+  );
 
   // Completion logging for every tool. logMcpRequest already emits an
   // `event=mcp.tool` audit line BEFORE a tool runs; this wraps each handler to
@@ -546,13 +569,25 @@ export const buildServer = (user: User): McpServer => {
     'list_arenas',
     {
       title: 'List arenas',
-      description: "List the authenticated user's arenas (arenaIds).",
+      description:
+        "List the authenticated user's arenas. Each carries a `watchUrl` — the " +
+        'public browser page where the user can watch that arena live — and ' +
+        '`isDefault` marks their primary arena (the one the website shows, and ' +
+        'the first by creation time).',
       inputSchema: {},
       annotations: READ_ONLY,
     },
     async () => {
       const arenas = await arenaService.getForUser(user.getId());
-      return ok(arenas.map((a) => ({ arenaId: a.getId() })));
+      // getForUser is ordered by creation time, so the first arena is the user's
+      // default (mirrors the REST default-arena resolution in resource.ts).
+      return ok(
+        arenas.map((a, i) => ({
+          arenaId: a.getId(),
+          watchUrl: watchUrl(a.getId()),
+          isDefault: i === 0,
+        }))
+      );
     }
   );
 
@@ -560,9 +595,11 @@ export const buildServer = (user: User): McpServer => {
     'create_arena',
     {
       title: 'Create arena',
-      description: `Create a new arena (up to ${MAX_ARENAS_PER_USER} per user).`,
+      description:
+        `Create a new arena (up to ${MAX_ARENAS_PER_USER} per user). Returns a ` +
+        '`watchUrl` — the public browser page where the user can watch it live.',
       inputSchema: {},
-      outputSchema: { arenaId: z.string() },
+      outputSchema: { arenaId: z.string(), watchUrl: z.string() },
       annotations: WRITE,
     },
     async () => {
@@ -571,7 +608,7 @@ export const buildServer = (user: User): McpServer => {
         return fail(`Arena limit reached (${MAX_ARENAS_PER_USER}).`);
       }
       const arena = await arenaService.create(user.getId());
-      return ok({ arenaId: arena.getId() });
+      return ok({ arenaId: arena.getId(), watchUrl: watchUrl(arena.getId()) });
     }
   );
 
@@ -617,7 +654,10 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
-      return ok(await buildArenaStatus(env, members));
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        ...(await buildArenaStatus(env, members)),
+      });
     }
   );
 
@@ -648,7 +688,10 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
-      return ok(await buildMatchSummary(env, members));
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        ...(await buildMatchSummary(env, members)),
+      });
     }
   );
 
@@ -678,7 +721,10 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
-      return ok(await buildMatchStatus(env, members));
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        ...(await buildMatchStatus(env, members)),
+      });
     }
   );
 
@@ -1037,7 +1083,11 @@ export const buildServer = (user: User): McpServer => {
         Date.now() - startedAt,
         summary
       );
-      return ok({ timedOut: !summary.match.decided, ...summary });
+      return ok({
+        watchUrl: watchUrl(arena.getId()),
+        timedOut: !summary.match.decided,
+        ...summary,
+      });
     }
   );
 
