@@ -62,7 +62,7 @@ New pieces:
 
 - Watch the brain work: add `console.log('mode:', this.mode);` at the top of your TICK.
 - Add a third mode. In SCANNED, if there are no enemies but you were attacking, set `this.mode = 'SEARCH'`. Try adding a `FLEE` mode you switch to later (next lesson!).
-- Make ATTACK chase: inside the `enemies.length > 0` block, add `bot.setOrientation(enemies[0].angle);`
+- Make ATTACK chase: inside the `enemies.length > 0` block, add `bot.turn(enemies[0].angle);` (`turn`, not `setOrientation` — an enemy's `angle` is measured from your own heading, so you turn _by_ it).
 
 ## Common questions
 

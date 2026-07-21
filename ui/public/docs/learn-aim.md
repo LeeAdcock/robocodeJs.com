@@ -60,7 +60,7 @@ Reading the tricky line: `closest === null || target.distance < closest.distance
 
 ## Experiment
 
-- Make Rusty face the enemy with its whole body too: add `bot.setOrientation(closest.angle);` inside the `if (closest !== null)` block.
+- Make Rusty face the enemy with its whole body too: add `bot.turn(closest.angle);` inside the `if (closest !== null)` block. It is `turn` and not `setOrientation` because `closest.angle` is measured from where you are already facing, so you turn _by_ it — the turret takes it as-is, since the turret is aimed relative to the body.
 - Log your target: `console.log('targeting one', closest.distance, 'away');`
 - Change `<` to `>` to aim at the **farthest** enemy instead. (Compare the difference!)
 
