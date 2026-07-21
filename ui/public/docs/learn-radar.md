@@ -9,7 +9,7 @@
 
 ## The idea
 
-Your robot has a **radar** (`bot.radar`) that can **scan** for other robots in the direction it's pointing. Like the turret, it needs time to recharge between scans, so we check `bot.radar.isReady()` first.
+Your robot has a **radar** (`bot.radar`) that can **scan** for other robots in the direction it's pointing. Picture it as a **flashlight, not a lamp**: it lights up a narrow beam pointing one way, not a circle of vision all around you. The beam starts about one tank wide at the robot and fans out to a few hundred feet across at the end of its long reach, so a robot sitting just off to the side is invisible even when it's right next to you. That's the key thing to remember: **where you point the radar matters more than how close the enemy is** — a scan only ever reports what happens to be caught in the beam. Like the turret, the radar needs time to recharge between scans, so we check `bot.radar.isReady()` first.
 
 When a scan finishes, the **SCANNED** event fires and hands you a **list** of everything it found. A list (programmers call it an **array**) is just several things in a row. Each item is a robot you spotted, and it's an object with useful labels:
 

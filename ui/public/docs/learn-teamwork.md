@@ -107,6 +107,7 @@ Build your own champion bot that combines what you've learned. A strong bot usua
 2. **Attacks** the nearest enemy: aim, wait for the cannon, fire (Lessons 8, 9).
 3. **Survives**: dodge when HIT and flee when health is low (Lesson 11).
 4. **Coordinates** with teammates over `send` / RECEIVED (this lesson).
+5. **Doesn't shoot its own team**: before firing, check that no friendly bot is on the line between you and your target (Lesson 8). With five bots fighting shoulder to shoulder this is easy to overlook — a team that nails the first four behaviours can still lose to friendly fire alone.
 
 Mix in markers, timers, and a state machine however you like. Your app already fields a team of five, so there's nothing to add to test the coordination — use the **Bots per app** dropdown in the arena toolbar if you want to try a different squad size. (The roster's **[+]** button adds a _different_ app, which gives you opponents rather than teammates: teammates are the bots running _your_ code.) Put an example bot in against them and watch the fight.
 

@@ -29,6 +29,8 @@ bot.setName('Rusty');
 
 Now press the **Deploy** button, or `Ctrl-S`. Look at the arena on the right. Your robot is now named **Rusty**!
 
+Look closely and you'll spot something: there isn't one Rusty out there, there are **five**. One app fields a whole **team of five robots**, and every one of them runs this exact same code — your program is a single recipe that all five follow at once. (That's also why the console can fill up so fast later: print one line and five robots each print it.) For now just think of them as _your robot_, singular; from [Lesson 5](/learn/walls) on, the fact that you're really commanding a squad starts to matter, and by the last lesson you'll have them working together as a team.
+
 Let's read that line like a sentence:
 
 - `bot` is **your robot**. You'll talk to it a lot.

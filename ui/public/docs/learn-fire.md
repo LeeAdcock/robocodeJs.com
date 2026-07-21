@@ -55,7 +55,7 @@ Two things worth expecting. Nothing happens for the first ten seconds of a fresh
 
 **Why does my robot fire slower than every tick?** Because of reload time. `isReady()` is `false` while reloading, so the `if` skips firing until it's loaded again.
 
-**Does firing hurt me or my teammates?** Firing itself is free, but a shot that _misses_ and flies off the field costs you **3 health**, so don't fire blindly into empty space. Your shots _can_ also hit teammates. Soon we'll learn to scan and only fire at enemies.
+**Does firing hurt me or my teammates?** Firing itself is free, but a shot that _misses_ and flies off the field costs you **3 health**, so don't fire blindly into empty space. And your bullets have no loyalty: a shot hits **any** robot it reaches, your own teammates included. Soon we'll learn to scan and only aim at enemies — but note that's about picking the right _target_. A teammate standing between you and that target still catches the bullet, so **not shooting your own team** is a second, separate habit (checking your line of fire); you'll meet it in [Lesson 8](/learn/aim) and again in your capstone.
 
 ## You learned
 
