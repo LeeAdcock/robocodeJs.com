@@ -190,7 +190,7 @@ interface Bot {
   MAX_SPEED: number;
   /** How much the speed changes per clock tick while moving toward the target speed, needed to judge braking distance. */
   ACCELERATION: number;
-  /** The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, and bots or bullets connect within two. */
+  /** The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, another bot within two (each has a radius), and a bullet within one. */
   RADIUS: number;
   /** Sets the bot's display name. */
   setName(name: string): void;

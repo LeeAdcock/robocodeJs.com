@@ -21,6 +21,12 @@ export const BARREL_LENGTH = 24;
 export default interface Bullet extends Point {
   id: BulletId;
   origin: Point;
+  // Where the bullet was at the end of the previous tick. Hit detection tests
+  // the SEGMENT prev -> (x, y), not the landing point alone: at BULLET_SPEED a
+  // bullet covers more ground per tick than a bot is wide, so a point sample
+  // would step clean over a target it actually flew through. Equal to (x, y) on
+  // the tick the shot is fired, which degenerates to a muzzle-point test.
+  prev: Point;
   x: number;
   y: number;
   speed: number;

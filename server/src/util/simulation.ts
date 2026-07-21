@@ -62,6 +62,39 @@ const damage = (bot: Bot, amount: number, source: Bot | null): number => {
   return dealt;
 };
 
+// Squared distance from a point to the segment (ax, ay) -> (bx, by). Squared so
+// bullet hit detection can compare against BOT_RADIUS ** 2 and skip the sqrt on
+// the overwhelmingly common miss.
+//
+// A zero-length segment (a bullet on the tick it was fired, which has not moved
+// yet) falls through to the distance from its start point, which is the muzzle
+// test we want rather than a divide by zero.
+const distanceToSegmentSquared = (
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number
+): number => {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  // How far along the segment the closest point sits, clamped to [0, 1] so a
+  // target behind the start or beyond the end measures to the nearer endpoint
+  // instead of to the infinite line through them.
+  const t =
+    lengthSquared > 0
+      ? Math.max(
+          0,
+          Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSquared)
+        )
+      : 0;
+  const closestX = ax + t * dx;
+  const closestY = ay + t * dy;
+  return (px - closestX) ** 2 + (py - closestY) ** 2;
+};
+
 // Record the tick each bot died — crash, bullet, collision, self-inflicted miss,
 // or sudden-death decay — and credit the kill when one is owed. Called once per
 // tick by Environment.tick, AFTER decay, so it sees each bot's final health and
@@ -385,24 +418,43 @@ export default {
                 otherBot.bullets
                   .filter((bullet) => !bullet.exploded)
                   .forEach((bullet) => {
-                    const distance = Math.sqrt(
-                      Math.pow(bullet.x - bot.x, 2) +
-                        Math.pow(bullet.y - bot.y, 2)
-                    );
-                    const angle: number = normalizeAngle(
-                      Math.atan2(
-                        bot.y - bullet.origin.y,
-                        bot.x - bullet.origin.x
-                      ) *
-                        (180 / Math.PI) -
-                        90
+                    // A bullet is a point, so it connects within ONE radius of
+                    // the target's center — two radii is the bot-vs-bot rule,
+                    // where both bodies contribute a radius, and applying it
+                    // here made a shot land a full body width wide of the hull.
+                    //
+                    // Testing the whole segment the bullet swept this tick,
+                    // rather than only where it ended up, is what makes the
+                    // tighter radius safe. A bullet covers BULLET_SPEED (25)
+                    // per tick against a 16 radius, so a per-tick point sample
+                    // is inside the circle for a chord of 2 * sqrt(R^2 - d^2) —
+                    // under 25, and therefore skippable, for any shot passing
+                    // more than ~8 units off center. Sampling points would drop
+                    // most genuine hits; sampling the segment drops none.
+                    const distanceSquared = distanceToSegmentSquared(
+                      bot.x,
+                      bot.y,
+                      bullet.prev.x,
+                      bullet.prev.y,
+                      bullet.x,
+                      bullet.y
                     );
 
-                    // A bullet lands anywhere within one tank width (two
-                    // radii) of the target's center.
-                    if (distance < BOT_RADIUS * 2) {
+                    if (distanceSquared < BOT_RADIUS * BOT_RADIUS) {
                       // We have a hit
                       if (bot.handlers[Event.HIT]) {
+                        // Bearing from where the shot was fired, resolved only
+                        // now: it is needed once per hit, not once per bullet
+                        // per bot per tick, and atan2 is the priciest call in
+                        // this loop.
+                        const angle: number = normalizeAngle(
+                          Math.atan2(
+                            bot.y - bullet.origin.y,
+                            bot.x - bullet.origin.x
+                          ) *
+                            (180 / Math.PI) -
+                            90
+                        );
                         bot.handlers[Event.HIT]({
                           angle: toRelativeBearing(
                             normalizeAngle(angle + 180),
@@ -694,6 +746,11 @@ export default {
               newY > -32 &&
               newY < env.getArena().getHeight() + 32
             ) {
+              // Remember the step we just took so next tick's hit detection can
+              // sweep it. Each tick's segment starts where the last one ended,
+              // so across a bullet's flight the tested segments tile its path
+              // exactly once — no gap to tunnel through, no stretch tested twice.
+              bullet.prev = { x: bullet.x, y: bullet.y };
               bullet.x = newX;
               bullet.y = newY;
             } else {

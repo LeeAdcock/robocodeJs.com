@@ -71,7 +71,7 @@ A few basic methods exist for setting and retrieving information about the bot.
 - `bot.getId() : string` Returns a unique identifier (a UUID string).
 - `bot.getHealth() : number` Returns the bot's health from 100 (full) down to 0 (unfortunately dead).
 - `bot.dropMarker() : marker` Returns a marker object for the bot's current location. Markers are serializable, so `bot.send(bot.dropMarker())` is the easy way to broadcast your position.
-- `bot.RADIUS : number` The bot's collision radius (half its width). A wall is hit when the bot's center comes within one radius of an arena edge, and bots or bullets connect within two radii, useful for planning how much room a turn or a stop needs.
+- `bot.RADIUS : number` The bot's collision radius (half its width). A wall is hit when the bot's center comes within one radius of an arena edge, and two bots connect within two radii (each contributes one). A bullet is a point, so it connects within a single radius — the shot has to reach the hull. Useful for planning how much room a turn or a stop needs.
 
 ## Bot events
 

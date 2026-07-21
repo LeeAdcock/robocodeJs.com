@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import Simulation, { applyEliminations } from '../src/util/simulation';
 import { BOT_MAX_SPEED, COLLISION_DAMAGE_FACTOR } from '../src/types/bot';
+import { BULLET_SPEED } from '../src/types/bullet';
 import { BotStats } from '../src/types/botStats';
 import { Event } from '../src/types/event';
 
@@ -537,6 +538,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 365 },
+      prev: { x: 375, y: 375 },
       callback: vi.fn(),
     };
     const shooter = makeBot({ id: 'b', x: 375, y: 300, bullets: [bullet] });
@@ -572,6 +574,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 365 },
+      prev: { x: 375, y: 375 },
       callback: vi.fn(),
     });
     const shooter = makeBot({
@@ -588,6 +591,56 @@ describe('Simulation.run — bullets', () => {
     expect(shooter.stats.damageDealt).toBe(10);
   });
 
+  // A bullet is a point, so it connects within ONE radius of the target's
+  // center. The old rule used two (the bot-vs-bot sum), which landed hits a
+  // full body width clear of the hull. These two pin both sides of the edge.
+  const shootAt = (bulletX: number, bulletY: number, prevY = bulletY) => {
+    const target = makeBot({ id: 'a', x: 375, y: 375 });
+    const bullet = {
+      id: 'b1',
+      x: bulletX,
+      y: bulletY,
+      speed: BULLET_SPEED,
+      orientation: 0,
+      exploded: false,
+      origin: { x: bulletX, y: 300 },
+      prev: { x: bulletX, y: prevY },
+      callback: vi.fn(),
+    };
+    const shooter = makeBot({ id: 'b', x: bulletX, y: 300, bullets: [bullet] });
+    run(makeEnv([makeProcess('a', [target]), makeProcess('b', [shooter])]));
+    return { target, bullet };
+  };
+
+  it('hits a bot when the bullet reaches within one radius of its center', () => {
+    // 15 units off center — inside the 16 hull, and inside the old 32 too.
+    const { target, bullet } = shootAt(375 + 15, 375);
+    expect(bullet.exploded).toBe(true);
+    expect(target.health).toBe(75);
+  });
+
+  it('misses a bot the bullet passes more than one radius from', () => {
+    // 20 units off center: clear of the hull, but inside the old two-radii
+    // rule, which would have scored this as a hit.
+    const { target, bullet } = shootAt(375 + 20, 375);
+    expect(bullet.exploded).toBe(false);
+    expect(target.health).toBe(100);
+    expect(target.stats.timesHit).toBe(0);
+  });
+
+  it('catches a fast bullet that stepped clean over the target in one tick', () => {
+    // The reason hit detection sweeps the segment instead of sampling the
+    // landing point. This shot passes 12 units to the side of the center, so it
+    // is only inside the 16 radius for a chord of ~21 — shorter than the 25 it
+    // travels per tick. Both endpoints sit ~17 units out (outside the hull), yet
+    // the path between them cuts straight through it. Sampling points would call
+    // this a miss; sweeping the segment scores the hit it plainly is.
+    const { target, bullet } = shootAt(375 + 12, 375 + 13, 375 - 12);
+    expect(bullet.exploded).toBe(true);
+    expect(target.health).toBe(75);
+    expect(target.stats.timesHit).toBe(1);
+  });
+
   it('moves a live bullet along its orientation', () => {
     const bullet = {
       id: 'b1',
@@ -597,6 +650,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 375 },
+      prev: { x: 375, y: 375 },
     };
     const bot = makeBot({ bullets: [bullet] });
     run(makeEnv([makeProcess('a', [bot])]));
@@ -613,6 +667,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 375 },
+      prev: { x: 375, y: 800 },
       callback: vi.fn(),
     };
     const bot = makeBot({ bullets: [bullet] });
@@ -634,6 +689,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 375 },
+      prev: { x: 375, y: 800 },
       callback: vi.fn(),
     };
     const bot = makeBot({ id: 'a', health: 100, bullets: [bullet] });
@@ -662,6 +718,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 375 },
+      prev: { x: 375, y: 800 },
       callback: vi.fn(),
     };
     const victim = makeBot({
@@ -679,6 +736,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 365 },
+      prev: { x: 375, y: 375 },
       callback: vi.fn(),
     };
     const killer = makeBot({ id: 'k', x: 375, y: 300, bullets: [incoming] });
@@ -701,6 +759,7 @@ describe('Simulation.run — bullets', () => {
       orientation: 0,
       exploded: false,
       origin: { x: 375, y: 375 },
+      prev: { x: 375, y: 800 },
       callback: vi.fn(),
     };
     const bot = makeBot({ id: 'a', health: 100, bullets: [bullet] });

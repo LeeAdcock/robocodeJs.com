@@ -166,6 +166,11 @@ export class BotTurret implements Orientated {
         x: muzzleX,
         y: muzzleY,
       },
+      // No travel yet, so this tick's swept segment is a single point.
+      prev: {
+        x: muzzleX,
+        y: muzzleY,
+      },
       orientation,
       speed: BULLET_SPEED,
     };

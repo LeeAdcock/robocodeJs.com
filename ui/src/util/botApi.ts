@@ -572,7 +572,7 @@ export const INTERFACES: ApiInterface[] = [
         name: 'RADIUS',
         kind: 'property',
         type: 'number',
-        doc: 'The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, and bots or bullets connect within two.',
+        doc: 'The bot’s collision radius (half its width): a wall is hit when the center comes within one radius of an edge, another bot within two (each has a radius), and a bullet within one.',
       },
       {
         name: 'setName',

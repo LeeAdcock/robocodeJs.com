@@ -50,7 +50,9 @@ export const commandBudgetRejected = (): Promise<never> =>
   );
 
 // A tank's collision radius (half its width): bots contact a wall when their
-// center comes within one radius of it, and contact bots/bullets within two.
+// center comes within one radius of it, and another bot within two (each body
+// contributes a radius). A bullet is a point, so it connects within ONE radius
+// — see the swept test in simulation.ts.
 // Mirrored into the sandbox as the bot.RADIUS attribute (compiler.ts).
 export const BOT_RADIUS = 16;
 // Degrees the body turns per tick, units/tick² toward the speed target, and
