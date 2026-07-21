@@ -96,7 +96,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: 'orientation',
     definition:
-      'An absolute direction in the arena’s frame, in degrees: your bot’s facing, or a contact’s direction of travel.',
+      'A direction in degrees, measured in the frame of whatever the part is mounted on: the body’s is absolute, the turret’s is relative to the body, and the radar’s to the turret.',
   },
   {
     term: 'radar',
