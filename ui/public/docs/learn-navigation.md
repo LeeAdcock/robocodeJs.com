@@ -54,9 +54,7 @@ We store the marker in `this.target` (lasting memory) so every tick can ask it f
 ## Experiment
 
 - Send Rusty to a corner instead: `arena.createMarker(40, 40);`
-- Remember home base and return there when hurt:
-  - In START: `this.home = bot.dropMarker();`
-  - In a HIT handler: `bot.turn(this.home.getBearing()).catch(() => {}); bot.setSpeed(5);`
+- Remember home base and head back when hurt. In START, pin it: `this.home = bot.dropMarker();`. Then in a HIT handler, change the destination rather than steering yourself: `this.target = this.home; bot.setSpeed(5);`. Steering directly with `bot.turn(...)` here would look right and do nothing, because TICK re-aims at `this.target` on the very next tick and undoes it.
 - Log the distance as you travel: `console.log('distance to target', this.target.getDistance());`
 - Before pinning a spot, check it's actually in the arena: `if (arena.contains(x, y)) { this.target = arena.createMarker(x, y); }`
 - `arena.getNearestWall()` gives you a **ready-made marker** on the closest wall, so log `arena.getNearestWall().getDistance()` in the TICK handler and watch it shrink as you approach a wall. (You'll stop a little short of 0, since you collide before the wall itself.)

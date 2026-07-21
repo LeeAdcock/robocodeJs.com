@@ -24,36 +24,52 @@ When any bot spots an enemy, it tells the team which way to point:
 bot.setName('Rusty');
 
 bot.on(Event.START, () => {
+  this.called = null; // the last direction a teammate called out
   bot.setSpeed(3);
 });
 
 clock.on(Event.TICK, () => {
+  if (!bot.isTurning()) bot.turn(20); // wander, so the radar sweeps
   if (bot.radar.isReady()) bot.radar.scan();
+
+  // Act on the newest call-out here, where only one thing is steering the gun.
+  if (this.called !== null) {
+    bot.turret.setOrientation(this.called - bot.getOrientation());
+    this.called = null;
+  }
 });
 
 bot.on(Event.SCANNED, (targets) => {
-  const enemies = targets.filter((t) => !t.isFriendly());
+  const enemies = targets.filter((t) => !t.friendly);
   if (enemies.length > 0) {
     // A scan's angle is relative to *us*, so share the absolute compass
     // direction (our heading + the bearing) that any teammate can use.
-    bot.send(Math.round(enemies[0].angle + bot.getOrientation()));
+    bot.send(Math.round(enemies[0].angle + bot.getOrientation()) % 360);
     bot.turret.setOrientation(enemies[0].angle); // our own aim (body-relative)
     if (bot.turret.isReady()) bot.turret.fire();
   }
 });
 
-// A teammate shared an absolute direction to an enemy — point our turret there
-// too, converting the compass heading into an offset from our body.
+// A teammate shared an absolute direction to an enemy. Write it down; TICK
+// points the turret. Several teammates can call out on the same tick, and if
+// each of them aimed from here they would just cancel each other.
 bot.on(Event.RECEIVED, (heading) => {
-  bot.turret.setOrientation(heading - bot.getOrientation());
+  this.called = heading;
+});
+
+bot.on(Event.COLLIDED, () => {
+  bot.turn(150).catch(() => {}); // don't spend the match against a wall
+  bot.setSpeed(3);
 });
 ```
 
-Press **Deploy**. Now the whole team swings their turrets toward an enemy the moment _any_ one of them sees it. (`Math.round` just sends a tidy whole number.)
+Press **Reboot**. Now the whole team swings their turrets toward an enemy the moment _any_ one of them sees it. (`Math.round` just sends a tidy whole number, and `% 360` keeps it a compass heading.)
+
+Notice where the aiming happens. Every broadcast is delivered on its own, so when three teammates spot the same enemy in one tick your `RECEIVED` handler runs three times, and three turret commands issued back-to-back mean the first two are cancelled before the gun has turned a degree. Writing the call-out down and acting on it once in TICK is the same "one handler owns one control" rule from [Lesson 11](/learn/survival).
 
 **Sharing a position instead of a direction.** A direction is only right from where _you_ stand. A teammate across the arena pointing the same way looks at a different spot. Every scan result is a **contact** (a marker pinned at the enemy's location), so you can broadcast its actual coordinates instead: `bot.send({ x: enemies[0].getX(), y: enemies[0].getY() })`, and each teammate aims with `bot.turret.turnTowards(message.x, message.y)`, the same point for everyone. The **Squad** example bot builds this out, team secret and all.
 
-**Sharing the whole contact.** You can even broadcast the contact itself: `bot.send(enemies[0])`. A contact is **serializable**: what actually transmits is its plain data (position, speed, heading, and so on; the methods aren't serialized, and its `angle`/`distance` readings are relative to the _sender_). Each teammate rebuilds a full contact from that data with `arena.createContact(message)`, its methods answer from **their** position, so `getBearing()` points _them_ at the enemy, and `getIntercept(bot.turret.BULLET_SPEED)` even leads the shot for them (see [Lesson 12](/learn/leading)). Markers work the same way: a sent marker arrives as its `x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it, so `bot.send(bot.dropMarker())` is the one-liner for telling teammates where **you** are.
+**Sharing the whole contact.** You can even broadcast the contact itself: `bot.send(enemies[0])`. A contact is **serializable**: what actually transmits is its plain data (position, speed, heading, and so on; the methods aren't serialized, and its `angle`/`distance` readings are relative to the _sender_). Each teammate rebuilds a full contact from that data with `arena.createContact(message)`, its methods answer from **their** position, so `getBearing()` points _them_ at the enemy, and `getIntercept(bot.turret.BULLET_SPEED)` even leads the shot for them (see [Lesson 14](/learn/leading)). Markers work the same way: a sent marker arrives as its `x`/`y`, and `arena.createMarker(message.x, message.y)` rebuilds it, so `bot.send(bot.dropMarker())` is the one-liner for telling teammates where **you** are.
 
 ## Debugging like a pro
 
@@ -92,7 +108,7 @@ Build your own champion bot that combines what you've learned. A strong bot usua
 3. **Survives**: dodge when HIT and flee when health is low (Lesson 11).
 4. **Coordinates** with teammates over `send` / RECEIVED (this lesson).
 
-Mix in markers, timers, and a state machine however you like. Test it by adding a few copies to the arena (the **[+]** button) and watching them fight.
+Mix in markers, timers, and a state machine however you like. Your app already fields a team of five, so there's nothing to add to test the coordination — use the **Bots per app** dropdown in the arena toolbar if you want to try a different squad size. (The roster's **[+]** button adds a _different_ app, which gives you opponents rather than teammates: teammates are the bots running _your_ code.) Put an example bot in against them and watch the fight.
 
 ## Where to go next
 

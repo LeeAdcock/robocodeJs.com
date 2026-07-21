@@ -25,7 +25,7 @@ The plan, in three steps:
 2. **Where is the enemy now**, in arena coordinates? We know our own position (`bot.getX()`, `bot.getY()`), the bearing to the enemy, and the distance.
 3. **Where will it be** after those ticks, if it keeps driving along its heading? Aim there instead.
 
-We turn a direction + distance into an `(x, y)` point (and back) with a little trig: the same `Math.atan2` / `Math.sin` / `Math.cos` toolbox from [Maps and math](/learn/navigation). Don't worry if the formulas look busy; you can copy them and tweak.
+We turn a direction + distance into an `(x, y)` point (and back) with a little trig: `Math.sin` and `Math.cos` to go out along a bearing, `Math.atan2` to turn a point back into one. That's a step up from the `Math.sqrt` of [Maps and math](/learn/navigation), so don't worry if the formulas look busy; you can copy them and tweak.
 
 ## Try it
 
@@ -42,7 +42,7 @@ clock.on(Event.TICK, () => {
   if (bot.radar.isReady()) bot.radar.scan();
 });
 
-bot.on(Event.SCANNED, (targets) => {
+bot.on(Event.SCANNED, async (targets) => {
   const enemy = targets.find((t) => !t.friendly);
   if (!enemy) {
     bot.turn(15); // no one in view — sweep around to look
@@ -63,15 +63,20 @@ bot.on(Event.SCANNED, (targets) => {
   const futureX = enemyX + enemy.speed * ticks * Math.sin(heading);
   const futureY = enemyY - enemy.speed * ticks * Math.cos(heading);
 
-  // Aim the turret at that predicted spot and fire.
+  // Aim the turret at that predicted spot, wait for it to get there, and fire.
   const aim =
     (Math.atan2(futureX - bot.getX(), bot.getY() - futureY) * 180) / Math.PI;
-  bot.turret.setOrientation(aim - bot.getOrientation());
-  if (bot.turret.isReady()) bot.turret.fire();
+  const aimed = await bot.turret
+    .setOrientation(aim - bot.getOrientation())
+    .then(() => true, () => false); // a newer scan cancelled this aim
+
+  if (aimed && bot.turret.isReady()) bot.turret.fire();
 });
 ```
 
-Press **Deploy**. Put a moving bot (say **Pathfinder** from the examples) in the arena and watch Deadeye lead it: its shots land where the target is _going_, not where it was.
+Press **Reboot**. Put a moving bot (say **Pathfinder** from the examples) in the arena and watch Deadeye lead it: its shots land where the target is _going_, not where it was.
+
+That `await` on the aim is doing as much work as the prediction. The turret turns 4 degrees a tick, so a fresh target can be 50 degrees off the gun's current heading — fire on the same tick you asked for the aim and the bullet leaves while the barrel is still swinging, nowhere near the spot you so carefully computed. Waiting roughly doubles Deadeye's hit rate, and it stops it shooting its own teammates on the way round.
 
 Reading the key idea: steps 2 and 3 build an `(x, y)` for the **future** position; the final `Math.atan2(...)` turns that point back into a compass heading, and we subtract our own heading to get a **body-relative** bearing the turret understands (just like a scan's `angle`).
 
@@ -100,14 +105,18 @@ Reading the key idea: steps 2 and 3 build an `(x, y)` for the **future** positio
 Now that you've built the prediction by hand, here's the confession: every scan result is a **contact** (a [marker](/learn/navigation) pinned at the detected bot's position) and it can solve this whole lesson in one call:
 
 ```
-bot.on(Event.SCANNED, (targets) => {
-  const enemy = targets.find((t) => !t.isFriendly());
+bot.on(Event.SCANNED, async (targets) => {
+  const enemy = targets.find((t) => !t.friendly);
   if (!enemy) { bot.turn(15); return; }
 
   const aim = enemy.getIntercept(bot.turret.BULLET_SPEED); // = 25
   if (!aim) return; // no shot can catch it
-  bot.turret.turnTowards(aim.getX(), aim.getY());
-  if (bot.turret.isReady()) bot.turret.fire();
+
+  const aimed = await bot.turret
+    .turnTowards(aim.getX(), aim.getY())
+    .then(() => true, () => false);
+
+  if (aimed && bot.turret.isReady()) bot.turret.fire();
 });
 ```
 

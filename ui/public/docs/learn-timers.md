@@ -17,7 +17,7 @@ Sometimes you don't want something _every_ tick. You want a **rhythm**, like "tu
 Two important notes:
 
 1. The number is in **game ticks** (the clock's heartbeat), **not** seconds. There's no real-world clock here. The game runs on its own time. (If you ever want the current tick number, ask `clock.getTime()`.)
-2. **Create timers inside START.** START runs once, so you set up your rhythms a single time. (If you made them in TICK, you'd start a brand-new timer every heartbeat!)
+2. **Create repeating timers inside START.** START runs once, so you set up your rhythms a single time. (If you made them in TICK, you'd start a brand-new timer every heartbeat!) A one-shot `setTimeout` scheduled from inside another timer is fine — you'll see one below — because it fires once and is gone.
 
 ## Try it
 
@@ -43,10 +43,14 @@ Press **Deploy**. Rusty moves in a steady, rhythmic pattern, turning constantly 
 
 ## Stopping a timer
 
-`setInterval` hands back an **id** (a ticket) you can use to cancel it later with `clearInterval`. Store the id in lasting memory (`this`) so other handlers can reach it:
+`setInterval` hands back an **id** (a ticket) you can use to cancel it later with `clearInterval`. Store the id in lasting memory (`this`) so other handlers can reach it.
+
+Add the timer _inside_ the START handler you already have — a second `bot.on(Event.START, ...)` would replace the first one, quietly taking your other two rhythms with it (Lesson 2: setting a handler twice keeps only the last):
 
 ```
 bot.on(Event.START, () => {
+  // ...your two intervals from above stay here...
+
   this.spin = setInterval(() => bot.turret.turn(20), 5);
 });
 
@@ -67,6 +71,8 @@ bot.on(Event.HIT, () => {
 ## Common questions
 
 **Is `10` ten seconds?** No, ten **ticks**. The clock ticks many times a second. Timers count ticks so the game can pause and resume cleanly. There is no `Date` here on purpose; use `clock.getTime()` for the tick count.
+
+**Is there a limit on timers?** Yes, **64** at once per robot (`setInterval` and `setTimeout` together). Past that the call returns `-1` and the callback never runs, which is the game's way of catching a timer being created in a loop. Sixty-four is far more rhythms than a good robot needs, so hitting it almost always means a `setInterval` ended up somewhere that runs repeatedly.
 
 **Why must timers go in START?** START runs once. If you create a timer in TICK, you'd create a new one every tick and end up with hundreds piling up. Set rhythms up once, in START.
 

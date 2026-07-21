@@ -22,16 +22,22 @@ Two new events help you survive:
 bot.setName('Rusty');
 
 bot.on(Event.START, () => {
+  this.spotted = 0; // ticks left of "someone has me on their radar"
   bot.setSpeed(3);
 });
 
 clock.on(Event.TICK, () => {
+  if (this.spotted > 0) this.spotted = this.spotted - 1;
+
   if (bot.getHealth() < 40) {
     // Low health — run and weave to dodge.
     bot.setSpeed(5);
     if (!bot.isTurning()) bot.turn(45);
+  } else if (this.spotted > 0) {
+    bot.setSpeed(5); // someone is watching — pick up the pace
   } else {
     bot.setSpeed(3);
+    if (!bot.isTurning()) bot.turn(10); // keep wandering, don't park on a wall
   }
 });
 
@@ -43,11 +49,22 @@ bot.on(Event.HIT, (info) => {
 
 bot.on(Event.DETECTED, () => {
   console.log('spotted — speeding up');
-  bot.setSpeed(5);
+  this.spotted = 20; // leave TICK a note instead of setting speed here
+});
+
+bot.on(Event.COLLIDED, () => {
+  bot.turn(150).catch(() => {}); // shove off the wall we just hit
+  bot.setSpeed(3);
 });
 ```
 
-Press **Deploy**. Rusty cruises normally, dashes and weaves when hurt, veers when shot, and speeds up when an enemy's radar finds it.
+Press **Reboot**. Rusty cruises and wanders, dashes and weaves when hurt, veers when shot, and picks up the pace when an enemy's radar finds it.
+
+Two details there are worth more than the health threshold itself.
+
+**DETECTED leaves a note rather than setting the speed.** TICK sets a speed on _every_ tick, so anything another handler sets is overwritten within a tick or two — a `bot.setSpeed(5)` inside DETECTED simply never survives long enough to see. Writing `this.spotted = 20` and letting TICK decide keeps one handler in charge of the throttle. Any time two handlers drive the same control, the one that runs most often wins, and the other looks broken.
+
+**The wander and the COLLIDED handler are what keep Rusty alive.** A robot that only ever drives straight finds a wall, stops, and then keeps grinding into it — dozens of bumps, each costing health. It is entirely possible to lose a match to the arena without an enemy ever hitting you.
 
 The threshold is the line `if (bot.getHealth() < 40)`. Above `40` it plays normal; below it, it panics and runs.
 
