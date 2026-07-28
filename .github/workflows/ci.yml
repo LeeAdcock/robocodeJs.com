@@ -66,9 +66,12 @@ jobs:
           name: coverage-server
           path: server/coverage/coverage-summary.json
           retention-days: 1
-      # Dependency vulnerability gate. Fails the build on high/critical
-      # advisories; moderate/low are reported but non-blocking.
-      - run: npm audit --audit-level=high
+      # Dependency vulnerability gate (scripts/audit-check.cjs): fails on any
+      # high/critical advisory EXCEPT documented, justified allowlist entries;
+      # moderate/low are reported but non-blocking. Same severity gate as the
+      # old `npm audit --audit-level=high`, with a place to accept specific
+      # non-applicable/unfixable advisories (mirrors CLAUDE.md accepted risks).
+      - run: node ../scripts/audit-check.cjs
 
   ui:
     name: ui (lint · build · test · audit)
@@ -92,7 +95,8 @@ jobs:
           name: coverage-ui
           path: ui/coverage/coverage-summary.json
           retention-days: 1
-      - run: npm audit --audit-level=high
+      # Dependency vulnerability gate — see scripts/audit-check.cjs (server job).
+      - run: node ../scripts/audit-check.cjs
 
   # Combined coverage gate: sums the two packages' covered/total counts into one
   # repo-wide number and fails under 80% (statements + lines). It reuses the
