@@ -148,6 +148,10 @@ describe('Simulation.run — collisions', () => {
     expect(collided.mock.calls[0][0].impactSpeed).toBeCloseTo(5);
     expect(bot.health).toBe(100 - Math.round(5 * COLLISION_DAMAGE_FACTOR)); // 96
     expect(bot.stats.damageTaken).toBe(Math.round(5 * COLLISION_DAMAGE_FACTOR));
+    // A wall hit files under the wall bucket.
+    expect(bot.stats.damageTakenWall).toBe(
+      Math.round(5 * COLLISION_DAMAGE_FACTOR)
+    );
     expect(bot.speed).toBe(0);
     expect(bot.y).toBe(740); // movement not applied on collision
     expect(env.emit).toHaveBeenCalledWith(
@@ -405,12 +409,37 @@ describe('Simulation.run — collisions', () => {
     const impact = Math.round(10 * COLLISION_DAMAGE_FACTOR); // 8
     expect(t1.health).toBe(100 - impact);
     expect(t2.health).toBe(100 - impact);
+    // Both bots are on app 'a', so this is a teammate collision.
+    expect(t1.stats.damageTakenTeammateCollision).toBe(impact);
+    expect(t1.stats.damageTakenEnemyCollision).toBe(0);
+    expect(t1.stats.timesCollidedTeammate).toBe(1);
 
     // Still pressed together next tick — the contact is not fresh, so no further
     // impact damage lands (a sustained shove is not a grind).
     run(makeEnv(processes));
     expect(t1.health).toBe(100 - impact);
     expect(t2.health).toBe(100 - impact);
+  });
+
+  it('buckets a collision between two apps as an enemy collision', () => {
+    // Same head-on geometry as the teammate case above, but the two bots are on
+    // different apps, so the impact files under enemyCollision and the teammate
+    // count stays 0.
+    const t1 = makeBot({ id: '1', x: 375, y: 370, speed: 5, speedTarget: 5 });
+    const t2 = makeBot({
+      id: '2',
+      x: 375,
+      y: 400,
+      orientation: 180,
+      speed: 5,
+      speedTarget: 5,
+    });
+    run(makeEnv([makeProcess('a', [t1]), makeProcess('b', [t2])]));
+    const impact = Math.round(10 * COLLISION_DAMAGE_FACTOR); // 8
+    expect(t1.stats.damageTakenEnemyCollision).toBe(impact);
+    expect(t1.stats.damageTakenTeammateCollision).toBe(0);
+    expect(t1.stats.timesCollidedTeammate).toBe(0);
+    expect(t1.stats.timesCollided).toBe(1);
   });
 
   it('keeps health integral even when the raw impact damage is fractional', () => {
@@ -554,11 +583,40 @@ describe('Simulation.run — bullets', () => {
     expect(shooter.stats.shotsHit).toBe(1);
     expect(target.stats.damageTaken).toBe(25);
     expect(shooter.stats.damageDealt).toBe(25);
+    // A shooter on a different app: this is enemy fire, not friendly.
+    expect(target.stats.damageTakenEnemyFire).toBe(25);
+    expect(target.stats.damageTakenFriendlyFire).toBe(0);
+    expect(shooter.stats.damageDealtFriendly).toBe(0);
     expect(target.lastDamagedBy).toBe(shooter);
     expect(env.emit).toHaveBeenCalledWith(
       'event',
       expect.objectContaining({ type: 'bulletExploded', id: 'b1' })
     );
+  });
+
+  it('files a teammate’s bullet as friendly fire on both sides', () => {
+    // Shooter and target share app 'a'. The hit still lands (bullets do not
+    // discriminate by team), but it must bucket as friendly fire — for the
+    // victim's damageTaken and the shooter's damageDealtFriendly — not enemy fire.
+    const target = makeBot({ id: 'a1', x: 375, y: 375 });
+    const bullet = {
+      id: 'b1',
+      x: 375,
+      y: 375,
+      speed: 5,
+      orientation: 0,
+      exploded: false,
+      origin: { x: 375, y: 365 },
+      prev: { x: 375, y: 375 },
+      callback: vi.fn(),
+    };
+    const shooter = makeBot({ id: 'a2', x: 375, y: 300, bullets: [bullet] });
+    run(makeEnv([makeProcess('a', [target, shooter])]));
+    expect(target.stats.damageTaken).toBe(25);
+    expect(target.stats.damageTakenFriendlyFire).toBe(25);
+    expect(target.stats.damageTakenEnemyFire).toBe(0);
+    expect(shooter.stats.damageDealt).toBe(25);
+    expect(shooter.stats.damageDealtFriendly).toBe(25);
   });
 
   it('counts only the health a bullet actually removed, not the nominal 25', () => {
@@ -697,6 +755,7 @@ describe('Simulation.run — bullets', () => {
     run(env);
     expect(bot.health).toBe(97);
     expect(bot.stats.damageTaken).toBe(3);
+    expect(bot.stats.damageTakenSelfMiss).toBe(3);
     expect(bullet.callback).toHaveBeenCalledWith({});
     expect(env.emit).toHaveBeenCalledWith(
       'event',

@@ -14,6 +14,7 @@ vi.mock('../src/util/matchSummary', () => ({
 
 import { runMatchToDecision, ArenaBusyError } from '../src/util/runMatch';
 import { buildMatchSummary, isMatchDecided } from '../src/util/matchSummary';
+import { SUDDEN_DEATH_TIME } from '../src/types/environment';
 
 // A mock Environment exposing only the surface runMatchToDecision drives.
 const makeEnv = () => ({
@@ -26,6 +27,7 @@ const makeEnv = () => ({
   resume: vi.fn(),
   pause: vi.fn(),
   isRunning: vi.fn(() => true),
+  getTime: vi.fn(() => 0),
 });
 
 beforeEach(() => vi.clearAllMocks());
@@ -103,6 +105,49 @@ describe('runMatchToDecision', () => {
     expect(env.pause).toHaveBeenCalled();
     // The claim is released even when the match throws.
     expect(env.endMatch).toHaveBeenCalled();
+  });
+
+  // The measurement harness passes stopAtSuddenDeath so balanced matches end at
+  // the sudden-death tick instead of grinding through decay. With the flag set,
+  // reaching SUDDEN_DEATH_TIME must exit the poll loop even while the match is
+  // still undecided (both apps alive).
+  it('stops at the sudden-death tick when stopAtSuddenDeath is set', async () => {
+    const env = makeEnv();
+    vi.mocked(isMatchDecided).mockReturnValue(false); // nobody eliminated yet
+    env.getTime.mockReturnValue(SUDDEN_DEATH_TIME); // but we've reached SD
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: false, winner: null },
+      leaderboard: [{ rank: 1, id: 'a1' }],
+    } as never);
+
+    // If the flag were ignored, this would spin (isMatchDecided stays false);
+    // it returns, proving the sudden-death tick ended the loop.
+    const summary = await runMatchToDecision(env as never, [], {
+      stopAtSuddenDeath: true,
+    });
+
+    expect(env.getTime).toHaveBeenCalled();
+    expect(env.pause).toHaveBeenCalled();
+    expect(buildMatchSummary).toHaveBeenCalledTimes(1);
+    expect(summary.leaderboard[0].id).toBe('a1');
+  });
+
+  // Without the flag, reaching sudden death is NOT a stop condition — the loop
+  // keeps polling isMatchDecided (the decay phase runs to a survivor). Guard that
+  // getTime is not even consulted, so default behavior is untouched.
+  it('ignores the sudden-death tick when stopAtSuddenDeath is not set', async () => {
+    const env = makeEnv();
+    // Decided on the first poll so the loop exits without hanging.
+    vi.mocked(isMatchDecided).mockReturnValue(true);
+    env.getTime.mockReturnValue(SUDDEN_DEATH_TIME);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1' } },
+      leaderboard: [{ rank: 1, id: 'a1' }],
+    } as never);
+
+    await runMatchToDecision(env as never, []);
+
+    expect(env.getTime).not.toHaveBeenCalled();
   });
 
   it('restores the prior speed when restart() itself rejects', async () => {

@@ -667,7 +667,9 @@ export default class Environment {
         process.bots
           .filter((bot) => bot.health > 0)
           .forEach((bot) => {
-            bot.stats.damageTaken += Math.min(1, bot.health);
+            const lost = Math.min(1, bot.health);
+            bot.stats.damageTaken += lost;
+            bot.stats.damageTakenSuddenDeath += lost;
             bot.health = Math.max(0, bot.health - 1);
             // Decay is the arena killing everyone, not an opponent — so a bot
             // that is ground down to zero here dies unattributed. The filter

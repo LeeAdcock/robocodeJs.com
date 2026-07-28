@@ -11,14 +11,26 @@ import { join } from 'node:path';
 // config, which is why it lives here rather than under src/ (it must never ship
 // in the server build):
 //
-//   npm run skill-luck                       # from server/, default settings
-//   HARNESS_SEEDS=40 npm run skill-luck      # more seeds = tighter estimates
+//   npm run skill-luck                          # from server/, default settings
+//   HARNESS_SEEDS=40 npm run skill-luck         # more seeds = tighter estimates
 //   HARNESS_MATCHUPS=marksman:survivor npm run skill-luck   # one matchup
+//   HARNESS_FULL_DECISION=1 npm run skill-luck   # slow, ladder-faithful (below)
 //
 // It reuses the exact engine path a ranked ladder match takes — a throwaway,
 // non-persisted Environment with two Processes, run through runMatchToDecision
 // on a pinned seed — so the numbers it reports are the game's real luck floor,
 // not an approximation.
+//
+// Sudden-death mode (the DEFAULT): balanced matchups often fail to eliminate
+// anyone within SUDDEN_DEATH_TIME and grind through the whole health-decay
+// phase, which is slow (a 120-match full-decision sweep exceeded 30 minutes) AND
+// decides the match by a low-signal tiebreak (decay removes 1hp per LIVING bot,
+// so it rewards health concentration, not combat). This mode stops at the
+// sudden-death tick and decides by combat standings (the leaderboard is already
+// ranked by total health / bots alive / shots hit) — faster, and arguably a
+// cleaner combat-skill signal. HARNESS_FULL_DECISION=1 restores the ladder-exact
+// full-decay resolution (keep N small); it is NOT the default because of the
+// runtime above.
 //
 // db is mocked so importing the engine never reaches Postgres (mirrors
 // simulationIntegration.test.ts); appService.get is then overridden in-process
@@ -32,7 +44,10 @@ vi.mock('../src/util/db', () => ({
 import appService from '../src/services/AppService';
 import App from '../src/types/app';
 import Arena from '../src/types/arena';
-import Environment, { Process } from '../src/types/environment';
+import Environment, {
+  Process,
+  SUDDEN_DEATH_TIME,
+} from '../src/types/environment';
 import ArenaMember from '../src/types/arenaMember';
 import { runMatchToDecision } from '../src/util/runMatch';
 
@@ -85,17 +100,25 @@ const parseMatchups = (): [string, string][] => {
 
 const SEEDS = Number(process.env.HARNESS_SEEDS ?? 20);
 const MATCH_TIMEOUT_MS = Number(process.env.HARNESS_MATCH_TIMEOUT_MS ?? 30000);
+// Default to stopping at sudden death: full decision is impractically slow at any
+// useful N (balanced matchups grind through the whole decay phase — a 120-match
+// full-decision sweep exceeded 30 minutes). Set HARNESS_FULL_DECISION=1 for the
+// slower, ladder-faithful measurement (best kept to a small N).
+const STOP_AT_SUDDEN_DEATH = process.env.HARNESS_FULL_DECISION !== '1';
 
 // ---------------------------------------------------------------------------
-// One match, run the way the ladder runs it. Returns just what the metrics need.
+// One match, run the way the ladder runs it. Returns what the metrics need,
+// including each side's aggregated stats (so the report can decompose damage by
+// source). `stats` is the per-app sum the match summary already computes.
 // ---------------------------------------------------------------------------
+type Stats = Record<string, number>;
 type Outcome = {
   winner: 'A' | 'B' | null; // A = process 0, B = process 1
-  decided: boolean;
-  suddenDeath: boolean;
+  counted: boolean; // a real result (elimination, or standings at sudden death)
+  reachedSuddenDeath: boolean;
   ticks: number;
-  healthA: number;
-  healthB: number;
+  statsA: Stats;
+  statsB: Stats;
 };
 
 const runMatch = async (a: Entry, b: Entry, seed: number): Promise<Outcome> => {
@@ -118,19 +141,33 @@ const runMatch = async (a: Entry, b: Entry, seed: number): Promise<Outcome> => {
     const summary = await runMatchToDecision(env, members, {
       seed,
       timeoutMs: MATCH_TIMEOUT_MS,
+      stopAtSuddenDeath: STOP_AT_SUDDEN_DEATH,
     });
     const entryA = summary.leaderboard.find((e) => e.id === appIdA);
     const entryB = summary.leaderboard.find((e) => e.id === appIdB);
-    const winnerId = summary.match.decided
-      ? (summary.match.winner?.id ?? null)
-      : null;
+    const reachedSuddenDeath = summary.clock.time >= SUDDEN_DEATH_TIME;
+
+    // Resolve the winner. An elimination decision always wins. Otherwise, in
+    // sudden-death mode, the standings leader (leaderboard rank 1 — total health,
+    // then bots alive, then shots hit) is the combat winner. A match that neither
+    // decided nor reached sudden death is a genuine timeout: not counted.
+    let winnerId: string | null = null;
+    let counted = false;
+    if (summary.match.decided) {
+      winnerId = summary.match.winner?.id ?? null;
+      counted = true;
+    } else if (STOP_AT_SUDDEN_DEATH && reachedSuddenDeath) {
+      winnerId = summary.leaderboard[0]?.id ?? null;
+      counted = true;
+    }
+
     return {
       winner: winnerId === appIdA ? 'A' : winnerId === appIdB ? 'B' : null,
-      decided: summary.match.decided,
-      suddenDeath: summary.match.suddenDeath,
+      counted,
+      reachedSuddenDeath,
       ticks: summary.clock.time,
-      healthA: entryA?.totalHealth ?? 0,
-      healthB: entryB?.totalHealth ?? 0,
+      statsA: (entryA?.stats ?? {}) as Stats,
+      statsB: (entryB?.stats ?? {}) as Stats,
     };
   } finally {
     // Release every isolate before the next match; nothing here is persisted.
@@ -174,6 +211,67 @@ const eloGap = (p: number): number => {
 
 const pct = (x: number) => `${(100 * x).toFixed(1)}%`;
 
+// The seven damageTaken source buckets, in report order. These sum to the
+// side's total damageTaken (see botStats.ts / simulation.ts `damage()`).
+const DAMAGE_SOURCES: [label: string, key: string][] = [
+  ['enemyFire', 'damageTakenEnemyFire'],
+  ['friendlyFire', 'damageTakenFriendlyFire'],
+  ['enemyCollide', 'damageTakenEnemyCollision'],
+  ['teamCollide', 'damageTakenTeammateCollision'],
+  ['wall', 'damageTakenWall'],
+  ['suddenDeath', 'damageTakenSuddenDeath'],
+  ['selfMiss', 'damageTakenSelfMiss'],
+];
+
+// Accumulate one side's stats across all its games.
+const emptySums = (): Stats => ({});
+const addStats = (into: Stats, from: Stats) => {
+  for (const k of Object.keys(from)) into[k] = (into[k] ?? 0) + (from[k] ?? 0);
+};
+const g = (s: Stats, k: string) => s[k] ?? 0;
+
+// Render one side's damage decomposition + supporting combat stats.
+const sideReport = (name: string, s: Stats, games: number): string[] => {
+  const taken = DAMAGE_SOURCES.reduce((sum, [, k]) => sum + g(s, k), 0);
+  const share = (k: string) => (taken > 0 ? g(s, k) / taken : 0);
+  const combat = share('damageTakenEnemyFire');
+  const incidental =
+    share('damageTakenEnemyCollision') +
+    share('damageTakenTeammateCollision') +
+    share('damageTakenWall') +
+    share('damageTakenSuddenDeath');
+  const selfInflicted =
+    share('damageTakenFriendlyFire') +
+    share('damageTakenTeammateCollision') +
+    share('damageTakenWall') +
+    share('damageTakenSelfMiss');
+
+  const breakdown = DAMAGE_SOURCES.map(
+    ([label, k]) => `${label} ${pct(share(k))}`
+  ).join('  ');
+
+  const shotsFired = g(s, 'shotsFired');
+  const accuracy = shotsFired > 0 ? g(s, 'shotsHit') / shotsFired : 0;
+  const dealt = g(s, 'damageDealt');
+  const friendlyShare = dealt > 0 ? g(s, 'damageDealtFriendly') / dealt : 0;
+  const collides = g(s, 'timesCollided');
+  const teamCollideShare =
+    collides > 0 ? g(s, 'timesCollidedTeammate') / collides : 0;
+
+  return [
+    `  ${name}:`,
+    `    damage taken   ${Math.round(taken / games)}/game   ` +
+      `combat ${pct(combat)} · incidental ${pct(incidental)} · ` +
+      `self-inflicted ${pct(selfInflicted)}`,
+    `      by source    ${breakdown}`,
+    `    damage dealt   ${Math.round(dealt / games)}/game   ` +
+      `friendly-fire ${pct(friendlyShare)}   accuracy ${pct(accuracy)}`,
+    `    collisions     ${(collides / games).toFixed(1)}/game   ` +
+      `teammate ${pct(teamCollideShare)}   ` +
+      `travel ${Math.round(g(s, 'distanceTraveled') / games)}/game`,
+  ];
+};
+
 // ---------------------------------------------------------------------------
 // The harness body.
 // ---------------------------------------------------------------------------
@@ -190,7 +288,10 @@ describe('skill-vs-luck measurement harness', () => {
       log('');
       log('='.repeat(72));
       log(
-        `SKILL vs LUCK — ${SEEDS} seeds/order, timeout ${MATCH_TIMEOUT_MS}ms`
+        `SKILL vs LUCK — ${SEEDS} seeds/order, timeout ${MATCH_TIMEOUT_MS}ms` +
+          (STOP_AT_SUDDEN_DEATH
+            ? ', STOP-AT-SUDDEN-DEATH (combat standings)'
+            : ', full decision')
       );
       log('='.repeat(72));
 
@@ -202,47 +303,51 @@ describe('skill-vs-luck measurement harness', () => {
         // Seeds 1..SEEDS. Every seed is run in BOTH orders (A as team 0 / B as
         // team 0) so we can measure positional luck (the seed-swap flip) and
         // neutralize it in the aggregate win-rate.
-        let aWins = 0; // A's wins across both orders (2*SEEDS games)
-        let games = 0;
+        let aWins = 0; // A's wins across both orders
+        let games = 0; // counted (decided) games
         let flips = 0; // seeds where swapping sides flipped the winner
         let team0Wins = 0; // process-0 wins, position bias signal
         let team0Games = 0;
-        let suddenDeaths = 0;
-        let timeouts = 0;
+        let suddenDeaths = 0; // matches that reached the sudden-death tick
+        let uncounted = 0; // timeouts / undecided
         let ticksSum = 0;
+        const sumsA = emptySums();
+        const sumsB = emptySums();
 
         for (let s = 1; s <= SEEDS; s++) {
           const fwd = await runMatch(a, b, s); // A=team0, B=team1
           const rev = await runMatch(b, a, s); // B=team0, A=team1
 
+          // fwd: A's stats are statsA; rev: A is team1, so A's stats are statsB.
+          addStats(sumsA, fwd.statsA);
+          addStats(sumsA, rev.statsB);
+          addStats(sumsB, fwd.statsB);
+          addStats(sumsB, rev.statsA);
+
           for (const r of [fwd, rev]) {
-            if (!r.decided) timeouts++;
-            if (r.suddenDeath) suddenDeaths++;
+            if (!r.counted) uncounted++;
+            if (r.reachedSuddenDeath) suddenDeaths++;
             ticksSum += r.ticks;
-            if (r.winner) {
+            if (r.counted && r.winner) {
               team0Games++;
               if (r.winner === 'A') team0Wins++; // team0 == process0
             }
           }
 
-          // A's result in each order (A is winner 'A' in fwd, winner 'B' in rev).
           const aWonFwd = fwd.winner === 'A';
           const aWonRev = rev.winner === 'B';
-          if (fwd.decided) {
+          if (fwd.counted) {
             games++;
             if (aWonFwd) aWins++;
           }
-          if (rev.decided) {
+          if (rev.counted) {
             games++;
             if (aWonRev) aWins++;
           }
 
           // Flip: same seed, both decided, but the winning SIDE (team 0 vs team
-          // 1) changed when we swapped who sat on team 0. team0 winner fwd is A
-          // iff aWonFwd; team0 winner rev is B iff !aWonRev... express via winner
-          // labels directly: fwd team0 winner = fwd.winner==='A'; rev team0
-          // winner = rev.winner==='B' (B is team0 in rev). Flip when they differ.
-          if (fwd.decided && rev.decided) {
+          // 1) changed when we swapped who sat on team 0.
+          if (fwd.counted && rev.counted) {
             const team0WonFwd = fwd.winner === 'A';
             const team0WonRev = rev.winner === 'B';
             if (team0WonFwd !== team0WonRev) flips++;
@@ -300,9 +405,13 @@ describe('skill-vs-luck measurement harness', () => {
         }
         const avgTicks = Math.round(ticksSum / totalGames);
         log(
-          `  sudden-death rate   ${pct(suddenDeaths / totalGames)}   ` +
-            `avg length ${avgTicks} ticks   timeouts ${timeouts}`
+          `  reached sudden-death ${pct(suddenDeaths / totalGames)}   ` +
+            `avg length ${avgTicks} ticks   uncounted ${uncounted}`
         );
+        log('');
+        log('  damage sources (per side, aggregated over all games):');
+        for (const line of sideReport(nameA, sumsA, totalGames)) log(line);
+        for (const line of sideReport(nameB, sumsB, totalGames)) log(line);
       }
 
       log('');
@@ -312,6 +421,16 @@ describe('skill-vs-luck measurement harness', () => {
       log('  * high flip rate => start position, not play, decides matches.');
       log('  * low decisiveness / high "games to confirm" => the ladder needs');
       log('    many games to see a real skill gap (luck is drowning skill).');
+      log(
+        '  * high "reached sudden-death" => combat rarely resolves the match;'
+      );
+      log(
+        '    the decay tiebreak (a low-skill mechanic) is deciding outcomes.'
+      );
+      log('  * damage sources: high combat share = skill channel; high');
+      log(
+        '    incidental/self-inflicted = position/coordination (fixable/luck).'
+      );
       log('='.repeat(72));
       log('');
 

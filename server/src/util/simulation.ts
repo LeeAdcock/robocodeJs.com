@@ -5,6 +5,7 @@ import Environment from '../types/environment';
 // `import type` is erased at compile time, so the cycle never exists at runtime.
 import type { Process } from '../types/environment';
 import type Bot from '../types/bot';
+import type { BotStats } from '../types/botStats';
 import {
   BOT_RADIUS,
   BOT_MAX_SPEED,
@@ -23,9 +24,33 @@ import { normalizeAngle, toRelativeBearing } from './geometry';
   elements in the arena, specifically bots and their bullets.
 */
 
+// Where a hit came from, so damage() can file it under the right damageTaken
+// bucket. The clean combat channel is 'enemyFire'; everything else is either
+// self-inflicted (friendly fire, wall, missed shot) or incidental (collisions).
+// Sudden-death decay is NOT applied through damage() — it is a bulk health
+// decrement in environment.ts that buckets itself into damageTakenSuddenDeath.
+type DamageCause =
+  | 'enemyFire'
+  | 'friendlyFire'
+  | 'enemyCollision'
+  | 'teammateCollision'
+  | 'wall'
+  | 'selfMiss';
+
+// Each cause files the SAME clamped `dealt` amount into its bucket, so the seven
+// damageTaken* buckets always sum to damageTaken.
+const DAMAGE_BUCKET: Record<DamageCause, keyof BotStats> = {
+  enemyFire: 'damageTakenEnemyFire',
+  friendlyFire: 'damageTakenFriendlyFire',
+  enemyCollision: 'damageTakenEnemyCollision',
+  teammateCollision: 'damageTakenTeammateCollision',
+  wall: 'damageTakenWall',
+  selfMiss: 'damageTakenSelfMiss',
+};
+
 // Apply `amount` damage to `bot` and record who did it (`source`, or null when the
 // cause has no attributable enemy: a collision, the arena wall, the bot's own
-// missed shot, sudden-death decay, or a crash).
+// missed shot, sudden-death decay, or a crash) and under which `cause` bucket.
 //
 // Only a blow that finds the bot ALIVE counts or changes attribution. Health is
 // allowed to go negative and several damage events can land on one bot in a single
@@ -44,19 +69,19 @@ import { normalizeAngle, toRelativeBearing } from './geometry';
 // (health gauge, match ranking, the bigint achievement counters) expects. It does
 // shift match outcomes very slightly versus fractional damage, but ranking already
 // sums integral health, so this only makes the numbers honest.
-//
-// Health still runs for a dead bot and still goes negative — the enclosing
-// `health > 0` checks are made once per tick and a dead bot's bullets keep flying
-// and penalizing it — so the `wasAlive` guard below stays: without it a hit on an
-// already-dead bot would over-count damage and overwrite lastDamagedBy, stealing
-// the kill from whoever landed the killing blow. Once dead, attribution is frozen.
-const damage = (bot: Bot, amount: number, source: Bot | null): number => {
+const damage = (
+  bot: Bot,
+  amount: number,
+  source: Bot | null,
+  cause: DamageCause
+): number => {
   const rounded = Math.round(amount);
   const wasAlive = bot.health > 0;
   const dealt = wasAlive ? Math.min(rounded, bot.health) : 0;
   bot.health -= rounded;
   if (wasAlive) {
     bot.stats.damageTaken += dealt;
+    bot.stats[DAMAGE_BUCKET[cause]] += dealt;
     bot.lastDamagedBy = source;
   }
   return dealt;
@@ -235,6 +260,7 @@ export default {
             closingSpeed: number;
             cosNormal: number;
             fresh: boolean;
+            friendly: boolean;
           } | null;
           let deepestOverlap = BOT_RADIUS * 2;
 
@@ -363,6 +389,7 @@ export default {
                   ) {
                     collisionsReported.add(botKey);
                     bot.stats.timesCollided += 1;
+                    if (friendly) bot.stats.timesCollidedTeammate += 1;
                     bot.logger.trace('Collided with bot');
                     if (bot.handlers[Event.COLLIDED]) {
                       bot.handlers[Event.COLLIDED]({
@@ -378,6 +405,7 @@ export default {
                   ) {
                     collisionsReported.add(otherKey);
                     otherBot.stats.timesCollided += 1;
+                    if (friendly) otherBot.stats.timesCollidedTeammate += 1;
                     otherBot.logger.trace('Collided with bot');
                     if (otherBot.handlers[Event.COLLIDED]) {
                       otherBot.handlers[Event.COLLIDED]({
@@ -404,6 +432,7 @@ export default {
                       closingSpeed,
                       cosNormal,
                       fresh: !bot.contacts?.has(otherBot.id),
+                      friendly,
                     };
                   }
                 }
@@ -466,11 +495,22 @@ export default {
                       // The last-hit rule: whoever landed this shot is on the hook
                       // for the kill if the bot doesn't recover. Friendly fire is
                       // recorded here too — it really happened — but applyEliminations
-                      // refuses to credit it as a kill.
-                      const dealt = damage(bot, BULLET_DAMAGE, otherBot);
+                      // refuses to credit it as a kill. Split the damage by team so
+                      // enemy fire (combat) and friendly fire (self-inflicted) land
+                      // in separate buckets on both the taking and the dealing side.
+                      const friendlyFire =
+                        otherProcess.getAppId() === process.getAppId();
+                      const dealt = damage(
+                        bot,
+                        BULLET_DAMAGE,
+                        otherBot,
+                        friendlyFire ? 'friendlyFire' : 'enemyFire'
+                      );
                       bot.stats.timesHit += 1;
                       otherBot.stats.shotsHit += 1;
                       otherBot.stats.damageDealt += dealt;
+                      if (friendlyFire)
+                        otherBot.stats.damageDealtFriendly += dealt;
 
                       bullet.exploded = true;
                       if (bullet.callback) bullet.callback({ id: bot.id });
@@ -585,7 +625,12 @@ export default {
               !bot.wallContact &&
               wallImpactSpeed > COLLISION_MIN_CLOSING_SPEED
             ) {
-              damage(bot, wallImpactSpeed * COLLISION_DAMAGE_FACTOR, null);
+              damage(
+                bot,
+                wallImpactSpeed * COLLISION_DAMAGE_FACTOR,
+                null,
+                'wall'
+              );
               env.emit('event', {
                 type: 'botDamaged',
                 time: env.getTime(),
@@ -648,7 +693,9 @@ export default {
 
               // Impact damage, once per contact, scaled by how fast we were
               // closing — a gentle touch is free, a hard ram hurts. Unattributed
-              // like every other collision (no ram-kill credit; see `damage`).
+              // like every other collision (no ram-kill credit; see `damage`), but
+              // bucketed teammate vs enemy: crowding your own team is a
+              // coordination cost, taking an enemy ram is incidental combat.
               if (
                 separation.fresh &&
                 separation.closingSpeed > COLLISION_MIN_CLOSING_SPEED
@@ -656,7 +703,8 @@ export default {
                 damage(
                   bot,
                   separation.closingSpeed * COLLISION_DAMAGE_FACTOR,
-                  null
+                  null,
+                  separation.friendly ? 'teammateCollision' : 'enemyCollision'
                 );
                 env.emit('event', {
                   type: 'botDamaged',
@@ -761,7 +809,7 @@ export default {
               // Self-inflicted, so nobody is credited. This runs for dead bots too
               // — their bullets stay in flight — but `damage` freezes a dead bot's
               // attribution, so a corpse's stray miss can't rob its killer.
-              damage(bot, BULLET_MISS_PENALTY, null);
+              damage(bot, BULLET_MISS_PENALTY, null, 'selfMiss');
               env.emit('event', {
                 type: 'bulletRemoved',
                 time: env.getTime(),

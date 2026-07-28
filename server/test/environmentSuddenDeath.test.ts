@@ -51,4 +51,20 @@ describe('Environment sudden-death announcement', () => {
     await env.step(); // deeper into sudden death: no repeat
     expect(events.length).toBe(1);
   });
+
+  it('files decay damage under the suddenDeath bucket', async () => {
+    const env = withProcess();
+    const bot = env.getProcesses()[0].bots[0];
+    expect(bot.health).toBe(100);
+
+    // Decay runs on ticks past SUDDEN_DEATH_TIME that are multiples of 50; the
+    // first is SUDDEN_DEATH_TIME + 50. Park just before it and step onto it.
+    (env as unknown as { clock: { time: number } }).clock.time =
+      SUDDEN_DEATH_TIME + 49;
+    await env.step(); // -> SUDDEN_DEATH_TIME + 50: one decay tick
+
+    expect(bot.health).toBe(99);
+    expect(bot.stats.damageTaken).toBe(1);
+    expect(bot.stats.damageTakenSuddenDeath).toBe(1);
+  });
 });

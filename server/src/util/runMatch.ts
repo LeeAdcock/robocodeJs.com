@@ -1,4 +1,4 @@
-import Environment from '../types/environment';
+import Environment, { SUDDEN_DEATH_TIME } from '../types/environment';
 import ArenaMember from '../types/arenaMember';
 import { buildMatchSummary, isMatchDecided } from './matchSummary';
 
@@ -47,7 +47,19 @@ export const DEFAULT_MATCH_TIMEOUT_MS = 60000;
 export const runMatchToDecision = async (
   env: Environment,
   members: ArenaMember[],
-  opts: { seed?: number; timeoutMs?: number } = {}
+  opts: {
+    seed?: number;
+    timeoutMs?: number;
+    // Stop as soon as the match reaches sudden death (tick SUDDEN_DEATH_TIME)
+    // instead of driving the health-decay phase to a single survivor. The
+    // returned summary is then NOT `decided` when more than one app is still
+    // alive — the caller decides the outcome from the standings (the leaderboard
+    // is already rank-ordered by combat: total health, bots alive, shots hit).
+    // Off by default: the ladder and MCP run_match keep full-decision behavior;
+    // this exists for measurement/iteration speed (the skill-vs-luck harness),
+    // where the decay tiebreak is a low-signal artifact worth excluding.
+    stopAtSuddenDeath?: boolean;
+  } = {}
 ): Promise<Awaited<ReturnType<typeof buildMatchSummary>>> => {
   if (!env.beginMatch()) {
     throw new ArenaBusyError(
@@ -68,7 +80,17 @@ export const runMatchToDecision = async (
 
       // Poll a cheap synchronous predicate (no DB/summary build per iteration) so
       // the loop cost stays negligible and the deadline actually bounds wall clock.
-      while (!isMatchDecided(env) && env.isRunning() && Date.now() < deadline) {
+      // In stopAtSuddenDeath mode, crossing the sudden-death tick is also a stop
+      // condition — it ends the many balanced matches that would otherwise grind
+      // through the whole decay phase.
+      const reachedSuddenDeath = () =>
+        opts.stopAtSuddenDeath && env.getTime() >= SUDDEN_DEATH_TIME;
+      while (
+        !isMatchDecided(env) &&
+        !reachedSuddenDeath() &&
+        env.isRunning() &&
+        Date.now() < deadline
+      ) {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
