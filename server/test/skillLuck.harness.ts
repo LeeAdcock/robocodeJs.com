@@ -119,6 +119,12 @@ const MATCH_TIMEOUT_MS = Number(process.env.HARNESS_MATCH_TIMEOUT_MS ?? 60000);
 // full-decision sweep exceeded 30 minutes). Set HARNESS_FULL_DECISION=1 for the
 // slower, ladder-faithful measurement (best kept to a small N).
 const STOP_AT_SUDDEN_DEATH = process.env.HARNESS_FULL_DECISION !== '1';
+// Bots per team (1–5). Default 5 (a real match). Drop to 1 for a clean duel:
+// squad bots that lean hard on broadcasting can trip the arena's per-bot send
+// rate limit (E024) in a 5v5 message storm and crash out, which decides matches
+// by attrition rather than skill — a 1v1 removes both the storm and friendly
+// fire, isolating raw combat.
+const BOT_COUNT = Number(process.env.HARNESS_BOT_COUNT ?? 5);
 
 // ---------------------------------------------------------------------------
 // One match, run the way the ladder runs it. Returns what the metrics need,
@@ -144,6 +150,7 @@ const runMatch = async (a: Entry, b: Entry, seed: number): Promise<Outcome> => {
 
   const arena = new Arena(randomUUID(), 'harness');
   const env = new Environment(arena);
+  if (BOT_COUNT !== 5) await env.setBotCount(BOT_COUNT);
   env.processes.push(new Process(appIdA));
   env.processes.push(new Process(appIdB));
   const members = [
@@ -175,13 +182,21 @@ const runMatch = async (a: Entry, b: Entry, seed: number): Promise<Outcome> => {
       counted = true;
     }
 
+    // Fold crashedCount into the stats bag (as a pseudo-counter) so it
+    // aggregates and reports alongside the real stats — squad bots tripping the
+    // send limit and crashing out is exactly what makes ladder-bot 5v5s noisy.
+    const withCrashed = (s: Stats | undefined, crashed: number): Stats => ({
+      ...(s ?? {}),
+      crashedBots: crashed,
+    });
+
     return {
       winner: winnerId === appIdA ? 'A' : winnerId === appIdB ? 'B' : null,
       counted,
       reachedSuddenDeath,
       ticks: summary.clock.time,
-      statsA: (entryA?.stats ?? {}) as Stats,
-      statsB: (entryB?.stats ?? {}) as Stats,
+      statsA: withCrashed(entryA?.stats as Stats, entryA?.crashedCount ?? 0),
+      statsB: withCrashed(entryB?.stats as Stats, entryB?.crashedCount ?? 0),
     };
   } finally {
     // Release every isolate before the next match; nothing here is persisted.
@@ -283,6 +298,8 @@ const sideReport = (name: string, s: Stats, games: number): string[] => {
     `    collisions     ${(collides / games).toFixed(1)}/game   ` +
       `teammate ${pct(teamCollideShare)}   ` +
       `travel ${Math.round(g(s, 'distanceTraveled') / games)}/game`,
+    `    crashed        ${(g(s, 'crashedBots') / games).toFixed(2)} bots/game   ` +
+      `(resource-limit / thrown-handler forfeits)`,
   ];
 };
 
@@ -302,7 +319,8 @@ describe('skill-vs-luck measurement harness', () => {
       log('');
       log('='.repeat(72));
       log(
-        `SKILL vs LUCK — ${SEEDS} seeds/order, timeout ${MATCH_TIMEOUT_MS}ms` +
+        `SKILL vs LUCK — ${SEEDS} seeds/order, ${BOT_COUNT}v${BOT_COUNT}, ` +
+          `timeout ${MATCH_TIMEOUT_MS}ms` +
           (STOP_AT_SUDDEN_DEATH
             ? ', STOP-AT-SUDDEN-DEATH (combat standings)'
             : ', full decision')
