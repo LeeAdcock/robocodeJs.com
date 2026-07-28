@@ -6,3 +6,4 @@ coverage
 **/*artifact*zip
 **/*robocodejs*zip
 **/secrets.sh
+server/skill-luck-report.txt

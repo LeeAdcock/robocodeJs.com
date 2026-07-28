@@ -11,6 +11,7 @@
     "lint:eslint": "eslint src --fix",
     "start": "node ./dist/src/index.js",
     "smoke": "node ./scripts/ivm-smoke.js",
+    "skill-luck": "vitest run --config vitest.harness.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
