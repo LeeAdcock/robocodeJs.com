@@ -64,16 +64,21 @@ appService.get = ((appId: string) => {
 
 // ---------------------------------------------------------------------------
 // Bot subjects. Loaded from the shipped sample bots (ui/public/samples/*.js) so
-// the harness measures real, non-trivial strategies. Override the roster with
-// HARNESS_MATCHUPS.
+// the harness measures real, non-trivial strategies. Point HARNESS_BOT_DIR at
+// another directory of `<name>.js` files to measure your own bots instead (e.g.
+// sources pulled from the ladder) — handy because the samples are deliberately
+// simple and some are chaotic (self-collide / friendly-fire heavily), which
+// makes them poor luck-floor probes. Override the roster with HARNESS_MATCHUPS.
 // ---------------------------------------------------------------------------
-const SAMPLES_DIR = join(__dirname, '..', '..', 'ui', 'public', 'samples');
+const SAMPLES_DIR =
+  process.env.HARNESS_BOT_DIR ??
+  join(__dirname, '..', '..', 'ui', 'public', 'samples');
 
 const loadSample = (name: string): string => {
   const path = join(SAMPLES_DIR, `${name}.js`);
   if (!existsSync(path)) {
     throw new Error(
-      `sample bot "${name}" not found at ${path} — check HARNESS_MATCHUPS names`
+      `bot "${name}" not found at ${path} — check HARNESS_MATCHUPS names / HARNESS_BOT_DIR`
     );
   }
   return readFileSync(path, 'utf8');
@@ -81,8 +86,14 @@ const loadSample = (name: string): string => {
 
 // Default roster: a self-mirror (the pure luck floor), a skilled-vs-weak pairing
 // (expected high decisiveness), and two skilled-vs-skilled pairings.
+//
+// The luck-floor mirror must be a bot that reliably ENGAGES — an identical pair
+// has to fight to a decision for the 50%-baseline to mean anything. `marksman`
+// is a passive camper (it only shoots what wanders into view), so a marksman
+// mirror just stares and times out with zero combat; `survivor` moves and
+// fights, so its mirror actually resolves.
 const DEFAULT_MATCHUPS: [string, string][] = [
-  ['marksman', 'marksman'], // self-mirror -> engine luck floor
+  ['survivor', 'survivor'], // self-mirror -> engine luck floor (engages)
   ['marksman', 'firstbot'], // skilled vs weak
   ['marksman', 'survivor'], // skilled vs skilled
   ['squad', 'marksman'], // coordinated vs skilled
@@ -99,7 +110,10 @@ const parseMatchups = (): [string, string][] => {
 };
 
 const SEEDS = Number(process.env.HARNESS_SEEDS ?? 20);
-const MATCH_TIMEOUT_MS = Number(process.env.HARNESS_MATCH_TIMEOUT_MS ?? 30000);
+// 60s so the heaviest 5v5 matches can reach the sudden-death tick (~7500) and be
+// decided by standings, rather than timing out mid-combat and going uncounted —
+// at unbounded speed the busiest matches only simulate ~5900 ticks in 30s.
+const MATCH_TIMEOUT_MS = Number(process.env.HARNESS_MATCH_TIMEOUT_MS ?? 60000);
 // Default to stopping at sudden death: full decision is impractically slow at any
 // useful N (balanced matchups grind through the whole decay phase — a 120-match
 // full-decision sweep exceeded 30 minutes). Set HARNESS_FULL_DECISION=1 for the
