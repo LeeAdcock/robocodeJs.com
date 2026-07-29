@@ -867,10 +867,14 @@ describe('compiler — bot API in a real isolate', () => {
     expect(ctx.bot.orientationTarget).toBe(270);
   });
 
-  // bot.send is the one command whose failure is decided synchronously (the
-  // budget check happens before any fan-out), so its promise is already settled
-  // when the bot receives it. These lock both settlements, because the whole
-  // point of the promise is telling a delivered broadcast from a dropped one.
+  // bot.send rides the shared __asyncCall/__settle bridge like every other async
+  // command: it resolves once the broadcast has gone out and rejects (E024) when
+  // the message was dropped for budget. These lock both settlements, because the
+  // whole point of the promise is telling a delivered broadcast from a dropped
+  // one. That the rejection is delivered through the (swallowed) settle apply —
+  // never during the caller's handler apply — is what keeps a fire-and-forget
+  // send non-fatal (#349); the simulation-integration suite exercises that path
+  // end-to-end.
   it('resolves the promise from a send inside the per-tick budget', async () => {
     ctx.run(`
       globalThis.__sent = 'pending'
@@ -943,15 +947,15 @@ describe('compiler — bot API in a real isolate', () => {
     );
   });
 
-  it('hands bot.send only copied plain data, never a host reference', () => {
-    // _bot_send now has a return value, which makes it subject to the copy
-    // boundary rule: what comes back must be plain data the isolate owns. A
-    // boolean that still carried host-backed machinery (an ivm Reference, or an
-    // object with host methods on it) would be a path off the sandbox.
-    expect(ctx.read('typeof _bot_send("\\"probe\\"")')).toBe('object');
-    expect(ctx.read('typeof _bot_send("\\"probe\\"").copy()')).toBe('boolean');
-    // The wrapper the bot actually calls yields a real in-isolate Promise, not
-    // something bridged back to the host.
+  it('routes bot.send through the shared async bridge, exposing no host reference', () => {
+    // send rides the same __asyncCall/__settle bridge as every other async
+    // command: the native _bot_send hands nothing straight back across the
+    // boundary (its outcome is delivered later via the copied __settle path), so
+    // there is no return value that could smuggle out an ivm Reference or a
+    // host-backed object. The wrapper the bot actually calls yields a real
+    // in-isolate Promise, not something bridged back to the host.
+    expect(ctx.read('typeof _bot_send')).toBe('function');
+    expect(ctx.read('typeof _bot_send(0, "\\"probe\\"")')).toBe('undefined');
     expect(ctx.read('bot.send("probe") instanceof Promise')).toBe(true);
     expect(ctx.read('typeof bot.send("probe").then')).toBe('function');
   });

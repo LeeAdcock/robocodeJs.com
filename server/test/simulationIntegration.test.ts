@@ -141,6 +141,33 @@ describe('sandbox + simulation integration', () => {
     expect(bot.getOrientation()).toBe(90); // kept running, reached new target
   });
 
+  it('does not crash when a fire-and-forget over-budget send escapes a SYNC handler (#349)', async () => {
+    // The other half of the "uncaught rejections don't kill a bot" invariant:
+    // an over-budget bot.send() rejection dropped from a *synchronous* handler,
+    // never awaited and never .catch()'d. Over the per-tick budget (50) the send
+    // rejects (E024), but because send rides the shared __asyncCall/__settle
+    // bridge that rejection is delivered through the host's swallowed settle
+    // apply — never during the handler's own apply — so it can't kill the bot
+    // (the old E013/E024 crash, which floated the rejection synchronously in the
+    // handler). The bot floods 60 sends/tick and keeps playing.
+    const bot = world.addBot(
+      `clock.on(Event.TICK, () => {
+         bot.setSpeed(5)
+         for (let i = 0; i < 60; i++) bot.send(i)
+       })`,
+      'chatterbox'
+    );
+    expect(bot.health).toBe(100);
+
+    await world.tick(5);
+
+    expect(bot.appCrashed).toBe(false);
+    expect(bot.health).toBe(100); // still alive
+    expect(bot.speedTarget).toBe(5); // still running its logic
+    // Only the budgeted sends went out each tick; the rest were silent drops.
+    expect(bot.stats.messagesSent).toBeGreaterThan(0);
+  });
+
   it('fires a tick-driven setTimeout after its interval elapses', async () => {
     const bot = world.addBot(
       `setTimeout(() => { bot.setSpeed(3) }, 3)`,

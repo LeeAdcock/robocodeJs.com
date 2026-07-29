@@ -482,25 +482,39 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
   // bot-side wrapper stringifies it and the host parses + validates it
   // (parseMessage) before broadcasting. JSON is the whitelist, so functions,
   // class instances, Dates, Maps/Sets, and host references can never be sent.
-  // It returns a Promise, like every other failable bot command: resolved once
-  // the broadcast has gone out, rejected with E024 when the per-tick send budget
-  // was already spent and the message was therefore dropped. Whether a send is
-  // accepted is known synchronously (no fan-out happens later), so this needs
-  // none of the __pending/__settle machinery — the wrapper builds an
-  // already-settled promise in-isolate from a copied boolean, and only plain
-  // data ever crosses the boundary.
-  bot
-    .getContext()
-    .global.setSync(
-      '_bot_send',
-      (json: unknown) => new ivm.ExternalCopy(bot.send(parseMessage(json)))
+  //
+  // Like every other failable command, send returns a Promise<void> that resolves
+  // once the broadcast has gone out and rejects (E024) when the per-tick budget was
+  // already spent and the message was dropped. It rides the SAME __asyncCall/__settle
+  // bridge as the other async commands rather than building its own in-isolate
+  // promise — which is what keeps the invariant uniform: a fire-and-forget send whose
+  // rejection escapes a *synchronous* handler cannot kill the bot (#349), because the
+  // host delivers that rejection through the swallowed __settle apply (see the settle
+  // helper's .catch in init), exactly as a superseded turn/setSpeed rejection is.
+  // The budget outcome is known synchronously (no fan-out happens later), so the fan-
+  // out runs in the native call and the settlement is just deferred a microtask onto
+  // the shared settle path; only plain data (the E024 string, or undefined) crosses
+  // the boundary. The host also logs an E024 warning to the bot's console on the
+  // first drop of a tick (see Bot.send).
+  bot.getContext().global.setSync('_bot_send', (id: number, json: unknown) => {
+    const settle = getSettler(bot);
+    const sent = bot.send(parseMessage(json));
+    // Defer the settlement off this synchronous native call so it is delivered
+    // via a later (swallowed) __settle apply, never during the caller's handler
+    // apply — the property that makes an uncaught rejection non-fatal.
+    Promise.resolve().then(() =>
+      sent
+        ? settle(id, true, undefined)
+        : settle(
+            id,
+            false,
+            `${ErrorCodes.E024}: send limit reached (${MAX_SENDS_PER_TICK} per tick). This broadcast was not sent.`
+          )
     );
+  });
   isolate
     .compileScriptSync(
-      `bot.send = (message) =>
-         _bot_send(JSON.stringify(message)).copy()
-           ? Promise.resolve()
-           : Promise.reject('${ErrorCodes.E024}: send limit reached (${MAX_SENDS_PER_TICK} per tick). This broadcast was not sent.')`
+      `bot.send = (message) => __asyncCall(_bot_send, JSON.stringify(message))`
     )
     .runSync(bot.getContext(), {});
 
