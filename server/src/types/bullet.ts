@@ -6,8 +6,15 @@ export type BulletId = string & {};
 // health a hit removes, and health the shooter loses when a shot leaves the
 // arena unhit. bulletSpeed/bulletDamage are mirrored into the sandbox as
 // bot.turret attributes in compiler.ts.
-export const BULLET_SPEED = 25;
-export const BULLET_DAMAGE = 25;
+//
+// BULLET_SPEED and BULLET_DAMAGE accept an env override (like MAX_SENDS_PER_TICK)
+// so the balance harness can sweep them headlessly without a code edit. The
+// defaults are unchanged, and prod never sets these; they exist for measuring
+// how a knob's value shifts the skill-vs-luck balance. The override flows to
+// BOTH the physics and the sandbox-exposed constant, so a bot's lead solve stays
+// consistent with the bullet it fires.
+export const BULLET_SPEED = Number(process.env.BULLET_SPEED) || 25;
+export const BULLET_DAMAGE = Number(process.env.BULLET_DAMAGE) || 25;
 export const BULLET_MISS_PENALTY = 3;
 
 // Distance from the bot's center to the muzzle, where a shot actually spawns —
