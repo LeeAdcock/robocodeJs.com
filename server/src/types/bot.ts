@@ -70,7 +70,14 @@ export const BOT_MAX_SPEED = 5;
 // two were closing: a gentle touch below COLLISION_MIN_CLOSING_SPEED does nothing,
 // a hard ram costs COLLISION_DAMAGE_FACTOR per unit of closing speed.
 export const COLLISION_MIN_CLOSING_SPEED = 1;
-export const COLLISION_DAMAGE_FACTOR = 0.75;
+// Env-overridable (like BULLET_SPEED) so the balance harness can sweep how much
+// incidental ram/wall damage — a pure position-luck channel — pollutes outcomes.
+// Uses an explicit-undefined check, not `|| 0.75`, so a sweep can set it to 0
+// (no collision damage). Default unchanged; prod never sets it.
+export const COLLISION_DAMAGE_FACTOR =
+  process.env.COLLISION_DAMAGE_FACTOR !== undefined
+    ? Number(process.env.COLLISION_DAMAGE_FACTOR)
+    : 0.75;
 
 // How much of a bot's velocity *into* the bot it hits is absorbed on contact, so
 // collisions don't feel frictionless ("sliding around each other like ice"). The
