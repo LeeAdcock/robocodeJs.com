@@ -37,7 +37,7 @@ describe('LeaderboardPage', () => {
   afterEach(cleanup);
   beforeEach(() => vi.mocked(axios.get).mockReset());
 
-  it('fetches and renders the ranked rows with owner and win%', async () => {
+  it('fetches and renders the ranked rows with owner and rating', async () => {
     vi.mocked(axios.get).mockResolvedValue({ data: rows } as never);
     render(
       <MemoryRouter>
@@ -50,7 +50,6 @@ describe('LeaderboardPage', () => {
     await screen.findByText('Overlord');
     expect(screen.getByText('Lee A.')).toBeTruthy();
     expect(screen.getByText('1712')).toBeTruthy();
-    expect(screen.getByText('75%')).toBeTruthy(); // winRate rounded
     expect(screen.getByText('Skirmisher')).toBeTruthy();
     // A little tank sprite renders next to each bot, using the row's color.
     const imgs = document.querySelectorAll('img[src^="/sprites/tank_"]');
