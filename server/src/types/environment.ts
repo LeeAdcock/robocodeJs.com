@@ -896,15 +896,6 @@ export default class Environment {
                 bot.y = spawn.y;
                 bot.orientation = spawn.orientation;
                 bot.orientationTarget = spawn.orientation;
-                // Point the turret and radar the same way the body faces (toward
-                // center) instead of the constructor's random heading. Random
-                // turret/radar init handed one team a first-scan/first-shot edge
-                // that the symmetric spawn otherwise removes; facing center makes
-                // the whole start congruent across teams.
-                bot.turret.orientation = spawn.orientation;
-                bot.turret.orientationTarget = spawn.orientation;
-                bot.turret.radar.orientation = spawn.orientation;
-                bot.turret.radar.orientationTarget = spawn.orientation;
               }
 
               process.bots.push(bot);

@@ -92,66 +92,59 @@ export function computeSpawns(
     });
   }
 
-  // Scatter ONE reference cluster (team 0's shape) inside its disk, keeping
-  // teammates at least MIN_SEP apart (rejection sampling; on exhaustion, keep the
-  // best-spaced candidate so the loop always terminates).
-  const center0 = centers[0];
-  const offsets: { x: number; y: number }[] = [];
-  for (let j = 0; j < botsPerTeam; j++) {
-    let best = { x: 0, y: 0 };
-    let bestSep = -1;
-    for (let t = 0; t < MAX_TRIES; t++) {
-      const ang = rng() * 360;
-      const r = clusterR * Math.sqrt(rng()); // uniform over the disk
-      const cand = { x: r * Math.sin(rad(ang)), y: -r * Math.cos(rad(ang)) };
-      let sep = Infinity;
-      for (const o of offsets) {
-        sep = Math.min(sep, Math.hypot(cand.x - o.x, cand.y - o.y));
-      }
-      if (sep >= MIN_SEP) {
-        best = cand;
-        break;
-      }
-      if (sep > bestSep) {
-        bestSep = sep;
-        best = cand;
-      }
-    }
-    offsets.push(best);
+  // Fisher–Yates shuffle of the slot indices, so team creation order doesn't map
+  // to a fixed angular slot a bot could exploit.
+  const order = centers.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
   }
 
-  // Recenter the reference cluster onto its ring center (a rigid shift: preserves
-  // MIN_SEP spacing and makes the centroid exactly the fair center).
-  const mx = offsets.reduce((s, o) => s + o.x, 0) / offsets.length;
-  const my = offsets.reduce((s, o) => s + o.y, 0) / offsets.length;
-  const refBots = offsets.map((o) => ({
-    x: center0.x + o.x - mx,
-    y: center0.y + o.y - my,
-  }));
+  for (let i = 0; i < teamCount; i++) {
+    const center = centers[order[i]];
 
-  // Every team is a RIGID ROTATION of the reference cluster about the arena
-  // center by k·(360/teamCount). All teams are therefore geometrically
-  // CONGRUENT — same intra-cluster shape, same distance to center/walls/nearest
-  // enemy — so no team can draw a luckier spawn than another. This removes the
-  // last inter-team positional asymmetry (each team used to scatter
-  // independently). The t=0 layout is more predictable, but DEPLOY_TICKS of
-  // damage-free movement makes a spawn read stale before weapons go live.
-  for (let k = 0; k < teamCount; k++) {
-    const phi = rad((k * 360) / teamCount);
-    const cos = Math.cos(phi);
-    const sin = Math.sin(phi);
-    const bots: Spawn[] = refBots.map((b) => {
-      const dx = b.x - cx;
-      const dy = b.y - cy;
+    // Scatter the team's offsets inside the cluster disk, keeping teammates at
+    // least MIN_SEP apart (rejection sampling; on exhaustion, keep the best-spaced
+    // candidate so the loop always terminates).
+    const offsets: { x: number; y: number }[] = [];
+    for (let j = 0; j < botsPerTeam; j++) {
+      let best = { x: 0, y: 0 };
+      let bestSep = -1;
+      for (let t = 0; t < MAX_TRIES; t++) {
+        const ang = rng() * 360;
+        const r = clusterR * Math.sqrt(rng()); // uniform over the disk
+        const cand = { x: r * Math.sin(rad(ang)), y: -r * Math.cos(rad(ang)) };
+        let sep = Infinity;
+        for (const o of offsets) {
+          sep = Math.min(sep, Math.hypot(cand.x - o.x, cand.y - o.y));
+        }
+        if (sep >= MIN_SEP) {
+          best = cand;
+          break;
+        }
+        if (sep > bestSep) {
+          bestSep = sep;
+          best = cand;
+        }
+      }
+      offsets.push(best);
+    }
+
+    // Recenter the cluster onto its symmetric center (a rigid shift: preserves the
+    // MIN_SEP spacing above, and makes the team centroid exactly the fair center).
+    const mx = offsets.reduce((s, o) => s + o.x, 0) / offsets.length;
+    const my = offsets.reduce((s, o) => s + o.y, 0) / offsets.length;
+
+    const bots: Spawn[] = offsets.map((o) => {
       // Safety clamp (a no-op for the square arena, where the radii above keep
       // every bot in bounds); guards odd width/height in the common case.
       const x = Math.max(
         BOT_RADIUS,
-        Math.min(width - BOT_RADIUS, cx + dx * cos - dy * sin)
+        Math.min(width - BOT_RADIUS, center.x + o.x - mx)
       );
       const y = Math.max(
         BOT_RADIUS,
-        Math.min(height - BOT_RADIUS, cy + dx * sin + dy * cos)
+        Math.min(height - BOT_RADIUS, center.y + o.y - my)
       );
       return { x, y, orientation: headingToward(x, y, cx, cy) };
     });
