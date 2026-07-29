@@ -4,8 +4,6 @@ This is the full reference for the bot API — what you can call, what each even
 
 A bot's logic is JavaScript, and it runs at the start of a match to issue its initial commands and register its event handlers. Saving your code reloads it live — your event handlers are replaced immediately — but it does **not** re-run the `START` handler, so a running bot keeps the state it set up. When you'd rather start clean, the editor's **Reboot** button (or `Ctrl-Shift-S`) reloads your code and re-runs `START`.
 
-The in-browser code editor also has **autocomplete** for the whole bot API: typing `bot.`, `arena.`, `clock.`, or `Event.` brings up the available members, each with its signature and a short description.
-
 A few other pages sit alongside this one. The [game rules & physics](/rules) has the exact speeds, turn rates, reload times, and damage values, the [FAQ](/faq) covers common questions, and [Coming from classic Robocode](/classic) is there if you've used the classic Java version. If you're brand new to coding, the [Learn course](/learn) starts from the beginning.
 
 - [Events overview](#events-overview)
