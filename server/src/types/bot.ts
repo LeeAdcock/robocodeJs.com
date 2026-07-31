@@ -60,15 +60,19 @@ export const BOT_RADIUS = 16;
 // 2*BOT_RADIUS square (a 32x32 sprite), so an r=BOT_RADIUS circle inscribed in
 // it leaves the four corners uncovered — the sprite's corners reach out to
 // BOT_RADIUS*sqrt(2) (~22.6), and a shot grazing that band looks like a hit but
-// misses. We forgive that gap with the *equal-area* circle: the circle whose
-// area equals the drawn square (side 2*BOT_RADIUS), radius = side/sqrt(pi) =
-// (2*BOT_RADIUS)/sqrt(pi) ~= 18.05. That covers the near-corner band a player
-// sees as a hit while only reaching a couple of units past the flat sides, and
-// stays a plain radius so bullet hits keep the cheap squared-distance test and
-// the rotation-independent fairness every other circle-based interaction has.
-// Deliberately separate from BOT_RADIUS: this only widens the bullet *target*,
-// never the body that collides, clamps to walls, or is scanned.
-export const BULLET_HIT_RADIUS = (BOT_RADIUS * 2) / Math.sqrt(Math.PI);
+// misses. This forgives that gap: 1.25 * BOT_RADIUS = 20 covers most of the
+// near-corner band a player reads as a hit (and the drawn shot's own half-width
+// on top of it) while staying short of the full ~22.6 corner reach, so a hit
+// never lands visibly clear of the tank. It was first set to the drawn square's
+// *equal-area* circle, (2*BOT_RADIUS)/sqrt(pi) ~= 18.05, which still let too
+// many visually-connecting grazes read as misses; the multiplier is the knob to
+// turn if it needs another nudge.
+//
+// It stays a plain radius, so bullet hits keep the cheap squared-distance test
+// and the rotation-independent fairness every other circle-based interaction
+// has. Deliberately separate from BOT_RADIUS: this only widens the bullet
+// *target*, never the body that collides, clamps to walls, or is scanned.
+export const BULLET_HIT_RADIUS = BOT_RADIUS * 1.25;
 // Degrees the body turns per tick, units/tick² toward the speed target, and
 // the body's top speed. Mirrored into the sandbox as the
 // bot.TURN_RATE/ACCELERATION/MAX_SPEED attributes (compiler.ts); BOT_TURN_SPEED

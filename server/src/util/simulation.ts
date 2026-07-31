@@ -423,17 +423,16 @@ export default {
                     // BULLET_HIT_RADIUS of the target's center — NOT two radii
                     // (the bot-vs-bot rule, where both bodies contribute a
                     // radius), which landed a shot a full body width wide of the
-                    // hull. BULLET_HIT_RADIUS (~18) is the equal-area circle of
-                    // the drawn 32x32 sprite: a touch wider than the physical
+                    // hull. BULLET_HIT_RADIUS (20) is wider than the physical
                     // BOT_RADIUS (16) hull so the sprite corners a player sees as
                     // a hit actually register, without reaching a full body width.
                     //
                     // Testing the whole segment the bullet swept this tick,
                     // rather than only where it ended up, is what keeps this
                     // radius safe. A bullet covers BULLET_SPEED (25) per tick
-                    // against an ~18 radius, so a per-tick point sample is inside
+                    // against a 20 radius, so a per-tick point sample is inside
                     // the circle for a chord of 2 * sqrt(R^2 - d^2) — under 25,
-                    // and therefore skippable, for any shot passing more than ~9
+                    // and therefore skippable, for any shot passing more than ~16
                     // units off center. Sampling points would drop most genuine
                     // hits; sampling the segment drops none.
                     const distanceSquared = distanceToSegmentSquared(
