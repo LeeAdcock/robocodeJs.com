@@ -10,6 +10,12 @@
 // The rating a brand-new app starts at.
 export const DEFAULT_RATING = 1500;
 
+// Ratings are floored here so a bot on a long losing streak can bottom out but
+// never go negative (a negative score reads as broken, not just weak). The floor
+// is applied after rounding, and deltas are derived from the clamped value so the
+// `before + delta === after` persistence/display invariant still holds.
+export const RATING_FLOOR = 0;
+
 // A bot's first PLACEMENT_GAMES ranked matches use a larger K-factor so it
 // converges toward its true strength quickly; afterwards K drops so an
 // established rating is stable and moves only gradually.
@@ -60,8 +66,14 @@ export const updateRatings = (
   const expectedA = expectedScore(a.rating, b.rating);
   const scoreA = outcome === 'a' ? 1 : outcome === 'b' ? 0 : 0.5;
 
-  const newA = Math.round(nextRating(a, expectedA, scoreA));
-  const newB = Math.round(nextRating(b, 1 - expectedA, 1 - scoreA));
+  const newA = Math.max(
+    RATING_FLOOR,
+    Math.round(nextRating(a, expectedA, scoreA))
+  );
+  const newB = Math.max(
+    RATING_FLOOR,
+    Math.round(nextRating(b, 1 - expectedA, 1 - scoreA))
+  );
 
   return {
     a: { rating: newA, delta: newA - a.rating },
