@@ -601,11 +601,11 @@ describe('Simulation.run — bullets', () => {
     expect(shooter.stats.damageDealt).toBe(10);
   });
 
-  // A bullet is a point, so it connects within one BULLET_HIT_RADIUS (~18, the
-  // equal-area circle of the drawn 32x32 sprite) of the target's center — a
-  // touch past the physical 16 hull so the sprite corners a player sees as a hit
-  // register. The old rule used two radii (the bot-vs-bot sum), which landed
-  // hits a full body width clear of the hull. These pin both sides of the edge.
+  // A bullet is a point, so it connects within one BULLET_HIT_RADIUS (20) of the
+  // target's center — past the physical 16 hull so the sprite corners a player
+  // sees as a hit register, still short of the ~22.6 those corners reach. The
+  // old rule used two radii (the bot-vs-bot sum), which landed hits a full body
+  // width clear of the hull. These pin both sides of the edge.
   const shootAt = (bulletX: number, bulletY: number, prevY = bulletY) => {
     const target = makeBot({ id: 'a', x: 375, y: 375 });
     const bullet = {
@@ -632,19 +632,19 @@ describe('Simulation.run — bullets', () => {
   });
 
   it('hits a shot grazing the sprite corner, just past the physical hull', () => {
-    // 17 units off center: outside the 16 physical hull but inside the ~18.05
+    // 19 units off center: outside the 16 physical hull but inside the 20
     // BULLET_HIT_RADIUS. This is exactly the sprite-corner band that used to
     // read as a hit yet register as a miss — it now scores.
-    const { target, bullet } = shootAt(375 + 17, 375);
+    const { target, bullet } = shootAt(375 + 19, 375);
     expect(bullet.exploded).toBe(true);
     expect(target.health).toBe(75);
     expect(target.stats.timesHit).toBe(1);
   });
 
   it('misses a bot the bullet passes more than one radius from', () => {
-    // 20 units off center: clear of even the widened ~18.05 BULLET_HIT_RADIUS,
-    // and well inside the old two-radii rule, which would have scored a hit.
-    const { target, bullet } = shootAt(375 + 20, 375);
+    // 22 units off center: clear of even the widened 20 BULLET_HIT_RADIUS, and
+    // well inside the old two-radii rule, which would have scored a hit.
+    const { target, bullet } = shootAt(375 + 22, 375);
     expect(bullet.exploded).toBe(false);
     expect(target.health).toBe(100);
     expect(target.stats.timesHit).toBe(0);
@@ -652,12 +652,12 @@ describe('Simulation.run — bullets', () => {
 
   it('catches a fast bullet that stepped clean over the target in one tick', () => {
     // The reason hit detection sweeps the segment instead of sampling the
-    // landing point. This shot passes 12 units to the side of the center, so it
-    // is only inside the 16 radius for a chord of ~21 — shorter than the 25 it
-    // travels per tick. Both endpoints sit ~17 units out (outside the hull), yet
-    // the path between them cuts straight through it. Sampling points would call
-    // this a miss; sweeping the segment scores the hit it plainly is.
-    const { target, bullet } = shootAt(375 + 12, 375 + 13, 375 - 12);
+    // landing point. This shot passes 17 units to the side of the center, so it
+    // is only inside the 20 radius for a chord of ~21 — shorter than the 25 it
+    // travels per tick. Both endpoints sit ~21 units out (clear of the radius),
+    // yet the path between them cuts straight through it. Sampling points would
+    // call this a miss; sweeping the segment scores the hit it plainly is.
+    const { target, bullet } = shootAt(375 + 17, 375 + 13, 375 - 12);
     expect(bullet.exploded).toBe(true);
     expect(target.health).toBe(75);
     expect(target.stats.timesHit).toBe(1);
