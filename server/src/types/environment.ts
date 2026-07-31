@@ -855,6 +855,28 @@ export default class Environment {
       this.random
     );
 
+    // Draw each bot's remaining seed-derived start state — turret and radar
+    // starting angles, and the seed for its in-isolate Math.random — HERE,
+    // synchronously, in a fixed (team, slot) order, BEFORE the async app fetches
+    // below. Those fetches (appService.get) are real DB queries whose .then()
+    // callbacks settle in completion order, not process order — so drawing these
+    // there (the Bot/BotTurret/BotRadar constructors and compiler.init) handed
+    // turret aim, radar sweep, and Math.random to whichever team's app row loaded
+    // first, and a pinned seed only reproduced the match when that race fell the
+    // same way. Pulling every seed-derived value out of the async region — as
+    // computeSpawns already does for position and body heading — is what makes a
+    // pinned seed reproduce the whole match. The Bot constructor still draws its
+    // own random placement/angles as it builds, but those are all overwritten
+    // below, and nothing downstream reads the PRNG again this restart, so their
+    // (async-ordered) draws no longer affect any kept value.
+    const starts = this.processes.map(() =>
+      Array.from({ length: this.botCount }, () => ({
+        turret: this.random() * 360,
+        radar: this.random() * 360,
+        mathSeed: Math.floor(this.random() * 0x100000000),
+      }))
+    );
+
     // Restart each process
     return Promise.all(
       this.processes.map((process, teamIndex) => {
@@ -896,8 +918,21 @@ export default class Environment {
                 bot.orientationTarget = spawn.orientation;
               }
 
+              // Overwrite the constructor's async-ordered turret/radar angles
+              // with the values drawn synchronously above, so a pinned seed sets
+              // the same opening aim/sweep on every restart.
+              const start = starts[teamIndex]?.[slot];
+              if (start) {
+                bot.turret.orientation = start.turret;
+                bot.turret.orientationTarget = start.turret;
+                bot.turret.radar.orientation = start.radar;
+                bot.turret.radar.orientationTarget = start.radar;
+              }
+
               process.bots.push(bot);
-              compiler.init(this, process, bot);
+              // Hand init this bot's precomputed Math.random seed (undefined
+              // falls back to a fresh draw, for the non-restart spawn paths).
+              compiler.init(this, process, bot, start?.mathSeed);
               return bot.execute(process).then(() => {
                 // Emit new bot event
                 this.emitter.emit('event', {

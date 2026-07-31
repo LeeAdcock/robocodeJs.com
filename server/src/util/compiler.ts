@@ -610,8 +610,19 @@ const execute = (process: Process, bot: Bot): Promise<unknown> => {
   });
 };
 
-// Initialize a bot.getContext() within the isolated sandbox
-const init = (env: Environment, process: Process, bot: Bot) => {
+// Initialize a bot.getContext() within the isolated sandbox.
+//
+// `mathSeed` seeds this bot's in-isolate Math.random. When omitted (mid-match
+// spawns, the dry-run compile) one is drawn from the arena PRNG here. restart()
+// instead precomputes every bot's seed synchronously, in a fixed (team, slot)
+// order, and passes it in — so a bot's randomness can't depend on when its app
+// row happened to load (see Environment.restart).
+const init = (
+  env: Environment,
+  process: Process,
+  bot: Bot,
+  mathSeed?: number
+) => {
   try {
     // Expose bot
     process
@@ -768,8 +779,10 @@ const init = (env: Environment, process: Process, bot: Bot) => {
     // reproducible when the arena seed is fixed (and still varies by default,
     // since the default seed is nondeterministic). Each bot draws a distinct
     // sub-seed, so bots behave differently but repeatably. The generator is pure
-    // in-isolate JS (mulberry32) — no host round-trip per call.
-    const mathSeed = Math.floor(env.random() * 0x100000000);
+    // in-isolate JS (mulberry32) — no host round-trip per call. `?? draw` (not
+    // `|| draw`) so a legitimately-zero precomputed seed is honoured rather than
+    // silently redrawn.
+    const botMathSeed = mathSeed ?? Math.floor(env.random() * 0x100000000);
     process
       .getSandbox()
       .compileScriptSync(
@@ -788,7 +801,7 @@ const init = (env: Environment, process: Process, bot: Bot) => {
         // have no need for locale formatting, so remove Intl entirely.
         Intl = undefined
         {
-          let __rng = ${mathSeed} >>> 0
+          let __rng = ${botMathSeed} >>> 0
           Math.random = () => {
             __rng = (__rng + 0x6D2B79F5) | 0
             let t = Math.imul(__rng ^ (__rng >>> 15), 1 | __rng)
