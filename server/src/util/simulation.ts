@@ -621,7 +621,11 @@ export default {
             } else {
               bot.x = newX;
               bot.y = newY;
-              bot.stats.distanceTraveled += bot.speed;
+              // Use the magnitude: bot.speed is signed (negative in reverse),
+              // and newX/newY move |bot.speed| units along the heading either
+              // way, so a reversing bot travels distance, it doesn't un-travel
+              // it. Mirrors the sqrt() displacement in the separation branch.
+              bot.stats.distanceTraveled += Math.abs(bot.speed);
             }
 
             // Manage acceleration / deceleration. Crucially we do NOT zero the
