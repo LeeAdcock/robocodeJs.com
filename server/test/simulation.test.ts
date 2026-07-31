@@ -84,6 +84,16 @@ describe('Simulation.run — movement', () => {
     expect(bot.stats.distanceTraveled).toBe(5);
   });
 
+  it('counts reverse motion as distance traveled, not un-traveled', () => {
+    // Driving backwards (negative speed) at orientation 0 moves -5 in +y, i.e.
+    // 5 units north. That's still 5 units of ground covered, so the counter must
+    // climb by the magnitude — a signed add would have decremented it to -5.
+    const bot = makeBot({ speed: -5, speedTarget: -5 });
+    run(makeEnv([makeProcess('a', [bot])]));
+    expect(bot.y).toBeCloseTo(370);
+    expect(bot.stats.distanceTraveled).toBe(5);
+  });
+
   it('accelerates toward speedTarget using pre-acceleration speed for the step', () => {
     const bot = makeBot({ speed: 0, speedTarget: 10 });
     run(makeEnv([makeProcess('a', [bot])]));
