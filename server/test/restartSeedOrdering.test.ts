@@ -16,9 +16,10 @@ import { describe, it, expect, vi } from 'vitest';
 // state is byte-for-byte the same regardless. Before the fix it diverges.
 
 const h = vi.hoisted(() => ({
-  // Captured (appId, turret, radar, mathSeed) per init call.
+  // Captured (appId, id, turret, radar, mathSeed) per init call.
   initCalls: [] as {
     appId: string;
+    id: string;
     turret: number;
     radar: number;
     mathSeed: number | undefined;
@@ -55,6 +56,7 @@ vi.mock('../src/util/compiler', () => ({
       _env: unknown,
       process: { getAppId: () => string },
       bot: {
+        id: string;
         turret: { orientation: number; radar: { orientation: number } };
         logger: unknown;
       },
@@ -62,6 +64,7 @@ vi.mock('../src/util/compiler', () => ({
     ) => {
       h.initCalls.push({
         appId: process.getAppId(),
+        id: bot.id,
         turret: bot.turret.orientation,
         radar: bot.turret.radar.orientation,
         mathSeed,
@@ -88,21 +91,28 @@ import Arena from '../src/types/arena';
 // `resolveRank`, and return each app's per-slot start state (in slot order).
 const restartAndCapture = async (
   seed: number,
-  resolveRank: Record<string, number>
+  resolveRank: Record<string, number>,
+  arenaId = 'a'
 ) => {
   h.initCalls.length = 0;
   h.resolveRank = resolveRank;
-  const env = new Environment(new Arena('a', 'u'));
+  const env = new Environment(new Arena(arenaId, 'u'));
   env.getProcesses().push(new Process('app1'));
   env.getProcesses().push(new Process('app2'));
   env.setSeed(seed);
   await env.restart();
   const byApp: Record<
     string,
-    { turret: number; radar: number; mathSeed: number | undefined }[]
+    {
+      id: string;
+      turret: number;
+      radar: number;
+      mathSeed: number | undefined;
+    }[]
   > = {};
   for (const c of h.initCalls) {
     (byApp[c.appId] ??= []).push({
+      id: c.id,
       turret: c.turret,
       radar: c.radar,
       mathSeed: c.mathSeed,
@@ -136,5 +146,34 @@ describe('restart per-bot start state is seed-deterministic, not load-order-depe
     const a = await restartAndCapture(42, { app1: 0, app2: 0 });
     const seeds = [...a.app1, ...a.app2].map((s) => s.mathSeed);
     expect(new Set(seeds).size).toBe(seeds.length);
+  });
+
+  it('gives every bot a distinct seed-derived id, stable across restarts', async () => {
+    // Same seed + reversed load order (asserted equal above, ids included).
+    const a = await restartAndCapture(42, { app1: 0, app2: 3 });
+    const b = await restartAndCapture(42, { app1: 3, app2: 0 });
+    const idsA = [...a.app1, ...a.app2].map((s) => s.id);
+    const idsB = [...b.app1, ...b.app2].map((s) => s.id);
+    expect(idsB).toEqual(idsA); // reproduced on restart
+    expect(new Set(idsA).size).toBe(idsA.length); // all distinct within the match
+    // v4-UUID shape (so it reads like the randomUUID ids it replaced).
+    for (const id of idsA)
+      expect(id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      );
+  });
+
+  it('gives two arenas that share a pinned seed different bot ids', async () => {
+    // Same seed, DIFFERENT arena id → the arena id folded into the id seed keeps
+    // them from colliding (they would be identical without it).
+    const a = await restartAndCapture(42, { app1: 0, app2: 0 }, 'arena-one');
+    const b = await restartAndCapture(42, { app1: 0, app2: 0 }, 'arena-two');
+    const idsA = [...a.app1, ...a.app2].map((s) => s.id);
+    const idsB = [...b.app1, ...b.app2].map((s) => s.id);
+    // No id from arena one appears in arena two.
+    expect(idsA.some((id) => idsB.includes(id))).toBe(false);
+    // But the seed-derived turret/radar/Math.random state is identical (those
+    // come from the shared PRNG stream, which the arena id doesn't perturb).
+    expect(a.app1.map((s) => s.turret)).toEqual(b.app1.map((s) => s.turret));
   });
 });

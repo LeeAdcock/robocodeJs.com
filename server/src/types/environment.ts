@@ -10,7 +10,7 @@ import Simulation, { applyEliminations } from '../util/simulation';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
-import { mulberry32 } from '../util/random';
+import { mulberry32, deterministicBotId } from '../util/random';
 import { computeSpawns } from '../util/placement';
 import { BotStats, STAT_KEYS } from './botStats';
 
@@ -869,8 +869,18 @@ export default class Environment {
     // own random placement/angles as it builds, but those are all overwritten
     // below, and nothing downstream reads the PRNG again this restart, so their
     // (async-ordered) draws no longer affect any kept value.
-    const starts = this.processes.map(() =>
-      Array.from({ length: this.botCount }, () => ({
+    // The bot id is seed-derived rather than drawn from the shared PRNG stream:
+    // it folds in the stable arena id so two arenas that share a pinned seed
+    // still get distinct ids, and it does NOT consume the stream, so the
+    // turret/radar/mathSeed draws below stay at the same stream positions. Bot
+    // ids are ephemeral in-match handles (never persisted — the app id is the
+    // DB key), so per-arena uniqueness is all they need. randomUUID() left this
+    // last sandbox-observable value (bot.getId(), a scanned contact's id) varying
+    // every restart even under a pinned seed.
+    const arenaId = this.arena.getId();
+    const starts = this.processes.map((_process, teamIndex) =>
+      Array.from({ length: this.botCount }, (_unused, slot) => ({
+        id: deterministicBotId(arenaId, this.seed, teamIndex, slot),
         turret: this.random() * 360,
         radar: this.random() * 360,
         mathSeed: Math.floor(this.random() * 0x100000000),
@@ -919,10 +929,15 @@ export default class Environment {
               }
 
               // Overwrite the constructor's async-ordered turret/radar angles
-              // with the values drawn synchronously above, so a pinned seed sets
-              // the same opening aim/sweep on every restart.
+              // and its randomUUID id with the seed-derived values computed
+              // synchronously above, so a pinned seed sets the same opening
+              // aim/sweep AND the same observable ids on every restart. Assigning
+              // id here (before init/execute and the placeBot emit below) is safe:
+              // the constructor's random id was only used for its own placement
+              // self-exclusion, which is thrown away with the random placement.
               const start = starts[teamIndex]?.[slot];
               if (start) {
+                bot.id = start.id;
                 bot.turret.orientation = start.turret;
                 bot.turret.orientationTarget = start.turret;
                 bot.turret.radar.orientation = start.radar;
