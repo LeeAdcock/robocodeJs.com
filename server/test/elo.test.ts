@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_RATING,
   PLACEMENT_GAMES,
+  RATING_FLOOR,
   kFactor,
   expectedScore,
   updateRatings,
@@ -70,6 +71,17 @@ describe('updateRatings', () => {
     const veteran = { rating: 1500, games: 100 };
     const res = updateRatings(rookie, veteran, 'a');
     expect(Math.abs(res.a.delta)).toBeGreaterThan(Math.abs(res.b.delta));
+  });
+
+  it('never lets a rating go below the floor, keeping the delta invariant', () => {
+    // Two evenly-matched low-rated bots: the loser's raw new rating would be
+    // 10 - 40*0.5 = -10. The floor clamps it to 0, and `before + delta === after`
+    // must still hold against the clamped value.
+    const loser = { rating: 10, games: 0 };
+    const winner = { rating: 10, games: 50 };
+    const res = updateRatings(loser, winner, 'b');
+    expect(res.a.rating).toBe(RATING_FLOOR);
+    expect(loser.rating + res.a.delta).toBe(res.a.rating);
   });
 
   it('a draw between equals leaves both ratings unchanged', () => {
