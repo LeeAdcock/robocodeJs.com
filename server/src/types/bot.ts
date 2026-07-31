@@ -51,10 +51,24 @@ export const commandBudgetRejected = (): Promise<never> =>
 
 // A tank's collision radius (half its width): bots contact a wall when their
 // center comes within one radius of it, and another bot within two (each body
-// contributes a radius). A bullet is a point, so it connects within ONE radius
-// — see the swept test in simulation.ts.
+// contributes a radius). This is the *physical* body used by every collision,
+// wall clamp, placement, and radar test.
 // Mirrored into the sandbox as the bot.RADIUS attribute (compiler.ts).
 export const BOT_RADIUS = 16;
+
+// The radius a bullet must reach to score a hit. The body is *drawn* as a
+// 2*BOT_RADIUS square (a 32x32 sprite), so an r=BOT_RADIUS circle inscribed in
+// it leaves the four corners uncovered — the sprite's corners reach out to
+// BOT_RADIUS*sqrt(2) (~22.6), and a shot grazing that band looks like a hit but
+// misses. We forgive that gap with the *equal-area* circle: the circle whose
+// area equals the drawn square (side 2*BOT_RADIUS), radius = side/sqrt(pi) =
+// (2*BOT_RADIUS)/sqrt(pi) ~= 18.05. That covers the near-corner band a player
+// sees as a hit while only reaching a couple of units past the flat sides, and
+// stays a plain radius so bullet hits keep the cheap squared-distance test and
+// the rotation-independent fairness every other circle-based interaction has.
+// Deliberately separate from BOT_RADIUS: this only widens the bullet *target*,
+// never the body that collides, clamps to walls, or is scanned.
+export const BULLET_HIT_RADIUS = (BOT_RADIUS * 2) / Math.sqrt(Math.PI);
 // Degrees the body turns per tick, units/tick² toward the speed target, and
 // the body's top speed. Mirrored into the sandbox as the
 // bot.TURN_RATE/ACCELERATION/MAX_SPEED attributes (compiler.ts); BOT_TURN_SPEED

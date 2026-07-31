@@ -7,6 +7,7 @@ import type { Process } from '../types/environment';
 import type Bot from '../types/bot';
 import {
   BOT_RADIUS,
+  BULLET_HIT_RADIUS,
   BOT_MAX_SPEED,
   BOT_ACCELERATION,
   COLLISION_MIN_CLOSING_SPEED,
@@ -63,8 +64,8 @@ const damage = (bot: Bot, amount: number, source: Bot | null): number => {
 };
 
 // Squared distance from a point to the segment (ax, ay) -> (bx, by). Squared so
-// bullet hit detection can compare against BOT_RADIUS ** 2 and skip the sqrt on
-// the overwhelmingly common miss.
+// bullet hit detection can compare against BULLET_HIT_RADIUS ** 2 and skip the
+// sqrt on the overwhelmingly common miss.
 //
 // A zero-length segment (a bullet on the tick it was fired, which has not moved
 // yet) falls through to the distance from its start point, which is the muzzle
@@ -418,19 +419,23 @@ export default {
                 otherBot.bullets
                   .filter((bullet) => !bullet.exploded)
                   .forEach((bullet) => {
-                    // A bullet is a point, so it connects within ONE radius of
-                    // the target's center — two radii is the bot-vs-bot rule,
-                    // where both bodies contribute a radius, and applying it
-                    // here made a shot land a full body width wide of the hull.
+                    // A bullet is a point, so it connects within one
+                    // BULLET_HIT_RADIUS of the target's center — NOT two radii
+                    // (the bot-vs-bot rule, where both bodies contribute a
+                    // radius), which landed a shot a full body width wide of the
+                    // hull. BULLET_HIT_RADIUS (~18) is the equal-area circle of
+                    // the drawn 32x32 sprite: a touch wider than the physical
+                    // BOT_RADIUS (16) hull so the sprite corners a player sees as
+                    // a hit actually register, without reaching a full body width.
                     //
                     // Testing the whole segment the bullet swept this tick,
-                    // rather than only where it ended up, is what makes the
-                    // tighter radius safe. A bullet covers BULLET_SPEED (25)
-                    // per tick against a 16 radius, so a per-tick point sample
-                    // is inside the circle for a chord of 2 * sqrt(R^2 - d^2) —
-                    // under 25, and therefore skippable, for any shot passing
-                    // more than ~8 units off center. Sampling points would drop
-                    // most genuine hits; sampling the segment drops none.
+                    // rather than only where it ended up, is what keeps this
+                    // radius safe. A bullet covers BULLET_SPEED (25) per tick
+                    // against an ~18 radius, so a per-tick point sample is inside
+                    // the circle for a chord of 2 * sqrt(R^2 - d^2) — under 25,
+                    // and therefore skippable, for any shot passing more than ~9
+                    // units off center. Sampling points would drop most genuine
+                    // hits; sampling the segment drops none.
                     const distanceSquared = distanceToSegmentSquared(
                       bot.x,
                       bot.y,
@@ -440,7 +445,10 @@ export default {
                       bullet.y
                     );
 
-                    if (distanceSquared < BOT_RADIUS * BOT_RADIUS) {
+                    if (
+                      distanceSquared <
+                      BULLET_HIT_RADIUS * BULLET_HIT_RADIUS
+                    ) {
                       // We have a hit
                       if (bot.handlers[Event.HIT]) {
                         // Bearing from where the shot was fired, resolved only

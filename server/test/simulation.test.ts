@@ -591,9 +591,11 @@ describe('Simulation.run — bullets', () => {
     expect(shooter.stats.damageDealt).toBe(10);
   });
 
-  // A bullet is a point, so it connects within ONE radius of the target's
-  // center. The old rule used two (the bot-vs-bot sum), which landed hits a
-  // full body width clear of the hull. These two pin both sides of the edge.
+  // A bullet is a point, so it connects within one BULLET_HIT_RADIUS (~18, the
+  // equal-area circle of the drawn 32x32 sprite) of the target's center — a
+  // touch past the physical 16 hull so the sprite corners a player sees as a hit
+  // register. The old rule used two radii (the bot-vs-bot sum), which landed
+  // hits a full body width clear of the hull. These pin both sides of the edge.
   const shootAt = (bulletX: number, bulletY: number, prevY = bulletY) => {
     const target = makeBot({ id: 'a', x: 375, y: 375 });
     const bullet = {
@@ -619,9 +621,19 @@ describe('Simulation.run — bullets', () => {
     expect(target.health).toBe(75);
   });
 
+  it('hits a shot grazing the sprite corner, just past the physical hull', () => {
+    // 17 units off center: outside the 16 physical hull but inside the ~18.05
+    // BULLET_HIT_RADIUS. This is exactly the sprite-corner band that used to
+    // read as a hit yet register as a miss — it now scores.
+    const { target, bullet } = shootAt(375 + 17, 375);
+    expect(bullet.exploded).toBe(true);
+    expect(target.health).toBe(75);
+    expect(target.stats.timesHit).toBe(1);
+  });
+
   it('misses a bot the bullet passes more than one radius from', () => {
-    // 20 units off center: clear of the hull, but inside the old two-radii
-    // rule, which would have scored this as a hit.
+    // 20 units off center: clear of even the widened ~18.05 BULLET_HIT_RADIUS,
+    // and well inside the old two-radii rule, which would have scored a hit.
     const { target, bullet } = shootAt(375 + 20, 375);
     expect(bullet.exploded).toBe(false);
     expect(target.health).toBe(100);
