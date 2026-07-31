@@ -10,7 +10,7 @@ import Simulation, { applyEliminations } from '../util/simulation';
 import appService from '../services/AppService';
 import { ErrorCodes } from './ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
-import { mulberry32 } from '../util/random';
+import { mulberry32, deterministicBotId } from '../util/random';
 import { computeSpawns } from '../util/placement';
 import { BotStats, STAT_KEYS } from './botStats';
 
@@ -855,6 +855,38 @@ export default class Environment {
       this.random
     );
 
+    // Draw each bot's remaining seed-derived start state — turret and radar
+    // starting angles, and the seed for its in-isolate Math.random — HERE,
+    // synchronously, in a fixed (team, slot) order, BEFORE the async app fetches
+    // below. Those fetches (appService.get) are real DB queries whose .then()
+    // callbacks settle in completion order, not process order — so drawing these
+    // there (the Bot/BotTurret/BotRadar constructors and compiler.init) handed
+    // turret aim, radar sweep, and Math.random to whichever team's app row loaded
+    // first, and a pinned seed only reproduced the match when that race fell the
+    // same way. Pulling every seed-derived value out of the async region — as
+    // computeSpawns already does for position and body heading — is what makes a
+    // pinned seed reproduce the whole match. The Bot constructor still draws its
+    // own random placement/angles as it builds, but those are all overwritten
+    // below, and nothing downstream reads the PRNG again this restart, so their
+    // (async-ordered) draws no longer affect any kept value.
+    // The bot id is seed-derived rather than drawn from the shared PRNG stream:
+    // it folds in the stable arena id so two arenas that share a pinned seed
+    // still get distinct ids, and it does NOT consume the stream, so the
+    // turret/radar/mathSeed draws below stay at the same stream positions. Bot
+    // ids are ephemeral in-match handles (never persisted — the app id is the
+    // DB key), so per-arena uniqueness is all they need. randomUUID() left this
+    // last sandbox-observable value (bot.getId(), a scanned contact's id) varying
+    // every restart even under a pinned seed.
+    const arenaId = this.arena.getId();
+    const starts = this.processes.map((_process, teamIndex) =>
+      Array.from({ length: this.botCount }, (_unused, slot) => ({
+        id: deterministicBotId(arenaId, this.seed, teamIndex, slot),
+        turret: this.random() * 360,
+        radar: this.random() * 360,
+        mathSeed: Math.floor(this.random() * 0x100000000),
+      }))
+    );
+
     // Restart each process
     return Promise.all(
       this.processes.map((process, teamIndex) => {
@@ -896,8 +928,26 @@ export default class Environment {
                 bot.orientationTarget = spawn.orientation;
               }
 
+              // Overwrite the constructor's async-ordered turret/radar angles
+              // and its randomUUID id with the seed-derived values computed
+              // synchronously above, so a pinned seed sets the same opening
+              // aim/sweep AND the same observable ids on every restart. Assigning
+              // id here (before init/execute and the placeBot emit below) is safe:
+              // the constructor's random id was only used for its own placement
+              // self-exclusion, which is thrown away with the random placement.
+              const start = starts[teamIndex]?.[slot];
+              if (start) {
+                bot.id = start.id;
+                bot.turret.orientation = start.turret;
+                bot.turret.orientationTarget = start.turret;
+                bot.turret.radar.orientation = start.radar;
+                bot.turret.radar.orientationTarget = start.radar;
+              }
+
               process.bots.push(bot);
-              compiler.init(this, process, bot);
+              // Hand init this bot's precomputed Math.random seed (undefined
+              // falls back to a fresh draw, for the non-restart spawn paths).
+              compiler.init(this, process, bot, start?.mathSeed);
               return bot.execute(process).then(() => {
                 // Emit new bot event
                 this.emitter.emit('event', {
