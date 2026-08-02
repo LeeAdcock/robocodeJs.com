@@ -14,6 +14,7 @@ import BlogIndexPage from './page/blogIndexPage';
 import NotFoundPage from './page/notFoundPage';
 import BlogPostPage from './page/blogPostPage';
 import User from './types/user';
+import { establishSession, nextSessionProbeState } from './util/session';
 import ArenaToolbar from './components/arena/arenaToolbar';
 import Alert from 'react-bootstrap/Alert';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -44,6 +45,31 @@ const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
+
+// How often to silently re-mint the Google id token behind the HttpOnly session
+// cookie. The token's own TTL is ~1h, so refresh comfortably inside that window
+// — keeping a signed-in user signed in (and their leaderboard rows bold) instead
+// of the cookie quietly lapsing after an hour.
+const SESSION_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+
+// Set right before we ask Google Identity for a silent token refresh, so the one
+// shared sign-in callback can tell a background refresh (fail quietly) from an
+// interactive sign-in (surface the error). Module-scoped because there is a
+// single App instance and GIS's callback is registered once.
+let silentRefreshInFlight = false;
+
+// Ask Google Identity to silently re-issue an id token (needs auto_select). The
+// initialize() callback receives the fresh credential and re-establishes the
+// session cookie via establishSession. Best-effort: a no-op when GIS is absent
+// (local dev / offline), and GIS itself may decline to re-issue (multiple Google
+// accounts, signed out of Google, One-Tap cooldown) — in which case the session
+// simply lapses as it did before, no worse than the prior behaviour.
+const requestSessionRefresh = (): void => {
+  if (typeof google !== 'undefined' && google.accounts?.id) {
+    silentRefreshInFlight = true;
+    google.accounts.id.prompt();
+  }
+};
 
 interface NavProps {
   user: User;
@@ -101,6 +127,10 @@ function NavBridge({
 
 function App() {
   const [user, setUser] = useState(null as unknown as User);
+  // Consecutive failures of the periodic session probe (GET /api/user). Held in a
+  // ref (not state) because it only gates a side effect and must not re-render.
+  // A single failure never signs the user out — see nextSessionProbeState.
+  const consecutiveAuthFailures = useRef(0);
   // Transient confirmation shown under the arena toolbar after the Share button
   // copies the public watch link.
   const [shareNotice, setShareNotice] = useState('');
@@ -252,26 +282,47 @@ function App() {
   // viewport widens back (e.g. rotation) — only its render is gated.
   const isMobile = useIsMobile();
 
-  // Reset the experience if the user session expires
+  // Reactive session watchdog: every 30s probe GET /api/user. On success, reset
+  // the failure count. On failure, attempt a silent token refresh and only sign
+  // the user out after repeated failures (nextSessionProbeState) — so a transient
+  // blip, a server 500 that leaves the cookie intact, or the brief window during
+  // a refresh never flashes a sign-out. Together with the proactive refresh
+  // below, a signed-in user stays signed in as long as GIS can re-issue.
   useEffect(() => {
     const interval = setInterval(() => {
       axios
         .get(`/api/user`)
-        .catch(() => {
-          setUser(null as unknown as User);
-          /*setArena({
-                        clock: { time: 0 },
-                        apps: [] as App[],
-                    } as Arena)
-                    setPaused(true)*/
+        .then(() => {
+          consecutiveAuthFailures.current = 0;
         })
         .catch(() => {
-          // Google Identity may be absent in local dev (no GSI script / offline).
-          if (typeof google !== 'undefined') google.accounts.id.prompt();
+          const { failures, clear } = nextSessionProbeState(
+            consecutiveAuthFailures.current,
+            false
+          );
+          consecutiveAuthFailures.current = failures;
+          // Try to recover the session silently before giving up.
+          requestSessionRefresh();
+          if (clear) {
+            consecutiveAuthFailures.current = 0;
+            setUser(null as unknown as User);
+          }
         });
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Proactive refresh: while signed in, re-mint the id token well inside its ~1h
+  // TTL so the cookie never lapses in the first place (the probe above is the
+  // backstop). Gated on `user` so it never runs logged-out and stops on sign-out.
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(
+      () => requestSessionRefresh(),
+      SESSION_REFRESH_INTERVAL_MS
+    );
+    return () => clearInterval(interval);
+  }, [user]);
 
   useEffect(() => {
     // Google Identity Services may be unavailable in local dev (the GSI script is
@@ -281,24 +332,31 @@ function App() {
       google.accounts.id.initialize({
         client_id:
           '926984742216-a5uuqefrrrvnn5pa87e357kld6rv2bsc.apps.googleusercontent.com',
+        // Let a returning, already-consented, single-account user get a fresh
+        // credential without a click — this is what lets requestSessionRefresh
+        // re-mint the token silently (and auto-signs a returning user back in).
+        auto_select: true,
         callback: (response: { credential: string }) => {
-          // The server verifies the credential and sets an HttpOnly
-          // session cookie (so it isn't readable by client-side JS).
-          axios
-            .post(`/api/session`, {
-              credential: response.credential,
+          // One callback serves BOTH an interactive sign-in (button / One Tap)
+          // and a background token refresh (requestSessionRefresh set the flag
+          // first). Both establish the session identically via establishSession;
+          // only the interactive path surfaces an error. The server verifies the
+          // credential and sets an HttpOnly session cookie (not readable by JS).
+          const interactive = !silentRefreshInFlight;
+          silentRefreshInFlight = false;
+          establishSession(response.credential)
+            .then((loadedUser) => {
+              setUser(loadedUser);
+              consecutiveAuthFailures.current = 0;
+              google.accounts.id.cancel();
             })
-            .then(() => axios.get(`/api/user`))
-            .then((res) =>
-              axios
-                .get(`/api/user/${res.data.id}`)
-                .then((res) => setUser(res.data))
-                .then(() => google.accounts.id.cancel())
-            )
             .catch((err) => {
-              // Don't fail silently — a rejected /api/session (e.g. the server
-              // couldn't verify the Google token) used to just close the popup
-              // and do nothing. Surface it so it's diagnosable.
+              // A background refresh must never pop UI — stay quiet and let the
+              // reactive probe handle an eventual real sign-out.
+              if (!interactive) return;
+              // Don't fail silently on an interactive sign-in — a rejected
+              // /api/session (e.g. the server couldn't verify the Google token)
+              // used to just close the popup and do nothing. Surface it.
               const status = err?.response?.status;
               console.error(
                 `Sign-in failed${status ? ` (HTTP ${status})` : ''}.` +
