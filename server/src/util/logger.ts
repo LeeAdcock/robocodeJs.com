@@ -48,6 +48,7 @@ export const LogEvent = {
   LADDER_MATCH: 'ladder.match', // a global-ladder ranked match completed (GitHub #151)
   ACHIEVEMENT_UNLOCKED: 'achievement.unlocked', // a user earned one or more badges (GitHub #121)
   HELP_UNANSWERED: 'help.unanswered', // a navbar search matched nothing (docs/routing gap)
+  ASSET_MISSING: 'asset.missing', // a subresource 404'd — usually a browser on a previous deploy asking for a stale hashed chunk
 } as const;
 
 // Log a bot fault uniformly. `kind` says where it happened (compile/run/handler/

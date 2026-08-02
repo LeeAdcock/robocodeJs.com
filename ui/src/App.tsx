@@ -24,6 +24,7 @@ import {
   clearSignedOut,
 } from './util/session';
 import ArenaToolbar from './components/arena/arenaToolbar';
+import ChunkErrorBoundary from './components/chunkErrorBoundary';
 import Alert from 'react-bootstrap/Alert';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
@@ -491,128 +492,142 @@ function App() {
               margin: '10px',
             }}
           >
-            <Suspense fallback={null}>
-              <Routes>
-                <Route path="/" element={<MarkdownPage path="index" />} />
-                <Route
-                  path="/privacy"
-                  element={<MarkdownPage path="privacy" />}
-                />
-                <Route
-                  path="/examples"
-                  element={<MarkdownPage path="examples" />}
-                />
-                {/* Read-only, in-app viewer for an example bot with a
+            {/* Catches a lazy route whose chunk no longer exists (the site was
+                redeployed while this tab was open) and reloads once into the
+                current build, instead of letting React unmount to a blank page. */}
+            <ChunkErrorBoundary>
+              <Suspense fallback={null}>
+                <Routes>
+                  <Route path="/" element={<MarkdownPage path="index" />} />
+                  <Route
+                    path="/privacy"
+                    element={<MarkdownPage path="privacy" />}
+                  />
+                  <Route
+                    path="/examples"
+                    element={<MarkdownPage path="examples" />}
+                  />
+                  {/* Read-only, in-app viewer for an example bot with a
                     clone-into-your-arena action. Linked from examples.md. */}
-                <Route
-                  path="/samples/:name"
-                  element={
-                    <SamplePage
-                      user={user}
-                      onCloned={() =>
-                        user &&
-                        axios
-                          .get(`/api/user/${user.id}`)
-                          .then((res) => setUser(res.data))
-                      }
-                    />
-                  }
-                />
-                <Route
-                  path="/learn/docs"
-                  element={<MarkdownPage path="dev" />}
-                />
-                {/* Old docs URL — redirect to the new one, preserving any
+                  <Route
+                    path="/samples/:name"
+                    element={
+                      <SamplePage
+                        user={user}
+                        onCloned={() =>
+                          user &&
+                          axios
+                            .get(`/api/user/${user.id}`)
+                            .then((res) => setUser(res.data))
+                        }
+                      />
+                    }
+                  />
+                  <Route
+                    path="/learn/docs"
+                    element={<MarkdownPage path="dev" />}
+                  />
+                  {/* Old docs URL — redirect to the new one, preserving any
                     #section hash so existing deep links keep working. */}
-                <Route
-                  path="/dev"
-                  element={
-                    <Navigate
-                      to={{
-                        pathname: '/learn/docs',
-                        hash: window.location.hash,
-                      }}
-                      replace
-                    />
-                  }
-                />
-                <Route path="/rules" element={<MarkdownPage path="rules" />} />
-                <Route path="/faq" element={<MarkdownPage path="faq" />} />
-                <Route
-                  path="/error-codes"
-                  element={<MarkdownPage path="error-codes" />}
-                />
-                <Route
-                  path="/classic"
-                  element={<MarkdownPage path="classic-robocode" />}
-                />
-                <Route path="/learn" element={<MarkdownPage path="learn" />} />
-                <Route path="/learn/:slug" element={<LessonPage />} />
-                {/* Global bot ladder — public, linked from the main nav. The
+                  <Route
+                    path="/dev"
+                    element={
+                      <Navigate
+                        to={{
+                          pathname: '/learn/docs',
+                          hash: window.location.hash,
+                        }}
+                        replace
+                      />
+                    }
+                  />
+                  <Route
+                    path="/rules"
+                    element={<MarkdownPage path="rules" />}
+                  />
+                  <Route path="/faq" element={<MarkdownPage path="faq" />} />
+                  <Route
+                    path="/error-codes"
+                    element={<MarkdownPage path="error-codes" />}
+                  />
+                  <Route
+                    path="/classic"
+                    element={<MarkdownPage path="classic-robocode" />}
+                  />
+                  <Route
+                    path="/learn"
+                    element={<MarkdownPage path="learn" />}
+                  />
+                  <Route path="/learn/:slug" element={<LessonPage />} />
+                  {/* Global bot ladder — public, linked from the main nav. The
                     signed-in user's own bots are bolded; the server marks them
                     by including the real appId only on the viewer's own rows. */}
-                <Route path="/leaderboard" element={<LeaderboardPage />} />
-                {/* Own badges (GitHub #121) — private, so the page gates itself
+                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  {/* Own badges (GitHub #121) — private, so the page gates itself
                     on the API's 401 rather than on the app's user state. */}
-                <Route path="/profile" element={<ProfilePage />} />
-                {/* Explainer for the global rankings/ladder. Distinct from
+                  <Route path="/profile" element={<ProfilePage />} />
+                  {/* Explainer for the global rankings/ladder. Distinct from
                     /leaderboard (the live board) so it doesn't collide. */}
-                <Route
-                  path="/rankings"
-                  element={<MarkdownPage path="rankings" />}
-                />
-                {/* Dev blog — a manifest-driven index (posts appear once their
+                  <Route
+                    path="/rankings"
+                    element={<MarkdownPage path="rankings" />}
+                  />
+                  {/* Dev blog — a manifest-driven index (posts appear once their
                     date arrives) + per-post markdown pages, mirroring /learn.
                     Posts are markdown at public/docs/blog/<slug>.md. */}
-                <Route path="/blog" element={<BlogIndexPage />} />
-                <Route path="/blog/:slug" element={<BlogPostPage />} />
-                <Route path="/about" element={<MarkdownPage path="about" />} />
-                {/* MCP setup guide, linked from the homepage getting-started list. */}
-                <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
-                {/* OAuth approval landing for MCP clients (see api/oauth.ts). */}
-                <Route
-                  path="/mcp/authorize"
-                  element={<McpAuthorizePage user={user} />}
-                />
+                  <Route path="/blog" element={<BlogIndexPage />} />
+                  <Route path="/blog/:slug" element={<BlogPostPage />} />
+                  <Route
+                    path="/about"
+                    element={<MarkdownPage path="about" />}
+                  />
+                  {/* MCP setup guide, linked from the homepage getting-started list. */}
+                  <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
+                  {/* OAuth approval landing for MCP clients (see api/oauth.ts). */}
+                  <Route
+                    path="/mcp/authorize"
+                    element={<McpAuthorizePage user={user} />}
+                  />
 
-                <Route
-                  path="user/:userId/app/:appId"
-                  element={
-                    <AppPage
-                      arena={arena}
-                      doDelete={() => {
-                        axios
-                          .get(`/api/user/${user.id}`)
-                          .then((res) => setUser(res.data));
-                      }}
-                      emitter={emitter}
-                    />
-                  }
-                />
-                <Route
-                  path="user/:userId/arena/logs"
-                  element={<ArenaLogPage />}
-                />
-                <Route
-                  path="/add-app/:appId"
-                  element={
-                    <AddAppPage
-                      user={user}
-                      onAdded={() =>
-                        user &&
-                        axios
-                          .get(`/api/user/${user.id}`)
-                          .then((res) => setUser(res.data))
-                      }
-                    />
-                  }
-                />
-                {/* Catch-all: any unmatched URL gets a friendly 404 instead of
+                  <Route
+                    path="user/:userId/app/:appId"
+                    element={
+                      <AppPage
+                        arena={arena}
+                        doDelete={() => {
+                          axios
+                            .get(`/api/user/${user.id}`)
+                            .then((res) => setUser(res.data));
+                        }}
+                        emitter={emitter}
+                      />
+                    }
+                  />
+                  <Route
+                    path="user/:userId/arena/logs"
+                    element={<ArenaLogPage />}
+                  />
+                  <Route
+                    path="/add-app/:appId"
+                    element={
+                      <AddAppPage
+                        user={user}
+                        onAdded={() =>
+                          user &&
+                          axios
+                            .get(`/api/user/${user.id}`)
+                            .then((res) => setUser(res.data))
+                        }
+                      />
+                    }
+                  />
+                  {/* Catch-all: any unmatched URL gets a friendly 404 instead of
                     an empty content area. The server marks unknown routes
                     noindex (util/seo.ts). Keep this LAST. */}
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </Suspense>
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
+            </ChunkErrorBoundary>
           </div>
         </Router>
       </div>

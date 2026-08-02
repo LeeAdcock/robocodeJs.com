@@ -13,6 +13,12 @@ import {
 } from './util/seo';
 import { buildSitemap } from './util/sitemap';
 import { PUBLIC_ORIGIN } from './util/publicOrigin';
+import {
+  isSubresourceRequest,
+  isHashedAsset,
+  IMMUTABLE_CACHE_CONTROL,
+  SHELL_CACHE_CONTROL,
+} from './util/staticAssets';
 
 import auth from './middleware/auth';
 import securityHeaders from './middleware/securityHeaders';
@@ -108,6 +114,13 @@ app.use(
       // Pre-set the type; send() won't override it.
       if (filePath.endsWith('.d.ts')) {
         res.setHeader('Content-Type', 'text/typescript; charset=utf-8');
+      }
+      // Content-hashed build output can be cached forever — the name changes
+      // whenever the bytes do. Everything else here (docs, samples, images) is
+      // served under a stable name and keeps the default revalidate-always
+      // behaviour.
+      if (isHashedAsset(filePath)) {
+        res.setHeader('Cache-Control', IMMUTABLE_CACHE_CONTROL);
       }
     },
   })
@@ -210,6 +223,22 @@ const shellHtml = (() => {
 // (path-to-regexp v8) no longer accepts a bare '*' route, so use a path-less
 // middleware, which matches every method and path including the root.
 app.use(function (req, res) {
+  // Nothing static matched. If this was a subresource rather than a navigation
+  // it must 404 — handing back the HTML shell would make the browser parse
+  // index.html as JavaScript and blank the page. The common case is a browser
+  // still running a previous deploy's HTML asking for a chunk whose hash no
+  // longer exists; logged so a spike is visible (clients stuck on an old build).
+  if (isSubresourceRequest(req.path)) {
+    logger.info(
+      { event: LogEvent.ASSET_MISSING, path: req.path },
+      'missing static asset'
+    );
+    res.status(404).type('txt').send('Not found');
+    return;
+  }
+  // The shell carries the current asset hashes under a filename that never
+  // changes, so it must be revalidated rather than reused from cache.
+  res.setHeader('Cache-Control', SHELL_CACHE_CONTROL);
   // Only GET navigations get the SEO treatment; other methods just get the
   // shell (or fall through to sendFile if the shell couldn't be read).
   if (req.method !== 'GET' || !shellHtml || !SEO_REGION.test(shellHtml)) {
