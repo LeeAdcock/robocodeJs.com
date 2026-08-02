@@ -80,7 +80,7 @@ Sometimes you lose anyway. The **DEATH** event fires **once**, the instant your 
 
 A few things to know about DEATH:
 
-- You're already destroyed, so **moving, turning, and firing do nothing** from here — `bot.turret.isReady()` and `bot.radar.isReady()` both report `false`, and `fire()`/`scan()` just refuse. Keep the handler to `console.log`.
+- You're already destroyed, so **moving, turning, firing, scanning, and even `bot.send` do nothing** from here — `bot.turret.isReady()` and `bot.radar.isReady()` report `false`, and `fire()`/`scan()`/`send()` just refuse. Keep the handler to `console.log`. (Read-only calls like `bot.getX()` still work, so you can note where you fell.)
 - It fires for a normal death — shot down, rammed to bits, or worn away by sudden death — but **not** when your own code crashes (a crash is reported separately as a fault).
 - Read your last words in the console under the editor, or in the fuller **Arena → View Logs** panel.
 

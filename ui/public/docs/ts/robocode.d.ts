@@ -150,7 +150,7 @@ interface Bot {
   turret: Turret;
   /** Fires when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does NOT re-fire it. Set up state here on `this`. */
   on(event: 'START', handler: () => void | Promise<unknown>): void;
-  /** Fires once when your bot is eliminated (destroyed, or ground down by sudden-death decay) — its last chance to run code. Use it to log final diagnostics (accumulated stats, last known enemy positions, why it lost) to the console so they're captured for debugging after the bot stops. Movement and fire commands have no effect here — the bot is already dead. A bot killed by its own crash does NOT get a DEATH event (its sandbox has already faulted). */
+  /** Fires once when your bot is eliminated (destroyed, or ground down by sudden-death decay) — its last chance to run code. Use it to log final diagnostics (accumulated stats, last known enemy positions, why it lost) to the console so they're captured for debugging after the bot stops. Action commands all fail here — the bot is already dead — so movement, turret/radar turns, fire(), scan(), and bot.send() reject and isReady() reads false; read-only calls (getX, getHealth, clock.getTime, arena.createMarker) still work. A bot killed by its own crash does NOT get a DEATH event (its sandbox has already faulted). */
   on(event: 'DEATH', handler: () => void | Promise<unknown>): void;
   /** Fires after your radar scans. The handler receives the array of Contacts the scan detected, the same objects bot.radar.scan() resolves with. */
   on(event: 'SCANNED', handler: (event: Contact[]) => void | Promise<unknown>): void;

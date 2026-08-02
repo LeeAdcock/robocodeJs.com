@@ -230,6 +230,27 @@ describe('Bot', () => {
     expect(received).toHaveBeenCalledWith(msg, { distance: 50 });
   });
 
+  it('send() is refused once the bot is dead (no broadcast, no delivery)', () => {
+    // A dead bot can't communicate — its DEATH ("last words") handler may log but
+    // must not message the living. send() returns false and delivers nothing.
+    const { bot, env } = makeRealBot();
+    const received = vi.fn();
+    const other = {
+      id: 'other',
+      health: 100,
+      x: 100,
+      y: 200,
+      stats: { messagesReceived: 0 },
+      handlers: { [Event.RECEIVED]: received },
+    };
+    env.getProcesses = () => [{ bots: [bot, other] }];
+    bot.health = 0;
+
+    expect(bot.send(7)).toBe(false);
+    expect(received).not.toHaveBeenCalled();
+    expect(bot.stats.messagesSent).toBe(0);
+  });
+
   it('send() enforces a per-tick budget and resets it when the clock advances', () => {
     const { bot, env, setTime } = makeRealBot();
     const received = vi.fn();

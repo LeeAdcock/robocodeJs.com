@@ -67,7 +67,7 @@ export const EVENTS: ApiEvent[] = [
     name: 'DEATH',
     payload: 'void',
     channel: 'bot',
-    doc: "Fires once when your bot is eliminated (destroyed, or ground down by sudden-death decay) — its last chance to run code. Use it to log final diagnostics (accumulated stats, last known enemy positions, why it lost) to the console so they're captured for debugging after the bot stops. Movement and fire commands have no effect here — the bot is already dead. A bot killed by its own crash does NOT get a DEATH event (its sandbox has already faulted).",
+    doc: "Fires once when your bot is eliminated (destroyed, or ground down by sudden-death decay) — its last chance to run code. Use it to log final diagnostics (accumulated stats, last known enemy positions, why it lost) to the console so they're captured for debugging after the bot stops. Action commands all fail here — the bot is already dead — so movement, turret/radar turns, fire(), scan(), and bot.send() reject and isReady() reads false; read-only calls (getX, getHealth, clock.getTime, arena.createMarker) still work. A bot killed by its own crash does NOT get a DEATH event (its sandbox has already faulted).",
   },
   {
     name: 'TICK',

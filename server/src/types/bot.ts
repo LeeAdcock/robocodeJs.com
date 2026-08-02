@@ -316,10 +316,12 @@ export default class Bot implements Point, Orientated {
       // { parked, done } without running any bot code synchronously — the isolate
       // apply is async, so a bot cannot mutate state during this tick's physics.
       let dispatch:
-        { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
+        | { parked: Promise<unknown>; done: Promise<unknown> }
+        | undefined;
       try {
         dispatch = handler(...args) as
-          { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
+          | { parked: Promise<unknown>; done: Promise<unknown> }
+          | undefined;
       } catch (e) {
         this.logger.error(`${ErrorCodes.E003}: ${e}`);
         return;
@@ -600,6 +602,14 @@ export default class Bot implements Point, Orientated {
   // into a resolved/rejected Promise (compiler.ts), so an author can await the
   // send and learn that it did not go out instead of silently losing it.
   send(message: JsonValue): boolean {
+    // A dead bot is gone — it can't broadcast. Gate this BEFORE the budget so a
+    // dead send is rejected for being dead (not "over budget") and consumes no
+    // budget; the compiler wrapper reads the same health to pick the rejection
+    // message. This is the send counterpart of the turret/radar/movement
+    // commands, which already reject once health <= 0 — so a DEATH ("last words")
+    // handler can log, but can't message the living or otherwise act.
+    if (this.health <= 0) return false;
+
     // Enforce the per-tick send budget before doing any O(bots) fan-out work.
     // The window is the current sim tick; when it advances, reset the counter.
     const now = this.env.getTime();
