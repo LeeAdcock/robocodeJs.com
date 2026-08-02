@@ -487,10 +487,45 @@ describe('mcp tools', () => {
     })) as never;
 
     expect(arenaService.get).toHaveBeenCalledWith('ar1');
-    expect(JSON.parse(textOf(res))).toEqual({
-      watchUrl: 'https://robocodejs.com/watch/ar1',
+    const out = JSON.parse(textOf(res));
+    expect(out.watchUrl).toBe('https://robocodejs.com/watch/ar1');
+    expect(out.match).toEqual({ decided: true, winner: { id: 'a1' } });
+    // A decided match points the caller at the log tools to debug the outcome.
+    expect(out.debugHint).toContain('recent_logs');
+  });
+
+  it('match_summary omits the debugHint while the match is still undecided', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: false, winner: null },
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'match_summary',
+      arguments: { arenaId: 'ar1' },
+    })) as never;
+
+    // Mid-match the hint would just be poll noise; it appears only once decided.
+    expect(JSON.parse(textOf(res)).debugHint).toBeUndefined();
+  });
+
+  it('match_summary marks the log tools owner-only when spectating another user’s arena', async () => {
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
       match: { decided: true, winner: { id: 'a1' } },
-    });
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'match_summary',
+      arguments: { arenaId: 'ar2' },
+    })) as never;
+
+    // recent_logs/recent_faults are owner-gated, so a spectator's hint says so.
+    expect(JSON.parse(textOf(res)).debugHint).toMatch(/owner-only/i);
   });
 
   it('match_status resolves the arena by id and returns the status', async () => {
@@ -726,6 +761,48 @@ describe('mcp tools', () => {
     expect(out.match.winner.id).toBe('a1');
     // The result carries a watchUrl so the agent can offer to show this combat.
     expect(out.watchUrl).toBe('https://robocodejs.com/watch/ar1');
+    // And a debugHint steering the client to the log tools after a match — the
+    // feedback was that clients read the outcome but never debug why a bot lost.
+    expect(out.debugHint).toContain('recent_faults');
+    expect(out.debugHint).toContain('recent_logs');
+    expect(out.debugHint).toContain('ar1');
+  });
+
+  it('run_match debugHint calls out a crash when a bot faulted', async () => {
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
+      {},
+      {},
+    ] as never);
+    const env = {
+      getProcesses: () => [{}, {}],
+      beginMatch: vi.fn(() => true),
+      endMatch: vi.fn(),
+      setSeed: vi.fn(),
+      getSpeed: () => 1,
+      setSpeed: vi.fn(),
+      restart: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
+      pause: vi.fn(),
+      isRunning: () => true,
+    };
+    vi.mocked(environmentService.get).mockResolvedValue(env as never);
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1', name: 'Winner' } },
+      leaderboard: [
+        { rank: 1, id: 'a1', crashedCount: 0 },
+        { rank: 2, id: 'a2', crashedCount: 3 },
+      ],
+    } as never);
+
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'run_match',
+      arguments: { arenaId: 'ar1' },
+    })) as never;
+
+    expect(JSON.parse(textOf(res)).debugHint).toMatch(/crashed this match/i);
   });
 
   it('run_match refuses cleanly when a match is already running in the arena', async () => {

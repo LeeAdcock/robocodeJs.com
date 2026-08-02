@@ -210,6 +210,30 @@ const logMatch = (
   );
 };
 
+// A one-line nudge, attached to the post-match tool results, pointing the client
+// at the two arena debug tools. Feedback: MCP clients read the outcome (winner /
+// leaderboard) but rarely follow up with the log tools, so they never learn WHY a
+// bot crashed or lost — the outcome views deliberately carry no per-bot console
+// output or crash detail. Stating it in the response (not just the tool docs) is
+// what actually gets it used. Leads with the crash callout when a bot faulted, so
+// the most actionable case is unmissable. `ownArena` is false for the read-only
+// spectate path (match_summary), where recent_logs/recent_faults are owner-only.
+const matchDebugHint = (
+  arenaId: string,
+  leaderboard: { crashedCount?: number }[] | undefined,
+  ownArena: boolean
+): string => {
+  const crashed = (leaderboard ?? []).some((e) => (e.crashedCount ?? 0) > 0);
+  const availability = ownArena ? '' : ' (owner-only, when the arena is yours)';
+  return (
+    (crashed ? 'A bot crashed this match. ' : '') +
+    'To debug this match — why a bot crashed, lost, or misbehaved — read ' +
+    `recent_faults (structured crash records: error code, kind, message, ` +
+    `failing line) and recent_logs (bot console output) for arenaId ` +
+    `"${arenaId}"${availability}; the match views omit per-bot logs.`
+  );
+};
+
 // Build a fresh MCP server bound to one authenticated user. All tools act on
 // that user's own resources only, so there is no cross-user addressing (and no
 // :userId argument): the bearer token already identifies the actor. Exported so
@@ -710,8 +734,11 @@ export const buildServer = (user: User): McpServer => {
         'total health), and elimination order. Complements arena_status (which is ' +
         'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
-        'decided when at most one app still has living bots. Read-only, so it ' +
-        'works for ANY arena id you have, not just your own.',
+        'decided when at most one app still has living bots. Once decided, the ' +
+        'result carries a `debugHint` pointing at recent_faults and recent_logs ' +
+        '(for your own arenas) — use them to learn WHY a bot crashed or lost, ' +
+        'which this outcome view does not explain. Read-only, so it works for ANY ' +
+        'arena id you have, not just your own.',
       inputSchema: {
         arenaId: z
           .string()
@@ -726,9 +753,24 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
+      const summary = await buildMatchSummary(env, members);
+      // Only nudge toward the log tools once the match is over (this is the "who
+      // won and how" moment); during polling it would just be noise. The arena
+      // may be someone else's (readableArena spectate), so phrase availability by
+      // actual ownership — recent_logs/recent_faults are owner-only.
+      const ownArena = arena.getUserId() === user.getId();
       return ok({
         watchUrl: watchUrl(arena.getId()),
-        ...(await buildMatchSummary(env, members)),
+        ...(summary.match.decided
+          ? {
+              debugHint: matchDebugHint(
+                arena.getId(),
+                summary.leaderboard,
+                ownArena
+              ),
+            }
+          : {}),
+        ...summary,
       });
     }
   );
@@ -1083,7 +1125,10 @@ export const buildServer = (user: User): McpServer => {
         'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
         'fast as possible until at most one app still has living bots ' +
         '(match.decided), then pauses and returns the match_summary. Needs at ' +
-        'least two apps in the arena.',
+        'least two apps in the arena. The result carries a `debugHint`: to ' +
+        'understand WHY a bot crashed, lost, or misbehaved, follow up with ' +
+        'recent_faults (structured crash records) and recent_logs (bot console ' +
+        'output) for this arena — the summary omits per-bot logs.',
       inputSchema: {
         arenaId: z.string().describe('The arena id'),
         seed: z
@@ -1134,6 +1179,9 @@ export const buildServer = (user: User): McpServer => {
       return ok({
         watchUrl: watchUrl(arena.getId()),
         timedOut: !summary.match.decided,
+        // run_match is owner-gated (ownedArena), so recent_logs/recent_faults are
+        // callable on this arena — hint without the ownership caveat.
+        debugHint: matchDebugHint(arena.getId(), summary.leaderboard, true),
         ...summary,
       });
     }
@@ -1600,9 +1648,14 @@ const registerPrompts = (server: McpServer): void => {
               `Run a RobocodeJs match in arena ${arenaId}.\n\n` +
               `Use list_apps and arena_status to see what's available; make sure ` +
               `at least two bots are in the arena (add_app_to_arena as needed). ` +
-              `restart_arena to begin, then poll arena_status to follow the ` +
-              `battle, and report the result (who survived / had the most health) ` +
-              `along with anything notable from recent_logs.`,
+              `restart_arena to begin, then poll arena_status (or match_status) ` +
+              `to follow the battle, and report the result (who survived / had ` +
+              `the most health). Once it's decided, ALWAYS debug the outcome: ` +
+              `read recent_faults (arenaId ${arenaId}) for any crashes ` +
+              `(structured code/kind/message/line) and recent_logs for console ` +
+              `output, and call out why a bot underperformed or crashed — the ` +
+              `match views don't include per-bot logs, so this is the only way ` +
+              `to explain the result.`,
           },
         },
       ],
