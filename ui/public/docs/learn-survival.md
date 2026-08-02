@@ -56,6 +56,12 @@ bot.on(Event.COLLIDED, () => {
   bot.turn(150).catch(() => {}); // shove off the wall we just hit
   bot.setSpeed(3);
 });
+
+bot.on(Event.DEATH, () => {
+  // Last words. This runs once, the moment you're destroyed — your final chance
+  // to say what happened. Great for leaving yourself a note to read afterwards.
+  console.log('destroyed — was I being watched?', this.spotted > 0);
+});
 ```
 
 Press **Reboot**. Rusty cruises and wanders, dashes and weaves when hurt, veers when shot, and picks up the pace when an enemy's radar finds it.
@@ -67,6 +73,16 @@ Two details there are worth more than the health threshold itself.
 **The wander and the COLLIDED handler are what keep Rusty alive.** A robot that only ever drives straight finds a wall, stops, and then keeps grinding into it — dozens of bumps, each costing health. It is entirely possible to lose a match to the arena without an enemy ever hitting you.
 
 The threshold is the line `if (bot.getHealth() < 40)`. Above `40` it plays normal; below it, it panics and runs.
+
+## When survival fails: last words
+
+Sometimes you lose anyway. The **DEATH** event fires **once**, the instant your robot is destroyed (or ground down to `0` by sudden death). It's your last chance to run code, and it's meant for one thing: **logging**. Print whatever you were tracking — your health, whether you'd been spotted, where the enemy last was — so you can read it back after the match and work out what went wrong.
+
+A few things to know about DEATH:
+
+- You're already destroyed, so **moving, turning, and firing do nothing** from here — `bot.turret.isReady()` and `bot.radar.isReady()` both report `false`, and `fire()`/`scan()` just refuse. Keep the handler to `console.log`.
+- It fires for a normal death — shot down, rammed to bits, or worn away by sudden death — but **not** when your own code crashes (a crash is reported separately as a fault).
+- Read your last words in the console under the editor, or in the fuller **Arena → View Logs** panel.
 
 ## Experiment
 
@@ -86,11 +102,14 @@ The threshold is the line `if (bot.getHealth() < 40)`. Above `40` it plays norma
 
 **Why `info.angle + 90`?** `info.angle` is the bearing back toward the shooter, relative to your heading. `bot.turn` turns you _by_ that amount, so `+ 90` turns you sideways to the shot, a quick dodge. `+ 180` would turn you straight away instead.
 
+**What's the point of DEATH if I'm already dead?** Debugging. You can't act, but you _can_ log — so DEATH is where you dump whatever you were tracking, and then read it back after the match to understand why you lost. Think of it as your robot's final report.
+
 ## You learned
 
 - `bot.getHealth()` returns `100` (full) down to `0` (destroyed).
 - A **threshold** (`if health < 40`) lets you change behavior when hurt.
 - The **HIT** event gives `info.angle`; the **DETECTED** event warns you've been spotted.
+- The **DEATH** event fires once when you're destroyed — use it to log your last words for debugging (you can't move or shoot, only log).
 
 ---
 
