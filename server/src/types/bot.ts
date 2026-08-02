@@ -316,12 +316,10 @@ export default class Bot implements Point, Orientated {
       // { parked, done } without running any bot code synchronously — the isolate
       // apply is async, so a bot cannot mutate state during this tick's physics.
       let dispatch:
-        | { parked: Promise<unknown>; done: Promise<unknown> }
-        | undefined;
+        { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
       try {
         dispatch = handler(...args) as
-          | { parked: Promise<unknown>; done: Promise<unknown> }
-          | undefined;
+          { parked: Promise<unknown>; done: Promise<unknown> } | undefined;
       } catch (e) {
         this.logger.error(`${ErrorCodes.E003}: ${e}`);
         return;
