@@ -14,6 +14,7 @@ import { buildArenaStatus } from '../src/util/arenaStatus';
 import { DEPLOY_TICKS } from '../src/types/environment';
 import { BOT_MAX_SPEED, BOT_ACCELERATION } from '../src/types/bot';
 import appService from '../src/services/AppService';
+import { sourceVersion } from '../src/util/sourceVersion';
 
 // A mock bullet exposing just the fields buildArenaStatus reads.
 const makeBullet = (
@@ -98,9 +99,9 @@ const makeEnv = (
     getTime: () => time,
   }) as never;
 
-const APPS: Record<string, { name: string; userId: string }> = {
-  a1: { name: 'Hunter', userId: 'u1' },
-  a2: { name: 'Wanderer', userId: 'u2' },
+const APPS: Record<string, { name: string; userId: string; source: string }> = {
+  a1: { name: 'Hunter', userId: 'u1', source: 'HUNTER_CODE' },
+  a2: { name: 'Wanderer', userId: 'u2', source: 'WANDERER_CODE' },
 };
 
 beforeEach(() => {
@@ -111,6 +112,7 @@ beforeEach(() => {
         getId: () => id,
         getName: () => APPS[id]?.name,
         getUserId: () => APPS[id]?.userId,
+        getSource: () => APPS[id]?.source ?? '',
       }) as never
   );
 });
@@ -152,6 +154,9 @@ describe('buildArenaStatus', () => {
     const app = status.apps[0];
     expect(app).toMatchObject({ id: 'a1', name: 'Hunter', userId: 'u1' });
     expect(app.addedTimestamp).toBe(5);
+    // The source fingerprint lets a client verify which source the running bots
+    // are on — the same value set_app_source / add_app_to_arena return.
+    expect(app.version).toBe(sourceVersion('HUNTER_CODE'));
 
     expect(app.bots[0]).toMatchObject({
       id: 't1',

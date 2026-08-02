@@ -34,10 +34,10 @@ Once connected, these tools are available (all scoped to your account, except th
 
 **Apps**
 
-- `list_apps`: list your apps
+- `list_apps`: list your apps (each with its current source `version`)
 - `get_app_source`: read an app's source
 - `create_app`: create an app (optionally with a name and initial source)
-- `set_app_source`: replace an app's source (live arenas pick it up)
+- `set_app_source`: replace an app's source (live arenas pick it up). Returns a `version` — a content fingerprint (truncated SHA-256) of the source you saved
 - `compile_app`: re-run an app's current saved source in your live arenas (does not change the source or re-fire `START`; use `set_app_source` / `reboot_app`)
 - `check_app_source`: dry-run compile source (pass `source`, or `appId` for a saved app) and report any syntax/load error with its code, without deploying it
 - `format_app_source`: pretty-print bot code in the house style (pass `source`, or `appId` for a saved app); returns the formatted text without saving it
@@ -50,7 +50,7 @@ Once connected, these tools are available (all scoped to your account, except th
 - `arena_status`: full snapshot (size, running state, clock, and every app's bots: position, orientation, health, bullets)
 - `match_summary`: outcome view with leaderboard, winner, per-bot accuracy/damage/ survival, and elimination order (most useful once a match is decided)
 - `match_status`: the cheap-to-poll companion. It returns just `decided`, the `winner`, and a coarse standings list (rank, bots alive, total health), with no per-bot stat blocks or per-bot positions. Use it to watch a running match ("is it decided yet / who's ahead?"), then reach for `match_summary` or `arena_status` for detail
-- `add_app_to_arena` / `remove_app_from_arena`
+- `add_app_to_arena` / `remove_app_from_arena` — `add_app_to_arena` returns the `version` of the source the arena loaded
 - `pause_arena` / `resume_arena` / `restart_arena`
 - `step_arena`: advance a paused arena by exactly one tick (or `count` ticks) to inspect state transitions frame by frame — pause first, then read `arena_status` / `match_status` between steps. A no-op (`stepped: false`) while the arena is running
 - `set_arena_speed`: set the simulation speed to a multiplier (1 = the default ~10 ticks/second), or `0`/`"max"` to run unbounded. The simulation stays deterministic at any speed
@@ -68,6 +68,8 @@ Once connected, these tools are available (all scoped to your account, except th
 Arena tools take a required `arenaId` — arena state, logs, and faults are all arena-specific, so you name the arena deliberately. Use `list_arenas` to look up your arena ids (or `create_arena` to make one).
 
 Every arena-scoped result carries a **`watchUrl`** — a public, sign-in-free spectator page (`/watch/<arenaId>`) that plays the live match in your browser, the same link the editor's "Share" button copies. It's how the AI can hand you a link to watch a match unfold rather than only describing it.
+
+Every app also carries a **`version`** — a content fingerprint (a truncated SHA-256) of its source. `set_app_source` and `create_app` return the version they saved, `add_app_to_arena` returns the version the arena loaded, and each app in `list_apps`, `arena_status`, `match_summary`, and `match_status` reports its current version. Because the same value follows one source revision through every step, the AI can verify that an arena is running exactly the source it deployed — not an earlier draft — and can trace a match outcome back to a specific revision. Editing the source produces a new version; saving identical source keeps the same one.
 
 **Resources**
 

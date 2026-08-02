@@ -13,6 +13,7 @@ import { buildMatchSummary, buildMatchStatus } from '../src/util/matchSummary';
 import { SUDDEN_DEATH_TIME } from '../src/types/environment';
 import { BotStats } from '../src/types/botStats';
 import appService from '../src/services/AppService';
+import { sourceVersion } from '../src/util/sourceVersion';
 
 // A mock bot exposing just the fields buildMatchSummary reads.
 const makeBot = (
@@ -56,9 +57,9 @@ const makeEnv = (
     getSeed: () => seed,
   }) as never;
 
-const APPS: Record<string, { name: string; userId: string }> = {
-  a1: { name: 'Hunter', userId: 'u1' },
-  a2: { name: 'Wanderer', userId: 'u2' },
+const APPS: Record<string, { name: string; userId: string; source: string }> = {
+  a1: { name: 'Hunter', userId: 'u1', source: 'HUNTER_CODE' },
+  a2: { name: 'Wanderer', userId: 'u2', source: 'WANDERER_CODE' },
 };
 
 beforeEach(() => {
@@ -69,6 +70,7 @@ beforeEach(() => {
         getId: () => id,
         getName: () => APPS[id]?.name,
         getUserId: () => APPS[id]?.userId,
+        getSource: () => APPS[id]?.source ?? '',
       }) as never
   );
 });
@@ -90,6 +92,12 @@ describe('buildMatchSummary', () => {
     // Both alive → ranked by total health: a2 (90) above a1 (80).
     expect(summary.leaderboard.map((e) => e.id)).toEqual(['a2', 'a1']);
     expect(summary.leaderboard[0].rank).toBe(1);
+    // Each row carries its app's source fingerprint so an outcome traces back to
+    // a specific source revision.
+    expect(summary.leaderboard.map((e) => e.version)).toEqual([
+      sourceVersion('WANDERER_CODE'),
+      sourceVersion('HUNTER_CODE'),
+    ]);
     expect(summary.match.durationTicks).toBe(900); // = clock.time (resets on restart)
     expect(summary.match.suddenDeathTick).toBe(SUDDEN_DEATH_TIME);
     expect(summary.match.suddenDeath).toBe(false);
@@ -226,6 +234,7 @@ describe('buildMatchStatus', () => {
       rank: 1,
       id: 'a2',
       name: 'Wanderer',
+      version: sourceVersion('WANDERER_CODE'),
       alive: true,
       botsAlive: 2,
       totalHealth: 90,

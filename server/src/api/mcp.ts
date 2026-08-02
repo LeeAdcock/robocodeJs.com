@@ -38,6 +38,7 @@ import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
 import { VERSION } from '../util/version';
+import { sourceVersion } from '../util/sourceVersion';
 import { collectMetrics } from '../util/metrics';
 import { watchUrl } from '../util/publicOrigin';
 
@@ -313,7 +314,10 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'List apps',
       description:
-        "List the authenticated user's apps (appId, name, and global-ladder rating).",
+        "List the authenticated user's apps (appId, name, current source " +
+        '`version`, and global-ladder rating). `version` is the content ' +
+        'fingerprint of the app’s saved source — the same value set_app_source ' +
+        'returns — so you can match a listed app to a specific source revision.',
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -323,6 +327,7 @@ export const buildServer = (user: User): McpServer => {
         apps.map((a) => ({
           appId: a.getId(),
           name: a.getName(),
+          version: sourceVersion(a.getSource()),
           rating: a.getRating(),
           ratingGames: a.getRatingGames(),
         }))
@@ -376,7 +381,10 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Create app',
       description:
-        'Create a new app, optionally setting its name and initial source.',
+        'Create a new app, optionally setting its name and initial source. ' +
+        'Returns a `version` — the content fingerprint of the saved source (the ' +
+        'same value set_app_source returns and that the arena/match views echo) ' +
+        'so you can trace this exact source through the system.',
       inputSchema: {
         name: z.string().optional().describe('Optional app name'),
         source: z
@@ -384,7 +392,11 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Optional initial JavaScript source'),
       },
-      outputSchema: { appId: z.string(), name: z.string() },
+      outputSchema: {
+        appId: z.string(),
+        name: z.string(),
+        version: z.string(),
+      },
       annotations: WRITE,
     },
     async ({ name, source }) => {
@@ -403,7 +415,11 @@ export const buildServer = (user: User): McpServer => {
       const app = await appService.create(user.getId());
       if (name) await app.setName(name);
       if (source) await app.setSource(source);
-      return ok({ appId: app.getId(), name: app.getName() });
+      return ok({
+        appId: app.getId(),
+        name: app.getName(),
+        version: sourceVersion(app.getSource()),
+      });
     }
   );
 
@@ -413,12 +429,22 @@ export const buildServer = (user: User): McpServer => {
       title: 'Set app source',
       description:
         "Replace an app's source. Live arenas it's in pick up the change " +
-        '(without re-firing START — use reboot_app for that).',
+        '(without re-firing START — use reboot_app for that). Returns a ' +
+        '`version` — the content fingerprint (a truncated SHA-256) of the source ' +
+        'you just saved. The same value appears against this app in ' +
+        'add_app_to_arena, list_apps, and the arena/match views ' +
+        '(arena_status/match_summary/match_status), so you can verify an arena is ' +
+        'running exactly this source. Saving identical source yields the same ' +
+        'version.',
       inputSchema: {
         appId: z.string().describe('The app id'),
         source: z.string().describe('New JavaScript source'),
       },
-      outputSchema: { appId: z.string(), updated: z.boolean() },
+      outputSchema: {
+        appId: z.string(),
+        updated: z.boolean(),
+        version: z.string(),
+      },
       annotations: IDEMPOTENT,
     },
     async ({ appId, source }) => {
@@ -427,7 +453,7 @@ export const buildServer = (user: User): McpServer => {
       const tooLarge = sourceSizeError(source);
       if (tooLarge) return fail(tooLarge);
       await propagateSource(app, source);
-      return ok({ appId, updated: true });
+      return ok({ appId, updated: true, version: sourceVersion(source) });
     }
   );
 
@@ -744,7 +770,11 @@ export const buildServer = (user: User): McpServer => {
     'add_app_to_arena',
     {
       title: 'Add app to arena',
-      description: `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps).`,
+      description:
+        `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps). ` +
+        'Returns the `version` of the source the arena loaded — the same ' +
+        'fingerprint set_app_source returns — so you can confirm the arena is ' +
+        'fielding the exact source you intended.',
       inputSchema: {
         appId: z.string().describe('The app id'),
         arenaId: z.string().describe('The arena id'),
@@ -753,6 +783,7 @@ export const buildServer = (user: User): McpServer => {
         appId: z.string(),
         arenaId: z.string(),
         added: z.boolean(),
+        version: z.string(),
       },
       annotations: WRITE,
     },
@@ -775,7 +806,12 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       env.addApp(botApp);
       await arenaMemberService.create(arena.getId(), botApp.getId());
-      return ok({ appId, arenaId: arena.getId(), added: true });
+      return ok({
+        appId,
+        arenaId: arena.getId(),
+        added: true,
+        version: sourceVersion(botApp.getSource()),
+      });
     }
   );
 

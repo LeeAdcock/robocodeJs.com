@@ -79,6 +79,7 @@ import environmentService from '../src/services/EnvironmentService';
 import { propagateSource, checkSource } from '../src/util/botActions';
 import { buildArenaStatus } from '../src/util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../src/util/matchSummary';
+import { sourceVersion } from '../src/util/sourceVersion';
 
 const user = { getId: () => 'u1' } as never;
 
@@ -103,6 +104,7 @@ describe('mcp tools', () => {
       {
         getId: () => 'a1',
         getName: () => 'Bot',
+        getSource: () => 'CODE',
         getRating: () => 1500,
         getRatingGames: () => 0,
       },
@@ -114,7 +116,13 @@ describe('mcp tools', () => {
     })) as never;
 
     expect(JSON.parse(textOf(res))).toEqual([
-      { appId: 'a1', name: 'Bot', rating: 1500, ratingGames: 0 },
+      {
+        appId: 'a1',
+        name: 'Bot',
+        version: sourceVersion('CODE'),
+        rating: 1500,
+        ratingGames: 0,
+      },
     ]);
   });
 
@@ -187,6 +195,7 @@ describe('mcp tools', () => {
     vi.mocked(appService.create).mockResolvedValue({
       getId: () => 'newid',
       getName: () => 'Nice Bot',
+      getSource: () => '',
       setName: vi.fn().mockResolvedValue(undefined),
       setSource: vi.fn().mockResolvedValue(undefined),
     } as never);
@@ -197,6 +206,13 @@ describe('mcp tools', () => {
     })) as { content: unknown[]; isError?: boolean };
     expect(res.isError).toBeFalsy();
     expect(appService.create).toHaveBeenCalled();
+    // A fresh app returns the version of its (empty) source — a stable fingerprint
+    // the caller can trace forward through add_app_to_arena and the arena views.
+    expect(JSON.parse(textOf(res))).toEqual({
+      appId: 'newid',
+      name: 'Nice Bot',
+      version: sourceVersion(''),
+    });
   });
 
   it('get_app_source returns source for an owned bot', async () => {
@@ -233,12 +249,19 @@ describe('mcp tools', () => {
     const app = { getId: () => 'a1', getUserId: () => 'u1' };
     vi.mocked(appService.get).mockResolvedValue(app as never);
     const client = await connect();
-    await client.callTool({
+    const res = (await client.callTool({
       name: 'set_app_source',
       arguments: { appId: 'a1', source: 'NEW' },
-    });
+    })) as never;
 
     expect(propagateSource).toHaveBeenCalledWith(app, 'NEW');
+    // The saved source's fingerprint comes back so the caller can trace it: the
+    // same version later shows up in the arena/match views for a running bot.
+    expect(JSON.parse(textOf(res))).toEqual({
+      appId: 'a1',
+      updated: true,
+      version: sourceVersion('NEW'),
+    });
   });
 
   // Resource-exhaustion guard (GitHub #147). The same MAX_SOURCE_BYTES (256 KB)
@@ -489,6 +512,37 @@ describe('mcp tools', () => {
       watchUrl: 'https://robocodejs.com/watch/ar1',
       match: { decided: false, winner: null },
       standings: [],
+    });
+  });
+
+  it('add_app_to_arena links the app and returns the source version', async () => {
+    const botApp = {
+      getId: () => 'a1',
+      getUserId: () => 'u1',
+      getSource: () => 'CODE',
+    };
+    const arena = { getId: () => 'ar1', getUserId: () => 'u1' };
+    // ownedApp then ownedArena both call appService.get / arenaService.get.
+    vi.mocked(appService.get).mockResolvedValue(botApp as never);
+    vi.mocked(arenaService.get).mockResolvedValue(arena as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    const addApp = vi.fn();
+    vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'add_app_to_arena',
+      arguments: { appId: 'a1', arenaId: 'ar1' },
+    })) as never;
+
+    expect(addApp).toHaveBeenCalledWith(botApp);
+    expect(arenaMemberService.create).toHaveBeenCalledWith('ar1', 'a1');
+    // The version of the source the arena just loaded — the same fingerprint
+    // set_app_source returns — so the caller can confirm what's fielded.
+    expect(JSON.parse(textOf(res))).toEqual({
+      appId: 'a1',
+      arenaId: 'ar1',
+      added: true,
+      version: sourceVersion('CODE'),
     });
   });
 
@@ -963,7 +1017,11 @@ describe('mcp tools', () => {
       arguments: { appId: 'a1', source: 'NEW' },
     })) as { structuredContent?: unknown };
 
-    expect(res.structuredContent).toEqual({ appId: 'a1', updated: true });
+    expect(res.structuredContent).toEqual({
+      appId: 'a1',
+      updated: true,
+      version: sourceVersion('NEW'),
+    });
   });
 
   it('exposes workflow prompts and fills in arguments', async () => {
