@@ -53,6 +53,21 @@ describe('runMatchToDecision', () => {
     expect(env.endMatch).toHaveBeenCalled();
   });
 
+  it('runs at a caller-provided bounded speed and still restores the prior one', async () => {
+    // The ladder passes a bounded speed to cap CPU (vs the default unbounded 0).
+    const env = makeEnv();
+    vi.mocked(buildMatchSummary).mockResolvedValue({
+      match: { decided: true, winner: { id: 'a1' } },
+      leaderboard: [{ rank: 1, id: 'a1' }],
+    } as never);
+
+    await runMatchToDecision(env as never, [], { seed: 42, speed: 20 });
+
+    // Capped at 20 during the match (not 0/unbounded), then restored to prior (3).
+    expect(env.setSpeed).toHaveBeenNthCalledWith(1, 20);
+    expect(env.setSpeed).toHaveBeenLastCalledWith(3);
+  });
+
   // The corruption this guard fixes: two matches driving the same live arena at
   // once (a client retrying a slow run_match). The second must refuse, not touch
   // the arena, and not release the first's claim.
