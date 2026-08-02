@@ -38,6 +38,7 @@ import { sanitizeBotName } from '../util/botName';
 import { isNameProfane } from '../util/nameFilter';
 import { logger, LogEvent } from '../util/logger';
 import { VERSION } from '../util/version';
+import { sourceVersion } from '../util/sourceVersion';
 import { collectMetrics } from '../util/metrics';
 import { watchUrl } from '../util/publicOrigin';
 
@@ -209,6 +210,30 @@ const logMatch = (
   );
 };
 
+// A one-line nudge, attached to the post-match tool results, pointing the client
+// at the two arena debug tools. Feedback: MCP clients read the outcome (winner /
+// leaderboard) but rarely follow up with the log tools, so they never learn WHY a
+// bot crashed or lost — the outcome views deliberately carry no per-bot console
+// output or crash detail. Stating it in the response (not just the tool docs) is
+// what actually gets it used. Leads with the crash callout when a bot faulted, so
+// the most actionable case is unmissable. `ownArena` is false for the read-only
+// spectate path (match_summary), where recent_logs/recent_faults are owner-only.
+const matchDebugHint = (
+  arenaId: string,
+  leaderboard: { crashedCount?: number }[] | undefined,
+  ownArena: boolean
+): string => {
+  const crashed = (leaderboard ?? []).some((e) => (e.crashedCount ?? 0) > 0);
+  const availability = ownArena ? '' : ' (owner-only, when the arena is yours)';
+  return (
+    (crashed ? 'A bot crashed this match. ' : '') +
+    'To debug this match — why a bot crashed, lost, or misbehaved — read ' +
+    `recent_faults (structured crash records: error code, kind, message, ` +
+    `failing line) and recent_logs (bot console output) for arenaId ` +
+    `"${arenaId}"${availability}; the match views omit per-bot logs.`
+  );
+};
+
 // Build a fresh MCP server bound to one authenticated user. All tools act on
 // that user's own resources only, so there is no cross-user addressing (and no
 // :userId argument): the bearer token already identifies the actor. Exported so
@@ -313,7 +338,10 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'List apps',
       description:
-        "List the authenticated user's apps (appId, name, and global-ladder rating).",
+        "List the authenticated user's apps (appId, name, current source " +
+        '`version`, and global-ladder rating). `version` is the content ' +
+        'fingerprint of the app’s saved source — the same value set_app_source ' +
+        'returns — so you can match a listed app to a specific source revision.',
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -323,6 +351,7 @@ export const buildServer = (user: User): McpServer => {
         apps.map((a) => ({
           appId: a.getId(),
           name: a.getName(),
+          version: sourceVersion(a.getSource()),
           rating: a.getRating(),
           ratingGames: a.getRatingGames(),
         }))
@@ -376,7 +405,10 @@ export const buildServer = (user: User): McpServer => {
     {
       title: 'Create app',
       description:
-        'Create a new app, optionally setting its name and initial source.',
+        'Create a new app, optionally setting its name and initial source. ' +
+        'Returns a `version` — the content fingerprint of the saved source (the ' +
+        'same value set_app_source returns and that the arena/match views echo) ' +
+        'so you can trace this exact source through the system.',
       inputSchema: {
         name: z.string().optional().describe('Optional app name'),
         source: z
@@ -384,7 +416,11 @@ export const buildServer = (user: User): McpServer => {
           .optional()
           .describe('Optional initial JavaScript source'),
       },
-      outputSchema: { appId: z.string(), name: z.string() },
+      outputSchema: {
+        appId: z.string(),
+        name: z.string(),
+        version: z.string(),
+      },
       annotations: WRITE,
     },
     async ({ name, source }) => {
@@ -403,7 +439,11 @@ export const buildServer = (user: User): McpServer => {
       const app = await appService.create(user.getId());
       if (name) await app.setName(name);
       if (source) await app.setSource(source);
-      return ok({ appId: app.getId(), name: app.getName() });
+      return ok({
+        appId: app.getId(),
+        name: app.getName(),
+        version: sourceVersion(app.getSource()),
+      });
     }
   );
 
@@ -413,12 +453,22 @@ export const buildServer = (user: User): McpServer => {
       title: 'Set app source',
       description:
         "Replace an app's source. Live arenas it's in pick up the change " +
-        '(without re-firing START — use reboot_app for that).',
+        '(without re-firing START — use reboot_app for that). Returns a ' +
+        '`version` — the content fingerprint (a truncated SHA-256) of the source ' +
+        'you just saved. The same value appears against this app in ' +
+        'add_app_to_arena, list_apps, and the arena/match views ' +
+        '(arena_status/match_summary/match_status), so you can verify an arena is ' +
+        'running exactly this source. Saving identical source yields the same ' +
+        'version.',
       inputSchema: {
         appId: z.string().describe('The app id'),
         source: z.string().describe('New JavaScript source'),
       },
-      outputSchema: { appId: z.string(), updated: z.boolean() },
+      outputSchema: {
+        appId: z.string(),
+        updated: z.boolean(),
+        version: z.string(),
+      },
       annotations: IDEMPOTENT,
     },
     async ({ appId, source }) => {
@@ -427,7 +477,7 @@ export const buildServer = (user: User): McpServer => {
       const tooLarge = sourceSizeError(source);
       if (tooLarge) return fail(tooLarge);
       await propagateSource(app, source);
-      return ok({ appId, updated: true });
+      return ok({ appId, updated: true, version: sourceVersion(source) });
     }
   );
 
@@ -684,8 +734,11 @@ export const buildServer = (user: User): McpServer => {
         'total health), and elimination order. Complements arena_status (which is ' +
         'the raw per-bot snapshot); this is the "who won and how" view and is ' +
         'most useful once the match is decided (`match.decided`). A match is ' +
-        'decided when at most one app still has living bots. Read-only, so it ' +
-        'works for ANY arena id you have, not just your own.',
+        'decided when at most one app still has living bots. Once decided, the ' +
+        'result carries a `debugHint` pointing at recent_faults and recent_logs ' +
+        '(for your own arenas) — use them to learn WHY a bot crashed or lost, ' +
+        'which this outcome view does not explain. Read-only, so it works for ANY ' +
+        'arena id you have, not just your own.',
       inputSchema: {
         arenaId: z
           .string()
@@ -700,9 +753,24 @@ export const buildServer = (user: User): McpServer => {
       if (!arena) return fail('No such arena.');
       const env = await environmentService.get(arena);
       const members = await arenaMemberService.getForArena(arena.getId());
+      const summary = await buildMatchSummary(env, members);
+      // Only nudge toward the log tools once the match is over (this is the "who
+      // won and how" moment); during polling it would just be noise. The arena
+      // may be someone else's (readableArena spectate), so phrase availability by
+      // actual ownership — recent_logs/recent_faults are owner-only.
+      const ownArena = arena.getUserId() === user.getId();
       return ok({
         watchUrl: watchUrl(arena.getId()),
-        ...(await buildMatchSummary(env, members)),
+        ...(summary.match.decided
+          ? {
+              debugHint: matchDebugHint(
+                arena.getId(),
+                summary.leaderboard,
+                ownArena
+              ),
+            }
+          : {}),
+        ...summary,
       });
     }
   );
@@ -744,7 +812,11 @@ export const buildServer = (user: User): McpServer => {
     'add_app_to_arena',
     {
       title: 'Add app to arena',
-      description: `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps).`,
+      description:
+        `Add one of your apps to an arena (max ${MAX_APPS_PER_ARENA + 1} apps). ` +
+        'Returns the `version` of the source the arena loaded — the same ' +
+        'fingerprint set_app_source returns — so you can confirm the arena is ' +
+        'fielding the exact source you intended.',
       inputSchema: {
         appId: z.string().describe('The app id'),
         arenaId: z.string().describe('The arena id'),
@@ -753,6 +825,7 @@ export const buildServer = (user: User): McpServer => {
         appId: z.string(),
         arenaId: z.string(),
         added: z.boolean(),
+        version: z.string(),
       },
       annotations: WRITE,
     },
@@ -775,7 +848,12 @@ export const buildServer = (user: User): McpServer => {
       const env = await environmentService.get(arena);
       env.addApp(botApp);
       await arenaMemberService.create(arena.getId(), botApp.getId());
-      return ok({ appId, arenaId: arena.getId(), added: true });
+      return ok({
+        appId,
+        arenaId: arena.getId(),
+        added: true,
+        version: sourceVersion(botApp.getSource()),
+      });
     }
   );
 
@@ -1047,7 +1125,10 @@ export const buildServer = (user: User): McpServer => {
         'resumes it (restart alone silently leaves the arena PAUSED), runs it as ' +
         'fast as possible until at most one app still has living bots ' +
         '(match.decided), then pauses and returns the match_summary. Needs at ' +
-        'least two apps in the arena.',
+        'least two apps in the arena. The result carries a `debugHint`: to ' +
+        'understand WHY a bot crashed, lost, or misbehaved, follow up with ' +
+        'recent_faults (structured crash records) and recent_logs (bot console ' +
+        'output) for this arena — the summary omits per-bot logs.',
       inputSchema: {
         arenaId: z.string().describe('The arena id'),
         seed: z
@@ -1098,6 +1179,9 @@ export const buildServer = (user: User): McpServer => {
       return ok({
         watchUrl: watchUrl(arena.getId()),
         timedOut: !summary.match.decided,
+        // run_match is owner-gated (ownedArena), so recent_logs/recent_faults are
+        // callable on this arena — hint without the ownership caveat.
+        debugHint: matchDebugHint(arena.getId(), summary.leaderboard, true),
         ...summary,
       });
     }
@@ -1564,9 +1648,14 @@ const registerPrompts = (server: McpServer): void => {
               `Run a RobocodeJs match in arena ${arenaId}.\n\n` +
               `Use list_apps and arena_status to see what's available; make sure ` +
               `at least two bots are in the arena (add_app_to_arena as needed). ` +
-              `restart_arena to begin, then poll arena_status to follow the ` +
-              `battle, and report the result (who survived / had the most health) ` +
-              `along with anything notable from recent_logs.`,
+              `restart_arena to begin, then poll arena_status (or match_status) ` +
+              `to follow the battle, and report the result (who survived / had ` +
+              `the most health). Once it's decided, ALWAYS debug the outcome: ` +
+              `read recent_faults (arenaId ${arenaId}) for any crashes ` +
+              `(structured code/kind/message/line) and recent_logs for console ` +
+              `output, and call out why a bot underperformed or crashed — the ` +
+              `match views don't include per-bot logs, so this is the only way ` +
+              `to explain the result.`,
           },
         },
       ],

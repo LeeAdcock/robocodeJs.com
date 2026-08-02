@@ -2,6 +2,7 @@ import Environment, { SUDDEN_DEATH_TIME } from '../types/environment';
 import ArenaMember from '../types/arenaMember';
 import { BotStats, STAT_KEYS } from '../types/botStats';
 import appService from '../services/AppService';
+import { sourceVersion } from './sourceVersion';
 
 // ── Shared ranking / outcome contract ──────────────────────────────────────
 // buildMatchSummary (the full "who won and how" view) and buildMatchStatus (the
@@ -145,6 +146,11 @@ export const buildMatchSummary = async (
         id: process.appId,
         name: app?.getName(),
         userId: app?.getUserId(),
+        // Content fingerprint of the app's current source (see sourceVersion) —
+        // the same value set_app_source/add_app_to_arena return, so a caller can
+        // confirm which source produced this outcome. Omitted if the app row
+        // can't be resolved.
+        version: app ? sourceVersion(app.getSource()) : undefined,
         alive,
         eliminatedAt,
         botsAlive,
@@ -218,6 +224,7 @@ export const buildMatchStatus = async (
         id: process.appId,
         name: app?.getName(),
         userId: app?.getUserId(),
+        version: app ? sourceVersion(app.getSource()) : undefined,
         alive,
         eliminatedAt,
         botsAlive,
@@ -233,6 +240,7 @@ export const buildMatchStatus = async (
     rank: i + 1,
     id: e.id,
     name: e.name,
+    version: e.version,
     alive: e.alive,
     botsAlive: e.botsAlive,
     totalHealth: e.totalHealth,

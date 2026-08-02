@@ -2,6 +2,7 @@ import Environment, { DEPLOY_TICKS } from '../types/environment';
 import { BOT_MAX_SPEED, BOT_ACCELERATION } from '../types/bot';
 import ArenaMember from '../types/arenaMember';
 import appService from '../services/AppService';
+import { sourceVersion } from './sourceVersion';
 
 // Builds the arena status snapshot returned by the REST status endpoints and the
 // MCP `arena_status` tool. Previously this object was constructed inline in both
@@ -52,51 +53,59 @@ export const buildArenaStatus = async (
             .find((member) => member?.getAppId() === b.appId)
             ?.getTimestamp() || 0)
       )
-      .map((process) => ({
-        id: process.getAppId(),
-        name: apps.find((app) => app?.getId() === process.appId)?.getName(),
-        userId: apps.find((app) => app?.getId() === process.appId)?.getUserId(),
-        addedTimestamp: members
-          .find((member) => member?.getAppId() === process.appId)
-          ?.getTimestamp(),
-        bots: process.bots.map((bot) => ({
-          id: bot.id,
-          x: bot.x,
-          y: bot.y,
-          speed: bot.speed,
-          speedTarget: bot.speedTarget,
-          speedAcceleration: BOT_ACCELERATION,
-          speedMax: BOT_MAX_SPEED,
-          bodyOrientation: bot.orientation,
-          bodyOrientationTarget: bot.orientationTarget,
-          bodyOrientationVelocity: bot.orientationVelocity,
-          turretOrientation: bot.turret.orientation,
-          turretOrientationTarget: bot.turret.orientationTarget,
-          turretOrientationVelocity: bot.turret.orientationVelocity,
-          radarOrientation: bot.turret.radar.orientation,
-          radarOrientationTarget: bot.turret.radar.orientationTarget,
-          radarOrientationVelocity: bot.turret.radar.orientationVelocity,
-          health: bot.health,
-          // Whether the bot crashed (vs. died in combat) — lets a client / AI tell
-          // a fault-death from a bullet-death. Detail is in the fault feed.
-          crashed: bot.appCrashed,
-          // Only live bullets, and include orientation/speed so a client that
-          // bootstraps from this snapshot (a reload, or a freshly connected SSE
-          // client) can both render the bullet (it rotates by orientation) and
-          // interpolate its motion. Omitting them left snapshot bullets with an
-          // undefined orientation — an invalid SVG transform that the browser
-          // drops, stranding the sprite at (0,0). Spent (exploded) bullets are
-          // excluded so they don't re-seed as immovable orphans.
-          bullets: bot.bullets
-            .filter((bullet) => !bullet.exploded)
-            .map((bullet) => ({
-              id: bullet.id,
-              x: bullet.x,
-              y: bullet.y,
-              orientation: bullet.orientation,
-              speed: bullet.speed,
-            })),
-        })),
-      })),
+      .map((process) => {
+        const app = apps.find((a) => a?.getId() === process.appId);
+        return {
+          id: process.getAppId(),
+          name: app?.getName(),
+          userId: app?.getUserId(),
+          // Content fingerprint of the app's current source (see sourceVersion):
+          // the same value set_app_source/add_app_to_arena hand back, so a client
+          // can verify which source the running bots are on. Omitted if the app
+          // row can't be resolved.
+          version: app ? sourceVersion(app.getSource()) : undefined,
+          addedTimestamp: members
+            .find((member) => member?.getAppId() === process.appId)
+            ?.getTimestamp(),
+          bots: process.bots.map((bot) => ({
+            id: bot.id,
+            x: bot.x,
+            y: bot.y,
+            speed: bot.speed,
+            speedTarget: bot.speedTarget,
+            speedAcceleration: BOT_ACCELERATION,
+            speedMax: BOT_MAX_SPEED,
+            bodyOrientation: bot.orientation,
+            bodyOrientationTarget: bot.orientationTarget,
+            bodyOrientationVelocity: bot.orientationVelocity,
+            turretOrientation: bot.turret.orientation,
+            turretOrientationTarget: bot.turret.orientationTarget,
+            turretOrientationVelocity: bot.turret.orientationVelocity,
+            radarOrientation: bot.turret.radar.orientation,
+            radarOrientationTarget: bot.turret.radar.orientationTarget,
+            radarOrientationVelocity: bot.turret.radar.orientationVelocity,
+            health: bot.health,
+            // Whether the bot crashed (vs. died in combat) — lets a client / AI tell
+            // a fault-death from a bullet-death. Detail is in the fault feed.
+            crashed: bot.appCrashed,
+            // Only live bullets, and include orientation/speed so a client that
+            // bootstraps from this snapshot (a reload, or a freshly connected SSE
+            // client) can both render the bullet (it rotates by orientation) and
+            // interpolate its motion. Omitting them left snapshot bullets with an
+            // undefined orientation — an invalid SVG transform that the browser
+            // drops, stranding the sprite at (0,0). Spent (exploded) bullets are
+            // excluded so they don't re-seed as immovable orphans.
+            bullets: bot.bullets
+              .filter((bullet) => !bullet.exploded)
+              .map((bullet) => ({
+                id: bullet.id,
+                x: bullet.x,
+                y: bullet.y,
+                orientation: bullet.orientation,
+                speed: bullet.speed,
+              })),
+          })),
+        };
+      }),
   };
 };
