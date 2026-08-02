@@ -14,7 +14,15 @@ import BlogIndexPage from './page/blogIndexPage';
 import NotFoundPage from './page/notFoundPage';
 import BlogPostPage from './page/blogPostPage';
 import User from './types/user';
-import { establishSession, nextSessionProbeState } from './util/session';
+import {
+  establishSession,
+  nextSessionProbeState,
+  classifyCredential,
+  shouldAcceptCredential,
+  isSignedOutDeliberately,
+  markSignedOut,
+  clearSignedOut,
+} from './util/session';
 import ArenaToolbar from './components/arena/arenaToolbar';
 import Alert from 'react-bootstrap/Alert';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -52,21 +60,19 @@ declare const google: any;
 // of the cookie quietly lapsing after an hour.
 const SESSION_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
-// Set right before we ask Google Identity for a silent token refresh, so the one
-// shared sign-in callback can tell a background refresh (fail quietly) from an
-// interactive sign-in (surface the error). Module-scoped because there is a
-// single App instance and GIS's callback is registered once.
-let silentRefreshInFlight = false;
-
 // Ask Google Identity to silently re-issue an id token (needs auto_select). The
 // initialize() callback receives the fresh credential and re-establishes the
 // session cookie via establishSession. Best-effort: a no-op when GIS is absent
 // (local dev / offline), and GIS itself may decline to re-issue (multiple Google
 // accounts, signed out of Google, One-Tap cooldown) — in which case the session
 // simply lapses as it did before, no worse than the prior behaviour.
+//
+// Never prompts after a deliberate sign-out: prompt() with auto_select on is
+// exactly what signed a just-logged-out user straight back in, and callers are
+// additionally gated on being signed in.
 const requestSessionRefresh = (): void => {
+  if (isSignedOutDeliberately()) return;
   if (typeof google !== 'undefined' && google.accounts?.id) {
-    silentRefreshInFlight = true;
     google.accounts.id.prompt();
   }
 };
@@ -288,7 +294,12 @@ function App() {
   // blip, a server 500 that leaves the cookie intact, or the brief window during
   // a refresh never flashes a sign-out. Together with the proactive refresh
   // below, a signed-in user stays signed in as long as GIS can re-issue.
+  //
+  // Only runs while signed in. Left ungated it polled for logged-out visitors
+  // too, and every 401 drove a One Tap prompt — which both nagged anonymous
+  // readers on public pages and signed a just-logged-out user back in.
   useEffect(() => {
+    if (!user) return;
     const interval = setInterval(() => {
       axios
         .get(`/api/user`)
@@ -310,19 +321,25 @@ function App() {
         });
     }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   // Proactive refresh: while signed in, re-mint the id token well inside its ~1h
   // TTL so the cookie never lapses in the first place (the probe above is the
   // backstop). Gated on `user` so it never runs logged-out and stops on sign-out.
+  //
+  // Keyed on the user id, not the user object: `user` is replaced by a fresh
+  // object on every profile refetch (rename, create app, …), and depending on
+  // it restarted this 45-minute timer each time — an active user could churn
+  // the timer indefinitely and never actually get a refresh.
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const interval = setInterval(
       () => requestSessionRefresh(),
       SESSION_REFRESH_INTERVAL_MS
     );
     return () => clearInterval(interval);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     // Google Identity Services may be unavailable in local dev (the GSI script is
@@ -336,14 +353,26 @@ function App() {
         // credential without a click — this is what lets requestSessionRefresh
         // re-mint the token silently (and auto-signs a returning user back in).
         auto_select: true,
-        callback: (response: { credential: string }) => {
+        callback: (response: { credential: string; select_by?: string }) => {
           // One callback serves BOTH an interactive sign-in (button / One Tap)
-          // and a background token refresh (requestSessionRefresh set the flag
-          // first). Both establish the session identically via establishSession;
-          // only the interactive path surfaces an error. The server verifies the
-          // credential and sets an HttpOnly session cookie (not readable by JS).
-          const interactive = !silentRefreshInFlight;
-          silentRefreshInFlight = false;
+          // and a background token refresh. GIS tells us which via `select_by`
+          // — 'auto' is Google choosing an account with no user action. Both
+          // establish the session identically via establishSession; only a
+          // credential the user actually chose surfaces an error. The server
+          // verifies the credential and sets an HttpOnly session cookie (not
+          // readable by JS).
+          const source = classifyCredential(response.select_by);
+          // Refuse an automatic credential after a deliberate sign-out — this
+          // is the loop that logged a user straight back in ~30s after they
+          // clicked Sign out.
+          if (!shouldAcceptCredential(source, isSignedOutDeliberately())) {
+            if (google.accounts?.id) google.accounts.id.cancel();
+            return;
+          }
+          const interactive = source === 'interactive';
+          // A credential the user picked is an intent to sign in — it retires
+          // the deliberate-sign-out record.
+          if (interactive) clearSignedOut();
           establishSession(response.credential)
             .then((loadedUser) => {
               setUser(loadedUser);
@@ -386,6 +415,10 @@ function App() {
       .get(`/api/user`)
       .then((res) => {
         if (!res.data || !res.data.id) return; // not an authenticated user payload
+        // A live server session outranks a stale deliberate-sign-out record
+        // (e.g. the logout DELETE failed): we are demonstrably signed in, so
+        // clear it rather than leave refresh permanently disabled.
+        clearSignedOut();
         return axios
           .get(`/api/user/${res.data.id}`)
           .then((res) => setUser(res.data));
@@ -433,8 +466,13 @@ function App() {
                 .then((res) => setUser(res.data));
             }}
             doLogout={() => {
-              // Stop Google from silently re-signing the user back in on the
-              // next auth poll (see the session-expiry effect below).
+              // Record the sign-out FIRST, before anything async: it is what
+              // makes the refusal in the GIS callback and requestSessionRefresh
+              // stick, and it survives a reload. disableAutoSelect() is still
+              // called (it is Google's documented remedy) but is no longer
+              // relied on alone — in practice it did not stop an explicit
+              // prompt() from auto-selecting the account straight back.
+              markSignedOut();
               if (typeof google !== 'undefined' && google.accounts?.id) {
                 google.accounts.id.disableAutoSelect();
               }
