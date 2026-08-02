@@ -1223,6 +1223,7 @@ const init = (
           TICK:'TICK',
           HIT: 'HIT',
           DETECTED:'DETECTED',
+          DEATH:'DEATH',
         }
         `
       )

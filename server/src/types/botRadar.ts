@@ -137,12 +137,18 @@ export class BotRadar implements Orientated {
   }
 
   isReady() {
-    return this.charged >= 100;
+    // A dead bot's radar is never ready — a DEATH ("last words") handler reads
+    // isReady() === false and can't kick off a scan that would never resolve
+    // (Simulation no longer ticks an eliminated bot).
+    return this.bot.health > 0 && this.charged >= 100;
   }
 
   scan() {
     if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
-    if (this.charged < 100) return Promise.reject('Radar not ready');
+    // Block scanning once dead (health <= 0): mirrors isReady() so scan() rejects
+    // from a DEATH handler instead of silently hanging.
+    if (this.bot.health <= 0 || this.charged < 100)
+      return Promise.reject('Radar not ready');
     this.bot.logger.trace('Scanning');
     this.charged = 0;
     this.bot.stats.scansCompleted += 1;

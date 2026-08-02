@@ -64,6 +64,12 @@ export const EVENTS: ApiEvent[] = [
     doc: 'Fires when the bot first starts, when the arena restarts, and when you reboot the app. An ordinary save does NOT re-fire it. Set up state here on `this`.',
   },
   {
+    name: 'DEATH',
+    payload: 'void',
+    channel: 'bot',
+    doc: "Fires once when your bot is eliminated (destroyed, or ground down by sudden-death decay) — its last chance to run code. Use it to log final diagnostics (accumulated stats, last known enemy positions, why it lost) to the console so they're captured for debugging after the bot stops. Movement and fire commands have no effect here — the bot is already dead. A bot killed by its own crash does NOT get a DEATH event (its sandbox has already faulted).",
+  },
+  {
     name: 'TICK',
     payload: 'void',
     channel: 'clock',

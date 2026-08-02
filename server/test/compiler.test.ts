@@ -621,6 +621,19 @@ describe('compiler — bot API in a real isolate', () => {
     );
   });
 
+  it('registers a DEATH handler and runs it through the bridge (last words)', async () => {
+    ctx.run(`
+            globalThis._lastWords = false
+            bot.on(Event.DEATH, () => { globalThis._lastWords = true })
+        `);
+    // The host drives this handler from applyEliminations when the bot dies.
+    expect(typeof ctx.bot.handlers[Event.DEATH]).toBe('function');
+    ctx.bot.handlers[Event.DEATH]();
+    expect(
+      await waitUntilRead('globalThis._lastWords', (v) => v === true)
+    ).toBe(true);
+  });
+
   it('wires clock.on(TICK) through to a bot TICK handler', async () => {
     ctx.run(`
             globalThis._ticks = 0
@@ -844,6 +857,7 @@ describe('compiler — bot API in a real isolate', () => {
   it('exposes the Event enum to bots', () => {
     expect(ctx.read('Event.START')).toBe('START');
     expect(ctx.read('Event.TICK')).toBe('TICK');
+    expect(ctx.read('Event.DEATH')).toBe('DEATH');
   });
 
   it('copies bot.getHealth() across the boundary on a 0–100 scale', () => {
