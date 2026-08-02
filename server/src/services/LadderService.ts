@@ -33,6 +33,7 @@ interface LadderLoopConfig {
   idleMs: number; // backoff when there's no pair or we're load-gated
   maxLiveIsolates: number; // yield the CPU when user arenas hold this many isolates
   timeoutMs: number; // per-match wall-clock cap
+  matchSpeed: number; // tick-rate cap for a ranked match (0 = unbounded)
 }
 
 const envInt = (name: string, dflt: number): number => {
@@ -97,6 +98,14 @@ class LadderService {
       timeoutMs:
         opts.timeoutMs ??
         envInt('LADDER_MATCH_TIMEOUT_MS', DEFAULT_MATCH_TIMEOUT_MS),
+      // Cap the tick rate of a ranked match instead of running it unbounded, so
+      // background matches don't pin a core on the small prod box (GitHub #151
+      // compute notes). Default 20 → ~5 ms/tick, so a full sudden-death match
+      // (SUDDEN_DEATH_TIME=7500 ticks) takes ~37.5 s — comfortably under the 60 s
+      // default timeout. Lowering this throttles harder but lengthens matches:
+      // keep LADDER_MATCH_TIMEOUT_MS above 7500/(10·speed) s or slow matches will
+      // time out unrated. 0 opts back into unbounded (the prior behaviour).
+      matchSpeed: opts.matchSpeed ?? envInt('LADDER_MATCH_SPEED', 20),
     };
     this.running = true;
     logger.info(
@@ -129,7 +138,10 @@ class LadderService {
 
       let idle = true;
       try {
-        const res = await this.runNextMatch({ timeoutMs: cfg.timeoutMs });
+        const res = await this.runNextMatch({
+          timeoutMs: cfg.timeoutMs,
+          speed: cfg.matchSpeed,
+        });
         idle = res === null; // no eligible pair right now
       } catch (err) {
         logger.error(
@@ -194,6 +206,7 @@ class LadderService {
     opts: {
       seed?: number;
       timeoutMs?: number;
+      speed?: number;
     } = {}
   ): Promise<LadderMatchResult | null> => {
     const pair = await this.pickPair();
@@ -309,7 +322,7 @@ class LadderService {
   runOneMatch = async (
     appIdA: AppId,
     appIdB: AppId,
-    opts: { seed?: number; timeoutMs?: number } = {}
+    opts: { seed?: number; timeoutMs?: number; speed?: number } = {}
   ): Promise<LadderMatchResult> => {
     const seed = opts.seed ?? Math.floor(Math.random() * 0x100000000);
 
@@ -359,6 +372,7 @@ class LadderService {
       const summary = await runMatchToDecision(env, members, {
         seed,
         timeoutMs: opts.timeoutMs,
+        speed: opts.speed,
       });
       const decided = summary.match.decided;
       const winnerId = decided ? (summary.match.winner?.id ?? null) : null;

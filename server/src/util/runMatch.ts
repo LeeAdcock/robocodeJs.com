@@ -13,12 +13,21 @@ export class ArenaBusyError extends Error {
 }
 
 // Run one match in an arena to a decision (or a timeout) and return its match
-// summary. Optionally reseeds first, then runs unbounded ("as fast as the bots
-// can be driven"): it restarts the arena — re-firing every bot's START — and
-// resumes it (restart() alone silently leaves the arena PAUSED), polls until at
-// most one app still has living bots (`match.decided`) or the arena stops (all
-// dead) or the wall-clock timeout elapses, then pauses and restores the arena's
-// prior speed.
+// summary. Optionally reseeds first, then runs at `opts.speed` — defaulting to 0
+// ("unbounded", as fast as the bots can be driven) — restarting the arena
+// (re-firing every bot's START), resuming it (restart() alone silently leaves the
+// arena PAUSED), polling until at most one app still has living bots
+// (`match.decided`) or the arena stops (all dead) or the wall-clock timeout
+// elapses, then pausing and restoring the arena's prior speed.
+//
+// `speed` lets a CPU-sensitive caller cap the tick rate instead of pinning a core
+// at unbounded speed. The global ladder passes a bounded value (LADDER_MATCH_SPEED)
+// so background ranked matches don't run the small prod box at 100%; the MCP
+// run_match tool leaves it unset (0 = unbounded) so an interactive match still
+// decides as fast as possible. A bounded speed makes a match take longer in
+// wall-clock: at speed S the tick target is 100/S ms, so a full sudden-death match
+// (SUDDEN_DEATH ticks) takes ~SUDDEN_DEATH/(10·S) seconds — keep `timeoutMs` above
+// that or a slow match will time out (unrated) before it decides.
 //
 // Two guarantees matter here because run_match drives the caller's LIVE arena:
 //
@@ -47,7 +56,7 @@ export const DEFAULT_MATCH_TIMEOUT_MS = 60000;
 export const runMatchToDecision = async (
   env: Environment,
   members: ArenaMember[],
-  opts: { seed?: number; timeoutMs?: number } = {}
+  opts: { seed?: number; timeoutMs?: number; speed?: number } = {}
 ): Promise<Awaited<ReturnType<typeof buildMatchSummary>>> => {
   if (!env.beginMatch()) {
     throw new ArenaBusyError(
@@ -57,7 +66,9 @@ export const runMatchToDecision = async (
   try {
     if (opts.seed !== undefined) env.setSeed(opts.seed);
     const priorSpeed = env.getSpeed();
-    env.setSpeed(0); // unbounded — decide the match as quickly as possible
+    // Default 0 = unbounded (decide as fast as possible); a caller passes a
+    // bounded speed to cap CPU (see the header note and LADDER_MATCH_SPEED).
+    env.setSpeed(opts.speed ?? 0);
 
     // Fix the deadline before any of the driven work (restart + settling) begins
     // so timeoutMs bounds the whole operation, not just the poll loop below.

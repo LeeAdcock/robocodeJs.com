@@ -202,6 +202,25 @@ describe('LadderService.runOneMatch', () => {
     expect(runMatch).not.toHaveBeenCalled();
   });
 
+  it('forwards the bounded match speed (CPU throttle) to the match runner', async () => {
+    const a = makeApp('A', 1500, 5);
+    const b = makeApp('B', 1500, 5);
+    getApp.mockImplementation((id) =>
+      Promise.resolve((id === 'A' ? a : b) as never)
+    );
+    runMatch.mockResolvedValue(summary('A'));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 9, speed: 20 });
+
+    // runMatchToDecision caps the tick rate instead of running unbounded, so the
+    // ladder never pins the box at 100%.
+    expect(runMatch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ seed: 9, speed: 20 })
+    );
+  });
+
   it('refuses a concurrent match for an app already in flight', async () => {
     const a = makeApp('A', 1500, 5);
     const b = makeApp('B', 1500, 5);
@@ -299,6 +318,25 @@ describe('LadderService background loop', () => {
     await sleep(20);
     expect(spy.mock.calls.length).toBe(settled); // no new matches after stop
 
+    spy.mockRestore();
+  });
+
+  it('passes the configured match speed (CPU cap) to each match', async () => {
+    const spy = vi
+      .spyOn(ladderService, 'runNextMatch')
+      .mockResolvedValue(null as never);
+
+    ladderService.start({
+      concurrency: 1,
+      idleMs: 0,
+      matchIntervalMs: 0,
+      matchSpeed: 15,
+    });
+    await sleep(20);
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ speed: 15 }));
+
+    ladderService.stop();
     spy.mockRestore();
   });
 
