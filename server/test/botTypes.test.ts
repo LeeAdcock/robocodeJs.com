@@ -230,6 +230,27 @@ describe('Bot', () => {
     expect(received).toHaveBeenCalledWith(msg, { distance: 50 });
   });
 
+  it('send() is refused once the bot is dead (no broadcast, no delivery)', () => {
+    // A dead bot can't communicate — its DEATH ("last words") handler may log but
+    // must not message the living. send() returns false and delivers nothing.
+    const { bot, env } = makeRealBot();
+    const received = vi.fn();
+    const other = {
+      id: 'other',
+      health: 100,
+      x: 100,
+      y: 200,
+      stats: { messagesReceived: 0 },
+      handlers: { [Event.RECEIVED]: received },
+    };
+    env.getProcesses = () => [{ bots: [bot, other] }];
+    bot.health = 0;
+
+    expect(bot.send(7)).toBe(false);
+    expect(received).not.toHaveBeenCalled();
+    expect(bot.stats.messagesSent).toBe(0);
+  });
+
   it('send() enforces a per-tick budget and resets it when the clock advances', () => {
     const { bot, env, setTime } = makeRealBot();
     const received = vi.fn();
@@ -362,6 +383,19 @@ describe('BotTurret', () => {
     expect(bot.turret.isReady()).toBe(true);
   });
 
+  it('is never ready and refuses to fire once the bot is dead', async () => {
+    // A DEATH ("last words") handler must not be able to fire: a dead bot is no
+    // longer ticked, so the shot would never leave the barrel. isReady() reads
+    // false and fire() rejects even with a fully loaded, deployed turret.
+    const { bot, setTime } = makeRealBot();
+    setTime(DEPLOY_TICKS);
+    bot.turret.loaded = 100;
+    bot.health = 0;
+    expect(bot.turret.isReady()).toBe(false);
+    await expect(bot.turret.fire()).rejects.toBe('Turret not ready');
+    expect(bot.bullets).toHaveLength(0);
+  });
+
   it('turn() sets the turret target and emits turretTurn', async () => {
     const { bot, emit } = makeRealBot();
     const p = bot.turret.turn(90);
@@ -400,6 +434,17 @@ describe('BotRadar.scan', () => {
     const { bot } = makeRealBot();
     bot.turret.radar.charged = 50;
     await expect(bot.turret.radar.scan()).rejects.toBe('Radar not ready');
+  });
+
+  it('is never ready and refuses to scan once the bot is dead', async () => {
+    // Same rule as the turret: a DEATH handler can't kick off a scan that would
+    // never resolve, so a dead bot's radar reads not-ready and scan() rejects.
+    const { bot } = makeRealBot();
+    bot.turret.radar.charged = 100;
+    bot.health = 0;
+    expect(bot.turret.radar.isReady()).toBe(false);
+    await expect(bot.turret.radar.scan()).rejects.toBe('Radar not ready');
+    expect(bot.stats.scansCompleted).toBe(0);
   });
 
   it('detects an enemy within range and within the radar cone', async () => {

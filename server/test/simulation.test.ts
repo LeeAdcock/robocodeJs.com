@@ -971,4 +971,45 @@ describe('applyEliminations — kill credit', () => {
     applyEliminations([link('a', [bot])], 4);
     expect(bot.eliminatedAt).toBeNull();
   });
+
+  // "Last words": a dying bot's DEATH handler fires once as it is eliminated, so
+  // it can flush final diagnostics to its console before it stops.
+  it('fires a dying bot’s DEATH handler exactly once', () => {
+    const death = vi.fn();
+    const victim = makeBot({
+      id: 'v',
+      health: 0,
+      handlers: { [Event.DEATH]: death },
+    });
+    const processes = [link('a', [victim])];
+    applyEliminations(processes, 5);
+    applyEliminations(processes, 6); // once-latch: never re-fires
+    expect(death).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire DEATH for a living bot', () => {
+    const death = vi.fn();
+    const bot = makeBot({
+      id: 'v',
+      health: 10,
+      handlers: { [Event.DEATH]: death },
+    });
+    applyEliminations([link('a', [bot])], 5);
+    expect(death).not.toHaveBeenCalled();
+  });
+
+  it('does not fire DEATH for a bot killed by its own crash', () => {
+    // A crashed bot's sandbox has already faulted (possibly disposed), so running
+    // more of its code would be unsafe — the crash is the diagnostic, not DEATH.
+    const death = vi.fn();
+    const victim = makeBot({
+      id: 'v',
+      health: 0,
+      appCrashed: true,
+      handlers: { [Event.DEATH]: death },
+    });
+    applyEliminations([link('a', [victim])], 5);
+    expect(victim.eliminatedAt).toBe(5); // still eliminated…
+    expect(death).not.toHaveBeenCalled(); // …but no last words
+  });
 });

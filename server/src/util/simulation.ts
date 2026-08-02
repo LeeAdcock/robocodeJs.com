@@ -97,13 +97,15 @@ const distanceToSegmentSquared = (
 };
 
 // Record the tick each bot died — crash, bullet, collision, self-inflicted miss,
-// or sudden-death decay — and credit the kill when one is owed. Called once per
-// tick by Environment.tick, AFTER decay, so it sees each bot's final health and
-// final attribution for the tick.
+// or sudden-death decay — credit the kill when one is owed, and fire the bot's
+// DEATH handler once. Called once per tick by Environment.tick, AFTER decay, so
+// it sees each bot's final health and final attribution for the tick.
 //
 // The eliminatedAt === null guard is the once-latch: a bot is processed on the
-// first tick it is found dead and never again, so a kill can't be double-counted.
-// Read-only for the physics — this never feeds back into the simulation.
+// first tick it is found dead and never again, so a kill can't be double-counted
+// and DEATH fires exactly once. Read-only for the physics — the elimination
+// bookkeeping never feeds back into the simulation; the DEATH dispatch is a pure
+// side effect (the handler runs off-thread and only its console output matters).
 export const applyEliminations = (processes: Process[], time: number): void => {
   for (const process of processes) {
     for (const bot of process.bots) {
@@ -118,6 +120,23 @@ export const applyEliminations = (processes: Process[], time: number): void => {
       const killer = bot.lastDamagedBy;
       if (killer && killer.process.getAppId() !== process.getAppId()) {
         killer.stats.kills += 1;
+      }
+
+      // "Last words": give the bot one final chance to run code as it is
+      // eliminated — a DEATH handler, typically used to flush accumulated
+      // diagnostics to its console so behaviour/arena data is captured for
+      // debugging (recent_logs) before the bot stops. The handler runs like any
+      // other event (Bot.on bridges into the isolate and self-registers its
+      // async work in botOps, which THIS tick's drainBotWork awaits, so the logs
+      // land immediately); dispatch follows the fixed process/bot order here, so
+      // it stays deterministic. Movement/fire commands issued from it have no
+      // effect — the bot is already dead and Simulation no longer ticks it.
+      //
+      // Skip a crashed bot: its sandbox already faulted (its isolate may be
+      // disposed), so running more of its code is both unsafe and pointless —
+      // the crash itself is the diagnostic, already on the fault feed.
+      if (!bot.appCrashed && bot.handlers[Event.DEATH]) {
+        bot.handlers[Event.DEATH]();
       }
     }
   }

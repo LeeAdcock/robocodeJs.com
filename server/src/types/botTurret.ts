@@ -133,12 +133,17 @@ export class BotTurret implements Orientated {
   }
 
   isReady() {
-    return this.loaded >= 100 && this.deployed();
+    // A dead bot's gun is never ready — so a DEATH ("last words") handler reads
+    // isReady() === false and can't be tricked into firing a shot that would
+    // never leave the barrel (Simulation no longer ticks an eliminated bot).
+    return this.bot.health > 0 && this.loaded >= 100 && this.deployed();
   }
 
   fire() {
     if (!this.bot.chargeCommandBudget()) return commandBudgetRejected();
-    if (this.loaded < 100 || !this.deployed())
+    // Block firing once dead (health <= 0): mirrors isReady() so fire() rejects
+    // from a DEATH handler instead of silently doing nothing.
+    if (this.bot.health <= 0 || this.loaded < 100 || !this.deployed())
       return Promise.reject('Turret not ready');
     this.bot.logger.trace('Turret firing');
 

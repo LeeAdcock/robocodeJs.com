@@ -508,7 +508,12 @@ function exposeBot(bot: Bot, isolate: ivm.Isolate) {
         : settle(
             id,
             false,
-            `${ErrorCodes.E024}: send limit reached (${MAX_SENDS_PER_TICK} per tick). This broadcast was not sent.`
+            // Bot.send returns false for two reasons; pick the matching message
+            // off the same health it gated on. A dead bot can't broadcast (it is
+            // eliminated); otherwise the per-tick send budget was spent.
+            bot.getHealth() <= 0
+              ? 'Bot is eliminated; broadcast not sent.'
+              : `${ErrorCodes.E024}: send limit reached (${MAX_SENDS_PER_TICK} per tick). This broadcast was not sent.`
           )
     );
   });
@@ -1223,6 +1228,7 @@ const init = (
           TICK:'TICK',
           HIT: 'HIT',
           DETECTED:'DETECTED',
+          DEATH:'DEATH',
         }
         `
       )
