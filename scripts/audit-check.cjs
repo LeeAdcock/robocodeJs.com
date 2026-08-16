@@ -23,16 +23,10 @@
 const { execSync } = require('node:child_process');
 
 // GHSA ids (the tail of `advisory.url`) that are accepted and must NOT fail CI.
-const ALLOWLIST = new Map([
-  [
-    'GHSA-qwww-vcr4-c8h2',
-    'react-router RSC-mode CSRF bypass — the UI is a client-only SPA using ' +
-      'BrowserRouter and never enables React Router’s RSC/server-action ' +
-      'mode, so the vulnerable path is unreachable. No fixed react-router-dom ' +
-      'exists (latest is still in the advisory range; npm’s only "fix" is ' +
-      'a semver-major downgrade to 7.11.0).',
-  ],
-]);
+// Currently empty: every known high/critical advisory has an upgrade available
+// and is taken. (The last entry, GHSA-qwww-vcr4-c8h2 / react-router RSC-mode
+// CSRF, was dropped once react-router-dom 7.18.2 shipped the fix.)
+const ALLOWLIST = new Map([]);
 
 const FAIL_SEVERITIES = new Set(['high', 'critical']);
 
