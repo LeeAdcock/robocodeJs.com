@@ -1,0 +1,159 @@
+name: Scheduled release tag
+
+# The deploy pipeline (AWS CodePipeline `RobocodeJs`, V2) has exactly one
+# trigger: a pushed `v*` tag. Merging to main does not deploy. This workflow
+# moves that tag push into an off-hours window, so a release lands when traffic
+# is lowest and the t2.micro has burst credits banked for the immutable swap --
+# rather than whenever the bump commit happened to be merged.
+#
+# The release intent is the `build: bump server to vX.Y.Z` commit (see
+# CLAUDE.md): once that commit is on main, the next weekday run tags it and the
+# pipeline deploys it. To hold a release, hold the bump commit.
+#
+# Release notes are still written by hand (CLAUDE.md house style requires
+# judgement this job has no business faking). Creating a Release against an
+# existing tag fires a `release` event, not a tag push, so notes can be added
+# the morning after without re-triggering the deploy.
+#
+# The tag is pushed with GITHUB_TOKEN, which deliberately does not trigger other
+# GitHub Actions workflows. That is fine here: CodePipeline watches the repo
+# through its CodeStar connection and sees the underlying git push, not the
+# Actions event.
+
+on:
+  schedule:
+    # 07:00 UTC Mon-Fri = 3am EDT / 2am EST. GitHub cron is UTC and does not
+    # follow DST, so the local hour shifts once in spring and once in autumn.
+    - cron: '0 7 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Resolve and log the pending release without pushing the tag'
+        type: boolean
+        default: false
+
+# Pushing a tag is a write to the repository. Nothing else here needs a scope.
+permissions:
+  contents: write
+
+# Never let a manual run race the scheduled one into creating the same tag.
+concurrency:
+  group: scheduled-release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: tag pending release
+    runs-on: ubuntu-latest
+    # Scheduled workflows keep firing on forks, where there is nothing to ship.
+    if: github.repository == 'LeeAdcock/robocodeJs.com'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          # Full history and tags: the job finds the bump commit by message and
+          # has to know which versions are already tagged.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve the pending release
+        id: resolve
+        run: |
+          set -euo pipefail
+
+          VERSION="$(node -p "require('./server/package.json').version")"
+          TAG="v$VERSION"
+          echo "Server version on main: $VERSION"
+
+          # Already released: the common case on most weekday mornings.
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already tagged - nothing to release."
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Tag the bump commit itself rather than main's HEAD. Main may have
+          # advanced past it, and the release notes are sourced from
+          # `git log <prev-tag>..<tag>` -- a range that is only honest if the
+          # tag marks exactly what the version bump released. Anything merged
+          # after the bump waits for the next one, which is how the manual
+          # process already behaves.
+          ESCAPED="${VERSION//./\\.}"
+          SHA="$(git log --format=%H --grep="^build: bump server to v${ESCAPED}\b" -n 1 main)"
+          if [ -z "$SHA" ]; then
+            echo "::error::server/package.json is at $VERSION but no 'build: bump server to $TAG' commit is on main. Refusing to guess which commit to tag."
+            exit 1
+          fi
+
+          # Guard against the message matching a commit that does not actually
+          # carry that version (a revert, a hand-written subject).
+          AT_SHA="$(git show "$SHA:server/package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"
+          if [ "$AT_SHA" != "$VERSION" ]; then
+            echo "::error::$SHA looks like the bump commit for $TAG but sets version $AT_SHA."
+            exit 1
+          fi
+
+          echo "Pending release: $TAG at $SHA"
+          {
+            echo "pending=true"
+            echo "tag=$TAG"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Require green CI on the release commit
+        id: ci
+        if: steps.resolve.outputs.pending == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          # Ask the CI workflow directly instead of reading the commit's check
+          # runs: this job's own run is itself a check run on main's head, so a
+          # generic "are all checks green" query would wait on itself.
+          CONCLUSION="$(gh api \
+            "/repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&status=completed" \
+            --jq '(.workflow_runs | sort_by(.created_at) | last | .conclusion) // "none"')"
+
+          # No completed run yet means the bump landed minutes ago and CI is
+          # still going. Not a failure -- just wait for the next window.
+          if [ "$CONCLUSION" = "none" ]; then
+            echo "CI has not finished on $SHA yet - deferring to the next run."
+            echo "green=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::CI concluded '$CONCLUSION' on $SHA. Refusing to tag a release that would deploy it."
+            exit 1
+          fi
+
+          echo "CI is green on $SHA."
+          echo "green=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push the tag
+        if: steps.resolve.outputs.pending == 'true' && steps.ci.outputs.green == 'true'
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Annotated, matching the tags created by hand.
+          git tag -a "$TAG" -m "Release $TAG" "$SHA"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run - would have pushed $TAG at $SHA."
+            echo "Dry run: would push **$TAG** at \`$SHA\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git push origin "$TAG"
+          echo "Pushed **$TAG** at \`$SHA\` - CodePipeline will deploy it." >> "$GITHUB_STEP_SUMMARY"
+          echo "Remember to publish release notes: gh release create $TAG --verify-tag --title \"$TAG\" --notes-file <notes.md>" >> "$GITHUB_STEP_SUMMARY"
