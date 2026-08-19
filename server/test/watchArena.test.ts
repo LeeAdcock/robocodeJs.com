@@ -49,30 +49,41 @@ beforeEach(() => {
 describe('public watch routes (/api/arena/:arenaId)', () => {
   it('serves the status snapshot to an anonymous visitor by arena UUID alone', async () => {
     (arenaService.get as ReturnType<typeof vi.fn>).mockResolvedValue(
-      fakeArena('arena-1', 'owner-9')
+      fakeArena(
+        'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+        '99999999-9999-4999-8999-999999999999'
+      )
     );
     (environmentService.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
     (
       arenaMemberService.getForArena as ReturnType<typeof vi.fn>
     ).mockResolvedValue([]);
     (buildArenaStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 'arena-1',
+      id: 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
       running: true,
       apps: [],
     });
 
-    const res = await request(makeAnonApp()).get('/api/arena/arena-1');
+    const res = await request(makeAnonApp()).get(
+      '/api/arena/bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1'
+    );
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: 'arena-1' });
+    expect(res.body).toMatchObject({
+      id: 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+    });
     // Resolved purely from the UUID — no owner userId was supplied or required.
-    expect(arenaService.get).toHaveBeenCalledWith('arena-1');
+    expect(arenaService.get).toHaveBeenCalledWith(
+      'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1'
+    );
   });
 
   it('404s for an unknown arena id', async () => {
     (arenaService.get as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-    const res = await request(makeAnonApp()).get('/api/arena/nope');
+    const res = await request(makeAnonApp()).get(
+      '/api/arena/00000000-0000-4000-8000-000000000000'
+    );
 
     expect(res.status).toBe(404);
     expect(buildArenaStatus).not.toHaveBeenCalled();
@@ -89,12 +100,27 @@ describe('public watch routes (/api/arena/:arenaId)', () => {
     expect(buildArenaStatus).not.toHaveBeenCalled();
   });
 
+  it('short-circuits a non-UUID id without consulting the database', async () => {
+    const res = await request(makeAnonApp()).get('/api/arena/not-a-uuid');
+
+    // The owner-scoped loaders answer a malformed id with 400/E028, but this is
+    // a public share link: a mangled one belongs on the friendly not-found page,
+    // so the public route deliberately keeps its 404.
+    expect(res.status).toBe(404);
+    expect(arenaService.get).not.toHaveBeenCalled();
+  });
+
   it('does NOT expose the private logs stream on the public tree', async () => {
     (arenaService.get as ReturnType<typeof vi.fn>).mockResolvedValue(
-      fakeArena('arena-1', 'owner-9')
+      fakeArena(
+        'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+        '99999999-9999-4999-8999-999999999999'
+      )
     );
 
-    const res = await request(makeAnonApp()).get('/api/arena/arena-1/logs');
+    const res = await request(makeAnonApp()).get(
+      '/api/arena/bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1/logs'
+    );
 
     // No /logs route is registered here — console output stays owner-only under
     // /api/user. Express returns 404 for the unmatched path.

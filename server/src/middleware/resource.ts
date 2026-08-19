@@ -2,10 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import userService from '../services/UserService';
 import appService from '../services/AppService';
 import { logger, LogEvent } from '../util/logger';
+import { isUuid } from '../util/uuid';
 import arenaService from '../services/ArenaService';
 import User from '../types/user';
 import App from '../types/app';
 import Arena from '../types/arena';
+import { ErrorCodes } from '../types/ErrorCodes';
 
 // Express middleware that removes the user-lookup / ownership / app-lookup
 // boilerplate that was repeated across the api/* route handlers.
@@ -24,12 +26,29 @@ export const scopedApp = (req: Request): App =>
 export const scopedArena = (req: Request): Arena =>
   (req as ArenaScopedRequest).targetArena;
 
+// Rejects a path id that isn't a well-formed UUID. This runs *before* any
+// service lookup: every id column is a Postgres `uuid`, so passing a name or a
+// pasted URL through to the query throws "invalid input syntax for type uuid"
+// and escapes as a 500 — an unhandled-error alarm for what is really a client
+// mistake. A malformed id is a bad request, not a missing resource, so it is a
+// 400 (E028); a *well-formed* id that matches nothing stays a 404 below.
+const rejectMalformedId = (res: Response, label: string) => {
+  res.status(400).json({
+    code: ErrorCodes.E028,
+    error: `Invalid ${label}: expected a UUID.`,
+  });
+};
+
 // Loads the :userId path param into req.targetUser, or 404s.
 export const loadUser = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  if (!isUuid(req.params.userId)) {
+    rejectMalformedId(res, 'user id');
+    return;
+  }
   const user = await userService.get(req.params.userId as string);
   if (!user) {
     res.status(404);
@@ -77,6 +96,10 @@ export const loadApp = async (
   res: Response,
   next: NextFunction
 ) => {
+  if (!isUuid(req.params.appId)) {
+    rejectMalformedId(res, 'app id');
+    return;
+  }
   const app = await appService.get(req.params.appId as string);
   if (!app) {
     res.status(404);
@@ -129,6 +152,10 @@ export const resolveArena = async (
 ) => {
   const targetUser = (req as UserScopedRequest).targetUser;
   if (req.params.arenaId) {
+    if (!isUuid(req.params.arenaId)) {
+      rejectMalformedId(res, 'arena id');
+      return;
+    }
     const arena = await arenaService.get(req.params.arenaId as string);
     if (!arena || arena.getUserId() !== targetUser.getId()) {
       res.status(404);
@@ -158,11 +185,16 @@ export const resolvePublicArena = async (
   // so a mangled share link (e.g. a non-UUID id the DB rejects with a cast error)
   // must render the friendly not-found page — a 404 the watch UI handles — rather
   // than a 500.
+  // Deliberately a 404 rather than the 400 the owner-scoped loaders return: this
+  // is a public share link, and a mangled one should land on the friendly
+  // not-found page, not an error body.
   let arena;
-  try {
-    arena = await arenaService.get(req.params.arenaId as string);
-  } catch {
-    arena = undefined;
+  if (isUuid(req.params.arenaId)) {
+    try {
+      arena = await arenaService.get(req.params.arenaId as string);
+    } catch {
+      arena = undefined;
+    }
   }
   if (!arena) {
     res.status(404);

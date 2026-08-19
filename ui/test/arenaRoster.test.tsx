@@ -41,6 +41,8 @@ const members = [
   },
 ];
 
+const SHARED_ID = '352dbcfe-9de6-4f2a-a2dc-7df12004fa68';
+
 const arena: any = { clock: { time: 0 }, apps: [{ id: 'a1' }] };
 
 const renderRoster = () =>
@@ -142,13 +144,65 @@ describe('ArenaRoster', () => {
     renderRoster();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
 
-    const id = 'b'.repeat(36);
     fireEvent.change(screen.getByLabelText('App id'), {
-      target: { value: id },
+      target: { value: SHARED_ID },
     });
     fireEvent.click(screen.getByText('Add'));
     await waitFor(() =>
-      expect(axios.put).toHaveBeenCalledWith(`/api/user/u1/arena/app/${id}`)
+      expect(axios.put).toHaveBeenCalledWith(
+        `/api/user/u1/arena/app/${SHARED_ID}`
+      )
+    );
+  });
+
+  // The field's own label offers "its id (or share link)", so a pasted link has
+  // to work: sending it verbatim previously fell through the SPA fallback to a
+  // 200 + HTML shell, which the UI read as success while nothing was added.
+  it('accepts a pasted share link and adds the id it points at', async () => {
+    renderRoster();
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText('App id'), {
+      target: { value: `https://robocodejs.com/add-app/${SHARED_ID}` },
+    });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() =>
+      expect(axios.put).toHaveBeenCalledWith(
+        `/api/user/u1/arena/app/${SHARED_ID}`
+      )
+    );
+  });
+
+  // The real-world mistake: copying a bot's *name* off the rankings page.
+  it('explains an app name instead of sending it to the server', async () => {
+    renderRoster();
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText('App id'), {
+      target: { value: 'S12-CORDON' },
+    });
+    fireEvent.click(screen.getByText('Add'));
+
+    expect(
+      await screen.findByText(/doesn.t look like an app id/i)
+    ).toBeTruthy();
+    expect(axios.put).not.toHaveBeenCalled();
+  });
+
+  it('clears the validation message once the input is corrected', async () => {
+    renderRoster();
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
+
+    const input = screen.getByLabelText('App id');
+    fireEvent.change(input, { target: { value: 'S12-CORDON' } });
+    fireEvent.click(screen.getByText('Add'));
+    expect(
+      await screen.findByText(/doesn.t look like an app id/i)
+    ).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: SHARED_ID } });
+    await waitFor(() =>
+      expect(screen.queryByText(/doesn.t look like an app id/i)).toBeNull()
     );
   });
 
