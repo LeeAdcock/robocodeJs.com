@@ -7,17 +7,17 @@ const app = express();
 
 // Listen to an arena
 app.get('/api/demo/events', async (req, res) => {
-  openSseStream(res);
+  const stream = openSseStream(req, res);
 
   function listener(event: unknown) {
-    res.write('data: ' + JSON.stringify(event) + '\n\n');
+    stream.send(event);
   }
 
   return demoService.getDemoEnvironment().then((env) => {
     env.addListener('event', listener);
     req.on('close', () => {
       env.removeListener('event', listener);
-      res.end();
+      stream.close();
     });
   });
 });
