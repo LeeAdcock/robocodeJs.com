@@ -34,7 +34,9 @@ const LOG_FONT_MAX = 30;
 const LOG_FONT_DEFAULT = 12;
 
 interface LogEntry {
-  id: string;
+  // Monotonic per-arena counter from the server; negative for the synthetic
+  // markers useLogsStream injects.
+  id: number;
   name: string;
   appId: string;
   botIndex: number;
@@ -111,7 +113,7 @@ interface LogsState {
   wrap: boolean;
   // Row id briefly outlined after a next/prev error or match jump, so the
   // landing row is findable in the stream.
-  flashId: string | null;
+  flashId: number | null;
 }
 
 // Identify one bot in the hide set.
@@ -1013,7 +1015,7 @@ const LOG_FONT_FAMILY =
 interface LogRowViewProps {
   rows: LogRow[];
   wrap: boolean;
-  flashId: string | null;
+  flashId: number | null;
   renderRow: (row: LogRow) => React.ReactNode;
 }
 
@@ -1069,7 +1071,7 @@ function VirtualLogList(props: {
   rows: LogRow[];
   fontSize: number;
   wrap: boolean;
-  flashId: string | null;
+  flashId: number | null;
   renderRow: (row: LogRow) => React.ReactNode;
   setListApi: (api: ListImperativeAPI | null) => void;
   onScroll: React.UIEventHandler<HTMLDivElement>;

@@ -211,6 +211,16 @@ export default class Environment {
     Number(process.env.MAX_RECENT_LOGS) || 1500;
   private recentLogs: unknown[] = [];
 
+  // Monotonic id stamped on every bot console log record. It exists so the UI
+  // can dedupe the replay the /logs stream sends on each reconnect, which only
+  // needs uniqueness within one arena's stream — this used to be a randomUUID(),
+  // 44 bytes of pure entropy per ~196-byte record that defeated compression
+  // (identical records differing only in this field gzip 5.8x worse with uuids
+  // than with a counter). Deliberately NOT reset by restart(): recentLogs
+  // survives a restart, so a reset would let a new record collide with a
+  // replayed one still held in the client's ring and be dropped as a duplicate.
+  private logSeq = 0;
+
   // Bounded history of the most recent structured bot faults (crashes), the
   // counterpart to recentLogs for the MCP `recent_faults` tool and the SSE
   // `botFault` event. Smaller than the log buffer — crashes are rare and each
@@ -406,6 +416,9 @@ export default class Environment {
     }
     return this.emitter.emit(eventName, ...args);
   }
+
+  // Next id for a bot console log record (see logSeq).
+  nextLogId = (): number => ++this.logSeq;
 
   // The most recent bot console logs (oldest first), up to MAX_RECENT_LOGS. Pass
   // a limit to read only the tail.

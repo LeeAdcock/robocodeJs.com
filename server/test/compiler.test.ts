@@ -25,7 +25,11 @@ function makeCompiledBot() {
   // Mutable so contact-staleness tests can advance the clock between a scan
   // and the intercept computed from it.
   let time = 42;
+  let logSeq = 0;
   const env = {
+    // Mirrors Environment.nextLogId: the monotonic per-arena id on every bot
+    // console log record.
+    nextLogId: () => ++logSeq,
     getArena: () => ({ getWidth: () => 750, getHeight: () => 600 }),
     getProcesses: () => [proc],
     getTime: () => time,

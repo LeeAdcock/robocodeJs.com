@@ -15,7 +15,11 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 export interface LogEntry {
-  id: string;
+  // Server-assigned, monotonically increasing within the arena (a counter, not
+  // a uuid — see Environment.logSeq: the id rides every record on a long-lived
+  // SSE stream, so its compressibility is worth real bandwidth). Synthetic
+  // client-side markers use negative ids so they can never collide with one.
+  id: number;
   name: string;
   appId: string;
   botIndex: number;
@@ -47,7 +51,7 @@ const emptyBuffer = (): LogEntries => ({
 let state: LogEntries = emptyBuffer();
 // Ids currently held in the ring, so replayed history (server resends its
 // buffer on every connect) isn't appended twice.
-const heldIds = new Set<string>();
+const heldIds = new Set<number>();
 const listeners = new Set<() => void>();
 let source: EventSource | undefined;
 let streamUserId: string | undefined;
@@ -78,7 +82,7 @@ function open(userId: string) {
   );
   source.onmessage = (message) => {
     const entry = JSON.parse(message.data) as LogEntry;
-    if (!entry.id || heldIds.has(entry.id)) return;
+    if (typeof entry.id !== 'number' || heldIds.has(entry.id)) return;
     append(entry);
   };
 }
@@ -87,7 +91,7 @@ function open(userId: string) {
 function append(entry: LogEntry) {
   const evicted = state.logs[state.index];
   if (evicted) heldIds.delete(evicted.id);
-  if (entry.id) heldIds.add(entry.id);
+  heldIds.add(entry.id);
   state.logs[state.index] = entry;
   state = { logs: state.logs, index: (state.index + 1) % state.logs.length };
   notify();
@@ -101,7 +105,7 @@ function append(entry: LogEntry) {
 let markerSeq = 0;
 export function addLogMarker(kind: string, label: string, time: number) {
   append({
-    id: `marker-${++markerSeq}`,
+    id: -++markerSeq,
     marker: kind,
     msg: label,
     time,

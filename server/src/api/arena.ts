@@ -415,10 +415,10 @@ app.post(dual('/seed'), loadUser, requireOwner, resolveArena, setSeed);
 
 // Listen to an arena's game events
 export const events = async (req: Request, res: Response) => {
-  openSseStream(res);
+  const stream = openSseStream(req, res);
 
   function listener(event: unknown) {
-    res.write('data: ' + JSON.stringify(event) + '\n\n');
+    stream.send(event);
   }
 
   const arena = scopedArena(req);
@@ -426,7 +426,7 @@ export const events = async (req: Request, res: Response) => {
     env.addListener('event', listener);
     req.on('close', () => {
       env.removeListener('event', listener);
-      res.end();
+      stream.close();
     });
   });
 };
@@ -437,10 +437,10 @@ app.get(dual('/events'), loadUser, resolveArena, events);
 // the author's private debug channel — a bot may print strategy or diagnostic
 // data — so this stream is owner-only via requireOwner.
 const logs = async (req: Request, res: Response) => {
-  openSseStream(res);
+  const stream = openSseStream(req, res);
 
   function listener(event: unknown) {
-    res.write('data: ' + JSON.stringify(event) + '\n\n');
+    stream.send(event);
   }
 
   const arena = scopedArena(req);
@@ -452,7 +452,7 @@ const logs = async (req: Request, res: Response) => {
 
     req.on('close', () => {
       env.removeListener('log', listener);
-      res.end();
+      stream.close();
     });
   });
 };

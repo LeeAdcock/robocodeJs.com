@@ -1232,7 +1232,8 @@ export const buildServer = (user: User): McpServer => {
         'Recent bot console output for an arena (oldest first). The live ' +
         'log stream is not replayable, so this returns a bounded buffer. Use the ' +
         'filters to narrow to one bot, a severity, or a substring. Logs are ' +
-        'arena-specific, so name the arena explicitly.',
+        'arena-specific, so name the arena explicitly. Each entry carries an ' +
+        '`id` that is a number, monotonically increasing within the arena.',
       inputSchema: {
         arenaId: z.string().describe('The arena id'),
         limit: z

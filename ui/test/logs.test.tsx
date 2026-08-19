@@ -8,7 +8,7 @@ import Logs from '../src/page/arena/logs';
 Element.prototype.scrollTo = () => {};
 
 interface Entry {
-  id: string;
+  id: number;
   name: string;
   appId: string;
   botIndex: number;
@@ -21,7 +21,7 @@ interface Entry {
 }
 let seq = 0;
 const entry = (over: Partial<Entry> = {}): Entry => ({
-  id: `e${seq++}`,
+  id: seq++,
   name: '<11>',
   appId: 'a1',
   botIndex: 1,
