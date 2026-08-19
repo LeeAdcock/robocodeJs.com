@@ -32,7 +32,7 @@ class FakeEventSource {
 
 let seq = 0;
 const entry = (over: Record<string, unknown> = {}) => ({
-  id: `dock-e${seq++}`,
+  id: seq++,
   name: '<11>',
   appId: 'a1',
   botIndex: 1,

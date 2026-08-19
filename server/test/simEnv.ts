@@ -74,7 +74,12 @@ export function makeSimEnv(
     return settled;
   };
 
+  let logSeq = 0;
   const env: any = {
+    // Mirrors Environment.nextLogId: the monotonic per-arena id stamped on every
+    // bot console log record (a counter, not a uuid — it rides every record on
+    // the long-lived SSE log stream).
+    nextLogId: () => ++logSeq,
     getArena: () => ({
       getWidth: () => opts.width ?? 750,
       getHeight: () => opts.height ?? 750,

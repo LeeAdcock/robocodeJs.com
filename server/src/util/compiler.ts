@@ -12,7 +12,6 @@ import { Event } from '../types/event';
 import { scheduleFactory } from './scheduleFactory';
 import ivm from 'isolated-vm';
 import { createLogger } from 'browser-bunyan';
-import { randomUUID } from 'node:crypto';
 import Environment, { Process } from '../types/environment';
 import Arena from '../types/arena';
 import appService from '../services/AppService';
@@ -1030,7 +1029,7 @@ const init = (
               appId: process.getAppId(),
               botIndex: process.bots.map((t) => t.id).indexOf(bot.id) + 1,
               time: env.getTime(),
-              id: randomUUID(),
+              id: env.nextLogId(),
             });
           },
         },
