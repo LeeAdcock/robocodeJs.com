@@ -28,6 +28,8 @@ describe('isSubresourceRequest', () => {
       '/sitemap.xml',
       '/fonts/inter.woff2',
       '/og-card.png',
+      // Reaching the fallback still means 404 — an explicit route ahead of it
+      // serves this one from the icon set (see util/rootIcons.ts).
       '/favicon.ico',
     ]) {
       expect(isSubresourceRequest(p), p).toBe(true);

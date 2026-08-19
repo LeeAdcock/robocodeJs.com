@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   createSeoResolver,
   renderHeadTags,
@@ -250,6 +252,25 @@ describe('the SEO region marker', () => {
     const out = shell.replace(SEO_REGION, '<!--SEO:start-->NEW<!--SEO:end-->');
     expect(out).toContain('NEW');
     expect(out).not.toContain('old');
+  });
+
+  it('does not cover the shell’s icon links', () => {
+    // The SPA fallback rewrites everything between the markers on every
+    // server-rendered navigation, so anything inside is per-page and transient.
+    // The favicon/apple-touch-icon links must therefore stay above the region —
+    // move them in and they vanish from every page the server renders.
+    const shell = fs.readFileSync(
+      path.resolve(__dirname, '../../ui/index.html'),
+      'utf8'
+    );
+    const [beforeRegion] = shell.split('<!--SEO:start-->');
+    for (const link of [
+      'rel="icon" href="/favicon.ico"',
+      'rel="apple-touch-icon"',
+      'rel="manifest"',
+    ]) {
+      expect(beforeRegion, link).toContain(link);
+    }
   });
 });
 
