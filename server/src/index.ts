@@ -19,6 +19,7 @@ import {
   IMMUTABLE_CACHE_CONTROL,
   SHELL_CACHE_CONTROL,
 } from './util/staticAssets';
+import { rootIconRouter } from './util/rootIcons';
 
 import auth from './middleware/auth';
 import securityHeaders from './middleware/securityHeaders';
@@ -92,6 +93,10 @@ app.use('/api/session', authRateLimit);
 app.use('/api/oauth', authRateLimit);
 app.use('/api', apiRateLimit);
 
+// The built UI: `ui build` writes into server/dist/public, and this file runs
+// from server/dist.
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
+
 app.use(
   '/',
   express.static('./dist/public', {
@@ -125,6 +130,14 @@ app.use(
     },
   })
 );
+
+// Browsers request /favicon.ico from the site root no matter what the shell's
+// <link rel="icon"> says, and iOS does the same for /apple-touch-icon.png. The
+// icon set lives under /icons/, so those bare root requests matched no static
+// file, fell through to the SPA fallback and 404'd — /favicon.ico alone was the
+// largest single source of asset.missing in production, burying the signal that
+// metric exists for (clients stuck on a previous build's chunk hashes).
+app.use(rootIconRouter(PUBLIC_DIR));
 
 app.use('/api/user', auth(true));
 // Bot metadata-by-id (GET /api/app/:appId) is readable by any signed-in user for
@@ -160,7 +173,6 @@ app.use(arenaEndpoints);
 // doesn't run JS) would see one generic <title> and empty description for the
 // homepage, docs, lessons, and blog. We compute per-route metadata from the
 // shared blog manifest and the markdown, and inject it into the shell.
-const PUBLIC_DIR = path.resolve(__dirname, '../public');
 const OG_IMAGE = PUBLIC_ORIGIN + '/og-card.png';
 
 const readPublic = (rel: string): string | null => {
