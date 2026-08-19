@@ -13,6 +13,7 @@ import Arena from '../types/arena';
 import ArenaMember from '../types/arenaMember';
 import { colors } from '../util/colors';
 import { titleCase } from '../util/titleCase';
+import { extractAppId } from '../util/appRef';
 
 // The arena roster: every app linked to the owner's arena — their own and any
 // added by reference — with an enable/disable toggle and an unlink action, plus
@@ -30,9 +31,11 @@ interface ArenaRosterProps {
   onChanged?: () => void;
 }
 
-// A full app id (uuid) is 36 chars; use that to decide when to preview a pasted
-// reference. Nothing security-sensitive — the server validates the id.
-const UUID_LENGTH = 36;
+// Shown when the box holds something that isn't an app reference at all — most
+// often the app's *name*, copied off the rankings page. Naming both accepted
+// forms matters: the id isn't discoverable unless you know to look for it.
+const NOT_AN_APP_ID =
+  'That doesn\u2019t look like an app id. Paste the app\u2019s share link, or the 36-character id from its page.';
 
 // Match the arena color assignment used elsewhere (navbar's AppLink): an app's
 // color is its index among the LIVE apps. A disabled / not-yet-live app has no
@@ -108,19 +111,23 @@ export default function ArenaRoster(props: ArenaRosterProps) {
     refetch();
   }, [show, refetch]);
 
-  // Preview a pasted id by resolving its metadata (name only). Runs once the
-  // input looks like a complete id; failure just clears the preview/leaves an
-  // error for the eventual Add attempt to report.
+  // What's in the box, resolved to an app id — accepting either a bare id or a
+  // full /add-app/<id> share link — or null if it isn't a reference at all.
+  const resolvedAddId = extractAppId(addId);
+
+  // Preview a pasted reference by resolving its metadata (name only). Runs once
+  // the input resolves to a complete id; failure just clears the preview/leaves
+  // an error for the eventual Add attempt to report. Editing the box also clears
+  // any stale validation error from a previous Add attempt.
   useEffect(() => {
-    const id = addId.trim();
     setAddError(null);
-    if (id.length !== UUID_LENGTH) {
+    if (!resolvedAddId) {
       setAddPreview(null);
       return;
     }
     let cancelled = false;
     axios
-      .get(`/api/app/${id}`)
+      .get(`/api/app/${resolvedAddId}`)
       .then((res) => {
         if (!cancelled) setAddPreview(res.data.name || 'Unnamed app');
       })
@@ -130,7 +137,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
     return () => {
       cancelled = true;
     };
-  }, [addId]);
+  }, [addId, resolvedAddId]);
 
   const atCapacity = members.length >= 5;
 
@@ -193,12 +200,18 @@ export default function ArenaRoster(props: ArenaRosterProps) {
   };
 
   const addExisting = () => {
-    const id = addId.trim();
-    if (!id) return;
+    if (!addId.trim()) return;
+    // Catch a name (or any other non-reference) here rather than sending it to
+    // the server, which can only answer with an error the user can't act on.
+    if (!resolvedAddId) {
+      setAddPreview(null);
+      setAddError(NOT_AN_APP_ID);
+      return;
+    }
     setAddBusy(true);
     setAddError(null);
     axios
-      .put(`/api/user/${userId}/arena/app/${id}`)
+      .put(`/api/user/${userId}/arena/app/${resolvedAddId}`)
       .then(() => {
         setAddId('');
         setAddPreview(null);
