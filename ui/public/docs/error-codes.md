@@ -232,6 +232,10 @@ bot.on(Event.START, () => {
 })
 ```
 
+## E028
+
+**Invalid id: the request was rejected.** A request addressed an app, arena, or user by something that isn't a valid id. Like [E022](#e022) and [E025](#e025), this is an API response (**HTTP 400**) surfaced in the app or your tooling, not a bot console message. Every id in RobocodeJs is a UUID — 36 characters of hex in the `8-4-4-4-12` pattern, e.g. `352dbcfe-9de6-4f2a-a2dc-7df12004fa68` — and the most common cause is using an app's **name** where its **id** was expected. Fix: use the id, which you'll find on the app's page and in the share link it offers (`/add-app/<id>`); the arena's "add by id" box also accepts a whole pasted share link. An id that is well-formed but matches nothing returns **404** instead.
+
 ## Reserved codes
 
 `E002`, `E005`–`E012`, `E014`–`E016`, `W001`, and `W002` are reserved and not currently emitted. If you ever see one, it's safe to report it.

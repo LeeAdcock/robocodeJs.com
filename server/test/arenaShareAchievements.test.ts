@@ -46,16 +46,16 @@ const mount = (viewerId: string) => {
 
 const setup = (botOwnerId: string) => {
   vi.mocked(userService.get).mockResolvedValue({
-    getId: () => 'u1',
+    getId: () => '11111111-1111-4111-8111-111111111111',
   } as never);
   vi.mocked(appService.get).mockResolvedValue({
-    getId: () => 'bot-1',
+    getId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
     getName: () => 'Rival',
     getUserId: () => botOwnerId,
   } as never);
   vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-    getId: () => 'ar1',
-    getUserId: () => 'u1',
+    getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+    getUserId: () => '11111111-1111-4111-8111-111111111111',
   } as never);
   vi.mocked(arenaMemberService.getForArena).mockResolvedValue([]);
   vi.mocked(environmentService.get).mockResolvedValue({
@@ -71,23 +71,37 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('add-by-reference — share achievements', () => {
   it("awards both halves when a user adds someone else's bot", async () => {
-    setup('u2');
+    setup('22222222-2222-4222-8222-222222222222');
 
-    const res = await request(mount('u1')).put('/api/user/u1/arena/app/bot-1');
+    const res = await request(
+      mount('11111111-1111-4111-8111-111111111111')
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     await settle();
 
     expect(res.status).toBe(201);
     // The author whose bot got picked up...
-    expect(award).toHaveBeenCalledWith('u2', 'account-shared');
+    expect(award).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      'account-shared'
+    );
     // ...and the player who fielded it.
-    expect(award).toHaveBeenCalledWith('u1', 'account-borrowed');
+    expect(award).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      'account-borrowed'
+    );
   });
 
   // Adding your own bot to your own arena is just using the app.
   it('awards nothing when a user adds their own bot', async () => {
-    setup('u1');
+    setup('11111111-1111-4111-8111-111111111111');
 
-    const res = await request(mount('u1')).put('/api/user/u1/arena/app/bot-1');
+    const res = await request(
+      mount('11111111-1111-4111-8111-111111111111')
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     await settle();
 
     expect(res.status).toBe(201);
@@ -97,12 +111,16 @@ describe('add-by-reference — share achievements', () => {
   // The route early-returns for an existing member, so the badge can't re-fire on
   // a re-add. (unlock is idempotent anyway — this pins the cheaper guard.)
   it('does not re-award when the bot is already a member', async () => {
-    setup('u2');
+    setup('22222222-2222-4222-8222-222222222222');
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
-      { getAppId: () => 'bot-1' },
+      { getAppId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1' },
     ] as never);
 
-    const res = await request(mount('u1')).put('/api/user/u1/arena/app/bot-1');
+    const res = await request(
+      mount('11111111-1111-4111-8111-111111111111')
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     await settle();
 
     expect(res.status).toBe(200);
@@ -111,7 +129,7 @@ describe('add-by-reference — share achievements', () => {
 
   // A roster that's full rejects the add, so nothing was shared.
   it('awards nothing when the add is rejected', async () => {
-    setup('u2');
+    setup('22222222-2222-4222-8222-222222222222');
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
       { getAppId: () => 'x1' },
       { getAppId: () => 'x2' },
@@ -120,7 +138,11 @@ describe('add-by-reference — share achievements', () => {
       { getAppId: () => 'x5' },
     ] as never);
 
-    const res = await request(mount('u1')).put('/api/user/u1/arena/app/bot-1');
+    const res = await request(
+      mount('11111111-1111-4111-8111-111111111111')
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     await settle();
 
     expect(res.status).toBe(400);

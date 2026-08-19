@@ -94,7 +94,7 @@ const mockUser = (id: string) => ({
 const mockApp = (id: string) => ({
   getId: () => id,
   getName: () => `App ${id}`,
-  getUserId: () => 'u1',
+  getUserId: () => '11111111-1111-4111-8111-111111111111',
   getSource: () => '// bot code',
   setSource: vi.fn().mockResolvedValue(undefined),
   // propagateSource reads this before saving, to spot a ladder-benched app being
@@ -139,15 +139,20 @@ describe('GET /health', () => {
 describe('user endpoints', () => {
   it('GET /api/user returns the authenticated user with their apps', async () => {
     vi.mocked(appService.getForUser).mockResolvedValue([
-      mockApp('a1'),
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'),
     ] as never);
-    const res = await request(makeApp(userRouter, mockUser('u1'))).get(
-      '/api/user'
-    );
+    const res = await request(
+      makeApp(userRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).get('/api/user');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
-      id: 'u1',
-      apps: [{ id: 'a1', name: 'App a1' }],
+      id: '11111111-1111-4111-8111-111111111111',
+      apps: [
+        {
+          id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+          name: 'App aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+        },
+      ],
     });
   });
 
@@ -158,120 +163,180 @@ describe('user endpoints', () => {
 
   it('GET /api/user/:userId returns 404 for an unknown user', async () => {
     vi.mocked(userService.get).mockResolvedValue(undefined);
-    const res = await request(makeApp(userRouter)).get('/api/user/nope');
+    const res = await request(makeApp(userRouter)).get(
+      '/api/user/00000000-0000-4000-8000-000000000000'
+    );
     expect(res.status).toBe(404);
   });
 
   it('GET /api/user/:userId returns the user when found', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.getForUser).mockResolvedValue([]);
-    const res = await request(makeApp(userRouter)).get('/api/user/u1');
+    const res = await request(makeApp(userRouter)).get(
+      '/api/user/11111111-1111-4111-8111-111111111111'
+    );
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: 'u1', apps: [] });
+    expect(res.body).toMatchObject({
+      id: '11111111-1111-4111-8111-111111111111',
+      apps: [],
+    });
   });
 });
 
 describe('app endpoints', () => {
   it('GET /api/user/:userId/apps lists the user apps', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.getForUser).mockResolvedValue([
-      mockApp('a1'),
-      mockApp('a2'),
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'),
+      mockApp('aaaaaaa2-2222-4222-8222-aaaaaaaaaaa2'),
     ] as never);
-    const res = await request(makeApp(appRouter)).get('/api/user/u1/apps');
+    const res = await request(makeApp(appRouter)).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/apps'
+    );
     expect(res.status).toBe(200);
     expect(res.body).toEqual([
-      { id: 'a1', name: 'App a1' },
-      { id: 'a2', name: 'App a2' },
+      {
+        id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+        name: 'App aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+      },
+      {
+        id: 'aaaaaaa2-2222-4222-8222-aaaaaaaaaaa2',
+        name: 'App aaaaaaa2-2222-4222-8222-aaaaaaaaaaa2',
+      },
     ]);
   });
 
   it('GET /api/user/:userId/apps returns 404 for an unknown user', async () => {
     vi.mocked(userService.get).mockResolvedValue(undefined);
-    const res = await request(makeApp(appRouter)).get('/api/user/u1/apps');
+    const res = await request(makeApp(appRouter)).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/apps'
+    );
     expect(res.status).toBe(404);
   });
 
   it('POST /api/user/:userId/app creates an app for the owner', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.create).mockResolvedValue(mockApp('a9') as never);
-    const res = await request(makeApp(appRouter, mockUser('u1'))).post(
-      '/api/user/u1/app/'
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
     );
+    vi.mocked(appService.create).mockResolvedValue(
+      mockApp('aaaaaaa9-9999-4999-8999-aaaaaaaaaaa9') as never
+    );
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/app/');
     expect(res.status).toBe(201);
-    expect(res.body).toEqual({ appId: 'a9' });
-    expect(appService.create).toHaveBeenCalledWith('u1');
+    expect(res.body).toEqual({ appId: 'aaaaaaa9-9999-4999-8999-aaaaaaaaaaa9' });
+    expect(appService.create).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111'
+    );
   });
 
   it('POST /api/user/:userId/app is forbidden for a different user', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     const res = await request(
-      makeApp(appRouter, mockUser('someone-else'))
-    ).post('/api/user/u1/app/');
+      makeApp(appRouter, mockUser('99999999-9999-4999-8999-999999999999'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/app/');
     expect(res.status).toBe(401);
     expect(appService.create).not.toHaveBeenCalled();
   });
 
   it('POST /api/user/:userId/app returns 404 for an unknown user', async () => {
     vi.mocked(userService.get).mockResolvedValue(undefined);
-    const res = await request(makeApp(appRouter, mockUser('u1'))).post(
-      '/api/user/u1/app/'
-    );
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/app/');
     expect(res.status).toBe(404);
   });
 
   it('GET /api/user/:userId/app/:appId returns 404 for an unknown user', async () => {
     vi.mocked(userService.get).mockResolvedValue(undefined);
-    const res = await request(makeApp(appRouter)).get('/api/user/u1/app/a1');
+    const res = await request(makeApp(appRouter)).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     expect(res.status).toBe(404);
   });
 
   it('GET /api/user/:userId/app/:appId returns the app when found', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
-    const res = await request(makeApp(appRouter)).get('/api/user/u1/app/a1');
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
+    const res = await request(makeApp(appRouter)).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: 'a1', name: 'App a1' });
+    expect(res.body).toMatchObject({
+      id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+      name: 'App aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+    });
   });
 
   it('GET /api/app/:appId resolves a bot by id (add-by-reference) with metadata only', async () => {
     // mockApp is owned by u1; a different user (u2) resolves it by id alone.
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
-    const res = await request(makeApp(appRouter, mockUser('u2'))).get(
-      '/api/app/a1'
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
     );
+    const res = await request(
+      makeApp(appRouter, mockUser('22222222-2222-4222-8222-222222222222'))
+    ).get('/api/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: 'a1', name: 'App a1', userId: 'u1' });
+    expect(res.body).toEqual({
+      id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+      name: 'App aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+      userId: '11111111-1111-4111-8111-111111111111',
+    });
     // Never leaks source through the by-id metadata route.
     expect(res.text).not.toContain('bot code');
   });
 
   it('GET /api/user/:userId/app/:appId/source returns the source to the owner', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
-    const res = await request(makeApp(appRouter, mockUser('u1'))).get(
-      '/api/user/u1/app/a1/source'
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/source'
     );
     expect(res.status).toBe(200);
     expect(res.text).toBe('// bot code');
   });
 
   it('GET /api/user/:userId/app/:appId/source returns 404 for an unknown app', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.get).mockResolvedValue(undefined);
-    const res = await request(makeApp(appRouter, mockUser('u1'))).get(
-      '/api/user/u1/app/missing/source'
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/00000000-0000-4000-8000-0000000000ff/source'
     );
     expect(res.status).toBe(404);
   });
 
   it('DELETE /api/user/:userId/app/:appId removes the app for the owner', async () => {
-    const app = mockApp('a1');
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    const app = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1');
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.get).mockResolvedValue(app as never);
     vi.mocked(arenaMemberService.getForApp).mockResolvedValue([]);
-    const res = await request(makeApp(appRouter, mockUser('u1'))).delete(
-      '/api/user/u1/app/a1'
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).delete(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
     );
     expect(res.status).toBe(200);
     expect(app.delete).toHaveBeenCalled();
@@ -279,33 +344,49 @@ describe('app endpoints', () => {
 
   it('POST /api/user/:userId/app/:appId/reboot reboots the app in running arenas', async () => {
     const reboot = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getForUser).mockResolvedValue([
-      { getId: () => 'ar1' },
+      { getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1' },
     ] as never);
     vi.mocked(environmentService.has).mockReturnValue(true as never);
     vi.mocked(environmentService.get).mockResolvedValue({ reboot } as never);
 
-    const res = await request(makeApp(appRouter, mockUser('u1'))).post(
-      '/api/user/u1/app/a1/reboot'
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/reboot'
     );
     expect(res.status).toBe(200);
-    expect(reboot).toHaveBeenCalledWith('a1');
+    expect(reboot).toHaveBeenCalledWith('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1');
   });
 
   it('POST /api/user/:userId/app/:appId/reboot is forbidden for a non-owner', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     const res = await request(
-      makeApp(appRouter, mockUser('someone-else'))
-    ).post('/api/user/u1/app/a1/reboot');
+      makeApp(appRouter, mockUser('99999999-9999-4999-8999-999999999999'))
+    ).post(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/reboot'
+    );
     expect(res.status).toBe(401);
   });
 
   it('POST /api/user/:userId/app/:appId/check dry-run compiles the posted source', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(compiler.check).mockResolvedValue({
       valid: false,
       stage: 'compile',
@@ -314,8 +395,12 @@ describe('app endpoints', () => {
       timedOut: false,
     } as never);
 
-    const res = await request(makeApp(appRouter, mockUser('u1')))
-      .post('/api/user/u1/app/a1/check')
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/check'
+      )
       .set('content-type', 'application/octet-stream')
       .send('function ( {');
 
@@ -325,10 +410,18 @@ describe('app endpoints', () => {
   });
 
   it('POST /api/user/:userId/app/:appId/check is forbidden for a non-owner', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
-    const res = await request(makeApp(appRouter, mockUser('someone-else')))
-      .post('/api/user/u1/app/a1/check')
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
+    const res = await request(
+      makeApp(appRouter, mockUser('99999999-9999-4999-8999-999999999999'))
+    )
+      .post(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/check'
+      )
       .set('content-type', 'application/octet-stream')
       .send('// code');
     expect(res.status).toBe(401);
@@ -336,10 +429,18 @@ describe('app endpoints', () => {
   });
 
   it('POST .../app/:appId/check rejects oversized source with 413 + E025', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
-    const res = await request(makeApp(appRouter, mockUser('u1')))
-      .post('/api/user/u1/app/a1/check')
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/check'
+      )
       .set('content-type', 'application/octet-stream')
       .send('x'.repeat(256 * 1024 + 1));
     expect(res.status).toBe(413);
@@ -351,37 +452,57 @@ describe('app endpoints', () => {
   // Object-level access control (A01-1). requireAppOwner must reject a caller
   // who owns the :userId in the path (passing requireOwner) but references
   // another user's :appId — the IDOR that would otherwise leak/overwrite/delete
-  // a victim's bot. mockApp is owned by 'u1'; the attacker authenticates as 'u2'
+  // a victim's bot. mockApp is owned by '11111111-1111-4111-8111-111111111111'; the attacker authenticates as '22222222-2222-4222-8222-222222222222'
   // and addresses their own userId with the victim's app id.
   it("GET .../app/:appId/source does NOT leak another user's source", async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u2') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never); // owned by u1
-    const res = await request(makeApp(appRouter, mockUser('u2'))).get(
-      '/api/user/u2/app/a1/source'
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('22222222-2222-4222-8222-222222222222') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    ); // owned by u1
+    const res = await request(
+      makeApp(appRouter, mockUser('22222222-2222-4222-8222-222222222222'))
+    ).get(
+      '/api/user/22222222-2222-4222-8222-222222222222/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/source'
     );
     expect(res.status).toBe(401);
     expect(res.text).not.toContain('// bot code');
   });
 
   it("PUT .../app/:appId/source cannot overwrite another user's source", async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u2') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never); // owned by u1
-    const res = await request(makeApp(appRouter, mockUser('u2')))
-      .put('/api/user/u2/app/a1/source')
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('22222222-2222-4222-8222-222222222222') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    ); // owned by u1
+    const res = await request(
+      makeApp(appRouter, mockUser('22222222-2222-4222-8222-222222222222'))
+    )
+      .put(
+        '/api/user/22222222-2222-4222-8222-222222222222/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/source'
+      )
       .set('content-type', 'application/octet-stream')
       .send('// malicious overwrite');
     expect(res.status).toBe(401);
   });
 
   it('PUT .../app/:appId/source saves a normal-sized body (200)', async () => {
-    const app = mockApp('a1'); // owned by u1
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    const app = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'); // owned by u1
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.get).mockResolvedValue(app as never);
     // propagateSource fans out to the app's arena members; none here.
     vi.mocked(arenaMemberService.getForApp).mockResolvedValue([] as never);
 
-    const res = await request(makeApp(appRouter, mockUser('u1')))
-      .put('/api/user/u1/app/a1/source')
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .put(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/source'
+      )
       .set('content-type', 'application/octet-stream')
       .send('clock.on(Event.TICK, () => {});');
 
@@ -424,14 +545,20 @@ describe('app endpoints', () => {
   // HTTP 413 + error code E025 BEFORE any persistence — the byte cap is
   // MAX_SOURCE_BYTES (256 KB), shared with the MCP set_app_source/create_app path.
   it('PUT .../app/:appId/source rejects an oversized body with 413 + E025', async () => {
-    const app = mockApp('a1'); // owned by u1
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    const app = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'); // owned by u1
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.get).mockResolvedValue(app as never);
     vi.mocked(arenaMemberService.getForApp).mockResolvedValue([] as never);
 
     const oversized = 'x'.repeat(256 * 1024 + 1); // one byte over the 256 KB cap
-    const res = await request(makeApp(appRouter, mockUser('u1')))
-      .put('/api/user/u1/app/a1/source')
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .put(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/source'
+      )
       .set('content-type', 'application/octet-stream')
       .send(oversized);
 
@@ -443,24 +570,30 @@ describe('app endpoints', () => {
   });
 
   it("DELETE .../app/:appId cannot delete another user's app", async () => {
-    const victimApp = mockApp('a1'); // owned by u1
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u2') as never);
+    const victimApp = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'); // owned by u1
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('22222222-2222-4222-8222-222222222222') as never
+    );
     vi.mocked(appService.get).mockResolvedValue(victimApp as never);
-    const res = await request(makeApp(appRouter, mockUser('u2'))).delete(
-      '/api/user/u2/app/a1'
+    const res = await request(
+      makeApp(appRouter, mockUser('22222222-2222-4222-8222-222222222222'))
+    ).delete(
+      '/api/user/22222222-2222-4222-8222-222222222222/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
     );
     expect(res.status).toBe(401);
     expect(victimApp.delete).not.toHaveBeenCalled();
   });
 
   it('POST /api/user/:userId/app rejects at the per-user app limit', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(appService.getForUser).mockResolvedValue(
       Array.from({ length: 20 }, (_, i) => mockApp(`a${i}`)) as never
     );
-    const res = await request(makeApp(appRouter, mockUser('u1'))).post(
-      '/api/user/u1/app/'
-    );
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/app/');
     expect(res.status).toBe(400);
     expect(appService.create).not.toHaveBeenCalled();
   });
@@ -474,7 +607,7 @@ describe('propagateSource (save + re-execute)', () => {
     let source = stored;
     return {
       getId: () => id,
-      getUserId: () => 'u1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
       isBroken: () => false,
       getSource: () => source,
       setSource: vi.fn().mockImplementation((s: string) => {
@@ -485,10 +618,13 @@ describe('propagateSource (save + re-execute)', () => {
   };
 
   it('re-executes the bot in every live arena when the source changed', async () => {
-    const app = makeStoredApp('a1', '// old');
+    const app = makeStoredApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1', '// old');
     const execute = vi.fn().mockResolvedValue(undefined);
     vi.mocked(arenaMemberService.getForApp).mockResolvedValue([
-      { getArenaId: () => 'ar1', getAppId: () => 'a1' },
+      {
+        getArenaId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+        getAppId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+      },
     ] as never);
     vi.mocked(environmentService.getByArenaId).mockResolvedValue({
       execute,
@@ -499,12 +635,19 @@ describe('propagateSource (save + re-execute)', () => {
     // Always persisted (setSource clears `broken` / bumps updatedTimestamp).
     expect(app.setSource).toHaveBeenCalledWith('// new');
     // And the changed source is re-run in the live arena.
-    expect(arenaMemberService.getForApp).toHaveBeenCalledWith('a1');
-    expect(execute).toHaveBeenCalledWith('a1');
+    expect(arenaMemberService.getForApp).toHaveBeenCalledWith(
+      'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
+    expect(execute).toHaveBeenCalledWith(
+      'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
   });
 
   it('still persists but skips the isolate re-execute when the source is unchanged', async () => {
-    const app = makeStoredApp('a1', '// same');
+    const app = makeStoredApp(
+      'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+      '// same'
+    );
     const execute = vi.fn().mockResolvedValue(undefined);
     vi.mocked(environmentService.getByArenaId).mockResolvedValue({
       execute,
@@ -522,11 +665,15 @@ describe('propagateSource (save + re-execute)', () => {
 
 describe('arena endpoints', () => {
   it('PUT /api/user/:userId/arena/app/:appId rejects once the arena is full', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     // already at the 5-app limit (distinct members, none matching a1 so the
     // idempotency short-circuit doesn't fire before the cap check)
@@ -536,8 +683,10 @@ describe('arena endpoints', () => {
       })) as never
     );
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
-      '/api/user/u1/arena/app/a1'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
     );
     expect(res.status).toBe(400);
     expect(environmentService.get).not.toHaveBeenCalled();
@@ -545,36 +694,48 @@ describe('arena endpoints', () => {
 
   it('PUT /api/user/:userId/arena/app/:appId adds an app when under the limit', async () => {
     const addApp = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([]);
     vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never);
     vi.mocked(arenaMemberService.create).mockResolvedValue(undefined as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
-      '/api/user/u1/arena/app/a1'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
     );
     expect(res.status).toBe(201);
     expect(addApp).toHaveBeenCalled();
   });
 
   it('PUT /api/user/:userId/arena/app/:appId is idempotent when already a member', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
-      { getAppId: () => 'a1' },
+      { getAppId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1' },
     ] as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
-      '/api/user/u1/arena/app/a1'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
     );
     expect(res.status).toBe(200);
     expect(arenaMemberService.create).not.toHaveBeenCalled();
@@ -583,41 +744,52 @@ describe('arena endpoints', () => {
 
   it("PUT /api/user/:userId/arena/app/:appId adds another user's bot (arena-owner gated)", async () => {
     const addApp = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     // A bot owned by a DIFFERENT user (u2), added by reference to u1's arena.
     vi.mocked(appService.get).mockResolvedValue({
-      getId: () => 'aX',
+      getId: () => 'aaaaaaa3-3333-4333-8333-aaaaaaaaaaa3',
       getName: () => 'Rival',
-      getUserId: () => 'u2',
+      getUserId: () => '22222222-2222-4222-8222-222222222222',
     } as never);
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([]);
     vi.mocked(environmentService.get).mockResolvedValue({ addApp } as never);
     vi.mocked(arenaMemberService.create).mockResolvedValue(undefined as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).put(
-      '/api/user/u1/arena/app/aX'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).put(
+      '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa3-3333-4333-8333-aaaaaaaaaaa3'
     );
     expect(res.status).toBe(201);
     expect(addApp).toHaveBeenCalled();
-    expect(arenaMemberService.create).toHaveBeenCalledWith('ar1', 'aX');
+    expect(arenaMemberService.create).toHaveBeenCalledWith(
+      'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      'aaaaaaa3-3333-4333-8333-aaaaaaaaaaa3'
+    );
   });
 
   it('POST .../arena/app/:appId/enabled=false pulls the bot from the live match, keeps membership', async () => {
     const setEnabled = vi.fn().mockResolvedValue(undefined);
     const removeApp = vi.fn();
     const addApp = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
-      { getAppId: () => 'a1', setEnabled },
+      { getAppId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1', setEnabled },
     ] as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       containsApp: () => true,
@@ -625,26 +797,36 @@ describe('arena endpoints', () => {
       removeApp,
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/app/a1/enabled')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post(
+        '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/enabled'
+      )
       .send({ enabled: false });
     expect(res.status).toBe(200);
     expect(setEnabled).toHaveBeenCalledWith(false);
-    expect(removeApp).toHaveBeenCalledWith('a1');
+    expect(removeApp).toHaveBeenCalledWith(
+      'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
     expect(addApp).not.toHaveBeenCalled();
   });
 
   it('POST .../arena/app/:appId/enabled=true adds the bot back into the match when absent', async () => {
     const setEnabled = vi.fn().mockResolvedValue(undefined);
     const addApp = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
-      { getAppId: () => 'a1', setEnabled },
+      { getAppId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1', setEnabled },
     ] as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       containsApp: () => undefined, // not currently in the live match
@@ -652,8 +834,12 @@ describe('arena endpoints', () => {
       removeApp: vi.fn(),
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/app/a1/enabled')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post(
+        '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/enabled'
+      )
       .send({ enabled: true });
     expect(res.status).toBe(200);
     expect(setEnabled).toHaveBeenCalledWith(true);
@@ -661,29 +847,43 @@ describe('arena endpoints', () => {
   });
 
   it('POST .../arena/app/:appId/enabled rejects a non-boolean body', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
-    vi.mocked(appService.get).mockResolvedValue(mockApp('a1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(
+      mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/app/a1/enabled')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post(
+        '/api/user/11111111-1111-4111-8111-111111111111/arena/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/enabled'
+      )
       .send({ enabled: 'yes' });
     expect(res.status).toBe(400);
   });
 
   it('GET /api/user/:userId/arena/members returns the roster (incl. disabled) with owner + no source', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([
-      { getAppId: () => 'a1', getEnabled: () => true, getTimestamp: () => 100 },
       {
-        getAppId: () => 'a2',
+        getAppId: () => 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
+        getEnabled: () => true,
+        getTimestamp: () => 100,
+      },
+      {
+        getAppId: () => 'aaaaaaa2-2222-4222-8222-aaaaaaaaaaa2',
         getEnabled: () => false,
         getTimestamp: () => 200,
       },
@@ -692,33 +892,40 @@ describe('arena endpoints', () => {
       (id) => Promise.resolve(mockApp(id as string)) as never
     );
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).get(
-      '/api/user/u1/arena/members'
-    );
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).get('/api/user/11111111-1111-4111-8111-111111111111/arena/members');
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(2);
     expect(res.body[0]).toMatchObject({
-      appId: 'a1',
+      appId: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
       enabled: true,
       isOwn: true,
-      ownerUserId: 'u1',
+      ownerUserId: '11111111-1111-4111-8111-111111111111',
     });
-    expect(res.body[1]).toMatchObject({ appId: 'a2', enabled: false });
+    expect(res.body[1]).toMatchObject({
+      appId: 'aaaaaaa2-2222-4222-8222-aaaaaaaaaaa2',
+      enabled: false,
+    });
     // Roster is metadata only — never source.
     expect(JSON.stringify(res.body)).not.toContain('bot code');
   });
 
   it('POST /api/user/:userId/arena/speed sets a numeric speed multiplier', async () => {
     const setSpeed = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({ setSpeed } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/speed')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post('/api/user/11111111-1111-4111-8111-111111111111/arena/speed')
       .send({ speed: 4 });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ speed: 4 });
@@ -727,29 +934,37 @@ describe('arena endpoints', () => {
 
   it('POST /api/user/:userId/arena/speed accepts "max" as unbounded (0)', async () => {
     const setSpeed = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({ setSpeed } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/speed')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post('/api/user/11111111-1111-4111-8111-111111111111/arena/speed')
       .send({ speed: 'max' });
     expect(res.status).toBe(200);
     expect(setSpeed).toHaveBeenCalledWith(0);
   });
 
   it('POST /api/user/:userId/arena/speed rejects a non-numeric speed', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/speed')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post('/api/user/11111111-1111-4111-8111-111111111111/arena/speed')
       .send({ speed: 'fast' });
     expect(res.status).toBe(400);
     expect(environmentService.get).not.toHaveBeenCalled();
@@ -757,17 +972,21 @@ describe('arena endpoints', () => {
 
   it('POST /api/user/:userId/arena/bot-count sets the per-app bot quantity', async () => {
     const setBotCount = vi.fn(() => Promise.resolve());
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       setBotCount,
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/bot-count')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post('/api/user/11111111-1111-4111-8111-111111111111/arena/bot-count')
       .send({ botCount: 3 });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ botCount: 3 });
@@ -775,15 +994,19 @@ describe('arena endpoints', () => {
   });
 
   it('POST /api/user/:userId/arena/bot-count rejects out-of-range and non-integer values', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
 
     for (const botCount of [0, 6, 2.5, 'many']) {
-      const res = await request(makeApp(arenaRouter, mockUser('u1')))
-        .post('/api/user/u1/arena/bot-count')
+      const res = await request(
+        makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+      )
+        .post('/api/user/11111111-1111-4111-8111-111111111111/arena/bot-count')
         .send({ botCount });
       expect(res.status).toBe(400);
     }
@@ -792,18 +1015,22 @@ describe('arena endpoints', () => {
 
   it('POST /api/user/:userId/arena/seed sets the arena seed', async () => {
     const setSeed = vi.fn();
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       setSeed,
       getSeed: () => 99,
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/seed')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post('/api/user/11111111-1111-4111-8111-111111111111/arena/seed')
       .send({ seed: 99 });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ seed: 99 });
@@ -811,37 +1038,49 @@ describe('arena endpoints', () => {
   });
 
   it('POST /api/user/:userId/arena/seed rejects a non-numeric seed', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1')))
-      .post('/api/user/u1/arena/seed')
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .post('/api/user/11111111-1111-4111-8111-111111111111/arena/seed')
       .send({ seed: 'abc' });
     expect(res.status).toBe(400);
     expect(environmentService.get).not.toHaveBeenCalled();
   });
 
   it('GET /api/user/:userId/arena/summary returns the match summary', async () => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
     vi.mocked(arenaService.getDefaultForUser).mockResolvedValue({
-      getId: () => 'ar1',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({} as never);
     vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
     vi.mocked(buildMatchSummary).mockResolvedValue({
-      match: { decided: true, winner: { id: 'a1', name: 'Hunter' } },
+      match: {
+        decided: true,
+        winner: { id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1', name: 'Hunter' },
+      },
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).get(
-      '/api/user/u1/arena/summary'
-    );
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).get('/api/user/11111111-1111-4111-8111-111111111111/arena/summary');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      match: { decided: true, winner: { id: 'a1', name: 'Hunter' } },
+      match: {
+        decided: true,
+        winner: { id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1', name: 'Hunter' },
+      },
     });
     expect(buildMatchSummary).toHaveBeenCalled();
   });
@@ -849,20 +1088,25 @@ describe('arena endpoints', () => {
 
 describe('multi-arena endpoints', () => {
   beforeEach(() => {
-    vi.mocked(userService.get).mockResolvedValue(mockUser('u1') as never);
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
   });
 
   it('GET /api/user/:userId/arenas lists the user’s arenas', async () => {
     vi.mocked(arenaService.getForUser).mockResolvedValue([
-      { getId: () => 'ar1' },
-      { getId: () => 'ar2' },
+      { getId: () => 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1' },
+      { getId: () => 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2' },
     ] as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).get(
-      '/api/user/u1/arenas'
-    );
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).get('/api/user/11111111-1111-4111-8111-111111111111/arenas');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([{ id: 'ar1' }, { id: 'ar2' }]);
+    expect(res.body).toEqual([
+      { id: 'bbbbbbb1-1111-4111-8111-bbbbbbbbbbb1' },
+      { id: 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2' },
+    ]);
   });
 
   it('POST /api/user/:userId/arenas creates an arena under the limit', async () => {
@@ -872,9 +1116,9 @@ describe('multi-arena endpoints', () => {
       getId: () => 'ar9',
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
-      '/api/user/u1/arenas'
-    );
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/arenas');
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ id: 'ar9' });
   });
@@ -884,9 +1128,9 @@ describe('multi-arena endpoints', () => {
       Array.from({ length: 10 }, (_, i) => ({ getId: () => `ar${i}` })) as never
     );
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
-      '/api/user/u1/arenas'
-    );
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/arenas');
     expect(res.status).toBe(400);
     expect(arenaService.create).not.toHaveBeenCalled();
   });
@@ -895,9 +1139,9 @@ describe('multi-arena endpoints', () => {
     vi.mocked(arenaService.getForUser).mockResolvedValue([] as never); // under per-user cap
     vi.mocked(arenaService.count).mockResolvedValue(1000); // at MAX_TOTAL_ARENAS
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
-      '/api/user/u1/arenas'
-    );
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post('/api/user/11111111-1111-4111-8111-111111111111/arenas');
     expect(res.status).toBe(503);
     expect(arenaService.create).not.toHaveBeenCalled();
   });
@@ -906,19 +1150,23 @@ describe('multi-arena endpoints', () => {
     const restart = vi.fn().mockResolvedValue(undefined);
     const resume = vi.fn();
     vi.mocked(arenaService.get).mockResolvedValue({
-      getId: () => 'ar2',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.get).mockResolvedValue({
       restart,
       resume,
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
-      '/api/user/u1/arenas/ar2/restart'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post(
+      '/api/user/11111111-1111-4111-8111-111111111111/arenas/bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2/restart'
     );
     expect(res.status).toBe(200);
-    expect(arenaService.get).toHaveBeenCalledWith('ar2');
+    expect(arenaService.get).toHaveBeenCalledWith(
+      'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2'
+    );
     expect(arenaService.getDefaultForUser).not.toHaveBeenCalled();
     expect(restart).toHaveBeenCalled();
     expect(resume).toHaveBeenCalled(); // a reset starts the arena running
@@ -926,12 +1174,14 @@ describe('multi-arena endpoints', () => {
 
   it('rejects addressing an arena owned by another user with 404', async () => {
     vi.mocked(arenaService.get).mockResolvedValue({
-      getId: () => 'ar2',
-      getUserId: () => 'someone-else',
+      getId: () => 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2',
+      getUserId: () => '99999999-9999-4999-8999-999999999999',
     } as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).post(
-      '/api/user/u1/arenas/ar2/restart'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).post(
+      '/api/user/11111111-1111-4111-8111-111111111111/arenas/bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2/restart'
     );
     expect(res.status).toBe(404);
     expect(environmentService.get).not.toHaveBeenCalled();
@@ -939,8 +1189,8 @@ describe('multi-arena endpoints', () => {
 
   it('DELETE /api/user/:userId/arenas/:arenaId tears down the arena', async () => {
     vi.mocked(arenaService.get).mockResolvedValue({
-      getId: () => 'ar2',
-      getUserId: () => 'u1',
+      getId: () => 'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2',
+      getUserId: () => '11111111-1111-4111-8111-111111111111',
     } as never);
     vi.mocked(environmentService.dispose).mockResolvedValue(undefined as never);
     vi.mocked(arenaMemberService.deleteForArena).mockResolvedValue(
@@ -948,13 +1198,21 @@ describe('multi-arena endpoints', () => {
     );
     vi.mocked(arenaService.delete).mockResolvedValue(undefined as never);
 
-    const res = await request(makeApp(arenaRouter, mockUser('u1'))).delete(
-      '/api/user/u1/arenas/ar2'
+    const res = await request(
+      makeApp(arenaRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    ).delete(
+      '/api/user/11111111-1111-4111-8111-111111111111/arenas/bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2'
     );
     expect(res.status).toBe(200);
-    expect(environmentService.dispose).toHaveBeenCalledWith('ar2');
-    expect(arenaMemberService.deleteForArena).toHaveBeenCalledWith('ar2');
-    expect(arenaService.delete).toHaveBeenCalledWith('ar2');
+    expect(environmentService.dispose).toHaveBeenCalledWith(
+      'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2'
+    );
+    expect(arenaMemberService.deleteForArena).toHaveBeenCalledWith(
+      'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2'
+    );
+    expect(arenaService.delete).toHaveBeenCalledWith(
+      'bbbbbbb2-2222-4222-8222-bbbbbbbbbbb2'
+    );
   });
 });
 
@@ -985,5 +1243,79 @@ describe('Express 5 async error forwarding', () => {
     const res = await request(app).get('/boom');
     expect(res.status).toBe(500);
     expect(res.text).toBe('Internal server error');
+  });
+});
+
+// A malformed id in the path is a client mistake, not a missing resource and
+// certainly not a server fault. Before these guards it reached Postgres as a
+// failed `uuid` cast and escaped as a 500 — which also meant ordinary typos
+// (pasting a bot's name into an id field) showed up in the http.error metric the
+// ops alarm watches. See middleware/resource.ts.
+describe('UUID path-param validation', () => {
+  const U1 = '11111111-1111-4111-8111-111111111111';
+  const A1 = 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1';
+  // The two shapes real users actually produce: an app *name* copied off the
+  // rankings page, and a whole share link pasted into an id box.
+  const NAME = 'S12-CORDON';
+
+  it('rejects a non-UUID :appId with 400/E028 instead of a 500', async () => {
+    const res = await request(makeApp(arenaRouter, mockUser(U1))).put(
+      `/api/user/${U1}/arena/app/${NAME}`
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('E028');
+    // The lookup must be short-circuited — never handed to the DB to cast.
+    expect(appService.get).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-UUID :userId with 400/E028', async () => {
+    const res = await request(makeApp(userRouter)).get('/api/user/not-a-uuid');
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('E028');
+    expect(userService.get).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-UUID :arenaId with 400/E028', async () => {
+    (userService.get as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockUser(U1)
+    );
+
+    const res = await request(makeApp(arenaRouter, mockUser(U1))).get(
+      `/api/user/${U1}/arenas/not-a-uuid`
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('E028');
+    expect(arenaService.get).not.toHaveBeenCalled();
+  });
+
+  it('still returns 404 — not 400 — for a well-formed but unknown id', async () => {
+    (userService.get as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockUser(U1)
+    );
+    (appService.get as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+    const res = await request(makeApp(appRouter, mockUser(U1))).get(
+      `/api/user/${U1}/app/${A1}`
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('accepts an uppercase UUID (ids are hex, case is not meaningful)', async () => {
+    (userService.get as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockUser(U1)
+    );
+    (appService.get as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockApp(A1.toUpperCase())
+    );
+
+    const res = await request(makeApp(appRouter, mockUser(U1))).get(
+      `/api/user/${U1}/app/${A1.toUpperCase()}`
+    );
+
+    expect(res.status).toBe(200);
   });
 });
