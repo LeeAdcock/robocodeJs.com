@@ -28,14 +28,14 @@
     "express-rate-limit": "^8.7.0",
     "glin-profanity": "^3.3.0",
     "globals": "^17.12.0",
-    "google-auth-library": "^11.0.0",
+    "google-auth-library": "^11.1.0",
     "helmet": "^8.3.0",
     "isolated-vm": "^6.2.0",
     "ml-classify-text": "^2.0.1",
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.8",
     "zod": "^4.6.2"
   },
   "devDependencies": {
