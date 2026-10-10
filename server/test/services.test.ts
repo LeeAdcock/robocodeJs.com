@@ -554,6 +554,47 @@ describe('RankedMatchService', () => {
     ]);
   });
 
+  it('matchesForApp() matches BOTH orientations and names the opponent', async () => {
+    // appA/appB record the order the match ran in, which is arbitrary, so the
+    // opponent is whichever column isn't the app being asked about.
+    query.mockResolvedValue({
+      rows: [
+        { appa: 'me', appb: 'x', createdtimestamp: '2026-06-01T00:00:00.000Z' },
+        { appa: 'y', appb: 'me', createdtimestamp: '2026-06-02T00:00:00.000Z' },
+      ],
+      rowCount: 2,
+    } as never);
+    const since = new Date('2026-01-01T00:00:00Z');
+    const got = await rankedMatchService.matchesForApp('me', since);
+
+    expect(got.map((g) => g.opponentId)).toEqual(['x', 'y']);
+    // pg-mem hands back ISO strings where pg gives Dates; both must normalize.
+    expect(got[0].at).toBeInstanceOf(Date);
+    expect(got[1].at.toISOString()).toBe('2026-06-02T00:00:00.000Z');
+
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('appA=$1 OR appB=$1');
+    expect(text).toContain('createdTimestamp > $2');
+    expect(values).toEqual(['me', since]);
+  });
+
+  it('deleteStaleForPair() scopes the delete to the pair in either orientation', async () => {
+    query.mockResolvedValue({ rows: [], rowCount: 7 } as never);
+    const cutoff = new Date('2026-09-01T00:00:00Z');
+    expect(await rankedMatchService.deleteStaleForPair('a', 'b', cutoff)).toBe(
+      7
+    );
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    // Both orientations, or half a pair's stale history would survive forever.
+    expect(text).toContain('(appA=$1 AND appB=$2) OR (appA=$2 AND appB=$1)');
+    expect(text).toContain('createdTimestamp < $3');
+    expect(values).toEqual(['a', 'b', cutoff]);
+  });
+
   it('deleteOlderThan() deletes a bounded batch below the cutoff and reports the count', async () => {
     query.mockResolvedValue({ rows: [], rowCount: 37 } as never);
     const cutoff = new Date('2026-01-01T00:00:00Z');

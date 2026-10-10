@@ -115,6 +115,56 @@ class RankedMatchService {
       .then((res) => res?.rowCount ?? 0);
   };
 
+  // Every match this app played since `since`, as (opponent, when) pairs — the
+  // raw input to LadderService's per-pair saturation cap. One query per anchor
+  // instead of one per candidate pair, folded per opponent in JS (the same
+  // portability choice getLeaderboard makes: no GROUP BY, no window function,
+  // works under pg-mem).
+  //
+  // `appA`/`appB` record the order the match ran in, which is arbitrary, so both
+  // orientations have to be matched and the opponent picked from whichever
+  // column isn't this app.
+  matchesForApp = (
+    appId: AppId,
+    since: Date
+  ): Promise<{ opponentId: AppId; at: Date }[]> => {
+    return pool
+      .query({
+        text:
+          'SELECT appA, appB, createdTimestamp FROM ranked_match ' +
+          'WHERE (appA=$1 OR appB=$1) AND createdTimestamp > $2',
+        values: [appId, since],
+      })
+      .then((res) =>
+        (res?.rows ?? []).map((row) => ({
+          opponentId: (row.appa === appId ? row.appb : row.appa) as AppId,
+          // pg returns a Date, pg-mem an ISO string.
+          at: new Date(row.createdtimestamp as string | Date),
+        }))
+      );
+  };
+
+  // Drop a pair's matches that predate `cutoff` (the later of the two apps' last
+  // edits), so what remains for the pair is exactly the head-to-head record
+  // between their CURRENT versions — which is also what the saturation cap
+  // counts. Called right after recording a match, so a pair is tidied on the
+  // first match after either side changes; see LadderService.
+  deleteStaleForPair = (
+    appA: AppId,
+    appB: AppId,
+    cutoff: Date
+  ): Promise<number> => {
+    return pool
+      .query({
+        text:
+          'DELETE FROM ranked_match WHERE ' +
+          '((appA=$1 AND appB=$2) OR (appA=$2 AND appB=$1)) ' +
+          'AND createdTimestamp < $3',
+        values: [appA, appB, cutoff],
+      })
+      .then((res) => res?.rowCount ?? 0);
+  };
+
   record = (m: RankedMatchRecord): Promise<void> => {
     return pool
       .query({

@@ -35,6 +35,7 @@ interface LadderLoopConfig {
   timeoutMs: number; // per-match wall-clock cap
   matchSpeed: number; // tick-rate cap for a ranked match (0 = unbounded)
   retentionDays: number; // age at which ranked_match rows are pruned (0 = keep)
+  pairMatchCap: number; // matches a pair may play since either changed (0 = off)
 }
 
 // Retention sweep pacing. One sweep per hour is plenty for a table that gains
@@ -126,6 +127,14 @@ class LadderService {
       // and restores the previous keep-forever behaviour.
       retentionDays:
         opts.retentionDays ?? envInt('LADDER_MATCH_RETENTION_DAYS', 7),
+      // How many times a given pair may meet before either side's code changes
+      // again (see pickPair). The pool is small — 12 apps in prod on 2026-10-10,
+      // so 66 distinct pairs — and the loop was replaying them ~85x/day each
+      // forever, long past the ~20-40 games a rating needs to settle. 10 is
+      // chosen for SAMPLING rather than convergence: spawn placement is random
+      // per seed and outcome-deciding, so ~10 seeds is a reasonable read on a
+      // pairing. 0 disables the cap (the prior play-forever behaviour).
+      pairMatchCap: opts.pairMatchCap ?? envInt('LADDER_PAIR_MATCH_CAP', 10),
     };
     this.running = true;
     // Sweep on the first loop iteration after a start, so a deploy that lowers
@@ -245,11 +254,26 @@ class LadderService {
   //      Same-owner matchups are allowed (see below) so a dominant player's bots
   //      still test each other.
   // In-flight apps and untouched starters are excluded.
-  pickPair = async (): Promise<[AppId, AppId] | null> => {
+  // `opts.pairMatchCap` overrides the resolved cap (used by tests to exercise
+  // saturation without standing up a loop).
+  pickPair = async (
+    opts: { pairMatchCap?: number } = {}
+  ): Promise<[AppId, AppId] | null> => {
     const pool = (await appService.getLadderCandidates()).filter(
       (c) => !this.inFlight.has(c.appId) && !isUntouchedStarter(c.source)
     );
     if (pool.length < 2) return null;
+
+    // Resolved here, once, so every anchor attempt in the loop below agrees.
+    // Falls back to the env default rather than to "off" when the loop hasn't
+    // been started: pickPair is reachable without start(), and a cap that
+    // quietly stops applying depending on how it was entered is the kind of
+    // thing that looks like it works. 0 means off because the operator said so,
+    // not because config wasn't built yet.
+    const cap =
+      opts.pairMatchCap ??
+      this.config?.pairMatchCap ??
+      envInt('LADDER_PAIR_MATCH_CAP', 10);
 
     // 1. Anchor: random pick among the fewest-played quartile (at least 1).
     const byGames = [...pool].sort((a, b) => a.ratingGames - b.ratingGames);
@@ -257,22 +281,86 @@ class LadderService {
       0,
       Math.max(1, Math.ceil(pool.length / 4))
     );
-    const anchor = anchorBand[Math.floor(Math.random() * anchorBand.length)];
+    // Try the fewest-played band first, then everyone else. A single anchor can
+    // be saturated against the whole pool while other pairings are still open,
+    // so one exhausted anchor must not read as "nothing to play" — only an
+    // exhausted POOL does. Ordered, not random, past the first band: by then we
+    // are scraping for any legal pairing, not choosing a preferred one.
+    const anchorOrder = [
+      anchorBand[Math.floor(Math.random() * anchorBand.length)],
+      ...anchorBand,
+      ...byGames,
+    ];
+    const tried = new Set<AppId>();
 
-    // 2. Opponent: nearest rating to the anchor (random among the few nearest
-    //    so pairings vary between rounds). Same-owner matchups are allowed on
-    //    purpose: random matchmaking already prevents targeted farming (you
-    //    can't choose your opponent) and a same-owner match is zero-sum, while
-    //    excluding them shields a dominant player's own bots from ever meeting —
-    //    which pins their ratings together and keeps them artificially undefeated.
+    for (const anchor of anchorOrder) {
+      if (tried.has(anchor.appId)) continue;
+      tried.add(anchor.appId);
+
+      // 2. Opponent: nearest rating to the anchor (random among the few nearest
+      //    so pairings vary between rounds). Same-owner matchups are allowed on
+      //    purpose: random matchmaking already prevents targeted farming (you
+      //    can't choose your opponent) and a same-owner match is zero-sum, while
+      //    excluding them shields a dominant player's own bots from ever meeting —
+      //    which pins their ratings together and keeps them artificially undefeated.
+      const others = await this.unsaturatedOpponents(anchor, pool, cap);
+      if (others.length === 0) continue;
+
+      const ratingDist = (c: LadderCandidate) =>
+        Math.abs(c.rating - anchor.rating);
+      const nearest = [...others].sort((a, b) => ratingDist(a) - ratingDist(b));
+      const nearBand = nearest.slice(0, Math.min(5, nearest.length));
+      const opponent = nearBand[Math.floor(Math.random() * nearBand.length)];
+
+      return [anchor.appId, opponent.appId];
+    }
+
+    // Every pairing has played its quota since both sides last changed. Nothing
+    // to learn until someone edits a bot; the caller backs off on idleMs.
+    return null;
+  };
+
+  // The pool members `anchor` may still legally meet: those it has played fewer
+  // than `pairMatchCap` times since the LATER of the two apps' last edits. One
+  // query for the anchor's whole recent history, folded per opponent — cheaper
+  // than a count per candidate pair, and the per-opponent cutoff differs (it
+  // depends on that opponent's own edit time), which is exactly what SQL
+  // aggregation can't express in one portable statement.
+  private unsaturatedOpponents = async (
+    anchor: LadderCandidate,
+    pool: LadderCandidate[],
+    cap: number
+  ): Promise<LadderCandidate[]> => {
     const others = pool.filter((c) => c.appId !== anchor.appId);
-    const ratingDist = (c: LadderCandidate) =>
-      Math.abs(c.rating - anchor.rating);
-    const nearest = [...others].sort((a, b) => ratingDist(a) - ratingDist(b));
-    const nearBand = nearest.slice(0, Math.min(5, nearest.length));
-    const opponent = nearBand[Math.floor(Math.random() * nearBand.length)];
+    if (cap <= 0) return others;
 
-    return [anchor.appId, opponent.appId];
+    // Anchor's own edit time is the floor for every pairing, so filter by it in
+    // SQL and apply each opponent's (later or earlier) edit time in JS.
+    const history = await rankedMatchService.matchesForApp(
+      anchor.appId,
+      anchor.updatedTimestamp
+    );
+
+    const played = new Map<AppId, Date[]>();
+    for (const h of history) {
+      const list = played.get(h.opponentId);
+      if (list) list.push(h.at);
+      else played.set(h.opponentId, [h.at]);
+    }
+
+    return others.filter((c) => {
+      const times = played.get(c.appId);
+      if (!times) return true;
+      const since = Math.max(
+        anchor.updatedTimestamp.getTime(),
+        c.updatedTimestamp.getTime()
+      );
+      const count = times.reduce(
+        (n, t) => (t.getTime() > since ? n + 1 : n),
+        0
+      );
+      return count < cap;
+    });
   };
 
   // Pick a pair and run their match. Returns null if no pair was available.
