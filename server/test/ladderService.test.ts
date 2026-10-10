@@ -17,7 +17,10 @@ vi.mock('../src/services/AppService', () => ({
   },
 }));
 vi.mock('../src/services/RankedMatchService', () => ({
-  default: { record: vi.fn().mockResolvedValue(undefined) },
+  default: {
+    record: vi.fn().mockResolvedValue(undefined),
+    deleteOlderThan: vi.fn().mockResolvedValue(0),
+  },
 }));
 
 vi.mock('../src/services/EnvironmentService', () => ({
@@ -45,6 +48,7 @@ const getApp = vi.mocked(appService.get);
 const getCandidates = vi.mocked(appService.getLadderCandidates);
 const getRanks = vi.mocked(appService.getRanks);
 const record = vi.mocked(rankedMatchService.record);
+const deleteOlderThan = vi.mocked(rankedMatchService.deleteOlderThan);
 const runMatch = vi.mocked(runMatchToDecision);
 
 // A ladder candidate row (as AppService.getLadderCandidates returns).
@@ -99,14 +103,20 @@ beforeEach(() => {
   // clearAllMocks resets calls but NOT implementations, so re-pin this: a rank
   // map set by one test would otherwise leak into the next.
   getRanks.mockResolvedValue(new Map());
-});
-
-// Never let a started background loop leak into the next test.
-afterEach(() => {
-  ladderService.stop();
+  deleteOlderThan.mockResolvedValue(0);
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Never let a started background loop leak into the next test. stop() only
+// clears the run flag — a worker parked in its inter-match delay returns to the
+// top of the loop and exits on the next macrotask, so yield before handing over.
+// Without the yield a stale worker is still live when the next test's start()
+// flips the flag back on, and it resumes against the config IT captured.
+afterEach(async () => {
+  ladderService.stop();
+  await sleep(5);
+});
 
 describe('LadderService.runOneMatch', () => {
   it('applies a zero-sum Elo update between equal apps and records the match', async () => {
@@ -379,6 +389,109 @@ describe('LadderService background loop', () => {
     expect(spy).toHaveBeenCalled(); // now it runs
 
     ladderService.stop();
+    spy.mockRestore();
+  });
+});
+
+// ── Ranked-match retention ──────────────────────────────────────────────────
+// ranked_match is append-only and the ladder is its only writer, so the loop
+// enforces retention itself. Without this the table grew forever (~4,500
+// rows/day in prod) and its index with it — the squeeze that tripped the RDS
+// freeable-memory alarm on 2026-10-09.
+describe('LadderService — ranked match retention', () => {
+  // Keep these from running real matches; the sweep is what's under test.
+  const stubMatches = () =>
+    vi.spyOn(ladderService, 'runNextMatch').mockResolvedValue(null as never);
+
+  it('prunes history older than the retention window on the first iteration', async () => {
+    const spy = stubMatches();
+    ladderService.start({
+      concurrency: 1,
+      idleMs: 0,
+      matchIntervalMs: 0,
+      retentionDays: 7,
+    });
+    await sleep(20);
+    ladderService.stop();
+
+    expect(deleteOlderThan).toHaveBeenCalled();
+    const [cutoff, batchSize] = deleteOlderThan.mock.calls[0];
+    // 7 days back, give or take the time the test took to get here.
+    const ageMs = Date.now() - (cutoff as Date).getTime();
+    expect(ageMs).toBeGreaterThan(6.9 * 24 * 60 * 60 * 1000);
+    expect(ageMs).toBeLessThan(7.1 * 24 * 60 * 60 * 1000);
+    expect(batchSize).toBeGreaterThan(0);
+    spy.mockRestore();
+  });
+
+  it('sweeps at most once per interval however many times the loop turns', async () => {
+    const spy = stubMatches();
+    ladderService.start({
+      concurrency: 1,
+      idleMs: 0,
+      matchIntervalMs: 0,
+      retentionDays: 7,
+    });
+    await sleep(40); // many loop turns at idleMs 0
+    ladderService.stop();
+
+    // One sweep, not one per turn — the hourly slot is claimed on the first.
+    expect(deleteOlderThan).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('keeps deleting in batches while each batch comes back full', async () => {
+    const spy = stubMatches();
+    // A backlog: two full batches, then a short one that ends the sweep.
+    deleteOlderThan
+      .mockResolvedValueOnce(5000)
+      .mockResolvedValueOnce(5000)
+      .mockResolvedValueOnce(12);
+
+    ladderService.start({
+      concurrency: 1,
+      idleMs: 0,
+      matchIntervalMs: 0,
+      retentionDays: 7,
+    });
+    await sleep(20);
+    ladderService.stop();
+
+    expect(deleteOlderThan).toHaveBeenCalledTimes(3);
+    spy.mockRestore();
+  });
+
+  it('does not prune when retention is disabled (0 = keep forever)', async () => {
+    const spy = stubMatches();
+    ladderService.start({
+      concurrency: 1,
+      idleMs: 0,
+      matchIntervalMs: 0,
+      retentionDays: 0,
+    });
+    await sleep(20);
+    ladderService.stop();
+
+    expect(deleteOlderThan).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('keeps matchmaking running when the prune fails', async () => {
+    const spy = stubMatches();
+    deleteOlderThan.mockRejectedValue(new Error('db down'));
+
+    ladderService.start({
+      concurrency: 1,
+      idleMs: 0,
+      matchIntervalMs: 0,
+      retentionDays: 7,
+    });
+    await sleep(20);
+    ladderService.stop();
+
+    // A prune that can't run must never take the ladder down with it.
+    expect(deleteOlderThan).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
 });

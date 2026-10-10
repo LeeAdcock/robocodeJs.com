@@ -4,11 +4,12 @@ import { AppId } from '../types/app';
 
 // One recorded global-ladder match (GitHub #151): who played, the pre-match
 // ratings, the signed rating deltas, the winning app (null if the match timed
-// out undecided), and the seed used. Kept for audit and future leaderboard
-// trend views; the live ratings themselves live on the `app` row.
-// Index createdTimestamp: the leaderboard "movement" query (deltasSince) filters
-// on it every request, and this table grows one row per ranked match forever, so
-// an index keeps that scan off a full-table seq scan as history accumulates.
+// out undecided), and the seed used. Kept as a short rolling audit trail (see
+// deleteOlderThan); the live ratings themselves live on the `app` row, so
+// pruning this table loses no rankings.
+// Index createdTimestamp: BOTH readers filter on it — the leaderboard "movement"
+// query (deltasSince) on every request, and the retention sweep
+// (deleteOlderThan) — so an index keeps them off a full-table seq scan.
 // Chained off the CREATE so the table exists first; Promise.resolve tolerates a
 // mocked pool.query returning undefined, and errors are swallowed (same lazy-DDL
 // idiom as the other services — see the accepted "lazy DDL startup" risk).
@@ -80,6 +81,38 @@ class RankedMatchService {
           { appId: row.appb as AppId, delta: (row.deltab as number) ?? 0 },
         ])
       );
+  };
+
+  // Drop rows older than `cutoff`, returning how many went. The ladder appends
+  // one row per match and nothing ever read the far history, so without this the
+  // table grew linearly forever (~4,500 rows/day in prod on 2026-10-10) and its
+  // index with it — the most plausible driver of the steady RDS FreeableMemory
+  // decline that tripped robocodejs-rds-freeable-memory on 2026-10-09. The only
+  // programmatic reader is deltasSince, which looks back 24h
+  // (AppService's MOVEMENT_WINDOW_MS), so anything past the retention window is
+  // unreferenced. This bounds the table at steady state rather than shrinking
+  // it: DELETE leaves the freed pages for the next INSERT to reuse, which is
+  // exactly what we want for a table that is written continuously.
+  //
+  // Capped at `batchSize` rows per call so clearing a large accumulated backlog
+  // is spread over several small transactions instead of one long one — a single
+  // DELETE of the whole history would burst WAL and leave one huge autovacuum
+  // pass on an instance already short of memory. The caller re-invokes until a
+  // call comes back short. (pg-mem, used only for local dev, ignores the LIMIT
+  // and deletes every matching row in one go; harmless, since a dev database
+  // holds almost no history and resets on restart.)
+  //
+  // `rowCount` is defensively coalesced because a mocked/pg-mem pool.query may
+  // not report one (same tolerance as the lazy DDL above).
+  deleteOlderThan = (cutoff: Date, batchSize: number): Promise<number> => {
+    return pool
+      .query({
+        text:
+          'DELETE FROM ranked_match WHERE id IN ' +
+          '(SELECT id FROM ranked_match WHERE createdTimestamp < $1 LIMIT $2)',
+        values: [cutoff, batchSize],
+      })
+      .then((res) => res?.rowCount ?? 0);
   };
 
   record = (m: RankedMatchRecord): Promise<void> => {

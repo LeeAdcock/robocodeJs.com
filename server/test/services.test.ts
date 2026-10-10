@@ -522,6 +522,26 @@ describe('RankedMatchService', () => {
     ]);
   });
 
+  it('deleteOlderThan() deletes a bounded batch below the cutoff and reports the count', async () => {
+    query.mockResolvedValue({ rows: [], rowCount: 37 } as never);
+    const cutoff = new Date('2026-01-01T00:00:00Z');
+    expect(await rankedMatchService.deleteOlderThan(cutoff, 5000)).toBe(37);
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('DELETE FROM ranked_match');
+    // The LIMIT is what keeps a large backlog from clearing in one long
+    // transaction, so it has to be in the statement, not just in the caller.
+    expect(text).toContain('LIMIT $2');
+    expect(text).toContain('createdTimestamp < $1');
+    expect(values).toEqual([cutoff, 5000]);
+  });
+
+  it('deleteOlderThan() reports 0 when the driver gives no row count', async () => {
+    query.mockResolvedValue({ rows: [] } as never);
+    expect(await rankedMatchService.deleteOlderThan(new Date(0), 100)).toBe(0);
+  });
+
   it('deltasSince() counts only RATED matches (winnerId not null) since the cutoff', async () => {
     query.mockResolvedValue({ rows: [], rowCount: 0 } as never);
     const cutoff = new Date('2026-01-01T00:00:00Z');
