@@ -34,7 +34,18 @@ interface LadderLoopConfig {
   maxLiveIsolates: number; // yield the CPU when user arenas hold this many isolates
   timeoutMs: number; // per-match wall-clock cap
   matchSpeed: number; // tick-rate cap for a ranked match (0 = unbounded)
+  retentionDays: number; // age at which ranked_match rows are pruned (0 = keep)
 }
+
+// Retention sweep pacing. One sweep per hour is plenty for a table that gains
+// ~1 row per completed match, and the per-sweep ceiling (BATCHES x BATCH_SIZE =
+// 100k rows) means an accumulated backlog drains over a few hours instead of in
+// one long transaction. Both are constants rather than env knobs: the thing
+// worth tuning per environment is the retention window, not the shape of the
+// sweep that enforces it.
+const RETENTION_SWEEP_MS = 60 * 60 * 1000;
+const RETENTION_BATCH_SIZE = 5000;
+const RETENTION_MAX_BATCHES = 20;
 
 const envInt = (name: string, dflt: number): number => {
   const n = parseInt(process.env[name] ?? '');
@@ -73,6 +84,8 @@ class LadderService {
   // (stop) lets each worker fall out after its current match.
   private running = false;
   private config: LadderLoopConfig | null = null;
+  // Epoch ms of the last retention sweep; 0 = never (sweep on next iteration).
+  private lastPruneAt = 0;
 
   isBusy = (appId: AppId): boolean => this.inFlight.has(appId);
 
@@ -106,8 +119,18 @@ class LadderService {
       // keep LADDER_MATCH_TIMEOUT_MS above 7500/(10·speed) s or slow matches will
       // time out unrated. 0 opts back into unbounded (the prior behaviour).
       matchSpeed: opts.matchSpeed ?? envInt('LADDER_MATCH_SPEED', 20),
+      // Age at which recorded matches are pruned (see maybePruneHistory). The
+      // only programmatic reader of the history is the leaderboard's movement
+      // arrows, which look back 24 h (AppService's MOVEMENT_WINDOW_MS), so a
+      // week leaves 7x headroom while bounding the table. 0 disables pruning
+      // and restores the previous keep-forever behaviour.
+      retentionDays:
+        opts.retentionDays ?? envInt('LADDER_MATCH_RETENTION_DAYS', 7),
     };
     this.running = true;
+    // Sweep on the first loop iteration after a start, so a deploy that lowers
+    // the retention window acts on the existing backlog promptly.
+    this.lastPruneAt = 0;
     logger.info(
       { event: LogEvent.LADDER_MATCH, config: this.config },
       'global ladder loop started'
@@ -127,6 +150,11 @@ class LadderService {
   private worker = async (): Promise<void> => {
     const cfg = this.config!;
     while (this.running) {
+      // Ahead of the load gate on purpose: the sweep is a handful of small
+      // DELETEs, and letting sustained live-arena load starve it would let the
+      // history grow unbounded exactly when the box can least afford it.
+      await this.maybePruneHistory(cfg);
+
       // Load gate: when user arenas are holding a lot of isolates, back off so
       // ranked matches never starve real players on the small prod box. (The
       // ladder's own ephemeral envs aren't in the store, so this measures user
@@ -150,6 +178,52 @@ class LadderService {
         );
       }
       await this.delay(idle ? cfg.idleMs : cfg.matchIntervalMs);
+    }
+  };
+
+  // Drop recorded matches older than the retention window, at most once per
+  // RETENTION_SWEEP_MS. The ladder is the only writer of ranked_match, so
+  // enforcing retention from its own loop keeps the two in step: no history
+  // accumulates while the loop is stopped, and nothing else needs scheduling.
+  //
+  // The slot is claimed before the first await so concurrent workers
+  // (LADDER_CONCURRENCY > 1) can't both sweep the same hour. Failures are logged
+  // and swallowed — a prune that can't run is a growing table, not a broken
+  // ladder, and must never take matchmaking down with it.
+  private maybePruneHistory = async (cfg: LadderLoopConfig): Promise<void> => {
+    if (cfg.retentionDays <= 0) return;
+    const now = Date.now();
+    if (now - this.lastPruneAt < RETENTION_SWEEP_MS) return;
+    this.lastPruneAt = now;
+
+    const cutoff = new Date(now - cfg.retentionDays * 24 * 60 * 60 * 1000);
+    try {
+      let removed = 0;
+      for (let i = 0; i < RETENTION_MAX_BATCHES; i++) {
+        const n = await rankedMatchService.deleteOlderThan(
+          cutoff,
+          RETENTION_BATCH_SIZE
+        );
+        removed += n;
+        // A short batch means the backlog is drained; anything still older than
+        // the cutoff waits for the next sweep.
+        if (n < RETENTION_BATCH_SIZE) break;
+      }
+      if (removed > 0) {
+        logger.info(
+          {
+            event: LogEvent.LADDER_MATCH,
+            removed,
+            retentionDays: cfg.retentionDays,
+          },
+          'pruned ranked match history'
+        );
+      }
+    } catch (err) {
+      logger.error(
+        { event: LogEvent.LADDER_MATCH, err },
+        'ranked match history prune failed'
+      );
     }
   };
 
