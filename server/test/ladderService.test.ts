@@ -14,12 +14,19 @@ vi.mock('../src/services/AppService', () => ({
     getLadderCandidates: vi.fn(),
     // The rank badges (GitHub #121) look the board up after the rating update.
     getRanks: vi.fn(async () => new Map<string, number>()),
+    // Cutoff for retiring a pair's pre-edit history. Null by default = "nothing
+    // to prune", so tests that don't care see no prune.
+    pairEditCutoff: vi.fn().mockResolvedValue(null),
   },
 }));
 vi.mock('../src/services/RankedMatchService', () => ({
   default: {
     record: vi.fn().mockResolvedValue(undefined),
     deleteOlderThan: vi.fn().mockResolvedValue(0),
+    // Pair-saturation inputs: no history and nothing stale, so by default every
+    // pairing is open and these tests see the pre-cap selection behaviour.
+    matchesForApp: vi.fn().mockResolvedValue([]),
+    deleteStaleForPair: vi.fn().mockResolvedValue(0),
   },
 }));
 
@@ -47,8 +54,11 @@ const metrics = vi.mocked(environmentService.metrics);
 const getApp = vi.mocked(appService.get);
 const getCandidates = vi.mocked(appService.getLadderCandidates);
 const getRanks = vi.mocked(appService.getRanks);
+const pairEditCutoff = vi.mocked(appService.pairEditCutoff);
 const record = vi.mocked(rankedMatchService.record);
 const deleteOlderThan = vi.mocked(rankedMatchService.deleteOlderThan);
+const matchesForApp = vi.mocked(rankedMatchService.matchesForApp);
+const deleteStaleForPair = vi.mocked(rankedMatchService.deleteStaleForPair);
 const runMatch = vi.mocked(runMatchToDecision);
 
 // A ladder candidate row (as AppService.getLadderCandidates returns).
@@ -57,8 +67,11 @@ const cand = (
   rating: number,
   ratingGames: number,
   userId = `owner-${appId}`,
-  source = `// ${appId}`
-) => ({ appId, userId, rating, ratingGames, source });
+  source = `// ${appId}`,
+  // Epoch unless a test cares: "last edited long ago", so every recorded match
+  // counts toward the pair's saturation.
+  updatedTimestamp = new Date(0)
+) => ({ appId, userId, rating, ratingGames, source, updatedTimestamp });
 
 // A minimal App stand-in tracking rating/games/broken through the setters the
 // ladder calls.
@@ -104,6 +117,9 @@ beforeEach(() => {
   // map set by one test would otherwise leak into the next.
   getRanks.mockResolvedValue(new Map());
   deleteOlderThan.mockResolvedValue(0);
+  matchesForApp.mockResolvedValue([]);
+  deleteStaleForPair.mockResolvedValue(0);
+  pairEditCutoff.mockResolvedValue(null);
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -307,6 +323,168 @@ describe('LadderService.pickPair', () => {
     const pair = await ladderService.pickPair();
     expect(pair).toEqual(['anchor', 'mine']);
     rnd.mockRestore();
+  });
+});
+
+// ── Per-pair saturation cap ─────────────────────────────────────────────────
+// The pool is small (12 apps in prod = 66 pairs) and the loop was replaying
+// every pairing ~85x/day forever, long past the ~20-40 games a rating needs.
+// The cap stops a pair once it has met `pairMatchCap` times since EITHER side's
+// code last changed, so the ladder goes quiet until someone edits a bot.
+describe('LadderService.pickPair — pair saturation', () => {
+  // Build a SYMMETRIC matchesForApp mock from pair records. The real query
+  // matches `(appA=$1 OR appB=$1)`, so it returns a pair's rows whichever column
+  // each app landed in — a one-sided fixture would make a saturated pair look
+  // open from the other app's turn as anchor, which is exactly the bug a cap
+  // like this would ship with if the test were asymmetric.
+  //
+  // `since` is ignored here: the query filters by the anchor's edit time in SQL,
+  // but pickPair re-applies max(anchor, opponent) in JS, so leaving it to the
+  // code under test gives the same answer and keeps the fixture honest.
+  const history = (pairs: { x: string; y: string; n: number; at?: Date }[]) =>
+    matchesForApp.mockImplementation(async (appId: string) =>
+      pairs.flatMap(({ x, y, n, at = new Date('2026-06-01') }) =>
+        appId === x || appId === y
+          ? Array.from({ length: n }, () => ({
+              opponentId: appId === x ? y : x,
+              at,
+            }))
+          : []
+      )
+    );
+
+  it('will not re-pair two apps that have played their quota', async () => {
+    getCandidates.mockResolvedValue([cand('a', 1500, 10), cand('b', 1500, 10)]);
+    history([{ x: 'a', y: 'b', n: 10 }]);
+
+    expect(await ladderService.pickPair({ pairMatchCap: 10 })).toBeNull();
+  });
+
+  it('still pairs them one short of the quota', async () => {
+    getCandidates.mockResolvedValue([cand('a', 1500, 10), cand('b', 1500, 10)]);
+    history([{ x: 'a', y: 'b', n: 9 }]);
+
+    expect(await ladderService.pickPair({ pairMatchCap: 10 })).not.toBeNull();
+  });
+
+  it('moves to another anchor rather than giving up when one is exhausted', async () => {
+    // 'a' is capped against both others; 'b' vs 'c' is still open. An exhausted
+    // ANCHOR must not read as an exhausted POOL.
+    getCandidates.mockResolvedValue([
+      cand('a', 1500, 0), // fewest games, so chosen as anchor first
+      cand('b', 1500, 50),
+      cand('c', 1500, 50),
+    ]);
+    history([
+      { x: 'a', y: 'b', n: 10 },
+      { x: 'a', y: 'c', n: 10 },
+    ]);
+
+    const pair = await ladderService.pickPair({ pairMatchCap: 10 });
+    expect(pair).not.toBeNull();
+    expect(new Set(pair!)).toEqual(new Set(['b', 'c']));
+  });
+
+  it('excludes only the saturated opponent, not the whole pool', async () => {
+    getCandidates.mockResolvedValue([
+      cand('a', 1500, 0),
+      cand('b', 1500, 50),
+      cand('c', 1500, 50),
+    ]);
+    history([{ x: 'a', y: 'b', n: 10 }]); // a-vs-b done, a-vs-c open
+
+    expect(await ladderService.pickPair({ pairMatchCap: 10 })).toEqual([
+      'a',
+      'c',
+    ]);
+  });
+
+  it('ignores matches played BEFORE either side was last edited', async () => {
+    // 20 past meetings, but 'b' was edited after all of them, so none count:
+    // the pairing is open again against 'b' s new code.
+    getCandidates.mockResolvedValue([
+      cand('a', 1500, 10, 'owner-a', '// a', new Date('2026-01-01')),
+      cand('b', 1500, 10, 'owner-b', '// b', new Date('2026-09-01')),
+    ]);
+    history([{ x: 'a', y: 'b', n: 20, at: new Date('2026-06-01') }]);
+
+    expect(await ladderService.pickPair({ pairMatchCap: 10 })).not.toBeNull();
+  });
+
+  it('counts a pair from the LATER of the two edit times', async () => {
+    // 'a' edited Jan, 'b' edited Sep. The 10 meetings in Jun predate 'b' s edit
+    // and must not count; the 10 in Oct do — so the pair is saturated.
+    getCandidates.mockResolvedValue([
+      cand('a', 1500, 10, 'owner-a', '// a', new Date('2026-01-01')),
+      cand('b', 1500, 10, 'owner-b', '// b', new Date('2026-09-01')),
+    ]);
+    history([
+      { x: 'a', y: 'b', n: 10, at: new Date('2026-06-01') },
+      { x: 'a', y: 'b', n: 10, at: new Date('2026-10-01') },
+    ]);
+
+    expect(await ladderService.pickPair({ pairMatchCap: 10 })).toBeNull();
+  });
+
+  it('applies no cap when pairMatchCap is 0 (play forever)', async () => {
+    getCandidates.mockResolvedValue([cand('a', 1500, 10), cand('b', 1500, 10)]);
+    history([{ x: 'a', y: 'b', n: 1000 }]);
+
+    expect(await ladderService.pickPair({ pairMatchCap: 0 })).not.toBeNull();
+    // Nothing to count, so the history is never even fetched.
+    expect(matchesForApp).not.toHaveBeenCalled();
+  });
+});
+
+// ── Pair history retirement ─────────────────────────────────────────────────
+// Per-pair pruning at write time is the PRIMARY retention rule: what remains for
+// a pair is its head-to-head record between the two apps' current versions,
+// which is also exactly what the saturation cap counts. The hourly sweep is only
+// a GC for pairings that stopped playing.
+describe('LadderService — pair history retirement', () => {
+  // 'A'/'B' because the shared `summary` fixture's leaderboard is keyed on those
+  // ids — other ids read as "no entry", which the crash check treats as fully
+  // crashed, leaving the match unrated and masking what these tests assert.
+  const run = () => ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+  beforeEach(() => {
+    getApp.mockImplementation(async (id: string) =>
+      id === 'A' ? makeApp('A', 1500, 30) : makeApp('B', 1500, 30)
+    );
+    runMatch.mockResolvedValue(summary('A') as never);
+  });
+
+  it('retires the pair rows that predate the later edit, after recording', async () => {
+    const cutoff = new Date('2026-09-01T00:00:00Z');
+    pairEditCutoff.mockResolvedValue(cutoff);
+
+    await run();
+
+    expect(pairEditCutoff).toHaveBeenCalledWith('A', 'B');
+    expect(deleteStaleForPair).toHaveBeenCalledWith('A', 'B', cutoff);
+    // Order matters: the row just written is newer than the cutoff and must
+    // survive, which only holds if record() happens first.
+    expect(record.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteStaleForPair.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('prunes nothing when neither app resolves a cutoff', async () => {
+    pairEditCutoff.mockResolvedValue(null);
+    await run();
+    expect(deleteStaleForPair).not.toHaveBeenCalled();
+  });
+
+  it('still completes a rated match when the prune throws', async () => {
+    pairEditCutoff.mockResolvedValue(new Date('2026-09-01T00:00:00Z'));
+    deleteStaleForPair.mockRejectedValue(new Error('db down'));
+
+    const res = await run();
+
+    // A bookkeeping failure must not unwind a match that already moved ratings.
+    expect(res.ran).toBe(true);
+    expect(res.winnerId).toBe('A');
+    expect(record).toHaveBeenCalled();
   });
 });
 

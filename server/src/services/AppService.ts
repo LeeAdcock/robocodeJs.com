@@ -82,6 +82,10 @@ export interface LadderCandidate {
   rating: number;
   ratingGames: number;
   source: string;
+  // When this app's code (or name) last changed. The per-pair saturation cap in
+  // LadderService measures "matches since either side changed" from it, so it
+  // must only move on a real edit — see the unchanged-name guard in App.setName.
+  updatedTimestamp: Date;
 }
 
 // One row of the public global-ladder leaderboard (see getLeaderboard). Wire
@@ -340,7 +344,7 @@ export class AppService {
   getLadderCandidates = (): Promise<LadderCandidate[]> => {
     return pool
       .query({
-        text: `SELECT app.id as "appId", app.userId as "userId", app.rating as "rating", app.ratingGames as "ratingGames", app.source as "source"
+        text: `SELECT app.id as "appId", app.userId as "userId", app.rating as "rating", app.ratingGames as "ratingGames", app.source as "source", app.updatedTimestamp as "updatedTimestamp"
                FROM app JOIN account ON account.id = app.userId
                WHERE NOT app.deleted
                  AND NOT COALESCE(app.broken, false)
@@ -357,8 +361,33 @@ export class AppService {
           rating: (row.rating as number | null) ?? DEFAULT_RATING,
           ratingGames: (row.ratingGames as number | null) ?? 0,
           source: (row.source as string | null) ?? '',
+          // pg hands back a Date, pg-mem an ISO string — normalize both. Epoch
+          // fallback means a row with no timestamp reads as "never edited",
+          // which keeps it saturatable rather than permanently fresh.
+          updatedTimestamp: row.updatedTimestamp
+            ? new Date(row.updatedTimestamp as string | Date)
+            : new Date(0),
         }))
       );
+  };
+
+  // The later of two apps' last-edit times — the point from which a pairing's
+  // head-to-head record is current. LadderService uses it both to measure pair
+  // saturation and to prune a pair's pre-edit rows. Null when neither id
+  // resolves (deleted mid-match), which callers read as "nothing to prune".
+  pairEditCutoff = (a: AppId, b: AppId): Promise<Date | null> => {
+    return pool
+      .query({
+        // IN over two placeholders, not `= ANY($1)`: pg-mem silently returns
+        // null for the ANY form, which would read as "no cutoff" and quietly
+        // disable pruning in local dev.
+        text: 'SELECT MAX(updatedTimestamp) as cutoff FROM app WHERE id IN ($1,$2)',
+        values: [a, b],
+      })
+      .then((res) => {
+        const raw = res?.rows?.[0]?.cutoff as string | Date | null | undefined;
+        return raw ? new Date(raw) : null;
+      });
   };
 
   getForUser = (userId: UserId): Promise<App[]> => {
