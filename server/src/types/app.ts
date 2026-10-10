@@ -119,6 +119,15 @@ export default class App {
     // filter. Direct callers (e.g. MCP) surface this; the sandbox bot.setName
     // path pre-checks and never reaches here with a profane name.
     if (isNameProfane(clean)) return Promise.reject(new NameRejectedError());
+    // No-op when the name is already what we'd write. `updatedTimestamp` is the
+    // ladder's "this app's code changed" signal (LadderService's per-pair
+    // saturation cap keys off it, and getLadderCandidates' 3-month activity gate
+    // reads it), so bumping it for a rename that isn't a rename would reset
+    // saturation and re-run matches for no reason. Bot.setName already compares
+    // before calling — every bot re-asserts its name on each script load, and
+    // the ladder boots 10 bots per match — but this is the authoritative
+    // chokepoint, so the guard belongs here too rather than only in one caller.
+    if (clean === this.name) return Promise.resolve(undefined);
     this.name = clean;
     return pool
       .query({

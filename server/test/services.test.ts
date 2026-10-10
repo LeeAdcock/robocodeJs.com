@@ -433,6 +433,38 @@ describe('AppService', () => {
     expect(app!.getName()).toBe('a'.repeat(50));
   });
 
+  it('setName() does not write (or bump updatedTimestamp) for an unchanged name', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'Sitter', source: 's' }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+
+    // Every bot re-asserts its name on each script load and the ladder boots 10
+    // bots per match, so a write here would keep bumping updatedTimestamp — the
+    // signal the per-pair saturation cap and the 3-month activity gate read.
+    query.mockClear();
+    await app!.setName('Sitter');
+    expect(query).not.toHaveBeenCalled();
+    expect(app!.getName()).toBe('Sitter');
+
+    // Sanitization happens first, so a name that only differs before cleaning is
+    // still recognised as unchanged.
+    query.mockClear();
+    await app!.setName('Sitter' + String.fromCodePoint(0));
+    expect(query).not.toHaveBeenCalled();
+
+    // A real change still persists.
+    query.mockClear();
+    await app!.setName('Different');
+    expect(query).toHaveBeenCalledTimes(1);
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('updatedTimestamp=CURRENT_TIMESTAMP');
+    expect(values[1]).toBe('Different');
+  });
+
   it('setName() rejects a profane name without writing', async () => {
     query.mockResolvedValue({
       rows: [{ userId: 'u1', name: 'Fine Name', source: 's' }],
