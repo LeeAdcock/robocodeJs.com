@@ -120,13 +120,15 @@ class LadderService {
       // keep LADDER_MATCH_TIMEOUT_MS above 7500/(10·speed) s or slow matches will
       // time out unrated. 0 opts back into unbounded (the prior behaviour).
       matchSpeed: opts.matchSpeed ?? envInt('LADDER_MATCH_SPEED', 20),
-      // Age at which recorded matches are pruned (see maybePruneHistory). The
-      // only programmatic reader of the history is the leaderboard's movement
-      // arrows, which look back 24 h (AppService's MOVEMENT_WINDOW_MS), so a
-      // week leaves 7x headroom while bounding the table. 0 disables pruning
-      // and restores the previous keep-forever behaviour.
+      // Backstop age for the hourly sweep. Per-pair pruning (runOneMatch) is now
+      // the primary retention rule, but it only ever touches pairs that are
+      // STILL PLAYING — a pairing whose app was deleted or aged out of
+      // eligibility is never written again, so its rows would sit forever. This
+      // sweep is the garbage collector for those, which is why the window is
+      // long (90 days) rather than tight: it is not what bounds the table, it
+      // just stops dead pairings accumulating. 0 disables it.
       retentionDays:
-        opts.retentionDays ?? envInt('LADDER_MATCH_RETENTION_DAYS', 7),
+        opts.retentionDays ?? envInt('LADDER_MATCH_RETENTION_DAYS', 90),
       // How many times a given pair may meet before either side's code changes
       // again (see pickPair). The pool is small — 12 apps in prod on 2026-10-10,
       // so 66 distinct pairs — and the loop was replaying them ~85x/day each
@@ -190,10 +192,14 @@ class LadderService {
     }
   };
 
-  // Drop recorded matches older than the retention window, at most once per
-  // RETENTION_SWEEP_MS. The ladder is the only writer of ranked_match, so
-  // enforcing retention from its own loop keeps the two in step: no history
-  // accumulates while the loop is stopped, and nothing else needs scheduling.
+  // Garbage-collect recorded matches older than the backstop window, at most
+  // once per RETENTION_SWEEP_MS. This is NOT what bounds the table — per-pair
+  // pruning in runOneMatch does that, and under the saturation cap a live
+  // pairing holds at most `pairMatchCap` rows. This only catches pairings that
+  // stopped playing entirely (an app deleted, or aged out of eligibility), whose
+  // rows write-time pruning can never reach again. The ladder is the only writer
+  // of ranked_match, so running it from the loop keeps the two in step: no
+  // history accumulates while the loop is stopped, and nothing needs scheduling.
   //
   // The slot is claimed before the first await so concurrent workers
   // (LADDER_CONCURRENCY > 1) can't both sweep the same hour. Failures are logged
@@ -225,7 +231,7 @@ class LadderService {
             removed,
             retentionDays: cfg.retentionDays,
           },
-          'pruned ranked match history'
+          'garbage-collected dead-pairing match history'
         );
       }
     } catch (err) {
@@ -594,6 +600,38 @@ class LadderService {
         deltaB: delta.b,
         seed,
       });
+
+      // Retire this pairing's PREVIOUS generation. What stays in ranked_match for
+      // a pair is then exactly its head-to-head record between the two apps'
+      // current versions — which is also what the saturation cap counts, so the
+      // retention rule and the control rule read the same rows rather than one
+      // shadowing the other. Pruning at write time keeps it with the only writer:
+      // a pair is tidied on its first match after either side changes, and the
+      // row just inserted is newer than the cutoff so it always survives.
+      //
+      // Best-effort: a failed prune leaves stale rows for the next match (or the
+      // GC sweep) to clear and must never fail a completed, already-rated match.
+      try {
+        const cutoff = await appService.pairEditCutoff(appIdA, appIdB);
+        if (cutoff) {
+          const dropped = await rankedMatchService.deleteStaleForPair(
+            appIdA,
+            appIdB,
+            cutoff
+          );
+          if (dropped > 0) {
+            logger.info(
+              { event: LogEvent.LADDER_MATCH, appIdA, appIdB, dropped },
+              'retired pre-edit head-to-head history'
+            );
+          }
+        }
+      } catch (err) {
+        logger.error(
+          { event: LogEvent.LADDER_MATCH, err },
+          'pair history prune failed'
+        );
+      }
 
       // Achievements (GitHub #121). Ladder badges are only worth something because
       // they can ONLY be earned here, so this is their sole award point — and the

@@ -371,6 +371,25 @@ export class AppService {
       );
   };
 
+  // The later of two apps' last-edit times — the point from which a pairing's
+  // head-to-head record is current. LadderService uses it both to measure pair
+  // saturation and to prune a pair's pre-edit rows. Null when neither id
+  // resolves (deleted mid-match), which callers read as "nothing to prune".
+  pairEditCutoff = (a: AppId, b: AppId): Promise<Date | null> => {
+    return pool
+      .query({
+        // IN over two placeholders, not `= ANY($1)`: pg-mem silently returns
+        // null for the ANY form, which would read as "no cutoff" and quietly
+        // disable pruning in local dev.
+        text: 'SELECT MAX(updatedTimestamp) as cutoff FROM app WHERE id IN ($1,$2)',
+        values: [a, b],
+      })
+      .then((res) => {
+        const raw = res?.rows?.[0]?.cutoff as string | Date | null | undefined;
+        return raw ? new Date(raw) : null;
+      });
+  };
+
   getForUser = (userId: UserId): Promise<App[]> => {
     return pool
       .query({

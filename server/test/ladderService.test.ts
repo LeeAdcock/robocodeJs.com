@@ -14,6 +14,9 @@ vi.mock('../src/services/AppService', () => ({
     getLadderCandidates: vi.fn(),
     // The rank badges (GitHub #121) look the board up after the rating update.
     getRanks: vi.fn(async () => new Map<string, number>()),
+    // Cutoff for retiring a pair's pre-edit history. Null by default = "nothing
+    // to prune", so tests that don't care see no prune.
+    pairEditCutoff: vi.fn().mockResolvedValue(null),
   },
 }));
 vi.mock('../src/services/RankedMatchService', () => ({
@@ -51,6 +54,7 @@ const metrics = vi.mocked(environmentService.metrics);
 const getApp = vi.mocked(appService.get);
 const getCandidates = vi.mocked(appService.getLadderCandidates);
 const getRanks = vi.mocked(appService.getRanks);
+const pairEditCutoff = vi.mocked(appService.pairEditCutoff);
 const record = vi.mocked(rankedMatchService.record);
 const deleteOlderThan = vi.mocked(rankedMatchService.deleteOlderThan);
 const matchesForApp = vi.mocked(rankedMatchService.matchesForApp);
@@ -115,6 +119,7 @@ beforeEach(() => {
   deleteOlderThan.mockResolvedValue(0);
   matchesForApp.mockResolvedValue([]);
   deleteStaleForPair.mockResolvedValue(0);
+  pairEditCutoff.mockResolvedValue(null);
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -428,6 +433,58 @@ describe('LadderService.pickPair — pair saturation', () => {
     expect(await ladderService.pickPair({ pairMatchCap: 0 })).not.toBeNull();
     // Nothing to count, so the history is never even fetched.
     expect(matchesForApp).not.toHaveBeenCalled();
+  });
+});
+
+// ── Pair history retirement ─────────────────────────────────────────────────
+// Per-pair pruning at write time is the PRIMARY retention rule: what remains for
+// a pair is its head-to-head record between the two apps' current versions,
+// which is also exactly what the saturation cap counts. The hourly sweep is only
+// a GC for pairings that stopped playing.
+describe('LadderService — pair history retirement', () => {
+  // 'A'/'B' because the shared `summary` fixture's leaderboard is keyed on those
+  // ids — other ids read as "no entry", which the crash check treats as fully
+  // crashed, leaving the match unrated and masking what these tests assert.
+  const run = () => ladderService.runOneMatch('A', 'B', { seed: 7 });
+
+  beforeEach(() => {
+    getApp.mockImplementation(async (id: string) =>
+      id === 'A' ? makeApp('A', 1500, 30) : makeApp('B', 1500, 30)
+    );
+    runMatch.mockResolvedValue(summary('A') as never);
+  });
+
+  it('retires the pair rows that predate the later edit, after recording', async () => {
+    const cutoff = new Date('2026-09-01T00:00:00Z');
+    pairEditCutoff.mockResolvedValue(cutoff);
+
+    await run();
+
+    expect(pairEditCutoff).toHaveBeenCalledWith('A', 'B');
+    expect(deleteStaleForPair).toHaveBeenCalledWith('A', 'B', cutoff);
+    // Order matters: the row just written is newer than the cutoff and must
+    // survive, which only holds if record() happens first.
+    expect(record.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteStaleForPair.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('prunes nothing when neither app resolves a cutoff', async () => {
+    pairEditCutoff.mockResolvedValue(null);
+    await run();
+    expect(deleteStaleForPair).not.toHaveBeenCalled();
+  });
+
+  it('still completes a rated match when the prune throws', async () => {
+    pairEditCutoff.mockResolvedValue(new Date('2026-09-01T00:00:00Z'));
+    deleteStaleForPair.mockRejectedValue(new Error('db down'));
+
+    const res = await run();
+
+    // A bookkeeping failure must not unwind a match that already moved ratings.
+    expect(res.ran).toBe(true);
+    expect(res.winnerId).toBe('A');
+    expect(record).toHaveBeenCalled();
   });
 });
 
