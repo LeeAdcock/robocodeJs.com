@@ -23,10 +23,19 @@
 const { execSync } = require('node:child_process');
 
 // GHSA ids (the tail of `advisory.url`) that are accepted and must NOT fail CI.
-// Currently empty: every known high/critical advisory has an upgrade available
-// and is taken. (The last entry, GHSA-qwww-vcr4-c8h2 / react-router RSC-mode
-// CSRF, was dropped once react-router-dom 7.18.2 shipped the fix.)
-const ALLOWLIST = new Map([]);
+// Each entry is justified in CLAUDE.md's "Accepted / deferred security risks".
+const ALLOWLIST = new Map([
+  [
+    'GHSA-vfj7-8cjw-p6xm',
+    'braces stack-exhaustion DoS, reachable only as nodemon -> chokidar -> ' +
+      'braces. No fix exists: braces@3.0.3 IS the latest, and nodemon pins ' +
+      'chokidar ^3 (chokidar 4 dropped glob support, so it is not a drop-in). ' +
+      'Dev-only and unreachable in prod: `npm ls braces --omit=dev` is empty, ' +
+      'and the only globs the watcher ever parses are our own nodemon watch ' +
+      'patterns, never attacker input. Re-check when nodemon moves to ' +
+      'chokidar 4.',
+  ],
+]);
 
 const FAIL_SEVERITIES = new Set(['high', 'critical']);
 
