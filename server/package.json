@@ -23,7 +23,7 @@
     "@modelcontextprotocol/sdk": "^1.31.0",
     "browser-bunyan": "^1.8.0",
     "cookie-parser": "^1.4.6",
-    "eslint": "^10.11.0",
+    "eslint": "^10.13.0",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "glin-profanity": "^3.3.0",
@@ -47,12 +47,12 @@
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.5",
     "nodemon": "^3.1.14",
-    "npm-run-all2": "^9.0.3",
+    "npm-run-all2": "^9.0.4",
     "pg-mem": "^3.0.14",
     "pino-pretty": "^13.2.0",
     "supertest": "^7.3.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.2",
+    "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.0"
   },
   "engines": {
