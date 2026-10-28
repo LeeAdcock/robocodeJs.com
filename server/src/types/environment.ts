@@ -695,12 +695,16 @@ export default class Environment {
     // sees each bot's final health and attribution for the tick.
     applyEliminations(this.processes, this.clock.time);
 
-    // Calculate application health
-    const appHealth: number[] = this.processes.map(
-      (process) =>
-        process.bots.reduce((sum, bot) => sum + bot.health, 0) /
-        (process.bots.length * 100)
-    );
+    // An app is alive while any one of its bots is — the same rule as
+    // isMatchDecided and the match summary (util/matchSummary.ts). This used to
+    // sum each app's health, but a dead bot's health isn't floored at 0
+    // (overkill, the missed-shot penalty), so dead teammates could drag a squad
+    // with a living bot to a total <= 0. The loop then stopped while the summary
+    // still reported two apps alive: run_match returned decided:false, and every
+    // resume ran one tick and stopped again (GitHub #422).
+    const appsAlive = this.processes.filter((process) =>
+      process.bots.some((bot) => bot.health > 0)
+    ).length;
 
     this.emitter.emit('event', {
       type: 'tick',
@@ -708,7 +712,7 @@ export default class Environment {
     });
 
     // Stop game if winning conditions are met
-    if (appHealth.filter((item) => item > 0).length === 0) {
+    if (appsAlive === 0) {
       logger.info({ arenaId: this.arena.getId() }, 'game over');
       this.emitter.emit('event', {
         type: 'arenaPaused',
