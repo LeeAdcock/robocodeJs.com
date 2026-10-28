@@ -3,8 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 // End-to-end ladder match: the REAL Environment + compiler + isolated-vm run a
 // 1v1 to a decision, exercising LadderService's ephemeral-arena wiring (Processes
 // pushed directly, synthetic members, runMatchToDecision). Only the database is
-// mocked — it serves two real bot sources for appService.get and swallows the
-// rating/history writes.
+// mocked — it serves two real bot sources for appService.get, keeps a tiny
+// in-memory ladder_claim table (the cross-instance claim, GitHub #409), and
+// swallows the rating/history writes.
 const APP_ROWS: Record<string, { source: string }> = {
   aggressor: {
     // Accelerate, sweep the turret, and fire on cooldown — enough to land hits.
@@ -23,6 +24,9 @@ const APP_ROWS: Record<string, { source: string }> = {
     source: `bot.setName('Sitter')`,
   },
 };
+
+// appId -> token of the match holding it.
+const claims = new Map<string, string>();
 
 vi.mock('../src/util/db', () => ({
   default: {
@@ -53,7 +57,29 @@ vi.mock('../src/util/db', () => ({
           rowCount: 1,
         });
       }
-      // All other queries (DDL, rating UPDATEs, ranked_match INSERT) succeed.
+      if (/INSERT INTO ladder_claim/i.test(text)) {
+        const [a, b, token] = values as string[];
+        for (const id of [a, b]) if (!claims.has(id)) claims.set(id, token);
+        return Promise.resolve({ rows: [], rowCount: 2 });
+      }
+      if (/SELECT appId, token FROM ladder_claim/i.test(text)) {
+        const rows = (values as string[])
+          .filter((id) => claims.has(id))
+          .map((id) => ({ appid: id, token: claims.get(id) }));
+        return Promise.resolve({ rows, rowCount: rows.length });
+      }
+      if (
+        /DELETE FROM ladder_claim WHERE appId IN \(\$1,\$2\) AND token/i.test(
+          text
+        )
+      ) {
+        const [a, b, token] = values as string[];
+        for (const id of [a, b])
+          if (claims.get(id) === token) claims.delete(id);
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      }
+      // All other queries (DDL, stale-claim expiry, rating UPDATEs,
+      // ranked_match INSERT) succeed.
       return Promise.resolve({ rows: [], rowCount: 1 });
     },
   },
@@ -76,8 +102,9 @@ describe('LadderService — real isolate match (integration)', () => {
     const loser = res.winnerId === 'aggressor' ? res.b! : res.a!;
     expect(winner.delta).toBeGreaterThan(0);
     expect(loser.delta).toBeLessThan(0);
-    // Locks released after teardown.
+    // Locks released after teardown: the local guard and the shared claim.
     expect(ladderService.isBusy('aggressor')).toBe(false);
     expect(ladderService.isBusy('sitter')).toBe(false);
+    expect(claims.size).toBe(0);
   }, 40000);
 });
