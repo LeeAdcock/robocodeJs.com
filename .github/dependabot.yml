@@ -1,5 +1,12 @@
 # Automated dependency-update PRs (OWASP A06-1: keep dependencies patched and
 # surface vulnerable/outdated packages). Weekly, grouped to limit PR noise.
+#
+# @types/node majors are ignored in both packages: the types must describe the
+# Node major we actually run (24 in the dev container, CI, CodeBuild and the
+# Elastic Beanstalk platform branch). A newer major's types let tsc accept APIs
+# that don't exist at runtime. Minor/patch updates within the major still flow
+# through the grouped PRs. Bump @types/node by hand alongside the runtime (next:
+# Node 26, together with isolated-vm 7 — see CLAUDE.md "Runtime requirements").
 version: 2
 updates:
   - package-ecosystem: npm
@@ -7,6 +14,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       server-minor-patch:
         update-types: [minor, patch]
@@ -16,6 +26,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       ui-minor-patch:
         update-types: [minor, patch]
