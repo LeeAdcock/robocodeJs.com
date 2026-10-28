@@ -43,6 +43,7 @@ PostgreSQL connection (see `src/util/db.ts`):
 | `SANDBOX_TIMEOUT_MS` | wall-clock ceiling for a single synchronous entry into bot code — script load, event handlers, and timer callbacks (default `5000`) |
 | `LOG_LEVEL` | application log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`/`silent`); defaults to `debug` in local dev, `info` otherwise, `silent` under test |
 | `RDS_SSL` / `RDS_SSL_NO_VERIFY` | TLS to Postgres — verified against the vendored RDS CA bundle (`certs/rds-global-bundle.pem`) by default. `RDS_SSL_NO_VERIFY=true` encrypts without verifying the CA (old behaviour, for a non-RDS cert); `RDS_SSL=false` disables TLS. |
+| `PG_POOL_MAX` / `PG_POOL_CONNECT_TIMEOUT_MS` / `PG_POOL_IDLE_TIMEOUT_MS` | Postgres pool sizing (defaults `20` / `5000` / `30000`). `max` is per instance, sized so 4 instances still fit the `db.t3.micro`'s ~112 `max_connections`. The connect timeout makes an exhausted pool fail fast instead of queueing forever, and each timeout is logged as `event=db.error`. Invalid values fall back to the default with a warning. See `src/util/db.ts`. |
 | `MAX_TOTAL_ARENAS` | global ceiling on concurrently-created arenas across **all** users (default `1000`); creation past it returns `503` |
 
 Global bot ladder (GitHub #151 — `src/services/LadderService.ts`; the background matchmaking loop is **off unless `LADDER_ENABLED=true`**, and never runs under test):

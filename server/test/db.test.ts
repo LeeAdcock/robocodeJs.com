@@ -1,7 +1,105 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
-import { sslConfig } from '../src/util/db';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import net from 'node:net';
+import { sslConfig, poolSizing, logPoolTimeouts } from '../src/util/db';
+import { logger, LogEvent } from '../src/util/logger';
 import { newDb } from 'pg-mem';
+import { Pool as PgPool } from 'pg';
 import type { Pool } from 'pg';
+
+// Pool sizing (GitHub #411): explicit defaults rather than pg's implicit
+// max 10 / no connect timeout, each overridable by a positive-integer env var.
+describe('poolSizing', () => {
+  const VARS = [
+    'PG_POOL_MAX',
+    'PG_POOL_CONNECT_TIMEOUT_MS',
+    'PG_POOL_IDLE_TIMEOUT_MS',
+  ];
+  afterEach(() => {
+    for (const v of VARS) delete process.env[v];
+  });
+
+  it('uses the documented defaults', () => {
+    expect(poolSizing()).toEqual({
+      max: 20,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+    });
+  });
+
+  it('takes overrides from the environment', () => {
+    process.env.PG_POOL_MAX = '35';
+    process.env.PG_POOL_CONNECT_TIMEOUT_MS = '2000';
+    process.env.PG_POOL_IDLE_TIMEOUT_MS = '60000';
+    expect(poolSizing()).toEqual({
+      max: 35,
+      connectionTimeoutMillis: 2000,
+      idleTimeoutMillis: 60000,
+    });
+  });
+
+  it('falls back to the default for unusable values instead of 0 or NaN', () => {
+    process.env.PG_POOL_MAX = '0';
+    process.env.PG_POOL_CONNECT_TIMEOUT_MS = 'five';
+    process.env.PG_POOL_IDLE_TIMEOUT_MS = '-1';
+    expect(poolSizing()).toEqual({
+      max: 20,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+    });
+  });
+});
+
+// A connect timeout rejects the caller's query and never reaches the pool's
+// 'error' event, so logPoolTimeouts is what makes pool exhaustion visible as
+// event=db.error. Exercised against a real pg Pool and a socket that accepts
+// connections but never speaks Postgres, so the timeout is pg's own.
+describe('logPoolTimeouts', () => {
+  let server: net.Server;
+  let port: number;
+  const sockets: net.Socket[] = [];
+
+  beforeEach(async () => {
+    server = net.createServer((socket) => sockets.push(socket));
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    port = (server.address() as net.AddressInfo).port;
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    for (const s of sockets.splice(0)) s.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const silentPool = () =>
+    new PgPool({ host: '127.0.0.1', port, connectionTimeoutMillis: 100 });
+
+  it('logs a connect timeout as db.error and still rejects the caller', async () => {
+    const error = vi.spyOn(logger, 'error');
+    const pool = silentPool();
+    logPoolTimeouts(pool);
+
+    await expect(pool.query('SELECT 1')).rejects.toThrow(/connection timeout/);
+    await vi.waitFor(() =>
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: LogEvent.DB_ERROR }),
+        'database pool connect timeout'
+      )
+    );
+    await pool.end();
+  });
+
+  it('leaves other query errors to the caller without logging them', async () => {
+    const error = vi.spyOn(logger, 'error');
+    const fake = {
+      query: () => Promise.reject(new Error('relation "nope" does not exist')),
+    } as unknown as Pool;
+    logPoolTimeouts(fake);
+
+    await expect(fake.query('SELECT * FROM nope')).rejects.toThrow(/nope/);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(error).not.toHaveBeenCalled();
+  });
+});
 
 // TLS posture for the RDS connection (OWASP A02-1). By default we verify the
 // server certificate against the pinned AWS RDS CA bundle; two env escape
