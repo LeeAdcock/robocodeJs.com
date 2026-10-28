@@ -20,12 +20,20 @@ import { isMatchDecided } from '../src/util/matchSummary';
 
 // Bots never load code here, so no handlers run and health only changes if we
 // change it. Each app gets one bot per entry in `healths`.
+//
+// Placement is random per arena seed, so occasionally two bots spawn touching
+// and the tick's collision path logs through bot.logger — which is normally
+// attached when a bot loads its code. Stub it so that seed doesn't crash the
+// tick (it made this file fail ~1 run in 30).
+const silentLogger = new Proxy({}, { get: () => () => undefined });
+
 const arenaWith = (...apps: number[][]) => {
   const env = new Environment(new Arena('a', 'u'));
   apps.forEach((healths, i) => {
     const process = new Process(`app${i}`);
     for (const health of healths) {
       const bot = new Bot(env, process);
+      bot.logger = silentLogger as Bot['logger'];
       bot.health = health;
       process.bots.push(bot);
     }
