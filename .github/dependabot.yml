@@ -7,6 +7,14 @@
 # that don't exist at runtime. Minor/patch updates within the major still flow
 # through the grouped PRs. Bump @types/node by hand alongside the runtime (next:
 # Node 26, together with isolated-vm 7 — see CLAUDE.md "Runtime requirements").
+#
+# TypeScript 7.0.x is ignored in both packages: 7.0 (the native Go compiler)
+# ships without the programmatic API that typescript-eslint is built on, so
+# ESLint crashes ("typescript-eslint does not support TS 7.0"; its peer range is
+# <6.1.0). Build and tests pass under 7.0.2 — lint is the only blocker. The API
+# is due in 7.1, which this rule deliberately lets through: when Dependabot
+# offers it, merge once typescript-eslint's peer range accepts it (tracking:
+# github.com/typescript-eslint/typescript-eslint/issues/10940).
 version: 2
 updates:
   - package-ecosystem: npm
@@ -17,6 +25,8 @@ updates:
     ignore:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript'
+        versions: ['7.0.x']
     groups:
       server-minor-patch:
         update-types: [minor, patch]
@@ -29,6 +39,8 @@ updates:
     ignore:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript'
+        versions: ['7.0.x']
     groups:
       ui-minor-patch:
         update-types: [minor, patch]
