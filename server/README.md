@@ -16,7 +16,7 @@ When `RDS_HOSTNAME` is unset and `NODE_ENV` is neither `production` nor `test`, 
 ## Scripts
 
 ```bash
-npm run dev     # build + nodemon-watch src, restart on change (port 8080)
+npm run dev     # build, then tsc --watch + node --watch: recompile and restart on change (port 8080)
 npm run build   # tsc -> dist/
 npm start       # node ./dist/src/index.js
 npm test        # run the Vitest suite once (test/**/*.test.ts)

@@ -24,18 +24,9 @@ const { execSync } = require('node:child_process');
 
 // GHSA ids (the tail of `advisory.url`) that are accepted and must NOT fail CI.
 // Each entry is justified in CLAUDE.md's "Accepted / deferred security risks".
-const ALLOWLIST = new Map([
-  [
-    'GHSA-vfj7-8cjw-p6xm',
-    'braces stack-exhaustion DoS, reachable only as nodemon -> chokidar -> ' +
-      'braces. No fix exists: braces@3.0.3 IS the latest, and nodemon pins ' +
-      'chokidar ^3 (chokidar 4 dropped glob support, so it is not a drop-in). ' +
-      'Dev-only and unreachable in prod: `npm ls braces --omit=dev` is empty, ' +
-      'and the only globs the watcher ever parses are our own nodemon watch ' +
-      'patterns, never attacker input. Re-check when nodemon moves to ' +
-      'chokidar 4.',
-  ],
-]);
+// Format: ['GHSA-xxxx-xxxx-xxxx', 'why it is non-applicable / unfixable'].
+// Currently empty (the braces entry left with nodemon, GitHub #413).
+const ALLOWLIST = new Map([]);
 
 const FAIL_SEVERITIES = new Set(['high', 'critical']);
 
