@@ -5,6 +5,7 @@ import ArenaMember from '../types/arenaMember';
 import { AppId } from '../types/app';
 import appService, { LadderCandidate } from './AppService';
 import rankedMatchService from './RankedMatchService';
+import ladderClaimService, { LadderClaim } from './LadderClaimService';
 import environmentService from './EnvironmentService';
 import { runMatchToDecision, DEFAULT_MATCH_TIMEOUT_MS } from '../util/runMatch';
 import { updateRatings, Outcome } from '../util/elo';
@@ -48,6 +49,14 @@ const RETENTION_SWEEP_MS = 60 * 60 * 1000;
 const RETENTION_BATCH_SIZE = 5000;
 const RETENTION_MAX_BATCHES = 20;
 
+// How long a cross-instance app claim (LadderClaimService) stays valid. A live
+// match releases its claim when it ends, so this only matters for a claim left
+// by an instance that died mid-match: it must outlast the longest possible
+// match (the wall-clock timeout, plus teardown) so a slow match is never
+// "expired" out from under itself, yet still free the apps reasonably soon.
+// Twice the match timeout plus a minute: ~5 min at prod's 120 s timeout.
+const claimTtlMs = (timeoutMs: number): number => 2 * timeoutMs + 60_000;
+
 const envInt = (name: string, dflt: number): number => {
   const n = parseInt(process.env[name] ?? '');
   return Number.isFinite(n) && n >= 0 ? n : dflt;
@@ -64,9 +73,11 @@ interface LadderSide {
 
 export interface LadderMatchResult {
   ran: boolean;
-  // Set when ran === false: 'missing-app' (an id no longer resolves) or 'busy'
-  // (one of the apps is already in a ladder match).
-  reason?: 'missing-app' | 'busy';
+  // Set when ran === false: 'missing-app' (an id no longer resolves), 'busy'
+  // (one of the apps is already in a ladder match, on this instance or any
+  // other), or 'saturated' (the pair reached the cap while this match was
+  // being set up — another instance finished one of its games first).
+  reason?: 'missing-app' | 'busy' | 'saturated';
   decided: boolean;
   timedOut: boolean;
   winnerId: AppId | null;
@@ -76,9 +87,11 @@ export interface LadderMatchResult {
 }
 
 class LadderService {
-  // App ids currently in a ladder match. Guards against running two matches for
-  // the same app at once, which would make the read-modify-write Elo update race
-  // (Node is single-threaded, so add/has/delete here are atomic between awaits).
+  // App ids currently in a ladder match on THIS instance. The fast, local half
+  // of "never put one app in two matches at once" (Node is single-threaded, so
+  // add/has/delete here are atomic between awaits); LadderClaimService is the
+  // cross-instance half, so the ladder is safe with several workers per
+  // instance (LADDER_CONCURRENCY) and several instances (GitHub #409).
   private inFlight = new Set<AppId>();
 
   // Background-loop state. `running` gates the worker loops; flipping it false
@@ -265,8 +278,17 @@ class LadderService {
   pickPair = async (
     opts: { pairMatchCap?: number } = {}
   ): Promise<[AppId, AppId] | null> => {
+    // Skip apps already in a match here (inFlight) or on another instance
+    // (claimed). The claim in runOneMatch is still the real guard; this just
+    // avoids picking a pair it would then refuse.
+    const claimed = await ladderClaimService.claimedApps(
+      new Date(Date.now() - claimTtlMs(this.matchTimeoutMs()))
+    );
     const pool = (await appService.getLadderCandidates()).filter(
-      (c) => !this.inFlight.has(c.appId) && !isUntouchedStarter(c.source)
+      (c) =>
+        !this.inFlight.has(c.appId) &&
+        !claimed.has(c.appId) &&
+        !isUntouchedStarter(c.source)
     );
     if (pool.length < 2) return null;
 
@@ -276,10 +298,7 @@ class LadderService {
     // quietly stops applying depending on how it was entered is the kind of
     // thing that looks like it works. 0 means off because the operator said so,
     // not because config wasn't built yet.
-    const cap =
-      opts.pairMatchCap ??
-      this.config?.pairMatchCap ??
-      envInt('LADDER_PAIR_MATCH_CAP', 10);
+    const cap = opts.pairMatchCap ?? this.pairMatchCap();
 
     // 1. Anchor: random pick among the fewest-played quartile (at least 1).
     const byGames = [...pool].sort((a, b) => a.ratingGames - b.ratingGames);
@@ -369,6 +388,35 @@ class LadderService {
     });
   };
 
+  // Resolved pair cap and match timeout: the started loop's config, else the env
+  // default. Falls back to the env default rather than to "off" when the loop
+  // hasn't been started: pickPair/runOneMatch are reachable without start(), and
+  // a cap that quietly stops applying depending on how it was entered is the
+  // kind of thing that looks like it works. 0 means off because the operator
+  // said so, not because config wasn't built yet.
+  private pairMatchCap = (): number =>
+    this.config?.pairMatchCap ?? envInt('LADDER_PAIR_MATCH_CAP', 10);
+
+  private matchTimeoutMs = (): number =>
+    this.config?.timeoutMs ??
+    envInt('LADDER_MATCH_TIMEOUT_MS', DEFAULT_MATCH_TIMEOUT_MS);
+
+  // Has this pair already played `cap` times since the later of the two apps'
+  // last edits? The same rule unsaturatedOpponents applies when picking, asked
+  // again for one pair once it's claimed: between pickPair's read and the claim,
+  // another instance can finish a game of this very pair (GitHub #409).
+  private pairSaturated = async (
+    appIdA: AppId,
+    appIdB: AppId,
+    cap: number
+  ): Promise<boolean> => {
+    if (cap <= 0) return false;
+    const since =
+      (await appService.pairEditCutoff(appIdA, appIdB)) ?? new Date(0);
+    const history = await rankedMatchService.matchesForApp(appIdA, since);
+    return history.filter((h) => h.opponentId === appIdB).length >= cap;
+  };
+
   // Pick a pair and run their match. Returns null if no pair was available.
   runNextMatch = async (
     opts: {
@@ -379,7 +427,10 @@ class LadderService {
   ): Promise<LadderMatchResult | null> => {
     const pair = await this.pickPair();
     if (!pair) return null;
-    return this.runOneMatch(pair[0], pair[1], opts);
+    return this.runOneMatch(pair[0], pair[1], {
+      ...opts,
+      pairMatchCap: this.pairMatchCap(),
+    });
   };
 
   // Run a single headless 1v1 ranked match between two apps to a decision (or a
@@ -490,19 +541,29 @@ class LadderService {
   runOneMatch = async (
     appIdA: AppId,
     appIdB: AppId,
-    opts: { seed?: number; timeoutMs?: number; speed?: number } = {}
+    opts: {
+      seed?: number;
+      timeoutMs?: number;
+      speed?: number;
+      // Re-check the pair cap after claiming (set by runNextMatch). Omitted for
+      // a directly-requested match, which is the caller's call to make.
+      pairMatchCap?: number;
+    } = {}
   ): Promise<LadderMatchResult> => {
     const seed = opts.seed ?? Math.floor(Math.random() * 0x100000000);
+    const notRun = (
+      reason: NonNullable<LadderMatchResult['reason']>
+    ): LadderMatchResult => ({
+      ran: false,
+      reason,
+      decided: false,
+      timedOut: false,
+      winnerId: null,
+      seed,
+    });
 
     if (this.inFlight.has(appIdA) || this.inFlight.has(appIdB)) {
-      return {
-        ran: false,
-        reason: 'busy',
-        decided: false,
-        timedOut: false,
-        winnerId: null,
-        seed,
-      };
+      return notRun('busy');
     }
 
     const [appA, appB] = await Promise.all([
@@ -510,18 +571,50 @@ class LadderService {
       appService.get(appIdB),
     ]);
     if (!appA || !appB) {
-      return {
-        ran: false,
-        reason: 'missing-app',
-        decided: false,
-        timedOut: false,
-        winnerId: null,
-        seed,
-      };
+      return notRun('missing-app');
     }
 
+    // Re-check the local guard: the app loads above awaited, and another worker
+    // on this instance may have taken one of these apps meanwhile.
+    if (this.inFlight.has(appIdA) || this.inFlight.has(appIdB)) {
+      return notRun('busy');
+    }
+    // Reserve locally before the claim's awaits, so a sibling worker can't race
+    // us into the claim for the same app.
     this.inFlight.add(appIdA);
     this.inFlight.add(appIdB);
+
+    // Cross-instance claim (GitHub #409): the shared version of inFlight.
+    let claim: LadderClaim | null = null;
+    try {
+      const now = new Date();
+      const timeoutMs = opts.timeoutMs ?? this.matchTimeoutMs();
+      claim = await ladderClaimService.claim(
+        appIdA,
+        appIdB,
+        now,
+        new Date(now.getTime() - claimTtlMs(timeoutMs))
+      );
+      if (!claim) return notRun('busy');
+      if (
+        opts.pairMatchCap !== undefined &&
+        (await this.pairSaturated(appIdA, appIdB, opts.pairMatchCap))
+      ) {
+        await ladderClaimService.release(claim);
+        claim = null;
+        return notRun('saturated');
+      }
+    } catch (err) {
+      // Release anything we did get, then let the worker log the error.
+      if (claim) await ladderClaimService.release(claim).catch(() => undefined);
+      throw err;
+    } finally {
+      // Not proceeding to a match: drop the local reservation too.
+      if (!claim) {
+        this.inFlight.delete(appIdA);
+        this.inFlight.delete(appIdB);
+      }
+    }
 
     // Throwaway arena + environment: not written to the DB, not registered with
     // EnvironmentService (so it's outside the 30-min GC and MAX_TOTAL_ARENAS).
@@ -573,17 +666,12 @@ class LadderService {
           outcome
         );
         delta = { a: res.a.delta, b: res.b.delta };
+        // Applied as increments, not absolute ratings, so a concurrent result
+        // for either app (another worker or instance) composes with this one
+        // instead of being overwritten (GitHub #409).
         await Promise.all([
-          appA.setRating(
-            res.a.rating,
-            appA.getRatingGames() + 1,
-            winnerId === appIdA
-          ),
-          appB.setRating(
-            res.b.rating,
-            appB.getRatingGames() + 1,
-            winnerId === appIdB
-          ),
+          appA.applyRatingResult(res.a.delta, winnerId === appIdA),
+          appB.applyRatingResult(res.b.delta, winnerId === appIdB),
         ]);
       }
 
@@ -647,7 +735,7 @@ class LadderService {
         appIdA,
         appIdB,
         before,
-        // Post-match counts: setRating already bumped these in memory, so a rank
+        // Post-match counts: applyRatingResult already synced these, so a rank
         // badge is gated on games INCLUDING the match that just earned it.
         games: { a: appA.getRatingGames(), b: appB.getRatingGames() },
       });
@@ -694,11 +782,22 @@ class LadderService {
       // bot.fault. Bounded so a wedged loop can't hang teardown; dispose is
       // safe regardless.
       await this.waitForLoopExit(env);
-      // Always release the isolates and the in-flight locks, even if the match
-      // threw partway through.
+      // Always release the isolates, the in-flight locks and the cross-instance
+      // claim, even if the match threw partway through. A claim release that
+      // fails is logged, not thrown: the lease expires on its own (claimTtlMs).
       env.dispose();
       this.inFlight.delete(appIdA);
       this.inFlight.delete(appIdB);
+      if (claim) {
+        await ladderClaimService
+          .release(claim)
+          .catch((err) =>
+            logger.error(
+              { event: LogEvent.LADDER_MATCH, err, appIdA, appIdB },
+              'ladder claim release failed; it will expire'
+            )
+          );
+      }
     }
   };
 

@@ -127,24 +127,33 @@ describe('AppService', () => {
     expect(app?.isBroken()).toBe(false);
   });
 
-  it('setRating() persists rating, games, and a lastRankedAt stamp', async () => {
+  it('applyRatingResult() writes increments and syncs to the returned row', async () => {
     query.mockResolvedValue({
       rows: [{ userId: 'u1', name: 'N', source: 's' }],
       rowCount: 1,
     } as never);
     const app = await appService.get('a1');
     query.mockClear();
-    await app!.setRating(1580, 5, true);
+    // The row as it stands after the update, which may include another
+    // worker's concurrent result: the in-memory view follows the row.
+    query.mockResolvedValue({
+      rows: [{ rating: 1580, ratingGames: 5, ratingWins: 3 }],
+      rowCount: 1,
+    } as never);
+    await app!.applyRatingResult(16, true);
     expect(app!.getRating()).toBe(1580);
     expect(app!.getRatingGames()).toBe(5);
-    expect(app!.getRatingWins()).toBe(1); // won -> wins incremented
+    expect(app!.getRatingWins()).toBe(3);
     const [{ text, values }] = query.mock.calls[0] as [
       { text: string; values: unknown[] },
     ];
-    expect(text).toContain('rating=$2');
-    expect(text).toContain('ratingWins=ratingWins + $4');
-    expect(text).toContain('lastRankedAt=CURRENT_TIMESTAMP');
-    expect(values).toEqual(['a1', 1580, 5, 1]);
+    // Relative to the row, never an absolute rating (GitHub #409).
+    expect(text).toContain('rating = COALESCE(rating, 1500) + $2');
+    expect(text).toContain('ratingGames = COALESCE(ratingGames, 0) + 1');
+    expect(text).toContain('ratingWins = COALESCE(ratingWins, 0) + $3');
+    expect(text).toContain('lastRankedAt = CURRENT_TIMESTAMP');
+    expect(text).toContain('RETURNING');
+    expect(values).toEqual(['a1', 16, 1]);
   });
 
   it('getLeaderboard() maps rows, rounds rating, and computes rank + win rate', async () => {

@@ -30,6 +30,17 @@ vi.mock('../src/services/RankedMatchService', () => ({
   },
 }));
 
+// Cross-instance app claims (GitHub #409). Granted by default, so these tests
+// see the single-instance behaviour; the claim-specific tests below override it.
+// Its real SQL is exercised against pg-mem in ladderClaim.test.ts.
+vi.mock('../src/services/LadderClaimService', () => ({
+  default: {
+    claim: vi.fn(),
+    release: vi.fn().mockResolvedValue(undefined),
+    claimedApps: vi.fn(),
+  },
+}));
+
 vi.mock('../src/services/EnvironmentService', () => ({
   default: { metrics: vi.fn(() => ({ isolates: 0 })) },
 }));
@@ -47,6 +58,7 @@ import environmentService from '../src/services/EnvironmentService';
 import { runMatchToDecision } from '../src/util/runMatch';
 import ladderService from '../src/services/LadderService';
 import { recordLadderResult } from '../src/util/awardAchievements';
+import ladderClaimService from '../src/services/LadderClaimService';
 import { STARTER_BOTS } from '../src/util/starterBots';
 
 const metrics = vi.mocked(environmentService.metrics);
@@ -60,6 +72,14 @@ const deleteOlderThan = vi.mocked(rankedMatchService.deleteOlderThan);
 const matchesForApp = vi.mocked(rankedMatchService.matchesForApp);
 const deleteStaleForPair = vi.mocked(rankedMatchService.deleteStaleForPair);
 const runMatch = vi.mocked(runMatchToDecision);
+const claim = vi.mocked(ladderClaimService.claim);
+const releaseClaim = vi.mocked(ladderClaimService.release);
+const claimedApps = vi.mocked(ladderClaimService.claimedApps);
+const grantClaim = () =>
+  claim.mockImplementation(async (a, b) => ({
+    appIds: [a, b],
+    token: `token-${a}-${b}`,
+  }));
 
 // A ladder candidate row (as AppService.getLadderCandidates returns).
 const cand = (
@@ -84,9 +104,9 @@ const makeApp = (id: string, rating: number, games: number, broken = false) => {
     getRating: () => state.rating,
     getRatingGames: () => state.games,
     isBroken: () => state.broken,
-    setRating: vi.fn((r: number, g: number) => {
-      state.rating = r;
-      state.games = g;
+    applyRatingResult: vi.fn((delta: number) => {
+      state.rating += delta;
+      state.games += 1;
       return Promise.resolve();
     }),
     setBroken: vi.fn((b: boolean) => {
@@ -120,6 +140,9 @@ beforeEach(() => {
   matchesForApp.mockResolvedValue([]);
   deleteStaleForPair.mockResolvedValue(0);
   pairEditCutoff.mockResolvedValue(null);
+  grantClaim();
+  releaseClaim.mockResolvedValue(undefined);
+  claimedApps.mockResolvedValue(new Set());
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -150,8 +173,11 @@ describe('LadderService.runOneMatch', () => {
     expect(res.winnerId).toBe('A');
     expect(res.a!.delta).toBeGreaterThan(0);
     expect(res.b!.delta).toBe(-res.a!.delta); // zero-sum between equals
-    expect(a.setRating).toHaveBeenCalledWith(1500 + res.a!.delta, 21, true); // A won
-    expect(b.setRating).toHaveBeenCalledWith(1500 + res.b!.delta, 21, false);
+    // Applied as increments, so a concurrent result can't be overwritten.
+    expect(a.applyRatingResult).toHaveBeenCalledWith(res.a!.delta, true); // A won
+    expect(b.applyRatingResult).toHaveBeenCalledWith(res.b!.delta, false);
+    expect(res.a!.ratingAfter).toBe(1500 + res.a!.delta);
+    expect(a.getRatingGames()).toBe(21);
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
         appA: 'A',
@@ -180,8 +206,8 @@ describe('LadderService.runOneMatch', () => {
     expect(b.setBroken).toHaveBeenCalledWith(true);
     expect(a.setBroken).not.toHaveBeenCalled();
     // A one-sided crash is still a real result — ratings move.
-    expect(a.setRating).toHaveBeenCalled();
-    expect(b.setRating).toHaveBeenCalled();
+    expect(a.applyRatingResult).toHaveBeenCalled();
+    expect(b.applyRatingResult).toHaveBeenCalled();
   });
 
   it('does not move ratings when both apps crash out', async () => {
@@ -195,8 +221,8 @@ describe('LadderService.runOneMatch', () => {
     const res = await ladderService.runOneMatch('A', 'B', { seed: 2 });
 
     expect(res.winnerId).toBeNull(); // no-contest
-    expect(a.setRating).not.toHaveBeenCalled();
-    expect(b.setRating).not.toHaveBeenCalled();
+    expect(a.applyRatingResult).not.toHaveBeenCalled();
+    expect(b.applyRatingResult).not.toHaveBeenCalled();
     expect(a.setBroken).toHaveBeenCalledWith(true);
     expect(b.setBroken).toHaveBeenCalledWith(true);
     expect(record).toHaveBeenCalledWith(
@@ -216,8 +242,8 @@ describe('LadderService.runOneMatch', () => {
 
     expect(res.decided).toBe(false);
     expect(res.timedOut).toBe(true);
-    expect(a.setRating).not.toHaveBeenCalled();
-    expect(b.setRating).not.toHaveBeenCalled();
+    expect(a.applyRatingResult).not.toHaveBeenCalled();
+    expect(b.applyRatingResult).not.toHaveBeenCalled();
   });
 
   it('refuses to run when an app id no longer resolves', async () => {
@@ -944,5 +970,116 @@ describe('LadderService — achievement awards', () => {
     expect(res.ran).toBe(true);
     expect(res.winnerId).toBe('A');
     expect(record).toHaveBeenCalledOnce();
+  });
+});
+
+// Several workers per instance, and several instances (GitHub #409): an app is
+// never in two matches at once, the cross-instance claim is always released,
+// and the pair cap holds even when another instance finishes a game of the same
+// pair between picking and claiming.
+describe('LadderService multi-runner safety', () => {
+  const pairApps = () => {
+    const a = makeApp('A', 1500, 20);
+    const b = makeApp('B', 1500, 20);
+    const c = makeApp('C', 1500, 20);
+    getApp.mockImplementation((id) =>
+      Promise.resolve(({ A: a, B: b, C: c } as never)[id])
+    );
+    return { a, b, c };
+  };
+
+  it('does not run when another instance holds a claim on either app', async () => {
+    pairApps();
+    claim.mockResolvedValue(null);
+
+    const res = await ladderService.runOneMatch('A', 'B', { seed: 1 });
+
+    expect(res).toMatchObject({ ran: false, reason: 'busy' });
+    expect(runMatch).not.toHaveBeenCalled();
+    expect(releaseClaim).not.toHaveBeenCalled();
+    // The local reservation taken before the claim is handed back.
+    expect(ladderService.isBusy('A')).toBe(false);
+    expect(ladderService.isBusy('B')).toBe(false);
+  });
+
+  it('releases its claim after the match, even when the match throws', async () => {
+    pairApps();
+    runMatch.mockRejectedValue(new Error('isolate exploded'));
+
+    await expect(
+      ladderService.runOneMatch('A', 'B', { seed: 1 })
+    ).rejects.toThrow('isolate exploded');
+
+    expect(releaseClaim).toHaveBeenCalledWith({
+      appIds: ['A', 'B'],
+      token: 'token-A-B',
+    });
+    expect(ladderService.isBusy('A')).toBe(false);
+  });
+
+  it('claims with a lease long enough to outlive the slowest match', async () => {
+    pairApps();
+    runMatch.mockResolvedValue(summary('A'));
+
+    await ladderService.runOneMatch('A', 'B', { seed: 1, timeoutMs: 120_000 });
+
+    const [, , now, staleBefore] = claim.mock.calls[0];
+    // 2 x timeout + 1 min: a live match is never expired out from under itself.
+    expect(now.getTime() - staleBefore.getTime()).toBe(2 * 120_000 + 60_000);
+  });
+
+  it('stands down if the pair hit its cap after it was picked', async () => {
+    pairApps();
+    // Another instance finished the pair's 10th game since it was picked.
+    matchesForApp.mockResolvedValue(
+      Array.from({ length: 10 }, () => ({ opponentId: 'B', at: new Date() }))
+    );
+
+    const res = await ladderService.runOneMatch('A', 'B', {
+      seed: 1,
+      pairMatchCap: 10,
+    });
+
+    expect(res).toMatchObject({ ran: false, reason: 'saturated' });
+    expect(runMatch).not.toHaveBeenCalled();
+    expect(releaseClaim).toHaveBeenCalledTimes(1);
+    expect(ladderService.isBusy('A')).toBe(false);
+  });
+
+  it('keeps two local workers from both taking an app while its row loads', async () => {
+    const { a, b, c } = pairApps();
+    // Hold the app loads so both calls are parked at the same await.
+    let loaded!: () => void;
+    const gate = new Promise<void>((resolve) => (loaded = resolve));
+    getApp.mockImplementation(async (id) => {
+      await gate;
+      return ({ A: a, B: b, C: c } as never)[id];
+    });
+    runMatch.mockResolvedValue(summary('A'));
+
+    const first = ladderService.runOneMatch('A', 'B', { seed: 1 });
+    const second = ladderService.runOneMatch('A', 'C', { seed: 2 });
+    loaded();
+    const results = await Promise.all([first, second]);
+
+    expect(results.filter((r) => r.ran)).toHaveLength(1);
+    expect(results.filter((r) => r.reason === 'busy')).toHaveLength(1);
+    expect(runMatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pick apps that are in a match on another instance', async () => {
+    getCandidates.mockResolvedValue([
+      cand('A', 1500, 0),
+      cand('B', 1500, 0),
+      cand('C', 1500, 0),
+    ] as never);
+    claimedApps.mockResolvedValue(new Set(['A', 'B']));
+
+    // Only C is free: no pair.
+    expect(await ladderService.pickPair()).toBeNull();
+
+    claimedApps.mockResolvedValue(new Set(['A']));
+    const pair = await ladderService.pickPair();
+    expect(new Set(pair)).toEqual(new Set(['B', 'C']));
   });
 });

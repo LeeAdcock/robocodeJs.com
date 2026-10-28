@@ -60,25 +60,42 @@ export default class App {
   getRatingWins = () => this.ratingWins;
   isBroken = () => this.broken;
 
-  // Persist a ranked-match rating update: the new absolute rating, the
-  // incremented game count, a win increment (when this app won), and a fresh
-  // lastRankedAt stamp. Kept as one write so they move together. `ratingGames` is
-  // the caller-supplied new total; wins increment by one only on a win so the
-  // win-rate the leaderboard shows stays consistent with the game count.
-  setRating = (
-    rating: number,
-    ratingGames: number,
-    won: boolean
-  ): Promise<undefined> => {
-    this.rating = rating;
-    this.ratingGames = ratingGames;
-    if (won) this.ratingWins += 1;
+  // Persist one ranked match's result: add the Elo `delta`, count the game, count
+  // the win (when this app won), and stamp lastRankedAt, all in one statement.
+  //
+  // Written as increments relative to the row, never as absolute values
+  // (GitHub #409). The delta is computed from the ratings read when the match
+  // STARTED, and a match takes ~40 s; writing back an absolute "start + delta"
+  // would silently erase any other result for this app that landed in between
+  // (another ladder worker or instance). Increments compose, so concurrent
+  // results all count. RETURNING syncs the in-memory fields to the row's actual
+  // post-update values, which include those concurrent results.
+  applyRatingResult = (delta: number, won: boolean): Promise<undefined> => {
     return pool
       .query({
-        text: 'UPDATE app SET rating=$2, ratingGames=$3, ratingWins=ratingWins + $4, lastRankedAt=CURRENT_TIMESTAMP WHERE id=$1',
-        values: [this.getId(), rating, ratingGames, won ? 1 : 0],
+        text:
+          'UPDATE app SET rating = COALESCE(rating, 1500) + $2, ' +
+          'ratingGames = COALESCE(ratingGames, 0) + 1, ' +
+          'ratingWins = COALESCE(ratingWins, 0) + $3, ' +
+          'lastRankedAt = CURRENT_TIMESTAMP WHERE id=$1 ' +
+          'RETURNING rating as "rating", ratingGames as "ratingGames", ratingWins as "ratingWins"',
+        values: [this.getId(), delta, won ? 1 : 0],
       })
-      .then(() => undefined);
+      .then((res) => {
+        const row = res?.rows?.[0];
+        if (row) {
+          this.rating = Number(row.rating);
+          this.ratingGames = Number(row.ratingGames);
+          this.ratingWins = Number(row.ratingWins);
+        } else {
+          // No row back (app deleted mid-match): keep the in-memory view
+          // consistent with what we tried to apply.
+          this.rating += delta;
+          this.ratingGames += 1;
+          if (won) this.ratingWins += 1;
+        }
+        return undefined;
+      });
   };
 
   // Flag (or clear) an app as broken for ladder purposes — set when it fails to
