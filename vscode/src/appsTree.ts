@@ -23,8 +23,6 @@ export class AppsTree implements vscode.TreeDataProvider<AppSummary> {
     item.id = app.appId;
     item.contextValue = 'app';
     item.iconPath = new vscode.ThemeIcon('file-code');
-    item.description =
-      app.ratingGames > 0 ? `${Math.round(app.rating)} Elo` : undefined;
     item.tooltip = `${app.name}\n${app.ratingGames} ranked games · version ${app.version}`;
     item.command = {
       command: 'robocodejs.openApp',
