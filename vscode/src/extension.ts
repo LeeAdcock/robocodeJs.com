@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
 
 import { RobocodeAuth } from './auth';
-import { AppSummary, RobocodeClient, SignInRequiredError } from './client';
+import {
+  AppSummary,
+  RobocodeClient,
+  SignInCancelledError,
+  SignInRequiredError,
+} from './client';
 import { AppsTree } from './appsTree';
 import { AppWorkspace } from './workspace';
 import { toProblems } from './problems';
@@ -40,6 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Every command funnels its failures through here, so an expired sign-in
   // anywhere turns into one consistent prompt.
   const report = async (err: unknown) => {
+    if (err instanceof SignInCancelledError) return;
     if (err instanceof SignInRequiredError) {
       await setSignedIn(false);
       tree.setApps([]);
@@ -171,6 +177,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       'robocodejs.signIn',
       guarded(async () => {
+        if (client.isSigningIn) {
+          await auth.reopenAuthorization();
+          return;
+        }
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,

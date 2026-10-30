@@ -6,6 +6,7 @@ import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { RobocodeAuth, SignInRequiredError } from './auth';
 
 export { SignInRequiredError };
+export { SignInCancelledError } from './auth';
 import { CheckResult } from './problems';
 
 // One of the user's apps, as list_apps returns it.
@@ -29,6 +30,7 @@ export interface ArenaSummary {
 // MCP tools. The server is stateless, so a connection is cheap to re-establish.
 export class RobocodeClient {
   private client: Client | undefined;
+  private signingIn: Promise<void> | undefined;
 
   constructor(
     private readonly serverUrl: string,
@@ -40,7 +42,21 @@ export class RobocodeClient {
   }
 
   // Run the browser sign-in and leave the client connected.
-  async signIn(token: vscode.CancellationToken): Promise<void> {
+  get isSigningIn(): boolean {
+    return this.signingIn !== undefined;
+  }
+
+  // Single-flight: a second Sign In while one is waiting on the browser must
+  // not start another flow. That would replace the first flow's state and
+  // listener, so approving in the first tab lands on a stale callback.
+  signIn(token: vscode.CancellationToken): Promise<void> {
+    this.signingIn ??= this.runSignIn(token).finally(() => {
+      this.signingIn = undefined;
+    });
+    return this.signingIn;
+  }
+
+  private async runSignIn(token: vscode.CancellationToken): Promise<void> {
     await this.disconnect();
     await this.auth.beginSignIn();
     try {

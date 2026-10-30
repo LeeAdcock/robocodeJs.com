@@ -26,6 +26,13 @@ export class SignInRequiredError extends Error {
   }
 }
 
+// The user dismissed the sign-in; not an error worth reporting.
+export class SignInCancelledError extends Error {
+  constructor() {
+    super('Sign-in cancelled.');
+  }
+}
+
 const page = (message: string) =>
   '<!doctype html><meta charset="utf-8"><title>RobocodeJs</title>' +
   '<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">' +
@@ -49,7 +56,8 @@ export class RobocodeAuth implements OAuthClientProvider {
   // Set only for the duration of signIn: the listener and the external URI the
   // browser will be sent back to. Its absence is also what keeps background
   // calls from ever registering a client or opening the browser.
-  private callback: { server: http.Server; uri: string } | undefined;
+  private callback:
+    { server: http.Server; uri: string; authorizationUrl?: string } | undefined;
   // The sign-in in progress: the state the SDK put in the authorization URL, and
   // the code the browser brought back for it (settled by the listener).
   private pending:
@@ -154,7 +162,16 @@ export class RobocodeAuth implements OAuthClientProvider {
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     if (!this.callback) throw new SignInRequiredError();
+    this.callback.authorizationUrl = authorizationUrl.href;
     await vscode.env.openExternal(vscode.Uri.parse(authorizationUrl.href));
+  }
+
+  // Show the in-progress sign-in's approval page again (e.g. the first tab was
+  // closed or opened out of sight). Reusing the same URL keeps its state, so
+  // whichever tab the user approves in completes this one sign-in.
+  async reopenAuthorization(): Promise<void> {
+    const url = this.callback?.authorizationUrl;
+    if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
   }
 
   saveCodeVerifier(codeVerifier: string): void {
@@ -194,7 +211,7 @@ export class RobocodeAuth implements OAuthClientProvider {
             SIGN_IN_TIMEOUT_MS
           );
           cancel = token.onCancellationRequested(() =>
-            reject(new Error('Sign-in cancelled.'))
+            reject(new SignInCancelledError())
           );
         }),
       ]);
@@ -219,7 +236,10 @@ export class RobocodeAuth implements OAuthClientProvider {
       !pending ||
       url.searchParams.get('state') !== pending.state
     ) {
-      reply(400, 'This sign-in link has expired. Start again from VS Code.');
+      reply(
+        400,
+        'This sign-in link is out of date. Use the most recent sign-in tab, or start again from VS Code.'
+      );
       return;
     }
     const code = url.searchParams.get('code');
