@@ -98,6 +98,30 @@ jobs:
       # Dependency vulnerability gate — see scripts/audit-check.cjs (server job).
       - run: node ../scripts/audit-check.cjs
 
+  # The VS Code extension. Not part of the combined coverage gate: most of it is
+  # VS Code API glue only exercisable in an Extension Development Host, so the
+  # unit suite covers the pure modules (problems/source) rather than lines.
+  # `npm run build` also copies ui/public/docs/ts/robocode.d.ts, so a moved
+  # typings file fails here.
+  vscode:
+    name: vscode (lint · build · test · audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: npm ci
+      - run: npx eslint src test
+      - run: npm run build
+      - run: npm test
+      - run: node ../scripts/audit-check.cjs
+
   # Combined coverage gate: sums the two packages' covered/total counts into one
   # repo-wide number and fails under 80% (statements + lines). It reuses the
   # summaries the server/ui jobs already produced (downloaded as artifacts) — the

@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-RobocodeJs is a browser-based programming game where users write JavaScript "bots" (tank AIs) that battle in teams in a shared arena. It is a two-package monorepo plus a tiny root dev proxy:
+RobocodeJs is a browser-based programming game where users write JavaScript "bots" (tank AIs) that battle in teams in a shared arena. It is a monorepo of two app packages, a VS Code extension, and a tiny root dev proxy:
 
 - `index.js` — root dev reverse proxy (port 5000). Routes `/api` and `/health` → `:8080` (server), everything else → `:3000` (ui). This is the port forwarded by `.devcontainer`.
 - `server/` — Express + TypeScript API and the game simulation engine (port 8080). Package `@robocodejs/server`.
 - `ui/` — Vite + React + TypeScript front end (port 3000). Renders the arena as SVG and the bot code editor.
+- `vscode/` — the VS Code extension (prototype, GitHub #438): an **MCP client** of `POST /api/mcp`, signing in via the server's OAuth 2.1 flow with a `vscode://` redirect (the bearer token is only accepted on `/api/mcp`, so the extension never touches the cookie-authed REST API). Apps are edited as real files in extension storage (VS Code's TS service only gives full IntelliSense to `file:` documents) next to a copy of `robocode.d.ts`, and each save is pushed with `set_app_source`. It relies on the shape of `check_app_source` messages (`(line L, char C)`, with the `wrapSource` prefix offset on line 1) and on `get_app_source`'s empty-app sentence — see `vscode/src/problems.ts` / `source.ts` when changing either. Not deployed by the pipeline; packaged with `npm run package` (`.vsix`).
 
 ## Commands
 

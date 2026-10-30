@@ -45,6 +45,25 @@ updates:
       ui-minor-patch:
         update-types: [minor, patch]
 
+  # @types/vscode is pinned to the extension's minimum supported VS Code
+  # (engines.vscode): vsce refuses to package when the typings are newer than
+  # the engine, and newer typings let tsc accept APIs older VS Codes lack. Bump
+  # both together by hand.
+  - package-ecosystem: npm
+    directory: /vscode
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/vscode'
+      - dependency-name: 'typescript'
+        versions: ['7.0.x']
+    groups:
+      vscode-minor-patch:
+        update-types: [minor, patch]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
