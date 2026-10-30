@@ -16,6 +16,9 @@ const SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
 // and with it the client registration — stays the same across sign-ins (in
 // Codespaces the port is part of the forwarded hostname). Any free port works.
 const PREFERRED_CALLBACK_PORT = 33418;
+// Requested, not relied on: Codespaces' asExternalUri drops the path and
+// returns the forwarded host's root, so the listener accepts a callback on any
+// path. The state parameter is what identifies a genuine one.
 const CALLBACK_PATH = '/callback';
 
 // Thrown when the stored credentials no longer work and the user has to sign in
@@ -229,6 +232,13 @@ export class RobocodeAuth implements OAuthClientProvider {
 
   private onCallback(req: http.IncomingMessage, res: http.ServerResponse) {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+    // The browser asks for an icon after showing the result page; that is not a
+    // callback, and answering it must not disturb the sign-in.
+    if (url.pathname === '/favicon.ico') {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
     const reply = (status: number, message: string) => {
       res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' });
       res.end(page(message));
@@ -241,7 +251,7 @@ export class RobocodeAuth implements OAuthClientProvider {
       `sign-in: callback ${url.pathname} state=${state ? 'present' : 'missing'} ` +
         `waiting=${pending ? 'yes' : 'no'} match=${!!pending && state === pending.state}`
     );
-    if (url.pathname !== CALLBACK_PATH || !pending) {
+    if (!pending) {
       reply(
         400,
         'This VS Code window isn’t waiting for a sign-in. Start again from VS Code.'
