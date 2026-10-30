@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 
 import Logs from './logs';
-import useLogsStream from '../../util/useLogsStream';
+import useLogsStream, { clearLogs } from '../../util/useLogsStream';
 import {
   subscribePlaybackTime,
   getPlaybackTime,
@@ -63,6 +63,7 @@ export default function ArenaLogsPage() {
         selectedBot={selectedBot}
         playbackTime={playbackTime}
         persistFiltersToUrl
+        onClear={() => clearLogs()}
       />
     </>
   );

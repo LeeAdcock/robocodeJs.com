@@ -10,6 +10,7 @@ import {
   FaAngleDown,
   FaAngleUp,
   FaCopy,
+  FaEraser,
   FaHighlighter,
   FaPause,
   FaPlay,
@@ -83,6 +84,9 @@ interface LogsProps {
   // and can be shared. Only the standalone logs page opts in; embedded uses
   // (the editor dock) leave the URL alone.
   persistFiltersToUrl?: boolean;
+  // Empty the console (the shared log store's clearLogs, scoped as the caller
+  // sees fit). The Clear button only renders when this is provided.
+  onClear?: () => void;
 }
 
 interface LogsState {
@@ -323,6 +327,20 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
         },
       });
     }
+  };
+
+  // Clear the console: empty the buffer and drop back to a live, attached view
+  // (a paused snapshot would otherwise keep showing the cleared lines). Filters
+  // are left alone — they're a view preference, not content.
+  clear = () => {
+    this.props.onClear?.();
+    this.matchCursor = -1;
+    this.setState({
+      pausedLogs: null,
+      newSince: 0,
+      follow: true,
+      flashId: null,
+    });
   };
 
   // Write the current filter state into the query string. Empty filters are
@@ -876,6 +894,21 @@ export default class Logs extends React.Component<LogsProps, LogsState> {
                 <FaCopy />
               </Button>
             </OverlayTrigger>
+            {this.props.onClear && (
+              <OverlayTrigger
+                placement="bottom"
+                overlay={<Tooltip id="log-clear">Clear the console</Tooltip>}
+              >
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  aria-label="Clear the console"
+                  onClick={this.clear}
+                >
+                  <FaEraser />
+                </Button>
+              </OverlayTrigger>
+            )}
           </ButtonGroup>
 
           <OverlayTrigger

@@ -52,6 +52,11 @@ let state: LogEntries = emptyBuffer();
 // Ids currently held in the ring, so replayed history (server resends its
 // buffer on every connect) isn't appended twice.
 const heldIds = new Set<number>();
+// Ids the user cleared out of the console (clearLogs). Like heldIds, they must
+// not be re-appended by a reconnect's replay — the server still has them.
+// Insertion-ordered and capped (see clearLogs), since anything older than the
+// server's own replay depth can never come back anyway.
+const clearedIds = new Set<number>();
 const listeners = new Set<() => void>();
 let source: EventSource | undefined;
 let streamUserId: string | undefined;
@@ -74,6 +79,7 @@ function open(userId: string) {
   if (streamUserId !== userId) {
     state = emptyBuffer();
     heldIds.clear();
+    clearedIds.clear();
     notify();
   }
   streamUserId = userId;
@@ -82,9 +88,48 @@ function open(userId: string) {
   );
   source.onmessage = (message) => {
     const entry = JSON.parse(message.data) as LogEntry;
-    if (typeof entry.id !== 'number' || heldIds.has(entry.id)) return;
+    if (
+      typeof entry.id !== 'number' ||
+      heldIds.has(entry.id) ||
+      clearedIds.has(entry.id)
+    )
+      return;
     append(entry);
   };
+}
+
+// Clear the console (GitHub #436). With an appId (the editor dock, hard-scoped
+// to one app) only that app's lines go — other apps' lines and the lifecycle
+// dividers stay, since the arena logs page still shows them. Without one, the
+// whole buffer is emptied. Survivors keep their order, repacked to end just
+// behind the write index — which deliberately doesn't move: consumers count
+// arrivals by how far the index advanced (the dock's unread badge, the
+// console's "N new lines"), so a clear must not read as a burst of new lines.
+export function clearLogs(appId?: string) {
+  const { logs, index } = state;
+  const survivors: LogEntry[] = [];
+  for (let i = 0; i < logs.length; i++) {
+    const entry = logs[(index + i) % logs.length];
+    if (!entry) continue;
+    if (appId === undefined || (!entry.marker && entry.appId === appId)) {
+      heldIds.delete(entry.id);
+      if (entry.id >= 0) clearedIds.add(entry.id);
+    } else {
+      survivors.push(entry);
+    }
+  }
+  // Bound the set to two replay depths' worth of the most recent clears.
+  for (const id of clearedIds) {
+    if (clearedIds.size <= BUFFER_SIZE * 2) break;
+    clearedIds.delete(id);
+  }
+  const next = emptyBuffer();
+  const start = index - survivors.length + BUFFER_SIZE;
+  survivors.forEach(
+    (entry, i) => (next.logs[(start + i) % BUFFER_SIZE] = entry)
+  );
+  state = { logs: next.logs, index };
+  notify();
 }
 
 // Append an entry to the ring in arrival position, evicting the oldest.
