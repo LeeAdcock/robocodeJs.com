@@ -71,7 +71,9 @@ export class RobocodeAuth implements OAuthClientProvider {
 
   constructor(
     private readonly secrets: vscode.SecretStorage,
-    private readonly serverUrl: string
+    private readonly serverUrl: string,
+    // Sign-in progress for the Output channel. Never passed a code or token.
+    private readonly log: (line: string) => void = () => undefined
   ) {}
 
   // Never undefined: the SDK reads a missing redirectUrl as a non-interactive
@@ -106,6 +108,9 @@ export class RobocodeAuth implements OAuthClientProvider {
       vscode.Uri.parse(`http://127.0.0.1:${port}${CALLBACK_PATH}`)
     );
     this.callback = { server, uri: external.toString(true) };
+    this.log(
+      `sign-in: listening on 127.0.0.1:${port}, redirect ${this.callback.uri}`
+    );
   }
 
   async endSignIn(): Promise<void> {
@@ -231,14 +236,22 @@ export class RobocodeAuth implements OAuthClientProvider {
     // An unsolicited or stale callback (wrong state) is refused without
     // touching the sign-in in progress: the state check is the CSRF guard.
     const pending = this.pending;
-    if (
-      url.pathname !== CALLBACK_PATH ||
-      !pending ||
-      url.searchParams.get('state') !== pending.state
-    ) {
+    const state = url.searchParams.get('state');
+    this.log(
+      `sign-in: callback ${url.pathname} state=${state ? 'present' : 'missing'} ` +
+        `waiting=${pending ? 'yes' : 'no'} match=${!!pending && state === pending.state}`
+    );
+    if (url.pathname !== CALLBACK_PATH || !pending) {
       reply(
         400,
-        'This sign-in link is out of date. Use the most recent sign-in tab, or start again from VS Code.'
+        'This VS Code window isn’t waiting for a sign-in. Start again from VS Code.'
+      );
+      return;
+    }
+    if (state !== pending.state) {
+      reply(
+        400,
+        'This link is from an earlier sign-in attempt. Use the newest sign-in tab, or start again from VS Code.'
       );
       return;
     }
