@@ -49,9 +49,9 @@ export class EnvironmentService {
   };
 
   // Pause every running arena nobody is watching or using. Nothing else pauses
-  // a running arena, so every arena anyone resumed used to tick until the next
-  // deploy and the box's capacity was "arenas touched since the last deploy"
-  // rather than "players online". A paused arena costs memory but no CPU, and
+  // a running arena, so without this every arena anyone resumed would tick
+  // until the next deploy and the box's capacity would be "arenas touched since
+  // the last deploy" rather than "players online". A paused arena costs memory but no CPU, and
   // the GC above frees it 30 minutes later. Waking is transparent: every access
   // goes through get(), which resumes it before the caller sees it. Returns how
   // many arenas were paused.
