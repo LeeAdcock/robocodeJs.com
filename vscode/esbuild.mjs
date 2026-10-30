@@ -2,8 +2,10 @@
 // require) and copies in robocode.d.ts, the bot-API typings the extension drops
 // next to each app so the editor's TypeScript service gives full IntelliSense.
 import { build, context } from 'esbuild';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
 
+// Start clean, so a production package never ships a dev build's stale map.
+rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist', { recursive: true });
 copyFileSync('../ui/public/docs/ts/robocode.d.ts', 'dist/robocode.d.ts');
 
