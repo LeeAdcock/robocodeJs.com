@@ -3,7 +3,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 
-import { RobocodeAuth } from './auth';
+import { RobocodeAuth, SignInRequiredError } from './auth';
+
+export { SignInRequiredError };
 import { CheckResult } from './problems';
 
 // One of the user's apps, as list_apps returns it.
@@ -19,14 +21,6 @@ export interface ArenaSummary {
   arenaId: string;
   watchUrl: string;
   isDefault: boolean;
-}
-
-// Thrown when the stored credentials no longer work and the user has to sign in
-// again (the SDK has already tried a refresh).
-export class SignInRequiredError extends Error {
-  constructor() {
-    super('Sign in to RobocodeJs to continue.');
-  }
 }
 
 // A typed wrapper over the RobocodeJs MCP endpoint (POST /api/mcp). The bearer
@@ -47,22 +41,26 @@ export class RobocodeClient {
 
   // Run the browser sign-in and leave the client connected.
   async signIn(token: vscode.CancellationToken): Promise<void> {
-    const transport = this.transport();
-    this.auth.interactive = true;
+    await this.disconnect();
+    await this.auth.beginSignIn();
     try {
-      await this.connectWith(transport);
-      return; // Already had working credentials.
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError)) throw err;
+      const transport = this.transport();
+      try {
+        await this.connectWith(transport);
+        return; // Already had working credentials.
+      } catch (err) {
+        if (!(err instanceof UnauthorizedError)) throw err;
+      }
+      // The SDK has registered the client and opened the browser; finish the
+      // flow with the code the browser brings back, then connect afresh (a
+      // transport that failed auth can't be reused for the session).
+      const code = await this.auth.waitForCode(token);
+      await transport.finishAuth(code);
+      await this.connectWith(this.transport());
     } finally {
-      this.auth.interactive = false;
+      // After finishAuth: the code exchange must present the same redirect URI.
+      await this.auth.endSignIn();
     }
-    // The SDK has registered the client and opened the browser; finish the
-    // flow with the code the browser brings back, then connect afresh (a
-    // transport that failed auth can't be reused for the session).
-    const code = await this.auth.waitForCode(token);
-    await transport.finishAuth(code);
-    await this.connectWith(this.transport());
   }
 
   async signOut(): Promise<void> {
@@ -149,9 +147,13 @@ export class RobocodeClient {
       return await this.connectWith(this.transport());
     } catch (err) {
       // Connecting non-interactively: a 401 that survived the SDK's refresh
-      // attempt means the grant is gone (RobocodeAuth doesn't open the browser
-      // outside signIn, so this never pops a surprise tab).
-      if (err instanceof UnauthorizedError) throw new SignInRequiredError();
+      // attempt means the grant is gone (RobocodeAuth refuses to open the
+      // browser outside signIn, so this never pops a surprise tab).
+      if (
+        err instanceof UnauthorizedError ||
+        err instanceof SignInRequiredError
+      )
+        throw new SignInRequiredError();
       throw err;
     }
   }
@@ -167,7 +169,10 @@ export class RobocodeClient {
     try {
       result = await client.callTool({ name, arguments: args });
     } catch (err) {
-      if (err instanceof UnauthorizedError) {
+      if (
+        err instanceof UnauthorizedError ||
+        err instanceof SignInRequiredError
+      ) {
         await this.disconnect();
         throw new SignInRequiredError();
       }

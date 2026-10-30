@@ -17,7 +17,7 @@ If an app was changed in the browser since you opened it in VS Code, saving asks
 
 ## How it works
 
-The extension is an [MCP](https://modelcontextprotocol.io) client of the RobocodeJs MCP endpoint (`/api/mcp`), the same one AI assistants connect to. Sign-in is the server's OAuth 2.1 flow (dynamic client registration and PKCE) with a `vscode://` redirect, so it also works in remote windows (dev containers, SSH, Codespaces). Tokens are kept in VS Code's secret storage.
+The extension is an [MCP](https://modelcontextprotocol.io) client of the RobocodeJs MCP endpoint (`/api/mcp`), the same one AI assistants connect to. Sign-in is the server's OAuth 2.1 flow (dynamic client registration and PKCE). The browser returns to a short-lived listener in the extension, published through VS Code's port forwarding, so it works on the desktop, in remote windows (dev containers, SSH) and in Codespaces in the browser. Tokens are kept in VS Code's secret storage.
 
 Apps are edited as real files in the extension's storage folder, one folder per app with its own `jsconfig.json`. VS Code's TypeScript service only gives full IntelliSense to real files.
 

@@ -12,14 +12,7 @@ export async function activate(context: vscode.ExtensionContext) {
     .getConfiguration('robocodejs')
     .get<string>('serverUrl', 'https://robocodejs.com')
     .replace(/\/+$/, '');
-  const callbackUri = await vscode.env.asExternalUri(
-    vscode.Uri.parse(`${vscode.env.uriScheme}://${context.extension.id}/auth`)
-  );
-  const auth = new RobocodeAuth(
-    context.secrets,
-    serverUrl,
-    callbackUri.toString(true)
-  );
+  const auth = new RobocodeAuth(context.secrets, serverUrl);
   const client = new RobocodeClient(serverUrl, auth);
   const workspace = new AppWorkspace(
     context.globalStorageUri,
@@ -32,7 +25,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const diagnostics = vscode.languages.createDiagnosticCollection('robocodejs');
   const output = vscode.window.createOutputChannel('RobocodeJs');
   context.subscriptions.push(
-    vscode.window.registerUriHandler(auth),
     vscode.window.registerTreeDataProvider('robocodejs.apps', tree),
     diagnostics,
     output

@@ -2,7 +2,7 @@
   "name": "robocodejs",
   "displayName": "RobocodeJs",
   "description": "Write, check and run your RobocodeJs tank apps from VS Code.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "robocode-js",
   "private": true,
   "license": "MIT",
@@ -19,9 +19,7 @@
     "Education"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "onUri"
-  ],
+  "activationEvents": [],
   "contributes": {
     "configuration": {
       "title": "RobocodeJs",
