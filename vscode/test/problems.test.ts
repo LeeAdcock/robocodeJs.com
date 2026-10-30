@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { toProblems } from '../src/problems';
+import { faultKey, faultToProblem, toProblems } from '../src/problems';
 
 // Fixtures are verbatim check_app_source results from the server's compiler.
 
@@ -80,5 +80,43 @@ describe('toProblems', () => {
         message: "E017: Cannot read properties of null (reading 'x')",
       },
     ]);
+  });
+});
+
+describe('faultToProblem', () => {
+  const fault = {
+    appId: 'a',
+    botId: 'b',
+    botIndex: 3,
+    code: 'E017',
+    kind: 'handler',
+    message: "Cannot read properties of null (reading 'x') (line 4, char 9)",
+    line: 4,
+    column: 9,
+    timedOut: false,
+    time: 812,
+  };
+
+  it('points at the failing line and names the bot and tick', () => {
+    expect(faultToProblem(fault)).toEqual({
+      line: 3,
+      column: 8,
+      message:
+        "E017: Cannot read properties of null (reading 'x') (bot #3 crashed at tick 812)",
+    });
+  });
+
+  it('undoes the wrapper offset on line 1', () => {
+    expect(faultToProblem({ ...fault, line: 1, column: 25 }).column).toBe(3);
+  });
+
+  it('falls back to the first line when there is no location', () => {
+    const p = faultToProblem({ ...fault, line: undefined, column: undefined });
+    expect([p.line, p.column]).toEqual([0, 0]);
+  });
+
+  it('keys the same crash identically', () => {
+    expect(faultKey(fault)).toBe(faultKey({ ...fault }));
+    expect(faultKey(fault)).not.toBe(faultKey({ ...fault, time: 813 }));
   });
 });

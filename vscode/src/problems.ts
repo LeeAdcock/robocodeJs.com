@@ -60,3 +60,39 @@ export const toProblems = (result: CheckResult): Problem[] => {
   }
   return problems;
 };
+
+// A runtime crash, as the recent_faults MCP tool reports it.
+export interface Fault {
+  appId: string;
+  botId: string;
+  botIndex: number;
+  code: string;
+  kind: string;
+  message: string;
+  line?: number;
+  column?: number;
+  timedOut: boolean;
+  time: number;
+}
+
+// A stable identity for a fault (they carry no id of their own), so the same
+// crash isn't reported twice across refreshes.
+export const faultKey = (f: Fault): string =>
+  [f.appId, f.botId, f.time, f.code, f.kind, f.line, f.column, f.message].join(
+    '|'
+  );
+
+// Where a crash lands in the editor. Runtime errors come from the wrapped
+// source, so line 1 carries the same column shift as a load error.
+export const faultToProblem = (f: Fault): Problem => {
+  const line = f.line ?? 1;
+  let column = f.column ?? 1;
+  if (line === 1) column = Math.max(1, column - WRAP_PREFIX_LENGTH);
+  return {
+    line: Math.max(0, line - 1),
+    column: Math.max(0, column - 1),
+    message:
+      `${f.code}: ${f.message.replace(LOCATION, '')} ` +
+      `(bot #${f.botIndex} crashed at tick ${f.time}${f.timedOut ? ', timed out' : ''})`,
+  };
+};

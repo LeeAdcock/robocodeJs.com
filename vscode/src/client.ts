@@ -7,7 +7,7 @@ import { RobocodeAuth, SignInRequiredError } from './auth';
 
 export { SignInRequiredError };
 export { SignInCancelledError } from './auth';
-import { CheckResult } from './problems';
+import { CheckResult, Fault } from './problems';
 
 // One of the user's apps, as list_apps returns it.
 export interface AppSummary {
@@ -24,10 +24,38 @@ export interface ArenaSummary {
   isDefault: boolean;
 }
 
+// The parts of match_status / run_match results the extension shows.
+export interface MatchStanding {
+  rank: number;
+  id: string;
+  name?: string;
+  alive: boolean;
+  botsAlive: number;
+  totalHealth: number;
+}
+
+export interface MatchStatus {
+  running: boolean;
+  clock: { time: number };
+  match: {
+    decided: boolean;
+    suddenDeath: boolean;
+    winner: { id: string; name?: string } | null;
+  };
+  standings: MatchStanding[];
+}
+
+export interface MatchResult {
+  watchUrl: string;
+  timedOut: boolean;
+  match: MatchStatus['match'];
+}
+
 // A typed wrapper over the RobocodeJs MCP endpoint (POST /api/mcp). The bearer
-// token from the OAuth flow is only accepted there — the REST API is
-// cookie-authenticated — so the extension reaches the server entirely through
-// MCP tools. The server is stateless, so a connection is cheap to re-establish.
+// token from the OAuth flow is only accepted under /api/mcp — the REST API is
+// cookie-authenticated — so the extension reaches the server through MCP tools,
+// plus the one bearer-authed stream at /api/mcp/arenas/:arenaId/logs. The
+// server is stateless, so a connection is cheap to re-establish.
 export class RobocodeClient {
   private client: Client | undefined;
   private signingIn: Promise<void> | undefined;
@@ -136,6 +164,34 @@ export class RobocodeClient {
     return this.call('reboot_app', { appId });
   }
 
+  async defaultArena(): Promise<ArenaSummary> {
+    const arenas = await this.listArenas();
+    const arena = arenas.find((a) => a.isDefault) ?? arenas[0];
+    if (!arena) throw new Error('You have no arenas yet.');
+    return arena;
+  }
+
+  async recentFaults(arenaId: string): Promise<Fault[]> {
+    const result = await this.call<{ faults: Fault[] }>('recent_faults', {
+      arenaId,
+    });
+    return result.faults;
+  }
+
+  matchStatus(arenaId: string): Promise<MatchStatus> {
+    return this.call('match_status', { arenaId });
+  }
+
+  runMatch(arenaId: string): Promise<MatchResult> {
+    // run_match waits up to 60s server-side for a decision.
+    return this.call('run_match', { arenaId }, { timeoutMs: 90_000 });
+  }
+
+  // The bot log stream URL for an arena (see server/src/api/mcp.ts).
+  logsUrl(arenaId: string): URL {
+    return new URL(`/api/mcp/arenas/${arenaId}/logs`, this.serverUrl);
+  }
+
   private transport(): StreamableHTTPClientTransport {
     return new StreamableHTTPClientTransport(this.mcpUrl, {
       authProvider: this.auth,
@@ -178,12 +234,16 @@ export class RobocodeClient {
   private async call<T>(
     name: string,
     args: Record<string, unknown>,
-    { raw = false } = {}
+    { raw = false, timeoutMs }: { raw?: boolean; timeoutMs?: number } = {}
   ): Promise<T> {
     const client = await this.connected();
     let result;
     try {
-      result = await client.callTool({ name, arguments: args });
+      result = await client.callTool(
+        { name, arguments: args },
+        undefined,
+        timeoutMs ? { timeout: timeoutMs } : undefined
+      );
     } catch (err) {
       if (
         err instanceof UnauthorizedError ||

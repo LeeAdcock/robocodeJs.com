@@ -9,7 +9,9 @@ import {
 } from './client';
 import { AppsTree } from './appsTree';
 import { AppWorkspace } from './workspace';
-import { toProblems } from './problems';
+import { BotLogs } from './botLogs';
+import { ArenaStatus } from './arenaStatus';
+import { Fault, faultToProblem, toProblems } from './problems';
 import { sourceFromText, sourceVersion } from './source';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -31,18 +33,34 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const tree = new AppsTree();
   const diagnostics = vscode.languages.createDiagnosticCollection('robocodejs');
+  // Live crashes, kept apart from check results: a save re-checks the source
+  // but says nothing about whether the new code still crashes at runtime.
+  const runtime =
+    vscode.languages.createDiagnosticCollection('robocodejs-runtime');
+  const log = (line: string) => output.appendLine(line);
+  const arenaStatus = new ArenaStatus(client, log);
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('robocodejs.apps', tree),
     diagnostics,
-    output
+    runtime,
+    output,
+    arenaStatus
   );
 
-  const setSignedIn = (signedIn: boolean) =>
-    vscode.commands.executeCommand(
+  // Everything live (bot logs, the arena status) runs only while signed in.
+  const setSignedIn = async (signedIn: boolean) => {
+    if (signedIn) {
+      arenaStatus.start();
+    } else {
+      arenaStatus.stop();
+      botLogs.stop();
+    }
+    await vscode.commands.executeCommand(
       'setContext',
       'robocodejs.signedIn',
       signedIn
     );
+  };
 
   // Every command funnels its failures through here, so an expired sign-in
   // anywhere turns into one consistent prompt.
@@ -70,6 +88,68 @@ export async function activate(context: vscode.ExtensionContext) {
   const refresh = async () => {
     tree.setApps(await client.listApps());
   };
+
+  // A crash lands on the failing line of the app's local file, and one
+  // notification per batch (an app's five bots often crash together) offers to
+  // jump there. Crashes in apps that aren't the user's (added by reference) are
+  // logged but have no file to point at.
+  const showFaults = async (faults: Fault[]) => {
+    const byApp = new Map<string, Fault[]>();
+    for (const f of faults)
+      byApp.set(f.appId, [...(byApp.get(f.appId) ?? []), f]);
+    for (const [appId, appFaults] of byApp) {
+      const app = tree.find(appId);
+      if (!app) continue;
+      const uri = workspace.fileFor(app.appId, app.name);
+      const added = appFaults.map((f) => {
+        const p = faultToProblem(f);
+        const d = new vscode.Diagnostic(
+          new vscode.Range(p.line, p.column, p.line, Number.MAX_SAFE_INTEGER),
+          p.message,
+          vscode.DiagnosticSeverity.Error
+        );
+        d.source = 'RobocodeJs (runtime)';
+        return d;
+      });
+      runtime.set(uri, [...(runtime.get(uri) ?? []), ...added]);
+      const first = faultToProblem(appFaults[0]);
+      const choice = await vscode.window.showErrorMessage(
+        `${app.name}: ${appFaults.length} bot crash${appFaults.length > 1 ? 'es' : ''} — ${first.message}`,
+        'Show',
+        'Bot Logs'
+      );
+      if (choice === 'Show') {
+        await openApp(app);
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          const pos = new vscode.Position(first.line, first.column);
+          editor.selection = new vscode.Selection(pos, pos);
+          editor.revealRange(new vscode.Range(pos, pos));
+        }
+      } else if (choice === 'Bot Logs') {
+        botLogs.show();
+      }
+    }
+  };
+  const clearFaults = (appId: string) => {
+    runtime.forEach((uri) => {
+      if (workspace.appIdFor(uri) === appId) runtime.delete(uri);
+    });
+  };
+
+  const botLogs = new BotLogs(
+    client,
+    auth,
+    (appId) => tree.find(appId)?.name,
+    (faults) => void showFaults(faults),
+    log
+  );
+  context.subscriptions.push(botLogs);
+  const startLogs = () =>
+    botLogs.start().catch((err) => {
+      if (!(err instanceof SignInRequiredError))
+        log(`bot logs: ${err instanceof Error ? err.message : String(err)}`);
+    });
 
   // The app the active editor is showing, if it's one of ours.
   const activeApp = ():
@@ -120,6 +200,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const doc = await vscode.workspace.openTextDocument(file);
     await vscode.window.showTextDocument(doc, { preview: false });
     await checkDocument(doc);
+    // Working on an app is when its runtime crashes matter.
+    void startLogs();
   };
 
   // Push a saved app file to the server, guarding against overwriting an edit
@@ -147,6 +229,8 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     const saved = await client.setSource(appId, source);
     await workspace.setBaseVersion(appId, saved.version);
+    // The crashes on record were from the code just replaced.
+    clearFaults(appId);
     vscode.window.setStatusBarMessage(
       `$(cloud-upload) Saved ${server.name}`,
       3000
@@ -258,6 +342,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!appId) throw new Error('Open an app to compile it.');
         await saveFirst(appId);
         await client.compile(appId);
+        clearFaults(appId);
+        void arenaStatus.refresh();
         vscode.window.setStatusBarMessage(
           '$(play) Compiled in your arenas',
           3000
@@ -271,6 +357,8 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!appId) throw new Error('Open an app to reboot it.');
         await saveFirst(appId);
         await client.reboot(appId);
+        clearFaults(appId);
+        void arenaStatus.refresh();
         vscode.window.setStatusBarMessage(
           '$(debug-restart) Rebooted in your arenas',
           3000
@@ -280,12 +368,56 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       'robocodejs.watchArena',
       guarded(async () => {
-        const arenas = await client.listArenas();
-        const arena = arenas.find((a) => a.isDefault) ?? arenas[0];
-        if (!arena) throw new Error('You have no arenas yet.');
+        const arena = await client.defaultArena();
         await vscode.env.openExternal(vscode.Uri.parse(arena.watchUrl));
       })
     ),
+    vscode.commands.registerCommand(
+      'robocodejs.showLogs',
+      guarded(async () => botLogs.show())
+    ),
+    vscode.commands.registerCommand(
+      'robocodejs.runMatch',
+      guarded(async () => {
+        const arena = await client.defaultArena();
+        // A match restarts the arena with every app's saved code; push any
+        // unsaved app edits first so the match runs what's on screen.
+        for (const doc of vscode.workspace.textDocuments)
+          if (workspace.appIdFor(doc.uri) && doc.isDirty) await doc.save();
+        const result = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Running a match in your arena…',
+          },
+          () => client.runMatch(arena.arenaId)
+        );
+        void arenaStatus.refresh();
+        const outcome = result.timedOut
+          ? 'The match was not decided in time.'
+          : result.match.winner
+            ? `${result.match.winner.name ?? 'An app'} won the match.`
+            : 'The match ended without a winner.';
+        const choice = await vscode.window.showInformationMessage(
+          outcome,
+          'Watch Arena',
+          'Bot Logs'
+        );
+        if (choice === 'Watch Arena')
+          await vscode.env.openExternal(vscode.Uri.parse(result.watchUrl));
+        else if (choice === 'Bot Logs') botLogs.show();
+      })
+    ),
+
+    // Offer RobocodeJs to VS Code's own MCP support (Copilot agent mode and
+    // other chat participants), which signs in with the same OAuth server.
+    vscode.lm.registerMcpServerDefinitionProvider('robocodejs', {
+      provideMcpServerDefinitions: () => [
+        new vscode.McpHttpServerDefinition(
+          'RobocodeJs',
+          vscode.Uri.parse(`${serverUrl}/api/mcp`)
+        ),
+      ],
+    }),
 
     // Format with the server's house style (the same Prettier settings as the
     // browser editor), so Format Document in an app file matches the site.
@@ -307,9 +439,10 @@ export async function activate(context: vscode.ExtensionContext) {
         .then(() => checkDocument(doc))
         .catch(report);
     }),
-    vscode.workspace.onDidCloseTextDocument((doc) =>
-      diagnostics.delete(doc.uri)
-    ),
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      diagnostics.delete(doc.uri);
+      runtime.delete(doc.uri);
+    }),
     vscode.window.onDidChangeActiveTextEditor(() =>
       vscode.commands.executeCommand(
         'setContext',

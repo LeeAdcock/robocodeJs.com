@@ -2,7 +2,7 @@
 
 Write, check and run your [RobocodeJs](https://robocodejs.com) tank apps from VS Code. Your apps stay on robocodejs.com and keep battling in your arena. The extension is just another editor for them.
 
-> **Prototype.** This is Phase 1 of [GitHub #438](https://github.com/LeeAdcock/robocodeJs.com/issues/438).
+> **Preview.** See [GitHub #438](https://github.com/LeeAdcock/robocodeJs.com/issues/438) for the plan.
 
 ## Features
 
@@ -12,6 +12,11 @@ Write, check and run your [RobocodeJs](https://robocodejs.com) tank apps from VS
 - **Problems as you save.** Each save runs the server's dry-run check, so syntax errors, undeclared variables (E027) and load errors appear as red squiggles.
 - **Compile / Reboot / Format** from the editor title bar or the command palette (`RobocodeJs: …`). Format uses the site's house style.
 - **Watch Arena** opens your arena's live spectator page in the browser.
+- **Bot Logs.** A _RobocodeJs Bot Logs_ output channel streams your arena's bot console output live, labelled with the tick, app name and bot number. It starts when you open an app; **Show Bot Logs** brings it up.
+- **Crashes in the editor.** When a bot crashes at runtime, the error is underlined on the failing line of that app, and a notification offers to jump there. Crashes from before you connected are left out, and saving, compiling or rebooting the app clears them.
+- **Arena status bar.** The tick and how many apps are still alive, or the winner once the match is decided. Click it to watch the arena.
+- **Run Match** restarts your arena and runs a match to a decision, then tells you who won.
+- **Copilot and other chat tools.** The extension registers RobocodeJs as an MCP server, so VS Code's agent mode can use the same tools AI assistants do.
 
 If an app was changed in the browser since you opened it in VS Code, saving asks whether to overwrite the server copy or reload it, rather than silently clobbering one side.
 
