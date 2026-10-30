@@ -145,6 +145,17 @@ export default class Environment {
   // See beginMatch()/endMatch() below.
   private matchInFlight = false;
 
+  // Idle auto-pause (EnvironmentService.pauseIdle). Nothing else ever pauses a
+  // running arena, so without this every arena anyone resumed kept ticking —
+  // isolates and all — until the next deploy, long after its owner left. The
+  // service pauses an arena with no SSE listeners and no recent access, and
+  // marks it here so the next access (EnvironmentService.get) resumes it
+  // transparently. Distinct from a user pause: a user-paused arena must stay
+  // paused, so any explicit pause()/resume() clears the flag.
+  private idlePaused = false;
+  // Last time the arena was accessed (EnvironmentService.get) or lost a viewer.
+  private lastActivityAt = Date.now();
+
   // Simulation speed. `1` = the baseline 100 ms/tick (10 ticks/s). Higher values
   // run proportionally faster; `0` means "unbounded" — run each tick as soon as the
   // previous one's bot work has settled ("as fast as possible"). In-memory only;
@@ -319,6 +330,38 @@ export default class Environment {
     this.matchInFlight = false;
   };
 
+  // --- Idle auto-pause (see idlePaused) -------------------------------------
+
+  touch = () => {
+    this.lastActivityAt = Date.now();
+  };
+
+  getIdleMs = (now = Date.now()) => now - this.lastActivityAt;
+
+  // Whether anyone is watching: an open /events or /logs SSE stream (incl. the
+  // public /watch page and the homepage demo).
+  hasViewers = () =>
+    this.emitter.listenerCount('event') + this.emitter.listenerCount('log') > 0;
+
+  isIdlePaused = () => this.idlePaused;
+
+  // Pause a running arena for idleness. Refuses while a driven match
+  // (run_match) holds the arena — it is busy even with nobody watching.
+  idlePause = (): boolean => {
+    if (!this.running || this.matchInFlight) return false;
+    this.pause();
+    this.idlePaused = true;
+    return true;
+  };
+
+  // Resume an arena the idle sweep paused. A no-op for any other arena, so a
+  // user-paused one stays paused.
+  wake = (): boolean => {
+    if (!this.idlePaused) return false;
+    this.resume();
+    return true;
+  };
+
   isRunning = () => this.running;
   // True while the async tick loop is still alive. pause() only flips `running`
   // off; the loop finishes its in-flight tick (bot handlers on the isolate
@@ -401,6 +444,8 @@ export default class Environment {
     listener: (...args: unknown[]) => void
   ) => {
     this.emitter.removeListener(eventName, listener);
+    // Start the idle clock from when the last viewer left, not their arrival.
+    this.touch();
     return this;
   };
 
@@ -759,6 +804,7 @@ export default class Environment {
       type: 'arenaResumed',
     });
     this.running = true;
+    this.idlePaused = false;
 
     // Guard against a second concurrent loop if resume() is called while one is
     // already draining a tick.
@@ -770,6 +816,8 @@ export default class Environment {
       type: 'arenaPaused',
     });
     this.running = false;
+    // An explicit pause supersedes an idle one (idlePause re-sets it after).
+    this.idlePaused = false;
     this.stoppedAt = new Date();
     // The loop only rejects a command's failure condition while ticking; settle
     // once here so bots awaiting a command see it cancelled (!isRunning) on pause
