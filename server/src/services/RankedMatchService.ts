@@ -10,6 +10,12 @@ import { AppId } from '../types/app';
 // Index createdTimestamp: BOTH readers filter on it — the leaderboard "movement"
 // query (deltasSince) on every request, and the retention sweep
 // (deleteOlderThan) — so an index keeps them off a full-table seq scan.
+// Index (appA, createdTimestamp) and (appB, createdTimestamp): the per-app
+// readers (matchesForApp, deleteStaleForPair) filter on one side's app id plus
+// a time bound. matchesForApp runs once per anchor on every idle pickPair poll
+// (~1/min when the ladder is saturated), so without these it re-scanned the
+// whole table each minute — enough to push the 1 GB RDS's working set out of
+// cache. Postgres BitmapOr's the pair for the `appA=$1 OR appB=$1` form.
 // Chained off the CREATE so the table exists first; Promise.resolve tolerates a
 // mocked pool.query returning undefined, and errors are swallowed (same lazy-DDL
 // idiom as the other services — see the accepted "lazy DDL startup" risk).
@@ -33,6 +39,16 @@ Promise.resolve(
   .then(() =>
     pool.query(
       'CREATE INDEX IF NOT EXISTS idx_ranked_match_created ON ranked_match(createdTimestamp)'
+    )
+  )
+  .then(() =>
+    pool.query(
+      'CREATE INDEX IF NOT EXISTS idx_ranked_match_appa ON ranked_match(appA, createdTimestamp)'
+    )
+  )
+  .then(() =>
+    pool.query(
+      'CREATE INDEX IF NOT EXISTS idx_ranked_match_appb ON ranked_match(appB, createdTimestamp)'
     )
   )
   .catch(() => undefined);
