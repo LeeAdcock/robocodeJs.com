@@ -44,12 +44,13 @@ import { VERSION } from '../util/version';
 import { sourceVersion } from '../util/sourceVersion';
 import { collectMetrics } from '../util/metrics';
 import { watchUrl } from '../util/publicOrigin';
+import { MAX_ARENAS_PER_USER } from '../util/limits';
 
 const app = express();
 
-// Caps mirrored from the REST API (api/arena.ts) so the MCP tools enforce the
-// same limits. Kept in sync by hand; both bound the in-memory EnvironmentService.
-const MAX_ARENAS_PER_USER = 10;
+// The per-arena roster cap, mirrored from the REST API (api/arena.ts) so the MCP
+// tools enforce the same limit. Kept in sync by hand; the per-user caps are
+// shared from util/limits.
 const MAX_APPS_PER_ARENA = 4;
 
 // The built static assets (bot API docs, type definitions, sample bots) that the
