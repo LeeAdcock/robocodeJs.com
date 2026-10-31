@@ -20,7 +20,7 @@ export class ArenaStatus implements vscode.Disposable {
   constructor(
     private readonly client: RobocodeClient,
     private readonly log: (line: string) => void,
-    // Every reading is shared (the Default Arena list renders the same one), so
+    // Every reading is shared (the Arena Apps list renders the same one), so
     // one poll serves both; undefined when stopped.
     private readonly onStatus: (status: MatchStatus | undefined) => void
   ) {

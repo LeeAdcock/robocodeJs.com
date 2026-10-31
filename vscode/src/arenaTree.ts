@@ -49,7 +49,8 @@ export class ArenaTree
     const own = this.ownApp(s.id);
     const item = new vscode.TreeItem(s.name ?? s.id.slice(0, 8));
     item.id = s.id;
-    item.contextValue = 'arenaApp';
+    // Restart is offered only on your own apps: reboot_app is owner-only.
+    item.contextValue = own ? 'arenaApp.own' : 'arenaApp.other';
     item.iconPath = new vscode.ThemeIcon(s.alive ? 'pulse' : 'circle-slash');
     item.description = s.alive
       ? `${s.botsAlive} bot${s.botsAlive === 1 ? '' : 's'} alive`

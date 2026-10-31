@@ -3,10 +3,12 @@ import * as vscode from 'vscode';
 import { AppSummary } from './client';
 import { APPS_MIME, ARENA_MIME, droppedIds } from './arenaTree';
 
-// The sidebar list of the user's apps. Data is pushed in by extension.ts (which
-// owns the client and error handling) rather than fetched here. Apps drag from
-// here into the Default Arena list; an arena app dropped back here is removed
-// from the arena.
+// The sidebar list of the user's apps that are NOT in the arena: each app
+// shows in exactly one of Apps and Arena Apps. Data is pushed in by
+// extension.ts (which owns the client and error handling) rather than fetched
+// here. Apps drag from here into the Arena Apps list; an arena app dropped
+// back here is removed from the arena. `find` still sees every app, since the
+// arena list and log labels look names up through it.
 export class AppsTree
   implements
     vscode.TreeDataProvider<AppSummary>,
@@ -18,11 +20,28 @@ export class AppsTree
   onRemoveFromArena: (appIds: string[]) => Promise<void> = async () =>
     undefined;
   private apps: AppSummary[] = [];
+  private inArena = new Set<string>();
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.changed.event;
 
   setApps(apps: AppSummary[]): void {
     this.apps = [...apps].sort((a, b) => a.name.localeCompare(b.name));
+    this.update();
+  }
+
+  // The apps currently in the arena, which this list leaves out.
+  setInArena(appIds: Iterable<string>): void {
+    this.inArena = new Set(appIds);
+    this.update();
+  }
+
+  private update(): void {
+    // Drives the empty-list message: "no apps yet" vs "all in the arena".
+    void vscode.commands.executeCommand(
+      'setContext',
+      'robocodejs.hasApps',
+      this.apps.length > 0
+    );
     this.changed.fire();
   }
 
@@ -45,7 +64,7 @@ export class AppsTree
   }
 
   getChildren(element?: AppSummary): AppSummary[] {
-    return element ? [] : this.apps;
+    return element ? [] : this.apps.filter((a) => !this.inArena.has(a.appId));
   }
 
   handleDrag(source: readonly AppSummary[], transfer: vscode.DataTransfer) {

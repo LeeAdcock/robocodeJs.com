@@ -48,7 +48,7 @@
         },
         {
           "id": "robocodejs.arena",
-          "name": "Default Arena",
+          "name": "Arena Apps",
           "when": "robocodejs.signedIn"
         }
       ]
@@ -62,11 +62,16 @@
       {
         "view": "robocodejs.apps",
         "contents": "You have no apps yet.\n[New app](command:robocodejs.newApp)",
-        "when": "robocodejs.signedIn"
+        "when": "robocodejs.signedIn && !robocodejs.hasApps"
+      },
+      {
+        "view": "robocodejs.apps",
+        "contents": "All your apps are in your arena; you'll find them under **Arena Apps**. Drag one back here to take it out of the arena.\n[New App](command:robocodejs.newApp)",
+        "when": "robocodejs.signedIn && robocodejs.hasApps"
       },
       {
         "view": "robocodejs.arena",
-        "contents": "No apps in your default arena yet.\nDrag apps here from **Apps**, or right-click an app and choose **Add to Arena**.",
+        "contents": "No apps in your arena yet.\nDrag apps here from **Apps**, or right-click an app and choose **Add to Arena**.",
         "when": "robocodejs.signedIn"
       }
     ],
@@ -119,7 +124,7 @@
         "command": "robocodejs.reboot",
         "title": "Reboot App",
         "category": "RobocodeJs",
-        "icon": "$(debug-restart)"
+        "icon": "$(debug-rerun)"
       },
       {
         "command": "robocodejs.watchArena",
@@ -132,12 +137,6 @@
         "title": "Show Bot Logs",
         "category": "RobocodeJs",
         "icon": "$(output)"
-      },
-      {
-        "command": "robocodejs.runMatch",
-        "title": "Run Match",
-        "category": "RobocodeJs",
-        "icon": "$(run-all)"
       },
       {
         "command": "robocodejs.watchArenaInBrowser",
@@ -156,6 +155,24 @@
         "title": "Remove from Arena",
         "category": "RobocodeJs",
         "icon": "$(remove)"
+      },
+      {
+        "command": "robocodejs.playArena",
+        "title": "Play",
+        "category": "RobocodeJs",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "robocodejs.pauseArena",
+        "title": "Pause",
+        "category": "RobocodeJs",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "robocodejs.restartMatch",
+        "title": "Restart Match",
+        "category": "RobocodeJs",
+        "icon": "$(debug-restart)"
       }
     ],
     "menus": {
@@ -184,21 +201,31 @@
           "group": "navigation@1"
         },
         {
-          "command": "robocodejs.runMatch",
-          "when": "view == robocodejs.arena",
+          "command": "robocodejs.playArena",
+          "when": "view == robocodejs.arena && !robocodejs.arenaRunning && !robocodejs.matchDecided",
           "group": "navigation@2"
+        },
+        {
+          "command": "robocodejs.pauseArena",
+          "when": "view == robocodejs.arena && robocodejs.arenaRunning",
+          "group": "navigation@2"
+        },
+        {
+          "command": "robocodejs.restartMatch",
+          "when": "view == robocodejs.arena",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
-          "command": "robocodejs.compile",
-          "when": "view == robocodejs.apps && viewItem == app",
+          "command": "robocodejs.reboot",
+          "when": "view == robocodejs.arena && viewItem == arenaApp.own",
           "group": "inline@1"
         },
         {
-          "command": "robocodejs.reboot",
-          "when": "view == robocodejs.apps && viewItem == app",
-          "group": "inline@2"
+          "command": "robocodejs.compile",
+          "when": "view == robocodejs.arena && viewItem == arenaApp.own",
+          "group": "inline@0"
         },
         {
           "command": "robocodejs.check",
@@ -211,12 +238,12 @@
         },
         {
           "command": "robocodejs.removeFromArena",
-          "when": "view == robocodejs.arena && viewItem == arenaApp",
-          "group": "inline"
+          "when": "view == robocodejs.arena && viewItem =~ /^arenaApp/",
+          "group": "inline@2"
         },
         {
           "command": "robocodejs.removeFromArena",
-          "when": "view == robocodejs.arena && viewItem == arenaApp",
+          "when": "view == robocodejs.arena && viewItem =~ /^arenaApp/",
           "group": "arena"
         }
       ],
@@ -268,10 +295,6 @@
           "when": "robocodejs.signedIn"
         },
         {
-          "command": "robocodejs.runMatch",
-          "when": "robocodejs.signedIn"
-        },
-        {
           "command": "robocodejs.watchArenaInBrowser",
           "when": "robocodejs.signedIn"
         },
@@ -282,6 +305,18 @@
         {
           "command": "robocodejs.removeFromArena",
           "when": "false"
+        },
+        {
+          "command": "robocodejs.playArena",
+          "when": "robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.pauseArena",
+          "when": "robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.restartMatch",
+          "when": "robocodejs.signedIn"
         }
       ]
     },
