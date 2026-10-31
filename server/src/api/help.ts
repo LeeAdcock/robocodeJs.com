@@ -54,6 +54,20 @@ const KEYWORD_ROUTES: {
     ],
   },
   {
+    // Using RobocodeJs from VS Code -> the extension guide. Distinctive editor
+    // vocabulary only (not bare "editor", which means the in-browser editor).
+    answer: '/vscode',
+    keywords: [
+      'vscode',
+      'vs code',
+      'visual studio code',
+      'vscode extension',
+      'editor extension',
+      'marketplace',
+      'codespaces',
+    ],
+  },
+  {
     // Connecting an AI assistant over MCP -> the MCP setup guide. Distinctive
     // vocabulary (deliberately NOT bare "ai", which a player uses for their bot's
     // own AI logic).
@@ -483,6 +497,11 @@ const mcp = [
   'how do I connect an assistant?',
   'how do I use claude with this?',
 ];
+const vscode = [
+  'can I write my bot in my own editor?',
+  'is there a vs code extension?',
+  'how do I code my bot in visual studio code?',
+];
 const about = [
   'who made this?',
   'tell me about robocodejs',
@@ -532,6 +551,7 @@ classifier.train(errors, 'errors');
 classifier.train(events, 'events');
 classifier.train(learn, 'learn');
 classifier.train(mcp, 'mcp');
+classifier.train(vscode, 'vscode');
 classifier.train(about, 'about');
 classifier.train(rules, 'rules');
 classifier.train(examples, 'examples');
@@ -550,6 +570,7 @@ const CLASSIFIER_ANSWERS: Record<string, string> = {
   errors: '/error-codes',
   learn: '/learn',
   mcp: '/mcp',
+  vscode: '/vscode',
   about: '/about',
   rules: '/rules',
   examples: '/examples',

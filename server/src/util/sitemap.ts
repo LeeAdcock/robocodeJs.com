@@ -26,6 +26,7 @@ const STATIC_ROUTES = [
   '/rankings',
   '/leaderboard',
   '/mcp',
+  '/vscode',
   '/classic',
   '/error-codes',
 ];

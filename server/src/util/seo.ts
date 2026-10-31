@@ -123,6 +123,12 @@ const STATIC_PAGES: Record<string, { title: string; description: string }> = {
       'Connect an AI assistant to RobocodeJs over the Model Context Protocol ' +
       'to write, run, and watch your bots.',
   },
+  '/vscode': {
+    title: 'RobocodeJs | VS Code Extension',
+    description:
+      'Write, check and run your RobocodeJs bots from Visual Studio Code: ' +
+      'autocomplete, live bot logs, and the arena beside your code.',
+  },
   '/classic': {
     title: 'RobocodeJs | Coming from classic Robocode?',
     description:

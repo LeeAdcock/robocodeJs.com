@@ -24,6 +24,10 @@ claude mcp add --transport http robocodejs https://robocodejs.com/api/mcp
 
 Then start Claude Code; on first use it opens your browser to authorize. After that, ask it to, for example, "list my RobocodeJs bots" or "open my arena status."
 
+### VS Code (GitHub Copilot)
+
+Install the **[RobocodeJs extension for VS Code](/vscode)** and sign in. It offers RobocodeJs to VS Code's AI chat automatically, so Copilot's agent mode gets these tools with no further setup.
+
 ### Other MCP clients
 
 Any client that supports a **remote / streamable-HTTP MCP server with OAuth** will work: point it at `https://robocodejs.com/api/mcp` and complete the sign-in when prompted. Clients handle token storage and refresh for you.

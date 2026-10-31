@@ -583,6 +583,10 @@ function App() {
                   />
                   {/* MCP setup guide, linked from the homepage getting-started list. */}
                   <Route path="/mcp" element={<MarkdownPage path="mcp" />} />
+                  <Route
+                    path="/vscode"
+                    element={<MarkdownPage path="vscode" />}
+                  />
                   {/* OAuth approval landing for MCP clients (see api/oauth.ts). */}
                   <Route
                     path="/mcp/authorize"
