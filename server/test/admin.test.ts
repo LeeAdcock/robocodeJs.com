@@ -159,18 +159,18 @@ describe('admin gate', () => {
     expect(res.text).toBe(FALLBACK);
   });
 
-  it('logs a signed-in non-admin probing the admin API', async () => {
-    const warn = vi.spyOn(logger, 'warn');
-    await request(server).get('/api/admin/me').set('Cookie', 'auth=user-token');
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: 'auth.forbidden',
-        admin: true,
-        userId: 'user-id',
-      }),
-      expect.any(String)
+  it('never logs a non-admin as auth.forbidden (it would page the security alarm)', async () => {
+    // The navbar probes /api/admin/me on every signed-in page load, so a
+    // security event here would trip robocodejs-auth-forbidden (>= 5 in 5 min).
+    const spies = (['warn', 'error', 'info'] as const).map((l) =>
+      vi.spyOn(logger, l)
     );
-    warn.mockRestore();
+    await request(server).get('/api/admin/me').set('Cookie', 'auth=user-token');
+    for (const spy of spies) {
+      for (const [obj] of spy.mock.calls)
+        expect(JSON.stringify(obj)).not.toContain('auth.forbidden');
+      spy.mockRestore();
+    }
   });
 
   it('admits an allowlisted email, case- and whitespace-insensitively', async () => {

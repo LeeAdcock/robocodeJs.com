@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import type User from '../types/user';
 import { isLocalDev } from '../util/devMode';
-import { logger, LogEvent } from '../util/logger';
+import { logger } from '../util/logger';
 
 // Admin access for the /admin control panel (GitHub #469).
 //
@@ -44,8 +44,12 @@ export const isAdmin = (user: User | undefined): boolean => {
 // would have handled an unknown path, so the admin API is indistinguishable
 // from a route that doesn't exist.
 //
-// A signed-in non-admin probing it is still worth knowing about, so that case
-// is logged; anonymous misses are not (they're routine scanner noise).
+// Non-admin hits are deliberately NOT logged as auth.forbidden. The UI's
+// navbar asks /api/admin/me on every page load for every signed-in user, so
+// that event would fire constantly and trip the robocodejs-auth-forbidden
+// alarm (>= 5 in 5 min), burying the real cross-user-probing signal it exists
+// for. A debug line with no `event` field keeps it visible locally without
+// feeding any metric filter.
 export const requireAdmin = (
   req: Request,
   _res: Response,
@@ -54,13 +58,8 @@ export const requireAdmin = (
   const user = (req as Request & { user?: User }).user;
   if (isAdmin(user)) return next();
   if (user) {
-    logger.warn(
-      {
-        event: LogEvent.AUTH_FORBIDDEN,
-        admin: true,
-        userId: user.getId(),
-        path: req.path,
-      },
+    logger.debug(
+      { userId: user.getId(), path: req.path },
       'non-admin request to the admin API'
     );
   }
