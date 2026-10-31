@@ -73,8 +73,8 @@ const forward = vi.hoisted(() => {
   class HomeUnavailableError extends Error {}
   return {
     HomeUnavailableError,
-    viewFromHome: vi.fn(
-      async (..._args: unknown[]): Promise<unknown> => undefined
+    viewFromHome: vi.fn<(ownerId: string, path: string) => Promise<unknown>>(
+      async () => undefined
     ),
   };
 });
