@@ -42,6 +42,7 @@ import helpEndpoints from './api/help';
 import demoEndpoints from './api/demo';
 import watchArenaEndpoints from './api/watchArena';
 import leaderboardEndpoints from './api/leaderboard';
+import tournamentEndpoints from './api/tournament';
 import profileEndpoints from './api/profile';
 
 const app = express();
@@ -147,6 +148,9 @@ app.use('/api/app', auth(true));
 
 app.use(healthEndpoints);
 app.use(leaderboardEndpoints);
+// Personal tournaments (GitHub #119): filtered views of the ladder. The board is
+// public by link; the routes gate themselves (auth(false) / auth(true)).
+app.use(tournamentEndpoints);
 // Own-profile achievements (GitHub #121). Sits outside the /api/user tree so the
 // /api/user/:userId route can't capture it; it gates itself with auth(true).
 app.use(profileEndpoints);
