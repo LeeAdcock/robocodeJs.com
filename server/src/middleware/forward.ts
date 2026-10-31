@@ -7,6 +7,7 @@ import arenaService from '../services/ArenaService';
 import { DEMO_USER_ID, UserId } from '../types/user';
 import { instanceIdentity, InstanceIdentity } from '../util/instance';
 import { isUuid } from '../util/uuid';
+import type { AuthenticatedRequest } from './auth';
 import { logger, LogEvent } from '../util/logger';
 import {
   forwardCounters as metrics,
@@ -29,6 +30,10 @@ import {
 //   forwardToHome    on the edge: resolves the request's owner, and proxies it
 //                    if their home is another instance. On the home it answers
 //                    421 if a forwarded request reached it after the user moved.
+//   forwardMcp       the same for POST /api/mcp, keyed by the token's user, so
+//                    mounted after mcpAuth (and after the body parsers).
+//   viewFromHome     for the MCP view tools spectating someone else's arena:
+//                    fetches the public REST view from the owner's home.
 //
 // Requests are signed with INTERNAL_FORWARD_SECRET. Without it this instance
 // never forwards and never trusts a forwarded marker: it serves everything
@@ -91,6 +96,8 @@ export const routingKey = async (
   if (m) return isUuid(m[1]) ? m[1] : undefined;
   m = /^\/api\/arena\/([^/]+)(\/|$)/.exec(path);
   if (m) return isUuid(m[1]) ? ownerOf(m[1]) : undefined;
+  m = /^\/api\/mcp\/arenas\/([^/]+)\//.exec(path);
+  if (m) return isUuid(m[1]) ? ownerOf(m[1]) : undefined;
   if (/^\/api\/demo(\/|$)/.test(path)) return DEMO_USER_ID;
   return undefined;
 };
@@ -134,6 +141,14 @@ const readBody = (req: Request): Promise<Buffer | 'too-large' | 'aborted'> =>
   });
 
 type Outcome = 'done' | 'misdirected' | 'unreachable' | 'failed';
+
+// Thrown by viewFromHome when the owner's home can't be reached and still
+// holds their lease, so there is nowhere correct to read the arena from.
+export class HomeUnavailableError extends Error {
+  constructor() {
+    super('Arena host unavailable; retry shortly.');
+  }
+}
 
 export interface ForwardingOptions {
   secret?: string;
@@ -186,30 +201,37 @@ export const createForwarding = ({
     next();
   };
 
+  // The marker headers that let the home trust a forwarded request.
+  const marker = async (method: string, url: string, ip: string) => {
+    const me = await identity();
+    const ts = String(Date.now());
+    return {
+      [H_FROM]: me.id,
+      [H_TS]: ts,
+      [H_IP]: ip,
+      [H_SIG]: sign(secret as string, { method, url, ts, from: me.id, ip }),
+    };
+  };
+
   const proxy = async (
     req: Request,
     res: Response,
     home: Home,
-    body: Buffer
+    body: Buffer,
+    reencoded: boolean
   ): Promise<Outcome> => {
-    const me = await identity();
-    const ts = String(Date.now());
-    const ip = req.ip ?? '';
     const headers: http.OutgoingHttpHeaders = {};
     for (const [name, value] of Object.entries(req.headers)) {
       if (!HOP_BY_HOP.has(name) && value !== undefined) headers[name] = value;
     }
+    // A body re-serialised from req.body is plain JSON, whatever encoding the
+    // client sent it in.
+    if (reencoded) delete headers['content-encoding'];
     headers['content-length'] = String(body.length);
-    headers[H_FROM] = me.id;
-    headers[H_TS] = ts;
-    headers[H_IP] = ip;
-    headers[H_SIG] = sign(secret as string, {
-      method: req.method,
-      url: req.originalUrl,
-      ts,
-      from: me.id,
-      ip,
-    });
+    Object.assign(
+      headers,
+      await marker(req.method, req.originalUrl, req.ip ?? '')
+    );
 
     return new Promise<Outcome>((resolve) => {
       let connected = false;
@@ -294,6 +316,64 @@ export const createForwarding = ({
     res.status(503).json({ error: 'Arena host unavailable; retry shortly.' });
   };
 
+  // Serve the request here, or proxy it to the user's home. `body` is the
+  // request body to send; `parsed` means the body parsers have already run, so
+  // the request can still be served here after a failed forward (otherwise the
+  // body has been read off the socket and only a client retry can resend it).
+  const route = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    userId: UserId,
+    takeBody: () => Promise<Buffer | 'too-large' | 'aborted'>,
+    parsed: boolean
+  ) => {
+    let home = await homes.resolve(userId);
+    // No answer from the database: serve here, as before forwarding existed.
+    if (!home || home.local) return next();
+
+    if (isForwarded(req)) {
+      // Another instance sent this here, but this instance isn't the user's
+      // home (any more). Never forward again, which could loop; tell the edge
+      // to look the home up afresh.
+      metrics.misdirected++;
+      res.setHeader(H_MISDIRECTED, '1');
+      return res.status(421).json({ error: 'Misdirected request' });
+    }
+
+    const body = await takeBody();
+    if (body === 'aborted') return;
+    if (body === 'too-large') {
+      return res.status(413).json({ error: 'Request body too large' });
+    }
+    const canServeHere = parsed || body.length === 0;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const outcome = await proxy(req, res, home, body, parsed);
+      if (outcome === 'done') {
+        metrics.forwarded++;
+        return;
+      }
+      homes.forget(userId);
+      if (outcome === 'failed') return unavailable(res);
+      if (outcome === 'unreachable') {
+        // The home may have died. If its lease has lapsed, take the user over
+        // and serve here; an unparsed body has already been read off the
+        // socket, so that client retries (Retry-After) and lands here.
+        const claimed = await homes.claim(userId);
+        if (claimed?.local && canServeHere) return next();
+        return unavailable(res);
+      }
+      // Misdirected: the cached home was stale. Look it up again, once.
+      const fresh = await homes.resolve(userId);
+      if (!fresh || fresh.local) {
+        return canServeHere ? next() : unavailable(res);
+      }
+      home = fresh;
+    }
+    return unavailable(res);
+  };
+
   const forwardToHome = async (
     req: Request,
     res: Response,
@@ -308,52 +388,99 @@ export const createForwarding = ({
       return next();
     }
     if (!userId) return next();
-
-    let home = await homes.resolve(userId);
-    // No answer from the database: serve here, as before forwarding existed.
-    if (!home || home.local) return next();
-
-    if (isForwarded(req)) {
-      // Another instance sent this here, but this instance isn't the user's
-      // home (any more). Never forward again, which could loop; tell the edge
-      // to look the home up afresh.
-      metrics.misdirected++;
-      res.setHeader(H_MISDIRECTED, '1');
-      return res.status(421).json({ error: 'Misdirected request' });
-    }
-
-    const body = await readBody(req);
-    if (body === 'aborted') return;
-    if (body === 'too-large') {
-      return res.status(413).json({ error: 'Request body too large' });
-    }
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const outcome = await proxy(req, res, home, body);
-      if (outcome === 'done') {
-        metrics.forwarded++;
-        return;
-      }
-      homes.forget(userId);
-      if (outcome === 'failed') return unavailable(res);
-      if (outcome === 'unreachable') {
-        // The home may have died. If its lease has lapsed, take the user over
-        // and serve here; a request with a body has already been read, so the
-        // client retries it (Retry-After) and the retry lands locally.
-        const claimed = await homes.claim(userId);
-        if (claimed?.local && body.length === 0) return next();
-        return unavailable(res);
-      }
-      // Misdirected: the cached home was stale. Look it up again, once.
-      const fresh = await homes.resolve(userId);
-      if (!fresh || fresh.local) {
-        if (body.length === 0) return next();
-        return unavailable(res);
-      }
-      home = fresh;
-    }
-    return unavailable(res);
+    return route(req, res, next, userId, () => readBody(req), false);
   };
 
-  return { acceptForwarded, forwardToHome };
+  // POST /api/mcp, keyed by the token's user (set by mcpAuth). The body
+  // parsers have already consumed the request, so the parsed JSON-RPC body is
+  // forwarded re-serialised; the home re-authenticates the bearer token itself.
+  const forwardMcp = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    if (!secret) return next();
+    const userId = (req as AuthenticatedRequest).user?.getId?.();
+    if (!userId) return next();
+    const body =
+      req.body === undefined
+        ? Buffer.alloc(0)
+        : Buffer.from(JSON.stringify(req.body));
+    return route(req, res, next, userId, async () => body, true);
+  };
+
+  const get = (
+    home: Home,
+    path: string,
+    headers: http.OutgoingHttpHeaders
+  ): Promise<
+    { status: number; body: string } | 'misdirected' | 'unreachable'
+  > =>
+    new Promise((resolve) => {
+      const upstream = http.get(
+        new URL(path, home.address),
+        { headers, agent, timeout: CONNECT_TIMEOUT_MS * 5 },
+        (incoming) => {
+          if (incoming.statusCode === 421 && incoming.headers[H_MISDIRECTED]) {
+            incoming.resume();
+            return resolve('misdirected');
+          }
+          const chunks: Buffer[] = [];
+          incoming.on('data', (c: Buffer) => chunks.push(c));
+          incoming.on('end', () =>
+            resolve({
+              status: incoming.statusCode ?? 502,
+              body: Buffer.concat(chunks).toString(),
+            })
+          );
+          incoming.on('error', () => resolve('unreachable'));
+        }
+      );
+      upstream.on('timeout', () => upstream.destroy(new Error('timeout')));
+      upstream.on('error', () => resolve('unreachable'));
+    });
+
+  // A public arena view (`/api/arena/:arenaId`, `/summary`, `/match-status`)
+  // read from the owner's home, for the MCP view tools spectating someone else's
+  // arena: building it here would load a second copy of their arena on this
+  // instance. Resolves to undefined when the arena should be read here instead
+  // (no secret, owner homed here, or the database can't say). Throws
+  // HomeUnavailableError when the home holds the lease but can't be reached.
+  const viewFromHome = async (
+    ownerId: UserId,
+    path: string
+  ): Promise<unknown | undefined> => {
+    if (!secret) return undefined;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const home = await homes.resolve(ownerId);
+      if (!home || home.local) return undefined;
+      const result = await get(home, path, {
+        accept: 'application/json',
+        ...(await marker('GET', path, '127.0.0.1')),
+      });
+      if (typeof result === 'object') {
+        if (result.status !== 200) {
+          throw new Error(`arena view from home answered ${result.status}`);
+        }
+        metrics.forwarded++;
+        return JSON.parse(result.body);
+      }
+      homes.forget(ownerId);
+      if (result === 'unreachable') {
+        const claimed = await homes.claim(ownerId);
+        if (claimed?.local) return undefined;
+        metrics.failures++;
+        throw new HomeUnavailableError();
+      }
+    }
+    metrics.failures++;
+    throw new HomeUnavailableError();
+  };
+
+  return { acceptForwarded, forwardToHome, forwardMcp, viewFromHome };
 };
+
+// The process-wide instance: index.ts mounts its middlewares and mcp.ts uses
+// forwardMcp and viewFromHome. Configured from INTERNAL_FORWARD_SECRET.
+let instance: ReturnType<typeof createForwarding> | undefined;
+export const forwarding = () => (instance ??= createForwarding());

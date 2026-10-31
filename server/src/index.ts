@@ -23,7 +23,7 @@ import { rootIconRouter } from './util/rootIcons';
 
 import auth from './middleware/auth';
 import securityHeaders from './middleware/securityHeaders';
-import { createForwarding } from './middleware/forward';
+import { forwarding } from './middleware/forward';
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit';
 import { isLocalDev } from './util/devMode';
 import { logger, LogEvent } from './util/logger';
@@ -88,7 +88,7 @@ app.use(
 // request before proxying it, and before the body parsers, so the body is
 // still unread when it's proxied. The per-user limiters live inside the
 // routers and so run on the user's home, which sees all their traffic.
-const { acceptForwarded, forwardToHome } = createForwarding();
+const { acceptForwarded, forwardToHome } = forwarding();
 if (
   !process.env.INTERNAL_FORWARD_SECRET &&
   process.env.NODE_ENV === 'production'

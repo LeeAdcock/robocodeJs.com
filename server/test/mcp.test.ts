@@ -67,6 +67,24 @@ vi.mock('../src/util/matchSummary', () => ({
 // Mock the formatter so format_app_source doesn't load Prettier here; the MCP glue
 // (arg handling, ownership, result shaping) is what's under test.
 vi.mock('../src/util/formatter', () => ({ default: { format: vi.fn() } }));
+// Forwarding (GitHub #444) is inert here: MCP requests are served locally and
+// the view tools read spectated arenas locally unless a test says otherwise.
+const forward = vi.hoisted(() => {
+  class HomeUnavailableError extends Error {}
+  return {
+    HomeUnavailableError,
+    viewFromHome: vi.fn(
+      async (..._args: unknown[]): Promise<unknown> => undefined
+    ),
+  };
+});
+vi.mock('../src/middleware/forward', () => ({
+  HomeUnavailableError: forward.HomeUnavailableError,
+  forwarding: () => ({
+    forwardMcp: (_req: unknown, _res: unknown, next: () => void) => next(),
+    viewFromHome: forward.viewFromHome,
+  }),
+}));
 
 import request from 'supertest';
 import mcpApp, { buildServer, logMcpRequest } from '../src/api/mcp';
@@ -459,6 +477,82 @@ describe('mcp tools', () => {
       watchUrl: 'https://robocodejs.com/watch/ar2',
       running: true,
     });
+  });
+
+  it("arena_status reads a spectated arena from its owner's home instance (#444)", async () => {
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    forward.viewFromHome.mockResolvedValueOnce({ running: true, from: 'home' });
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'arena_status',
+      arguments: { arenaId: 'ar2' },
+    })) as never;
+
+    expect(forward.viewFromHome).toHaveBeenCalledWith('u2', '/api/arena/ar2');
+    // No second copy of u2's arena is loaded here.
+    expect(environmentService.get).not.toHaveBeenCalled();
+    expect(JSON.parse(textOf(res))).toEqual({
+      watchUrl: 'https://robocodejs.com/watch/ar2',
+      running: true,
+      from: 'home',
+    });
+  });
+
+  it("match_summary from the owner's home still carries the decided-match hint", async () => {
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    forward.viewFromHome.mockResolvedValueOnce({
+      match: { decided: true },
+      leaderboard: [],
+    });
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'match_summary',
+      arguments: { arenaId: 'ar2' },
+    })) as never;
+
+    expect(forward.viewFromHome).toHaveBeenCalledWith(
+      'u2',
+      '/api/arena/ar2/summary'
+    );
+    expect(environmentService.get).not.toHaveBeenCalled();
+    const body = JSON.parse(textOf(res));
+    expect(body.match).toEqual({ decided: true });
+    expect(body.debugHint).toBeDefined();
+  });
+
+  it("match_status reports an unreachable owner's home as a retryable error", async () => {
+    const otherArena = { getId: () => 'ar2', getUserId: () => 'u2' };
+    vi.mocked(arenaService.get).mockResolvedValue(otherArena as never);
+    forward.viewFromHome.mockRejectedValueOnce(
+      new forward.HomeUnavailableError()
+    );
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'match_status',
+      arguments: { arenaId: 'ar2' },
+    })) as { isError?: boolean };
+
+    expect(forward.viewFromHome).toHaveBeenCalledWith(
+      'u2',
+      '/api/arena/ar2/match-status'
+    );
+    expect(res.isError).toBe(true);
+    expect(textOf(res as never)).toMatch(/retry/);
+  });
+
+  it('the view tools never go remote for your own arena', async () => {
+    const own = { getId: () => 'ar1', getUserId: () => 'u1' };
+    vi.mocked(arenaService.get).mockResolvedValue(own as never);
+    vi.mocked(arenaMemberService.getForArena).mockResolvedValue([] as never);
+    vi.mocked(buildMatchStatus).mockResolvedValue({ match: {} } as never);
+    const client = await connect();
+    await client.callTool({
+      name: 'match_status',
+      arguments: { arenaId: 'ar1' },
+    });
+    expect(forward.viewFromHome).not.toHaveBeenCalled();
   });
 
   it('pause_arena refuses an arena owned by someone else (writes stay owner-only)', async () => {

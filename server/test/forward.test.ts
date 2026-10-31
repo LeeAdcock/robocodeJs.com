@@ -375,6 +375,12 @@ describe('routingKey', () => {
     expect(ownerOf).toHaveBeenCalledWith(ARENA);
   });
 
+  it('routes the MCP log stream by the arena owner', async () => {
+    const ownerOf = vi.fn(async () => USER);
+    expect(await key(`/api/mcp/arenas/${ARENA}/logs`, ownerOf)).toBe(USER);
+    expect(ownerOf).toHaveBeenCalledWith(ARENA);
+  });
+
   it('routes the demo to the demo user', async () => {
     const { DEMO_USER_ID } = await import('../src/types/user');
     expect(await key('/api/demo/events')).toBe(DEMO_USER_ID);
@@ -400,5 +406,171 @@ describe('routingKey', () => {
     expect(await key(`/api/arena/${ARENA}`, async () => undefined)).toBe(
       undefined
     );
+  });
+});
+
+describe('forwardMcp', () => {
+  // POST /api/mcp is keyed by the token's user, after auth and body parsing.
+  const mcpApp = (name: string, homes: ReturnType<typeof fakeHomes>) => {
+    const app = express();
+    const fwd = createForwarding({
+      secret: SECRET,
+      identity: async () => ({ id: name, address: 'unused' }),
+      homes,
+    });
+    app.use(fwd.acceptForwarded);
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      (req as unknown as { user: unknown }).user = { getId: () => USER };
+      next();
+    });
+    app.post('/api/mcp', fwd.forwardMcp, (req, res) => {
+      res.json({
+        servedBy: name,
+        body: req.body,
+        forwarded: isForwarded(req),
+        encoding: req.headers['content-encoding'] ?? null,
+      });
+    });
+    return app;
+  };
+  const mcpHomes = fakeHomes();
+  const mcpEdgeHomes = fakeHomes();
+  let mcpHome: http.Server;
+  let mcpEdge: http.Server;
+
+  beforeAll(async () => {
+    mcpHome = await listen(mcpApp('home', mcpHomes));
+    mcpEdge = await listen(mcpApp('edge', mcpEdgeHomes));
+  });
+  afterAll(() => {
+    mcpHome.close();
+    mcpEdge.close();
+  });
+  beforeEach(() => {
+    mcpHomes.resolve.mockImplementation(async (u: string) => local(u));
+    mcpEdgeHomes.resolve.mockImplementation(async (u: string) =>
+      remote(u, urlOf(mcpHome))
+    );
+  });
+
+  const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/list' };
+  const post = (headers: Record<string, string> = {}, body: unknown = rpc) =>
+    fetch(`${urlOf(mcpEdge)}/api/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+
+  it("forwards the whole JSON-RPC request to the token user's home", async () => {
+    expect(await post()).toEqual({
+      servedBy: 'home',
+      body: rpc,
+      forwarded: true,
+      encoding: null,
+    });
+  });
+
+  it('drops content-encoding: the forwarded body is re-serialised plain JSON', async () => {
+    const res = await fetch(`${urlOf(mcpEdge)}/api/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-encoding': 'gzip',
+      },
+      body: zlib.gzipSync(JSON.stringify(rpc)),
+    }).then((r) => r.json());
+    expect(res).toMatchObject({ servedBy: 'home', body: rpc, encoding: null });
+  });
+
+  it('serves the already-parsed request here when the dead home is taken over', async () => {
+    mcpEdgeHomes.resolve.mockResolvedValue(remote(USER, 'http://127.0.0.1:1'));
+    mcpEdgeHomes.claim.mockResolvedValue(local(USER));
+    // Unlike a REST request with a body, no 503: the body was parsed, not lost.
+    expect(await post()).toMatchObject({ servedBy: 'edge', body: rpc });
+  });
+
+  it('serves here after a 421 when the user turns out to be homed here', async () => {
+    mcpHomes.resolve.mockResolvedValue(remote(USER, 'http://127.0.0.1:1'));
+    mcpEdgeHomes.resolve
+      .mockResolvedValueOnce(remote(USER, urlOf(mcpHome)))
+      .mockResolvedValueOnce(local(USER));
+    expect(await post()).toMatchObject({ servedBy: 'edge', body: rpc });
+  });
+});
+
+describe('viewFromHome', () => {
+  let viewHome: http.Server;
+  let status = 200;
+  beforeAll(async () => {
+    const app = express();
+    const fwd = createForwarding({
+      secret: SECRET,
+      identity: async () => ({ id: 'home', address: 'unused' }),
+      homes: homeHomes,
+      ownerOf: async () => USER,
+    });
+    app.use(fwd.acceptForwarded, fwd.forwardToHome);
+    app.get('/api/arena/:arenaId/summary', (req, res) => {
+      res.status(status).json({
+        arenaId: req.params.arenaId,
+        forwarded: isForwarded(req),
+      });
+    });
+    viewHome = await listen(app);
+  });
+  afterAll(() => viewHome.close());
+  beforeEach(() => {
+    status = 200;
+  });
+
+  const view = (homes: ReturnType<typeof fakeHomes>, secret = SECRET) =>
+    createForwarding({
+      secret,
+      identity: async () => ({ id: 'edge', address: 'unused' }),
+      homes,
+    }).viewFromHome(USER, `/api/arena/${ARENA}/summary`);
+
+  it("reads the view from the owner's home, signed", async () => {
+    const homes = fakeHomes();
+    homes.resolve.mockResolvedValue(remote(USER, urlOf(viewHome)));
+    expect(await view(homes)).toEqual({ arenaId: ARENA, forwarded: true });
+  });
+
+  it('defers to a local read when the owner is homed here, or with no secret', async () => {
+    const homes = fakeHomes();
+    homes.resolve.mockResolvedValue(local(USER));
+    expect(await view(homes)).toBeUndefined();
+    expect(await view(fakeHomes(), '')).toBeUndefined();
+  });
+
+  it('follows the user after a 421', async () => {
+    homeHomes.resolve.mockResolvedValueOnce(remote(USER, 'http://127.0.0.1:1'));
+    const homes = fakeHomes();
+    homes.resolve.mockResolvedValue(remote(USER, urlOf(viewHome)));
+    expect(await view(homes)).toEqual({ arenaId: ARENA, forwarded: true });
+    expect(homes.forget).toHaveBeenCalledWith(USER);
+  });
+
+  it('throws HomeUnavailableError while an unreachable home holds the lease', async () => {
+    const { HomeUnavailableError } = await import('../src/middleware/forward');
+    const homes = fakeHomes();
+    homes.resolve.mockResolvedValue(remote(USER, 'http://127.0.0.1:1'));
+    homes.claim.mockResolvedValue(remote(USER, 'http://127.0.0.1:1'));
+    await expect(view(homes)).rejects.toBeInstanceOf(HomeUnavailableError);
+  });
+
+  it('defers to a local read after taking over an unreachable home', async () => {
+    const homes = fakeHomes();
+    homes.resolve.mockResolvedValue(remote(USER, 'http://127.0.0.1:1'));
+    homes.claim.mockResolvedValue(local(USER));
+    expect(await view(homes)).toBeUndefined();
+  });
+
+  it('surfaces a non-200 answer as an error', async () => {
+    status = 500;
+    const homes = fakeHomes();
+    homes.resolve.mockResolvedValue(remote(USER, urlOf(viewHome)));
+    await expect(view(homes)).rejects.toThrow(/500/);
   });
 });
