@@ -15,6 +15,7 @@ import { ErrorCodes } from '../types/ErrorCodes';
 import { isUuid } from '../util/uuid';
 import { streamArenaLogs } from '../util/logStream';
 import { mcpRateLimit } from '../middleware/rateLimit';
+import { forwarding, HomeUnavailableError } from '../middleware/forward';
 import { isLocalDev } from '../util/devMode';
 import userService from '../services/UserService';
 import { provider, RESOURCE_URL } from './oauth';
@@ -180,6 +181,37 @@ const readableArena = async (
   } catch {
     return null;
   }
+};
+
+// The view a read-only tool returns for an arena. Someone else's arena lives on
+// its owner's home instance (GitHub #444), and this request was forwarded to
+// the caller's home, which may be a different instance: read the owner's arena
+// through the public REST view on their home (`/api/arena/:arenaId` + `path`,
+// the same builders these tools use) rather than loading a second copy of it
+// here. Own arenas, and any arena whose owner is homed here, build locally.
+const UNAVAILABLE =
+  'The server holding this arena is unavailable right now; retry shortly.';
+// Turns a HomeUnavailableError into null (the caller answers UNAVAILABLE);
+// anything else still throws.
+const unavailable = (err: unknown): null => {
+  if (err instanceof HomeUnavailableError) return null;
+  throw err;
+};
+
+const arenaView = async <T>(
+  user: User,
+  arena: Arena,
+  path: '' | '/summary' | '/match-status',
+  build: () => Promise<T>
+): Promise<T> => {
+  if (arena.getUserId() !== user.getId()) {
+    const remote = await forwarding().viewFromHome(
+      arena.getUserId(),
+      `/api/arena/${arena.getId()}${path}`
+    );
+    if (remote !== undefined) return remote as T;
+  }
+  return build();
 };
 
 // The run_match tool drives a match with the shared runMatchToDecision helper
@@ -717,11 +749,15 @@ export const buildServer = (user: User): McpServer => {
     async ({ arenaId }) => {
       const arena = await readableArena(user, arenaId);
       if (!arena) return fail('No such arena.');
-      const env = await environmentService.get(arena);
-      const members = await arenaMemberService.getForArena(arena.getId());
+      const status = await arenaView(user, arena, '', async () => {
+        const env = await environmentService.get(arena);
+        const members = await arenaMemberService.getForArena(arena.getId());
+        return buildArenaStatus(env, members);
+      }).catch(unavailable);
+      if (!status) return fail(UNAVAILABLE);
       return ok({
         watchUrl: watchUrl(arena.getId()),
-        ...(await buildArenaStatus(env, members)),
+        ...status,
       });
     }
   );
@@ -754,9 +790,12 @@ export const buildServer = (user: User): McpServer => {
     async ({ arenaId }) => {
       const arena = await readableArena(user, arenaId);
       if (!arena) return fail('No such arena.');
-      const env = await environmentService.get(arena);
-      const members = await arenaMemberService.getForArena(arena.getId());
-      const summary = await buildMatchSummary(env, members);
+      const summary = await arenaView(user, arena, '/summary', async () => {
+        const env = await environmentService.get(arena);
+        const members = await arenaMemberService.getForArena(arena.getId());
+        return buildMatchSummary(env, members);
+      }).catch(unavailable);
+      if (!summary) return fail(UNAVAILABLE);
       // Only nudge toward the log tools once the match is over (this is the "who
       // won and how" moment); during polling it would just be noise. The arena
       // may be someone else's (readableArena spectate), so phrase availability by
@@ -802,11 +841,15 @@ export const buildServer = (user: User): McpServer => {
     async ({ arenaId }) => {
       const arena = await readableArena(user, arenaId);
       if (!arena) return fail('No such arena.');
-      const env = await environmentService.get(arena);
-      const members = await arenaMemberService.getForArena(arena.getId());
+      const status = await arenaView(user, arena, '/match-status', async () => {
+        const env = await environmentService.get(arena);
+        const members = await arenaMemberService.getForArena(arena.getId());
+        return buildMatchStatus(env, members);
+      }).catch(unavailable);
+      if (!status) return fail(UNAVAILABLE);
       return ok({
         watchUrl: watchUrl(arena.getId()),
-        ...(await buildMatchStatus(env, members)),
+        ...status,
       });
     }
   );
@@ -1215,6 +1258,22 @@ export const buildServer = (user: User): McpServer => {
         '- `metrics.maxAvgTickMs` — the busiest arena’s average wall-clock time to ' +
         'compute one tick; single digits are healthy, a steadily rising value ' +
         'means an arena is struggling to keep up\n' +
+        '- `metrics.homeUsers` — users whose arenas this instance is the home ' +
+        'for (it holds their lease)\n' +
+        '- `metrics.leaseTakeovers` / `metrics.leaseConflicts` / ' +
+        '`metrics.leasesLost` — counts since this instance started: expired ' +
+        'homes it took over, times it found a user it serves already homed on ' +
+        'another instance (normal briefly during a deploy), and homes another ' +
+        'instance took from it\n' +
+        '- `metrics.conflictedUsers` — users this instance serves right now ' +
+        'whose home is another instance\n' +
+        '- `metrics.leaseQueries` — database queries the home-lease layer has ' +
+        'issued since this instance started\n' +
+        '- `metrics.forwardedRequests` / `metrics.forwardFailures` / ' +
+        '`metrics.misdirectedRequests` — counts since this instance started: ' +
+        'requests it passed to a user’s home instance, forwards that failed ' +
+        '(the client got a 503 and should retry), and forwarded requests it ' +
+        'turned away because the user had moved\n' +
         '- `metrics.rssMB` / `metrics.heapUsedMB` — the whole server process’s ' +
         'resident and heap memory, in MB, for this instance',
       inputSchema: {},
@@ -1731,34 +1790,45 @@ export const logMcpRequest = (userId: string, body: unknown): void => {
 
 // mcpRateLimit runs AFTER mcpAuth so req.user is populated and the limit keys
 // per user (u:<id>) rather than falling back to IP — see rateLimit.ts.
-app.post('/api/mcp', mcpAuth, mcpRateLimit, async (req, res) => {
-  const user = (req as AuthenticatedRequest).user;
-  logMcpRequest(user.getId(), req.body);
-  const server = buildServer(user);
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-  res.on('close', () => {
-    transport.close();
-    server.close();
-  });
-  try {
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
-  } catch (err: unknown) {
-    logger.error(
-      { err: err instanceof Error ? err.message : String(err) },
-      'mcp: request handling failed'
-    );
-    if (!res.headersSent) {
-      res.status(500).json({
-        jsonrpc: '2.0',
-        error: { code: -32603, message: 'Internal server error' },
-        id: null,
-      });
+//
+// forwardMcp sits between them (GitHub #444): the whole request goes to the
+// token user's home instance, where their arenas live, before anything here
+// touches them. Placing it before mcpRateLimit means the per-user limit counts
+// at the home, which sees all of that user's MCP traffic.
+app.post(
+  '/api/mcp',
+  mcpAuth,
+  (req, res, next) => forwarding().forwardMcp(req, res, next),
+  mcpRateLimit,
+  async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    logMcpRequest(user.getId(), req.body);
+    const server = buildServer(user);
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    res.on('close', () => {
+      transport.close();
+      server.close();
+    });
+    try {
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    } catch (err: unknown) {
+      logger.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        'mcp: request handling failed'
+      );
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null,
+        });
+      }
     }
   }
-});
+);
 
 // Stateless mode does not use server-initiated GET (SSE) or DELETE (session
 // teardown) streams; answer them per the MCP spec.

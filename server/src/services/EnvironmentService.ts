@@ -1,9 +1,10 @@
 import Arena from '../types/arena';
 import Environment, { ArenaId, Process } from '../types/environment';
 import arenaMemberService from './ArenaMemberService';
+import homeService from './HomeService';
 import { logger, LogEvent } from '../util/logger';
 import { recordSandboxStats } from '../util/awardAchievements';
-import { DEMO_USER_ID } from '../types/user';
+import { DEMO_USER_ID, UserId } from '../types/user';
 
 // How long a running arena may go with no viewers and no access before it is
 // paused (see pauseIdle). `0` disables idle pausing.
@@ -26,12 +27,38 @@ export class EnvironmentService {
   // returning user on a paused arena. Just ids, so it costs nothing to keep.
   private wakeOnLoad: Set<ArenaId> = new Set();
 
+  private reconciling = false;
+
   constructor() {
     setInterval(() => {
       this.pauseIdle();
       this.collectGarbage();
+      void this.reconcileHomes();
     }, 10000);
   }
+
+  // Keep this instance's home leases (GitHub #444) matching the users it holds
+  // arenas for: renew them, release users whose last arena the GC just
+  // collected, and drop the arenas of any user whose home another instance took
+  // over. Their requests are forwarded to the new home from then on, so the
+  // copies here would only keep stale SSE viewers on a match nobody is
+  // driving; dropping them closes those streams and the browsers reconnect
+  // through the new home. Skipped while a previous pass is still waiting on
+  // the database.
+  reconcileHomes = async (now = Date.now()): Promise<void> => {
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      const lost = await homeService.reconcile(this.owners, now);
+      lost.forEach((userId) => this.disposeUser(userId));
+    } finally {
+      this.reconciling = false;
+    }
+  };
+
+  // Users with at least one arena held on this instance.
+  owners = (): Set<UserId> =>
+    new Set(Object.values(this.store).map((env) => env.getArena().getUserId()));
 
   // Dispose environments that have been stopped for thirty minutes. Only a
   // stopped arena qualifies: stoppedAt is stamped at construction and on each
@@ -130,6 +157,10 @@ export class EnvironmentService {
     }
 
     this.store[arena.getId()] = env;
+    // Take the owner's home lease now rather than at the next reconcile, so
+    // the lease is in place as soon as their first arena is. Fire-and-forget:
+    // claim never throws, and nothing routes on the result yet.
+    void homeService.claim(ownerId);
     return arenaMemberService
       .getForArena(arena.getId())
       .then((members) =>
@@ -168,6 +199,19 @@ export class EnvironmentService {
       env.dispose();
     }
     return Promise.resolve();
+  };
+
+  // Tears down every arena a user owns on this instance. Used when another
+  // instance has taken over the user's home, so it holds their arenas now.
+  disposeUser = (userId: UserId): number => {
+    const arenaIds = (Object.entries(this.store) as [ArenaId, Environment][])
+      .filter(([, env]) => env.getArena().getUserId() === userId)
+      .map(([arenaId]) => arenaId);
+    arenaIds.forEach((arenaId) => {
+      this.store[arenaId].pause();
+      void this.dispose(arenaId);
+    });
+    return arenaIds.length;
   };
 
   // Tears down every live environment (pausing its tick loop first, then

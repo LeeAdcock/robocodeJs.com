@@ -424,9 +424,12 @@ export const events = async (req: Request, res: Response) => {
 
   const arena = scopedArena(req);
   return environmentService.get(arena).then((env) => {
+    const end = () => stream.close();
     env.addListener('event', listener);
+    env.addListener('disposed', end);
     req.on('close', () => {
       env.removeListener('event', listener);
+      env.removeListener('disposed', end);
       stream.close();
     });
   });
