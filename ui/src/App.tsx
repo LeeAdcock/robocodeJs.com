@@ -49,6 +49,7 @@ const SamplePage = lazy(() => import('./page/sample/samplePage'));
 const LeaderboardPage = lazy(
   () => import('./page/leaderboard/leaderboardPage')
 );
+const TournamentPage = lazy(() => import('./page/leaderboard/tournamentPage'));
 const ProfilePage = lazy(() => import('./page/profile/profilePage'));
 const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
@@ -562,7 +563,17 @@ function App() {
                   {/* Global bot ladder — public, linked from the main nav. The
                     signed-in user's own bots are bolded; the server marks them
                     by including the real appId only on the viewer's own rows. */}
-                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  <Route
+                    path="/leaderboard"
+                    element={<LeaderboardPage signedIn={!!user} />}
+                  />
+                  {/* A personal tournament (GitHub #119): the global ratings
+                    filtered to its members' bots. The URL is the join link —
+                    public to view, sign-in to join. */}
+                  <Route
+                    path="/leaderboard/:tournamentId"
+                    element={<TournamentPage signedIn={!!user} />}
+                  />
                   {/* Own badges (GitHub #121) — private, so the page gates itself
                     on the API's 401 rather than on the app's user state. */}
                   <Route path="/profile" element={<ProfilePage />} />

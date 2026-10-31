@@ -121,6 +121,8 @@ This makes `app.updatedTimestamp` load-bearing as the "**this app's code changed
 
 The public top-20 is `GET /api/leaderboard` (`api/leaderboard.ts`, unauthenticated, no source) + the MCP `leaderboard` tool, rendered at the UI `/leaderboard` route (main-nav "Rankings", visible logged-out). `account.lastActiveAt` (bumped, throttled, in `middleware/auth.ts`) feeds the owner-activity eligibility gate.
 
+**Personal tournaments** (GitHub #119) are a named, link-shared **filter** over the ladder, not a second ladder: no matches of their own. `services/TournamentService.ts` holds `tournament` + `tournament_member` (membership is per **user**, so joining adds every rated app the member owns, including later ones). The board is `getLeaderboard(limit, viewer, { tournamentId })`: the same candidate SQL plus one `JOIN tournament_member`, ranks renumbered 1..N, **no** per-owner cap (`rankWithOwnerCap(..., Infinity)`), movement rewound within the group. Routes are `api/tournament.ts` under `/api/tournaments` (board `GET /:id` public via `auth(false)`, display names only, never member user ids; join/leave via `members/me`; rename/delete creator-only; `MAX_TOURNAMENTS_PER_USER` 10, `MAX_TOURNAMENT_MEMBERS` 100). The UI lives inside `/leaderboard` (a "Personal tournaments" section) with the board and join link at `/leaderboard/:tournamentId`, which SEO marks `noindex`. No MCP tools yet.
+
 ### SEO (public pages)
 
 The UI is a client-rendered SPA, so the server injects per-page SEO metadata into the shell for the **public** routes (homepage, docs, lessons, examples, rankings, about, mcp, classic, blog). Keep this maintained when adding or renaming public pages:
