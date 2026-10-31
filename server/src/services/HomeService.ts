@@ -34,8 +34,10 @@ Promise.resolve(
 export const LEASE_MS = 30_000;
 // How long an edge trusts a looked-up remote home before asking again. A stale
 // entry costs one misdirected forward (421, then a fresh lookup), so this only
-// bounds how often an edge hits the database for a user homed elsewhere.
-export const REMOTE_CACHE_MS = 5_000;
+// bounds how often an edge hits the database for a user homed elsewhere: at
+// most one lookup per user per 15 s per instance. Kept under LEASE_MS so an
+// edge never caches a home past the point its lease could have lapsed.
+export const REMOTE_CACHE_MS = 15_000;
 
 export interface Home {
   userId: UserId;
