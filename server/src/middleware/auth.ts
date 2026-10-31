@@ -66,10 +66,13 @@ export default (required: boolean) =>
         return next();
       }
     }
-    // Bearer tokens (the MCP OAuth access token) are NOT handled here: the
-    // /api/mcp route verifies them with the SDK's requireBearerAuth against the
-    // OAuth provider (see api/mcp.ts). This middleware covers the browser session
-    // (Google cookie) that gates the REST API and the OAuth consent page.
+    // Bearer tokens (the MCP OAuth access token) are NOT handled here, by
+    // design: the two credentials stay scoped to their own surfaces. Bearer
+    // tokens are honoured only under /api/mcp (POST /api/mcp and the
+    // GET /api/mcp/arenas/:arenaId/logs stream, both via mcpAuth in
+    // api/mcp.ts). This middleware covers the browser session (Google cookie)
+    // that gates the REST API and the OAuth consent page. Don't accept a bearer
+    // token here to reuse a REST route; add the route under /api/mcp instead.
 
     // Step 1 — verify the Google credential. A failure here means the token is
     // missing/expired/invalid (or minted for another audience): the *client's*
