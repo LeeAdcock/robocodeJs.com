@@ -69,6 +69,14 @@ where `actualScore` is **1** for a win and **0** for a loss, and `K` is the bot'
 
 Ratings are stored and shown as **whole numbers** (they're rounded after each update).
 
+# Personal tournaments
+
+A personal tournament ranks just the bots of a group you choose, like your friends, a class, or a club. Create one from the bottom of the [Global Rankings](/leaderboard) page, then share its link. Anyone with the link can view the board; signing in lets them join.
+
+There are no separate tournament matches. A tournament shows the same global Elo ratings, filtered to the bots of its members and numbered from 1. Joining adds **all** of your rated bots, including ones you write later, and leaving takes them out. Unlike the global board, a tournament shows every member bot rather than capping each player at three. A bot appears once it has played a ranked match on the global ladder.
+
+The creator can rename or delete a tournament. Deleting it only removes the board and its link; nobody's bots or ratings change.
+
 # On-demand matches (MCP)
 
 Separate from the background Elo ladder, you can run matches on demand through the [MCP integration](/mcp), handy when you want to compare the bots in one of your arenas head-to-head, right now. There's no button for it in the UI; it's available as the `run_match` tool for an AI assistant (or any MCP client) connected to your account.

@@ -125,6 +125,16 @@ describe('seo resolver', () => {
     expect(m.title).toContain('Watch');
   });
 
+  it('noindexes a personal tournament board but titles it', () => {
+    const m = resolver().resolve(
+      '/leaderboard/3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+    );
+    expect(m.noindex).toBe(true);
+    expect(m.title).toContain('Tournament');
+    // The global board itself stays indexable.
+    expect(resolver().resolve('/leaderboard').noindex).toBeFalsy();
+  });
+
   it('ignores a trailing slash', () => {
     expect(resolver().resolve('/about/').canonical).toBe(
       'https://example.test/about'

@@ -29,15 +29,24 @@ const LEADERBOARD_SCAN_LIMIT = 500;
 // Only apps that have actually played a ranked game appear (ratingGames > 0), so
 // never-played 1500 defaults and untouched starters don't clutter it; broken and
 // deleted apps are excluded, as is the demo user.
-const LEADERBOARD_CANDIDATE_SQL = `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
+// `memberJoin` narrows the board to one personal tournament's members (GitHub
+// #119): the same eligibility and ordering, restricted to apps whose owner has a
+// tournament_member row for $3. Only the extra JOIN differs, so a tournament
+// board can never disagree with the global one about who is ranked above whom.
+const leaderboardCandidateSql = (memberJoin = '') =>
+  `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
                 app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
-         FROM app JOIN account ON account.id = app.userId
+         FROM app JOIN account ON account.id = app.userId${memberJoin}
          WHERE NOT app.deleted
            AND NOT COALESCE(app.broken, false)
            AND COALESCE(app.ratingGames, 0) > 0
            AND app.userId <> $2
          ORDER BY app.rating DESC, app.ratingGames DESC
          LIMIT $1`;
+const LEADERBOARD_CANDIDATE_SQL = leaderboardCandidateSql();
+const TOURNAMENT_CANDIDATE_SQL = leaderboardCandidateSql(
+  '\n         JOIN tournament_member tm ON tm.userId = app.userId AND tm.tournamentId = $3'
+);
 
 // Assign board ranks to an ALREADY-ORDERED candidate list, applying the per-owner
 // cap. The one place a rank is defined: getLeaderboard uses it for both the live
@@ -47,15 +56,20 @@ const LEADERBOARD_CANDIDATE_SQL = `SELECT app.id as "appId", app.userId as "owne
 // Ranks the full ordering rather than truncating to a visible limit, so an app
 // below the fold still has a real rank (the movement arrows need it, and so does a
 // badge for an app sitting at #34).
+//
+// `cap` defaults to the global board's per-owner cap. A personal tournament
+// passes Infinity: it is a small group that wants to see every entry, and no
+// badge depends on a tournament rank.
 export const rankWithOwnerCap = (
-  ordered: { appId: string; ownerId: string }[]
+  ordered: { appId: string; ownerId: string }[],
+  cap: number = MAX_APPS_PER_OWNER_ON_BOARD
 ): Map<string, number> => {
   const ranks = new Map<string, number>();
   const perOwner = new Map<string, number>();
   for (const row of ordered) {
     const count = perOwner.get(row.ownerId) ?? 0;
     // Skip an owner's 4th+ bot so a single player can't dominate.
-    if (count >= MAX_APPS_PER_OWNER_ON_BOARD) continue;
+    if (count >= cap) continue;
     perOwner.set(row.ownerId, count + 1);
     ranks.set(row.appId, ranks.size + 1);
   }
@@ -190,19 +204,34 @@ export class AppService {
   // That ceiling is provably sufficient — with MAX_APPS_PER_USER (20) and a
   // 3-per-owner cap, filling a 20-row board scans well under it — so it never
   // truncates the visible board in practice.
+  //
+  // `tournamentId` scopes the board to one personal tournament's members (GitHub
+  // #119): same ratings, same ordering, ranks renumbered 1..N within the group,
+  // no per-owner cap, and movement rewound within the group too.
   getLeaderboard = async (
     limit = 20,
-    viewerUserId?: UserId
+    viewerUserId?: UserId,
+    opts: { tournamentId?: string } = {}
   ): Promise<LeaderboardEntry[]> => {
     // How far back "movement" looks: the up/down arrow compares each app's
     // current rank to where it stood this long ago. A rolling day is stable
     // enough to be meaningful (vs. per-match jitter) yet fresh for daily movers.
     const MOVEMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-    const res = await pool.query({
-      text: LEADERBOARD_CANDIDATE_SQL,
-      values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
-    });
+    const { tournamentId } = opts;
+    const ownerCap =
+      tournamentId === undefined ? MAX_APPS_PER_OWNER_ON_BOARD : Infinity;
+    const res = await pool.query(
+      tournamentId === undefined
+        ? {
+            text: LEADERBOARD_CANDIDATE_SQL,
+            values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID],
+          }
+        : {
+            text: TOURNAMENT_CANDIDATE_SQL,
+            values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID, tournamentId],
+          }
+    );
 
     // Reconstruct the board as of MOVEMENT_WINDOW_MS ago: rewind each app's
     // rating by the deltas it earned inside the window, then re-rank with the
@@ -247,7 +276,7 @@ export class AppService {
       );
     // Rank across the full ordering (not truncated to `limit`) so a bot that
     // climbed from, say, #34 into the visible board still shows real movement.
-    const previousRankByApp = rankWithOwnerCap(prevOrdered);
+    const previousRankByApp = rankWithOwnerCap(prevOrdered, ownerCap);
 
     // The live board, ranked by the same rule — then truncated to `limit` for
     // display. Rank comes from the shared map, so a row's rank is what it would be
@@ -256,7 +285,8 @@ export class AppService {
       res.rows.map((row) => ({
         appId: row.appId as string,
         ownerId: row.ownerUserId as string,
-      }))
+      })),
+      ownerCap
     );
 
     const entries: LeaderboardEntry[] = [];

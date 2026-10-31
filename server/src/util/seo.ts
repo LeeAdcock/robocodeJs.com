@@ -344,6 +344,20 @@ export const createSeoResolver = (deps: SeoDeps) => {
       };
     }
 
+    // A personal tournament board (/leaderboard/:tournamentId, GitHub #119).
+    // Unlisted: shareable by link, but kept out of the index like /watch, with a
+    // real title so a shared link previews sensibly instead of as a soft-404.
+    if (/^\/leaderboard\/[^/]+$/.test(path)) {
+      return {
+        title: `${SITE} | Tournament`,
+        description:
+          'A personal RobocodeJs tournament: the members’ bots ranked by their global Elo rating.',
+        canonical,
+        ogType: 'website',
+        noindex: true,
+      };
+    }
+
     // Public "watch" spectator page (/watch/:arenaId). A per-arena, ephemeral
     // view — give it a friendly brand title for the browser tab / link preview,
     // but keep it out of the index (it's transient and has no stable content).
