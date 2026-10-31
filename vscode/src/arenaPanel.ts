@@ -27,8 +27,13 @@ export class ArenaPanel implements vscode.Disposable {
         'Arena',
         { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
         {
-          // The frame runs its own scripts; the webview document needs none.
-          enableScripts: false,
+          // Required for the FRAMED page's scripts, not ours: VS Code enforces
+          // enableScripts: false by sandboxing the webview without
+          // allow-scripts, and sandbox flags are inherited by every nested
+          // frame, so the arena page would load but never run ("You need to
+          // enable JavaScript"). The webview document itself still runs
+          // nothing: its CSP below grants no script-src.
+          enableScripts: true,
           // Keep the match streaming while the tab is in the background, rather
           // than reloading (and replaying the arena) every time it's shown.
           retainContextWhenHidden: true,
@@ -69,7 +74,8 @@ export class ArenaPanel implements vscode.Disposable {
     const attr = (s: string) =>
       s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
     // The webview's own policy: nothing but the one framed origin and inline
-    // styles for the full-bleed layout. The frame is sandboxed without
+    // styles for the full-bleed layout. No script-src, so although scripts
+    // are enabled for the frame's sake, this document can't run any. The frame is sandboxed without
     // allow-top-navigation, so it can't navigate VS Code's webview away.
     return `<!DOCTYPE html>
 <html>
