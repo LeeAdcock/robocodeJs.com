@@ -27,9 +27,11 @@ import { apiRateLimit, authRateLimit } from './middleware/rateLimit';
 import { isLocalDev } from './util/devMode';
 import { logger, LogEvent } from './util/logger';
 import { collectMetrics } from './util/metrics';
+import { PORT } from './util/instance';
 import pool from './util/db';
 import environmentService from './services/EnvironmentService';
 import ladderService from './services/LadderService';
+import homeService from './services/HomeService';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
@@ -292,7 +294,7 @@ process.on('uncaughtException', (err) => {
   );
 });
 
-const port = 8080;
+const port = PORT;
 const server = app.listen(port, () => {
   logger.info({ port }, `server started at http://localhost:${port}`);
   if (isLocalDev) {
@@ -361,12 +363,19 @@ const shutdown = (signal: NodeJS.Signals) => {
   // Stop scheduling new ranked matches before tearing down isolates.
   ladderService.stop();
 
+  // Hand back this instance's user homes (GitHub #444) straight away, so users
+  // can be placed on the replacement instance without waiting out the lease.
+  // Started before server.close, which can wait on open SSE streams until the
+  // failsafe fires; awaited below before the pool closes.
+  const homesReleased = homeService.releaseAll();
+
   server.close(async () => {
     try {
+      const homesHandedBack = await homesReleased;
       const isolatesDisposed = environmentService.disposeAll();
       await pool.end();
       logger.info(
-        { event: LogEvent.SHUTDOWN, signal, isolatesDisposed },
+        { event: LogEvent.SHUTDOWN, signal, isolatesDisposed, homesHandedBack },
         'graceful shutdown complete'
       );
     } catch (err) {
