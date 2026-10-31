@@ -19,7 +19,10 @@ export class ArenaStatus implements vscode.Disposable {
 
   constructor(
     private readonly client: RobocodeClient,
-    private readonly log: (line: string) => void
+    private readonly log: (line: string) => void,
+    // Every reading is shared (the Default Arena list renders the same one), so
+    // one poll serves both; undefined when stopped.
+    private readonly onStatus: (status: MatchStatus | undefined) => void
   ) {
     this.item.command = 'robocodejs.watchArena';
     this.item.name = 'RobocodeJs Arena';
@@ -38,6 +41,7 @@ export class ArenaStatus implements vscode.Disposable {
     this.timer = undefined;
     this.arenaId = undefined;
     this.item.hide();
+    this.onStatus(undefined);
   }
 
   dispose(): void {
@@ -45,10 +49,17 @@ export class ArenaStatus implements vscode.Disposable {
     this.item.dispose();
   }
 
+  // The default arena's id, looked up once per sign-in.
+  async defaultArenaId(): Promise<string> {
+    this.arenaId ??= (await this.client.defaultArena()).arenaId;
+    return this.arenaId;
+  }
+
   async refresh(): Promise<void> {
     try {
-      this.arenaId ??= (await this.client.defaultArena()).arenaId;
-      this.render(await this.client.matchStatus(this.arenaId));
+      const status = await this.client.matchStatus(await this.defaultArenaId());
+      this.render(status);
+      this.onStatus(status);
     } catch (err) {
       // A status line isn't worth an error popup; leave the last reading.
       this.log(

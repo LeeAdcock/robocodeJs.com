@@ -12,6 +12,7 @@ import { AppWorkspace } from './workspace';
 import { BotLogs } from './botLogs';
 import { ArenaStatus } from './arenaStatus';
 import { ArenaPanel } from './arenaPanel';
+import { ArenaTree } from './arenaTree';
 import { Fault, faultToProblem, toProblems } from './problems';
 import { sourceFromText, sourceVersion } from './source';
 
@@ -39,10 +40,27 @@ export async function activate(context: vscode.ExtensionContext) {
   const runtime =
     vscode.languages.createDiagnosticCollection('robocodejs-runtime');
   const log = (line: string) => output.appendLine(line);
-  const arenaStatus = new ArenaStatus(client, log);
+  // The Default Arena list adds/removes through these, defined below once the
+  // error reporting they use exists.
+  const arenaTree = new ArenaTree(
+    (appId) => tree.find(appId),
+    (appIds) => addToArena(appIds)
+  );
+  const arenaStatus = new ArenaStatus(client, log, (status) =>
+    arenaTree.setStatus(status)
+  );
   const arenaPanel = new ArenaPanel(serverUrl, context.extensionUri);
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('robocodejs.apps', tree),
+    vscode.window.createTreeView('robocodejs.apps', {
+      treeDataProvider: tree,
+      dragAndDropController: tree,
+      canSelectMany: true,
+    }),
+    vscode.window.createTreeView('robocodejs.arena', {
+      treeDataProvider: arenaTree,
+      dragAndDropController: arenaTree,
+      canSelectMany: true,
+    }),
     diagnostics,
     runtime,
     output,
@@ -90,7 +108,38 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const refresh = async () => {
     tree.setApps(await client.listApps());
+    void arenaStatus.refresh();
   };
+
+  // Roster changes to the default arena, one app at a time so one refusal
+  // (arena full, already in it) doesn't hide what did change. The arena list
+  // and status bar re-read match_status afterwards.
+  const changeArena = async (
+    appIds: string[],
+    verb: 'add' | 'remove'
+  ): Promise<void> => {
+    const arenaId = await arenaStatus.defaultArenaId();
+    const failures: string[] = [];
+    for (const appId of appIds) {
+      try {
+        if (verb === 'add') await client.addToArena(arenaId, appId);
+        else await client.removeFromArena(arenaId, appId);
+      } catch (err) {
+        if (err instanceof SignInRequiredError) throw err;
+        const name = tree.find(appId)?.name ?? appId.slice(0, 8);
+        failures.push(
+          `${name}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+    await arenaStatus.refresh();
+    if (failures.length) throw new Error(failures.join(' '));
+  };
+  const addToArena = (appIds: string[]) =>
+    changeArena(appIds, 'add').catch(report);
+  const removeFromArena = (appIds: string[]) =>
+    changeArena(appIds, 'remove').catch(report);
+  tree.onRemoveFromArena = removeFromArena;
 
   // A crash lands on the failing line of the app's local file, and one
   // notification per batch (an app's five bots often crash together) offers to
@@ -291,6 +340,22 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     ),
     vscode.commands.registerCommand('robocodejs.refresh', guarded(refresh)),
+    // Menu equivalents of dragging, for keyboard users. A view command gets the
+    // clicked item plus, with several selected, the whole selection.
+    vscode.commands.registerCommand(
+      'robocodejs.addToArena',
+      (item: AppSummary, selected?: AppSummary[]) =>
+        addToArena(
+          (selected?.length ? selected : [item])
+            .map((a) => a.appId)
+            .filter((id) => !arenaTree.has(id))
+        )
+    ),
+    vscode.commands.registerCommand(
+      'robocodejs.removeFromArena',
+      (item: { id: string }, selected?: { id: string }[]) =>
+        removeFromArena((selected?.length ? selected : [item]).map((s) => s.id))
+    ),
     vscode.commands.registerCommand('robocodejs.openApp', guarded(openApp)),
     vscode.commands.registerCommand(
       'robocodejs.newApp',

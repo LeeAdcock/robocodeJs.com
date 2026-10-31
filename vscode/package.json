@@ -2,7 +2,7 @@
   "name": "robocodejs",
   "displayName": "RobocodeJs",
   "description": "Write, check and run your RobocodeJs tank apps from VS Code.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "robocode-js",
   "private": true,
   "license": "MIT",
@@ -45,6 +45,11 @@
         {
           "id": "robocodejs.apps",
           "name": "Apps"
+        },
+        {
+          "id": "robocodejs.arena",
+          "name": "Default Arena",
+          "when": "robocodejs.signedIn"
         }
       ]
     },
@@ -57,6 +62,11 @@
       {
         "view": "robocodejs.apps",
         "contents": "You have no apps yet.\n[New app](command:robocodejs.newApp)",
+        "when": "robocodejs.signedIn"
+      },
+      {
+        "view": "robocodejs.arena",
+        "contents": "No apps in your default arena yet.\nDrag apps here from **Apps**, or right-click an app and choose **Add to Arena**.",
         "when": "robocodejs.signedIn"
       }
     ],
@@ -134,20 +144,22 @@
         "title": "Watch Arena in Browser",
         "category": "RobocodeJs",
         "icon": "$(link-external)"
+      },
+      {
+        "command": "robocodejs.addToArena",
+        "title": "Add to Arena",
+        "category": "RobocodeJs",
+        "icon": "$(add)"
+      },
+      {
+        "command": "robocodejs.removeFromArena",
+        "title": "Remove from Arena",
+        "category": "RobocodeJs",
+        "icon": "$(remove)"
       }
     ],
     "menus": {
       "view/title": [
-        {
-          "command": "robocodejs.runMatch",
-          "when": "view == robocodejs.apps && robocodejs.signedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "robocodejs.watchArena",
-          "when": "view == robocodejs.apps && robocodejs.signedIn",
-          "group": "navigation@1"
-        },
         {
           "command": "robocodejs.newApp",
           "when": "view == robocodejs.apps && robocodejs.signedIn",
@@ -165,6 +177,16 @@
         {
           "command": "robocodejs.showLogs",
           "when": "view == robocodejs.apps && robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.watchArena",
+          "when": "view == robocodejs.arena",
+          "group": "navigation@1"
+        },
+        {
+          "command": "robocodejs.runMatch",
+          "when": "view == robocodejs.arena",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -181,6 +203,21 @@
         {
           "command": "robocodejs.check",
           "when": "view == robocodejs.apps && viewItem == app"
+        },
+        {
+          "command": "robocodejs.addToArena",
+          "when": "view == robocodejs.apps && viewItem == app",
+          "group": "arena"
+        },
+        {
+          "command": "robocodejs.removeFromArena",
+          "when": "view == robocodejs.arena && viewItem == arenaApp",
+          "group": "inline"
+        },
+        {
+          "command": "robocodejs.removeFromArena",
+          "when": "view == robocodejs.arena && viewItem == arenaApp",
+          "group": "arena"
         }
       ],
       "editor/title": [
@@ -237,6 +274,14 @@
         {
           "command": "robocodejs.watchArenaInBrowser",
           "when": "robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.addToArena",
+          "when": "false"
+        },
+        {
+          "command": "robocodejs.removeFromArena",
+          "when": "false"
         }
       ]
     },
