@@ -4,6 +4,7 @@
   "description": "Write, check and run your RobocodeJs tank apps from VS Code.",
   "version": "1.2.139",
   "publisher": "robocode-js",
+  "icon": "media/icon.png",
   "private": true,
   "license": "MIT",
   "repository": {
