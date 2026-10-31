@@ -137,15 +137,16 @@ export default function TournamentPage(props: { signedIn: boolean }) {
         <h1>{board.name}</h1>
         <p>
           A personal tournament
-          {board.ownerName ? ` created by ${board.ownerName}` : ''}. It ranks
-          the bots of its {board.memberCount}{' '}
-          {board.memberCount === 1 ? 'member' : 'members'} by their{' '}
-          <Link to="/leaderboard">global Elo rating</Link>. There are no
-          separate matches: joining adds all of your rated bots, and leaving
-          takes them out. Share the link below to invite others.
+          {board.ownerName ? ` created by ${board.ownerName}` : ''}, ranked by{' '}
+          <Link to="/leaderboard">global rating</Link>.
         </p>
-        {board.members.length > 0 && (
-          <p style={{ color: '#888' }}>Members: {board.members.join(', ')}</p>
+        {/* The roster and the sharing/management controls below are the
+          creator's; the server only sends `members` to them. */}
+        {board.isOwner && board.members && board.members.length > 0 && (
+          <p style={{ color: '#888' }}>
+            {board.memberCount} {board.memberCount === 1 ? 'member' : 'members'}
+            : {board.members.join(', ')}
+          </p>
         )}
       </div>
 
@@ -159,24 +160,28 @@ export default function TournamentPage(props: { signedIn: boolean }) {
             marginBottom: 12,
           }}
         >
-          <input
-            readOnly
-            value={link}
-            aria-label="Join link"
-            onFocus={(e) => e.currentTarget.select()}
-            style={{
-              flex: '1 1 260px',
-              minWidth: 0,
-              padding: '4px 8px',
-              background: 'var(--bg)',
-              color: 'var(--fg)',
-              border: '1px solid var(--rule)',
-              borderRadius: 4,
-            }}
-          />
-          <Button size="sm" variant="outline-secondary" onClick={share}>
-            Copy join link
-          </Button>
+          {board.isOwner && (
+            <input
+              readOnly
+              value={link}
+              aria-label="Join link"
+              onFocus={(e) => e.currentTarget.select()}
+              style={{
+                flex: '1 1 260px',
+                minWidth: 0,
+                padding: '4px 8px',
+                background: 'var(--bg)',
+                color: 'var(--fg)',
+                border: '1px solid var(--rule)',
+                borderRadius: 4,
+              }}
+            />
+          )}
+          {board.isOwner && (
+            <Button size="sm" variant="outline-secondary" onClick={share}>
+              Copy join link
+            </Button>
+          )}
           {props.signedIn &&
             (board.joined ? (
               <Button

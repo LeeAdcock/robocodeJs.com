@@ -23,7 +23,8 @@ export interface TournamentBoard {
   joined: boolean;
   memberCount: number;
   maxMembers: number;
-  // Abbreviated display names ("First L."), earliest joiner first.
-  members: string[];
+  // Abbreviated display names ("First L."), earliest joiner first. Sent only
+  // to the tournament's creator.
+  members?: string[];
   entries: LeaderboardEntry[];
 }

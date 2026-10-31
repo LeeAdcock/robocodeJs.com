@@ -112,7 +112,8 @@ describe('tournament board', () => {
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Club');
     expect(res.body.memberCount).toBe(2);
-    expect(res.body.members).toEqual(['Alice A.', 'Bob B.']);
+    // The member roster is owner-only.
+    expect(res.body.members).toBeUndefined();
     expect(res.body.ownerName).toBe('Alice A.');
     expect(
       res.body.entries.map((e: { rank: number; name: string }) => [
@@ -154,6 +155,12 @@ describe('tournament board', () => {
 
     const res = await api(ALICE).get(`/api/tournaments/${t.id}`);
     expect(res.body.isOwner).toBe(true);
+    expect(res.body.members).toEqual(['Alice A.', 'Bob B.']);
+    // A member who isn't the creator doesn't get the roster.
+    const bob = await api(BOB).get(`/api/tournaments/${t.id}`);
+    expect(bob.body.isOwner).toBe(false);
+    expect(bob.body.joined).toBe(true);
+    expect(bob.body.members).toBeUndefined();
     expect(res.body.joined).toBe(true);
     const mine = res.body.entries.filter((e: { appId?: string }) => e.appId);
     expect(mine.map((e: { appId: string }) => e.appId)).toEqual([a1]);

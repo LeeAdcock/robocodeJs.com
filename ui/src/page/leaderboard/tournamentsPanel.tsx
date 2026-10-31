@@ -53,10 +53,8 @@ export default function TournamentsPanel(props: { signedIn: boolean }) {
     <section className="markdown" style={{ marginTop: 32 }}>
       <h1>Personal tournaments</h1>
       <p>
-        Rank your bots against just your friends, class, or club. A personal
-        tournament uses the same global ratings shown above, filtered to the
-        bots of the people who join. Create one and share its link. Anyone with
-        the link can view it, and joining adds all of your bots.
+        Rank your bots against just your friends, class, or club. Create a
+        tournament, then share its link to invite others.
       </p>
 
       {!props.signedIn && <p>Sign in (top right) to create or join one.</p>}

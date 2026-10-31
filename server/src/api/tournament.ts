@@ -162,6 +162,8 @@ app.get(
         }),
       ]);
       const owner = members.find((m) => m.userId === tournament.ownerUserId);
+      const isOwner =
+        viewerId !== undefined && viewerId === tournament.ownerUserId;
       res.json({
         id: tournament.id,
         name: tournament.name,
@@ -169,13 +171,18 @@ app.get(
         // account name only comes from the member list, so a creator who left
         // reads as Anonymous rather than costing an extra lookup.
         ownerName: owner ? publicOwnerName(owner.name) : undefined,
-        isOwner: viewerId !== undefined && viewerId === tournament.ownerUserId,
+        isOwner,
         joined:
           viewerId !== undefined && members.some((m) => m.userId === viewerId),
         memberCount: members.length,
         maxMembers: MAX_TOURNAMENT_MEMBERS,
-        // Display names only — member user ids never leave the server.
-        members: members.map((m) => publicOwnerName(m.name)),
+        // The member roster is the creator's alone: other viewers see the
+        // ranked bots (which already carry owner names) but not who has joined
+        // without a ranked bot yet. Display names only — member user ids never
+        // leave the server.
+        members: isOwner
+          ? members.map((m) => publicOwnerName(m.name))
+          : undefined,
         entries,
       });
     } catch (err) {
