@@ -257,6 +257,45 @@ describe('Logs (per-bot filtering)', () => {
     expect(screen.queryByText('while paused 2')).toBeTruthy();
   });
 
+  it('Clear calls onClear and resumes a paused view', () => {
+    const onClear = vi.fn();
+    const ring = { logs: [entry({ msg: 'noisy line' })], index: 0 };
+    const { rerender } = render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={ring}
+        onClear={onClear}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Pause log output'));
+
+    fireEvent.click(screen.getByLabelText('Clear the console'));
+    expect(onClear).toHaveBeenCalledTimes(1);
+    // A paused snapshot would keep showing the cleared lines, so Clear unpauses.
+    expect(screen.getByLabelText('Pause log output')).toBeTruthy();
+    rerender(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{ logs: [null], index: 0 }}
+        onClear={onClear}
+      />
+    );
+    expect(screen.queryByText('noisy line')).toBeNull();
+  });
+
+  it('has no Clear button without an onClear handler', () => {
+    render(
+      <Logs
+        bots={bots}
+        playbackTime={Number.POSITIVE_INFINITY}
+        logEntries={{ logs: [], index: 0 }}
+      />
+    );
+    expect(screen.queryByLabelText('Clear the console')).toBeNull();
+  });
+
   it('scrolling up detaches the tail and shows a new-lines pill that re-attaches', () => {
     const first = entry({ msg: 'line one' });
     const ring = (entries: Entry[]) => ({

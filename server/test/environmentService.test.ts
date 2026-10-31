@@ -11,8 +11,11 @@ vi.mock('../src/util/awardAchievements', () => ({
   recordSandboxStats: vi.fn().mockResolvedValue(undefined),
 }));
 
-import environmentService from '../src/services/EnvironmentService';
+import environmentService, {
+  parseIdlePauseMs,
+} from '../src/services/EnvironmentService';
 import Arena from '../src/types/arena';
+import Environment from '../src/types/environment';
 import { DEMO_USER_ID } from '../src/types/user';
 import { recordSandboxStats } from '../src/util/awardAchievements';
 
@@ -54,11 +57,13 @@ describe('EnvironmentService.metrics', () => {
     clear();
     store()['a'] = {
       isRunning: () => true,
+      isIdlePaused: () => false,
       getProcesses: () => [{}, {}], // 2 isolates
       getAvgTickMs: () => 3.2,
     };
     store()['b'] = {
       isRunning: () => false, // paused arena still counts as a live env
+      isIdlePaused: () => true,
       getProcesses: () => [{}], // 1 isolate
       getAvgTickMs: () => 7.891,
     };
@@ -66,6 +71,7 @@ describe('EnvironmentService.metrics', () => {
     const m = environmentService.metrics();
     expect(m.arenas).toBe(2);
     expect(m.runningArenas).toBe(1);
+    expect(m.idlePausedArenas).toBe(1);
     expect(m.isolates).toBe(3);
     // Busiest arena's EMA, rounded to 2 decimals.
     expect(m.maxAvgTickMs).toBe(7.89);
@@ -78,6 +84,7 @@ describe('EnvironmentService.metrics', () => {
     expect(environmentService.metrics()).toEqual({
       arenas: 0,
       runningArenas: 0,
+      idlePausedArenas: 0,
       isolates: 0,
       maxAvgTickMs: 0,
     });
@@ -127,5 +134,215 @@ describe('EnvironmentService.get — achievement stats sink', () => {
     const { default: Environment } = await import('../src/types/environment');
     const env = new Environment(new Arena('arena-x', 'user-1'));
     expect((env as unknown as { statsSink: unknown }).statsSink).toBeNull();
+  });
+});
+
+// Idle auto-pause. Nothing else pauses a running arena, so without it every
+// arena anyone resumed kept ticking until the next deploy.
+describe('EnvironmentService idle pause', () => {
+  const MIN = 60 * 1000;
+  const clearStore = () => {
+    for (const key of Object.keys(environmentService.store)) {
+      environmentService.store[key].pause();
+      delete environmentService.store[key];
+    }
+  };
+  // An arena with no bots ends its match (game over) on the first tick, so stub
+  // the tick loop out: these tests are about the running flag, not ticking.
+  const noLoop = (env: Environment) => {
+    (env as unknown as { runLoop: () => Promise<void> }).runLoop = () =>
+      Promise.resolve();
+    return env;
+  };
+  const running = async (id: string) => {
+    const env = noLoop(await environmentService.get(new Arena(id, 'user-1')));
+    env.resume();
+    return env;
+  };
+  const later = (ms: number) => Date.now() + ms;
+
+  beforeEach(() => {
+    clearStore();
+    environmentService.idlePauseMs = 5 * MIN;
+  });
+
+  it('pauses a running arena once nobody has watched or used it for the window', async () => {
+    const env = await running('idle-1');
+
+    expect(environmentService.pauseIdle(later(4 * MIN))).toBe(0);
+    expect(env.isRunning()).toBe(true);
+
+    expect(environmentService.pauseIdle(later(6 * MIN))).toBe(1);
+    expect(env.isRunning()).toBe(false);
+    expect(env.isIdlePaused()).toBe(true);
+    expect(environmentService.metrics().idlePausedArenas).toBe(1);
+  });
+
+  it('never pauses an arena with an open SSE stream', async () => {
+    const env = await running('idle-2');
+    const listener = () => undefined;
+    env.addListener('log', listener);
+
+    expect(environmentService.pauseIdle(later(60 * MIN))).toBe(0);
+    expect(env.isRunning()).toBe(true);
+
+    // The idle clock starts when the last viewer leaves, not when they arrived.
+    env.removeListener('log', listener);
+    expect(environmentService.pauseIdle(later(4 * MIN))).toBe(0);
+    expect(environmentService.pauseIdle(later(6 * MIN))).toBe(1);
+  });
+
+  it('leaves a driven match (run_match) running', async () => {
+    const env = await running('idle-3');
+    env.beginMatch();
+    expect(environmentService.pauseIdle(later(60 * MIN))).toBe(0);
+    expect(env.isRunning()).toBe(true);
+    env.endMatch();
+  });
+
+  it('wakes an idle-paused arena on the next access and restarts its idle clock', async () => {
+    const env = await running('idle-4');
+    environmentService.pauseIdle(later(6 * MIN));
+
+    const again = await environmentService.get(new Arena('idle-4', 'user-1'));
+    expect(again).toBe(env);
+    expect(env.isRunning()).toBe(true);
+    expect(env.isIdlePaused()).toBe(false);
+    expect(environmentService.pauseIdle(later(4 * MIN))).toBe(0);
+  });
+
+  it('keeps a user-paused arena paused on access', async () => {
+    const env = await running('idle-5');
+    env.pause();
+    expect(environmentService.pauseIdle(later(60 * MIN))).toBe(0);
+
+    await environmentService.get(new Arena('idle-5', 'user-1'));
+    expect(env.isRunning()).toBe(false);
+  });
+
+  it('turns an idle pause into a user pause when the user pauses explicitly', async () => {
+    const env = await running('idle-6');
+    environmentService.pauseIdle(later(6 * MIN));
+    env.pause();
+    expect(env.isIdlePaused()).toBe(false);
+
+    await environmentService.get(new Arena('idle-6', 'user-1'));
+    expect(env.isRunning()).toBe(false);
+  });
+
+  it('is disabled by a zero window', async () => {
+    environmentService.idlePauseMs = 0;
+    const env = await running('idle-7');
+    expect(environmentService.pauseIdle(later(60 * MIN))).toBe(0);
+    expect(env.isRunning()).toBe(true);
+  });
+
+  // A rebuilt arena resumes inside get(), before a test could stub its loop,
+  // so these assert on the resume() call rather than on isRunning().
+  it('rebuilds an arena the GC disposed while idle-paused as running', async () => {
+    const resume = vi.spyOn(Environment.prototype, 'resume');
+    const arena = new Arena('idle-8', 'user-1');
+    const env = await running('idle-8');
+    environmentService.pauseIdle(later(6 * MIN));
+    environmentService.collectGarbage(later(31 * MIN));
+    expect(environmentService.has('idle-8')).toBe(false);
+
+    resume.mockClear();
+    const rebuilt = await environmentService.get(arena);
+    expect(rebuilt).not.toBe(env);
+    expect(resume.mock.contexts).toEqual([rebuilt]);
+
+    // Only once: the next rebuild of this arena comes back paused.
+    rebuilt.pause();
+    environmentService.collectGarbage(later(31 * MIN));
+    resume.mockClear();
+    await environmentService.get(arena);
+    expect(resume).not.toHaveBeenCalled();
+    resume.mockRestore();
+  });
+
+  it('rebuilds a GC-disposed user-paused arena paused', async () => {
+    const resume = vi.spyOn(Environment.prototype, 'resume');
+    const env = await running('idle-9');
+    env.pause();
+    environmentService.collectGarbage(later(31 * MIN));
+
+    resume.mockClear();
+    await environmentService.get(new Arena('idle-9', 'user-1'));
+    expect(resume).not.toHaveBeenCalled();
+    resume.mockRestore();
+  });
+});
+
+describe('parseIdlePauseMs', () => {
+  it('defaults to five minutes and accepts 0 to disable', () => {
+    expect(parseIdlePauseMs(undefined)).toBe(5 * 60 * 1000);
+    expect(parseIdlePauseMs('')).toBe(5 * 60 * 1000);
+    expect(parseIdlePauseMs('abc')).toBe(5 * 60 * 1000);
+    expect(parseIdlePauseMs('-1')).toBe(5 * 60 * 1000);
+    expect(parseIdlePauseMs('0')).toBe(0);
+    expect(parseIdlePauseMs('60000')).toBe(60000);
+  });
+});
+
+// The 30-minute GC. stoppedAt is stamped at construction and on each stop but
+// never cleared on resume, so the GC must check that an arena is actually
+// stopped — it used to dispose arenas played continuously for 30 minutes.
+describe('EnvironmentService.collectGarbage', () => {
+  const MIN = 60 * 1000;
+  const store = () =>
+    environmentService.store as unknown as Record<string, unknown>;
+  const clear = () => Object.keys(store()).forEach((k) => delete store()[k]);
+  const fake = (state: {
+    running: boolean;
+    looping?: boolean;
+    stoppedMinsAgo: number;
+  }) => ({
+    isRunning: () => state.running,
+    isLooping: () => state.looping ?? false,
+    isIdlePaused: () => false,
+    stoppedAt: new Date(Date.now() - state.stoppedMinsAgo * MIN),
+    dispose: vi.fn(),
+  });
+
+  beforeEach(clear);
+
+  it('disposes an arena stopped for over thirty minutes', () => {
+    const env = fake({ running: false, stoppedMinsAgo: 31 });
+    store()['stale'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).toHaveBeenCalledOnce();
+    expect(environmentService.has('stale')).toBe(false);
+  });
+
+  it('keeps an arena stopped more recently', () => {
+    const env = fake({ running: false, stoppedMinsAgo: 29 });
+    store()['recent'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).not.toHaveBeenCalled();
+    expect(environmentService.has('recent')).toBe(true);
+  });
+
+  it('never disposes a running arena, however old its stoppedAt', () => {
+    const env = fake({ running: true, stoppedMinsAgo: 120 });
+    store()['live'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).not.toHaveBeenCalled();
+    expect(environmentService.has('live')).toBe(true);
+  });
+
+  it('waits for a paused arena’s in-flight tick to drain', () => {
+    const env = fake({ running: false, looping: true, stoppedMinsAgo: 31 });
+    store()['draining'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).not.toHaveBeenCalled();
   });
 });

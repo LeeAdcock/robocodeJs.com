@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import Badge from 'react-bootstrap/Badge';
 import { FaChevronDown, FaChevronUp, FaTerminal } from 'react-icons/fa';
 import Logs from '../arena/logs';
-import useLogsStream from '../../util/useLogsStream';
+import useLogsStream, { clearLogs } from '../../util/useLogsStream';
 import {
   subscribePlaybackTime,
   getPlaybackTime,
@@ -234,6 +234,7 @@ export default function AppLogsDock(props: AppLogsDockProps) {
               scopeToApp={props.appId}
               logEntries={logEntries}
               playbackTime={playbackTime}
+              onClear={() => clearLogs(props.appId)}
             />
           </div>
         </div>

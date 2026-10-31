@@ -78,6 +78,15 @@ describe('Environment game-over check', () => {
     expect(await gameOverOnNextTick(env)).toBe(true);
   });
 
+  it('stamps stoppedAt at game over so the GC times it from the end of the match', async () => {
+    const env = arenaWith([0, -3], [-6, -1]);
+    env.stoppedAt = new Date(0); // as if constructed long ago
+
+    await gameOverOnNextTick(env);
+
+    expect(Date.now() - env.stoppedAt.getTime()).toBeLessThan(1000);
+  });
+
   it('keeps running in a normal mid-match state', async () => {
     const env = arenaWith([100, 75, 0, -3, 50], [25, 100, 100, 100, 100]);
 

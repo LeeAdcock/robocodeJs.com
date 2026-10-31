@@ -48,6 +48,8 @@ export const LogEvent = {
   LADDER_MATCH: 'ladder.match', // a global-ladder ranked match completed (GitHub #151)
   ACHIEVEMENT_UNLOCKED: 'achievement.unlocked', // a user earned one or more badges (GitHub #121)
   HELP_UNANSWERED: 'help.unanswered', // a navbar search matched nothing (docs/routing gap)
+  ARENA_IDLE_PAUSE: 'arena.idle_pause', // a running arena with no viewers/access was paused to free CPU
+  ARENA_IDLE_WAKE: 'arena.idle_wake', // an idle-paused arena was resumed by a new access
   ASSET_MISSING: 'asset.missing', // a subresource 404'd — usually a browser on a previous deploy asking for a stale hashed chunk
 } as const;
 
