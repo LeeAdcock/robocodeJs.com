@@ -40,11 +40,6 @@ Promise.resolve(
   )
   .catch(() => undefined);
 
-// How many tournaments one user may create. Generous for a teacher running a few
-// classes, small enough that the table can't be farmed.
-export const MAX_TOURNAMENTS_PER_USER = Number(
-  process.env.MAX_TOURNAMENTS_PER_USER ?? 10
-);
 // How many users may join one tournament. Bounds the board query (each member
 // brings up to MAX_APPS_PER_USER apps) and the member list in the response.
 export const MAX_TOURNAMENT_MEMBERS = Number(

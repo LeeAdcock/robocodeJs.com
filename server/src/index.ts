@@ -44,6 +44,7 @@ import watchArenaEndpoints from './api/watchArena';
 import leaderboardEndpoints from './api/leaderboard';
 import tournamentEndpoints from './api/tournament';
 import profileEndpoints from './api/profile';
+import adminEndpoints from './api/admin';
 
 const app = express();
 
@@ -155,6 +156,10 @@ app.use(tournamentEndpoints);
 // /api/user/:userId route can't capture it; it gates itself with auth(true).
 app.use(profileEndpoints);
 app.use(sessionEndpoints);
+// Admin control panel API (GitHub #469). Gates itself (auth(false) +
+// requireAdmin): a non-admin leaves the router and falls through to the SPA
+// fallback below, exactly as for a path that doesn't exist.
+app.use(adminEndpoints);
 // OAuth 2.1 authorization-server endpoints (/.well-known/*, /authorize, /token,
 // /register, /revoke) live at the app root — must be mounted before the SPA
 // fallback below so they aren't swallowed by index.html.

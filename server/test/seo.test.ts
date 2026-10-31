@@ -111,6 +111,14 @@ describe('seo resolver', () => {
     expect(m.title).toBe('RobocodeJs | Page not found');
   });
 
+  it('noindexes the admin panel and gives it no page-specific metadata', () => {
+    // /admin (GitHub #469) is deliberately left out of STATIC_PAGES: it must
+    // read as an ordinary unknown route to anyone who isn't an admin.
+    const m = resolver().resolve('/admin');
+    expect(m.noindex).toBe(true);
+    expect(m.title).toBe('RobocodeJs | Page not found');
+  });
+
   it('noindexes the public watch page but gives it a friendly title', () => {
     const m = resolver().resolve('/watch/3f2504e0-4f89-41d3-9a0c-0305e82c3301');
     expect(m.noindex).toBe(true);
@@ -290,6 +298,10 @@ describe('buildSitemap', () => {
     lessonSlugs: ['move', 'radar'],
     now: () => new Date('2025-06-15T00:00:00Z'),
     origin: 'https://example.test',
+  });
+
+  it('never lists the admin panel', () => {
+    expect(xml).not.toContain('/admin');
   });
 
   it('lists static routes, lessons, and only published posts', () => {

@@ -51,6 +51,10 @@ const LeaderboardPage = lazy(
 );
 const TournamentPage = lazy(() => import('./page/leaderboard/tournamentPage'));
 const ProfilePage = lazy(() => import('./page/profile/profilePage'));
+// Admin control panel (GitHub #469): its own chunk, so ordinary visitors never
+// download it. The page gates itself and renders "Page not found" to anyone
+// the server doesn't confirm as an admin.
+const AdminPage = lazy(() => import('./page/admin/adminPage'));
 const McpAuthorizePage = lazy(() => import('./page/mcpAuthorize'));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -577,6 +581,7 @@ function App() {
                   {/* Own badges (GitHub #121) — private, so the page gates itself
                     on the API's 401 rather than on the app's user state. */}
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/admin" element={<AdminPage />} />
                   {/* Explainer for the global rankings/ladder. Distinct from
                     /leaderboard (the live board) so it doesn't collide. */}
                   <Route

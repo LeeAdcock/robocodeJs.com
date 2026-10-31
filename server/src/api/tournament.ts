@@ -2,10 +2,10 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import appService from '../services/AppService';
 import tournamentService, {
-  MAX_TOURNAMENTS_PER_USER,
   MAX_TOURNAMENT_MEMBERS,
   Tournament,
 } from '../services/TournamentService';
+import { MAX_TOURNAMENTS_PER_USER } from '../util/limits';
 import auth from '../middleware/auth';
 import { writeRateLimit } from '../middleware/rateLimit';
 import { ErrorCodes } from '../types/ErrorCodes';

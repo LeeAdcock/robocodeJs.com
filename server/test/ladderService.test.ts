@@ -1083,3 +1083,86 @@ describe('LadderService multi-runner safety', () => {
     expect(new Set(pair)).toEqual(new Set(['B', 'C']));
   });
 });
+
+describe('LadderService.adminSnapshot (admin panel, GitHub #469)', () => {
+  // Symmetric history fixture, as in the pair-saturation suite above.
+  const history = (pairs: { x: string; y: string; n: number; at?: Date }[]) =>
+    matchesForApp.mockImplementation(async (appId: string) =>
+      pairs.flatMap(({ x, y, n, at = new Date('2026-06-01') }) =>
+        appId === x || appId === y
+          ? Array.from({ length: n }, () => ({
+              opponentId: appId === x ? y : x,
+              at,
+            }))
+          : []
+      )
+    );
+
+  it('reports every unordered pairing with its count against the cap', async () => {
+    getCandidates.mockResolvedValue([
+      cand('a', 1600, 10),
+      cand('b', 1500, 10),
+      cand('c', 1400, 10),
+    ]);
+    history([
+      { x: 'a', y: 'b', n: 10 },
+      { x: 'a', y: 'c', n: 3 },
+    ]);
+
+    const snap = await ladderService.adminSnapshot();
+
+    expect(snap.config.pairMatchCap).toBe(10);
+    expect(snap.pool.map((p) => p.appId)).toEqual(['a', 'b', 'c']);
+    expect(snap.pairs).toEqual([
+      { appA: 'a', appB: 'b', matches: 10, saturated: true },
+      { appA: 'a', appB: 'c', matches: 3, saturated: false },
+      { appA: 'b', appB: 'c', matches: 0, saturated: false },
+    ]);
+  });
+
+  it('agrees with pickPair: a pair saturated in the snapshot is never picked', async () => {
+    getCandidates.mockResolvedValue([cand('a', 1500, 10), cand('b', 1500, 10)]);
+    history([{ x: 'a', y: 'b', n: 10 }]);
+
+    const snap = await ladderService.adminSnapshot();
+    expect(snap.pairs.every((p) => p.saturated)).toBe(true);
+    expect(await ladderService.pickPair()).toBeNull();
+  });
+
+  it('only counts matches since the later of the two apps’ edits', async () => {
+    const edited = new Date('2026-07-01');
+    getCandidates.mockResolvedValue([
+      cand('a', 1500, 10),
+      cand('b', 1500, 10, 'owner-b', '// b', edited),
+    ]);
+    history([
+      { x: 'a', y: 'b', n: 8, at: new Date('2026-06-01') }, // before b's edit
+      { x: 'a', y: 'b', n: 2, at: new Date('2026-08-01') }, // after
+    ]);
+
+    const snap = await ladderService.adminSnapshot();
+    expect(snap.pairs).toEqual([
+      { appA: 'a', appB: 'b', matches: 2, saturated: false },
+    ]);
+  });
+
+  it('drops untouched starters but keeps busy (claimed) apps in the pool', async () => {
+    getCandidates.mockResolvedValue([
+      cand('a', 1500, 10),
+      cand('b', 1500, 10),
+      cand('s', 1500, 0, 'owner-s', STARTER_BOTS[0].source),
+    ]);
+    claimedApps.mockResolvedValue(new Set(['a']));
+
+    const snap = await ladderService.adminSnapshot();
+    expect(snap.pool.map((p) => p.appId)).toEqual(['a', 'b']);
+    expect(snap.claimedAppIds).toEqual(['a']);
+  });
+
+  it('reports the loop as not running when it was never started here', async () => {
+    getCandidates.mockResolvedValue([]);
+    const snap = await ladderService.adminSnapshot();
+    expect(snap.loopRunning).toBe(false);
+    expect(snap.pairs).toEqual([]);
+  });
+});

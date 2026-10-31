@@ -34,9 +34,8 @@ vi.mock('../src/middleware/auth', () => ({
 
 import pool from '../src/util/db';
 import tournamentRouter from '../src/api/tournament';
-import tournamentService, {
-  MAX_TOURNAMENTS_PER_USER,
-} from '../src/services/TournamentService';
+import tournamentService from '../src/services/TournamentService';
+import { MAX_TOURNAMENTS_PER_USER } from '../src/util/limits';
 import appService from '../src/services/AppService';
 
 const ALICE = '11111111-1111-1111-1111-111111111111';
