@@ -9,9 +9,11 @@ import { logger } from './logger';
 //
 // In production the id and private IPv4 come from EC2 instance metadata
 // (IMDSv2), so they're stable for the instance's life and meaningful in the
-// console. Everywhere else, and if IMDS can't be reached, the id is synthetic
-// (hostname + pid, so two local processes never collide) and the address is
-// loopback.
+// console. Everywhere else the id is synthetic (hostname + pid, so two local
+// processes never collide) and the address is loopback. If IMDS can't be
+// reached in production, the id is synthetic but the address is the machine's
+// own private IPv4 (from its network interfaces), never loopback: another
+// instance that forwarded to 127.0.0.1 would be sending the request to itself.
 export interface InstanceIdentity {
   id: string;
   address: string;
@@ -26,6 +28,14 @@ export const localIdentity = (): InstanceIdentity => ({
   id: `local-${os.hostname()}-${process.pid}`,
   address: `http://127.0.0.1:${PORT}`,
 });
+
+// The first non-internal IPv4 address, or undefined if there is none.
+export const privateIpv4 = (
+  interfaces: ReturnType<typeof os.networkInterfaces> = os.networkInterfaces()
+): string | undefined =>
+  Object.values(interfaces)
+    .flat()
+    .find((addr) => addr && addr.family === 'IPv4' && !addr.internal)?.address;
 
 const readImds = async (
   fetchFn: typeof fetch
@@ -50,7 +60,8 @@ const readImds = async (
 
 export const resolveIdentity = async (
   production = process.env.NODE_ENV === 'production',
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
+  ip: () => string | undefined = privateIpv4
 ): Promise<InstanceIdentity> => {
   if (!production) return localIdentity();
   try {
@@ -59,9 +70,13 @@ export const resolveIdentity = async (
   } catch (err) {
     logger.warn({ err }, 'instance metadata lookup failed');
   }
-  const fallback = localIdentity();
+  const local = localIdentity();
+  const address = ip();
+  const fallback = address
+    ? { id: local.id, address: `http://${address}:${PORT}` }
+    : local;
   logger.warn(
-    { instanceId: fallback.id },
+    { instanceId: fallback.id, address: fallback.address },
     'no instance metadata; using a synthetic instance identity'
   );
   return fallback;

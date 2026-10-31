@@ -47,6 +47,10 @@ export class HomeService {
   // Set by releaseAll on shutdown so a late claim or renew can't re-take a
   // lease this instance has just handed back.
   private closed = false;
+  // Users currently found homed on another instance. A conflict is counted and
+  // logged once when it starts, not on every 10 s pass while it lasts, and ends
+  // when this instance claims the user or stops holding arenas for them.
+  private conflicted: Set<UserId> = new Set();
   private takeovers = 0;
   private conflicts = 0;
   private lost = 0;
@@ -112,10 +116,12 @@ export class HomeService {
           );
         }
         this.held.set(userId, home.epoch);
-      } else {
+        this.conflicted.delete(userId);
+      } else if (!this.conflicted.has(userId)) {
         // Without forwarding this instance serves the user anyway, so two
         // instances now hold arena state for them. Expected while an Immutable
         // deploy overlaps old and new; anything else is what phase 3 fixes.
+        this.conflicted.add(userId);
         this.conflicts++;
         logger.info(
           { event: LogEvent.HOME_CONFLICT, userId, home: home.instanceId },
@@ -133,27 +139,37 @@ export class HomeService {
   };
 
   // Bring the leases in line with the users this instance has arenas for:
-  // renew those, claim any it doesn't hold yet, and release the rest. Resolves
+  // renew those, claim any it doesn't hold yet, and release the rest.
+  // `owners` is a function rather than a snapshot because a user can come back
+  // while a pass is waiting on the database: it's re-read before each release
+  // and again before renewing, so an arena rebuilt mid-pass keeps (or re-takes)
+  // its lease instead of running unleased until the next pass. Resolves
   // to the users whose home was taken by another instance since the last
   // reconcile (counted and logged; nothing acts on it until forwarding lands).
   // A database error keeps every
   // lease as it was and reports nothing lost, because no other instance can
   // claim without the database either.
   reconcile = async (
-    wanted: Set<UserId>,
+    owners: () => Set<UserId>,
     now = Date.now()
   ): Promise<UserId[]> => {
     if (this.closed) return [];
     try {
       const me = await this.identity();
+      for (const userId of [...this.conflicted]) {
+        if (!owners().has(userId)) this.conflicted.delete(userId);
+      }
       for (const userId of [...this.held.keys()]) {
-        if (wanted.has(userId)) continue;
+        if (owners().has(userId)) continue;
         await pool.query({
           text: 'DELETE FROM user_home WHERE user_id = $1 AND instance_id = $2',
           values: [userId, me.id],
         });
         this.held.delete(userId);
       }
+      // Re-read after the releases: a user rebuilt while a delete was in
+      // flight is wanted again and gets re-claimed below.
+      const wanted = owners();
       if (wanted.size === 0) return [];
 
       // One statement renews every lease still ours. pg-mem has no working
@@ -203,6 +219,10 @@ export class HomeService {
   // Hand back every lease this instance holds, so returning users can be
   // placed on another instance straight away instead of after LEASE_MS. Called
   // at the start of graceful shutdown; nothing is claimed after it.
+  //
+  // Accepted race: a claim whose upsert is already on the wire when this runs
+  // can land after the delete and leave one row behind. Covering it would mean
+  // tracking every in-flight claim; the row just expires after LEASE_MS.
   releaseAll = async (): Promise<number> => {
     this.closed = true;
     const count = this.held.size;
@@ -221,12 +241,15 @@ export class HomeService {
 
   //   homeUsers       users whose home lease this instance holds
   //   leaseTakeovers  expired homes this instance took from another
-  //   leaseConflicts  claims that found another instance's live lease
+  //   leaseConflicts  times a user was found homed on another instance (once
+  //                   per episode, not per pass)
+  //   conflictedUsers users homed elsewhere that this instance also serves now
   //   leasesLost      leases another instance took from this one (still served here)
   metrics = () => ({
     homeUsers: this.held.size,
     leaseTakeovers: this.takeovers,
     leaseConflicts: this.conflicts,
+    conflictedUsers: this.conflicted.size,
     leasesLost: this.lost,
   });
 }

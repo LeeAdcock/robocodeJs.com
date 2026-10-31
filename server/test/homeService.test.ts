@@ -92,14 +92,14 @@ describe('HomeService.reconcile', () => {
     await a.claim(U1, T0);
     // Renewed at T0 + 20s, so the lease runs to T0 + 50s and b can't take it
     // at T0 + 40s, after the original expiry.
-    expect(await a.reconcile(new Set([U1]), T0 + 20_000)).toEqual([]);
+    expect(await a.reconcile(() => new Set([U1]), T0 + 20_000)).toEqual([]);
     await b.claim(U1, T0 + 40_000);
     expect(await holder(U1)).toEqual({ instanceId: 'a', epoch: 1 });
   });
 
   it('claims wanted users it has no lease for yet', async () => {
     const a = instance('a');
-    await a.reconcile(new Set([U1, U2]), T0);
+    await a.reconcile(() => new Set([U1, U2]), T0);
     expect(await holder(U1)).toMatchObject({ instanceId: 'a' });
     expect(await holder(U2)).toMatchObject({ instanceId: 'a' });
     expect(a.metrics().homeUsers).toBe(2);
@@ -109,7 +109,7 @@ describe('HomeService.reconcile', () => {
     const a = instance('a');
     await a.claim(U1, T0);
     await a.claim(U2, T0);
-    await a.reconcile(new Set([U2]), T0 + 10_000);
+    await a.reconcile(() => new Set([U2]), T0 + 10_000);
     expect(await holder(U1)).toBeNull();
     expect(await holder(U2)).toMatchObject({ instanceId: 'a' });
     expect(a.metrics().homeUsers).toBe(1);
@@ -121,7 +121,9 @@ describe('HomeService.reconcile', () => {
     await a.claim(U1, T0);
     // a stalls past expiry and b takes the user over.
     await b.claim(U1, T0 + LEASE_MS + 1);
-    expect(await a.reconcile(new Set([U1]), T0 + LEASE_MS + 2)).toEqual([U1]);
+    expect(await a.reconcile(() => new Set([U1]), T0 + LEASE_MS + 2)).toEqual([
+      U1,
+    ]);
     expect(a.metrics()).toMatchObject({ homeUsers: 0, leasesLost: 1 });
     expect(await holder(U1)).toMatchObject({ instanceId: 'b', epoch: 2 });
   });
@@ -130,7 +132,7 @@ describe('HomeService.reconcile', () => {
     const a = instance('a');
     const b = instance('b');
     await b.claim(U1, T0);
-    expect(await a.reconcile(new Set([U1]), T0 + 1000)).toEqual([]);
+    expect(await a.reconcile(() => new Set([U1]), T0 + 1000)).toEqual([]);
     expect(a.metrics()).toMatchObject({ leasesLost: 0, leaseConflicts: 1 });
   });
 
@@ -138,8 +140,62 @@ describe('HomeService.reconcile', () => {
     const a = instance('a');
     await a.claim(U1, T0);
     const spy = vi.spyOn(pool, 'query').mockRejectedValue(new Error('down'));
-    expect(await a.reconcile(new Set([U1]), T0 + 10_000)).toEqual([]);
+    expect(await a.reconcile(() => new Set([U1]), T0 + 10_000)).toEqual([]);
     spy.mockRestore();
+    expect(a.metrics().homeUsers).toBe(1);
+  });
+});
+
+describe('HomeService conflicts', () => {
+  it('counts and logs a conflict once per episode, not per pass', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    for (let i = 1; i <= 6; i++) {
+      await a.reconcile(() => new Set([U1]), T0 + i * 1000);
+    }
+    expect(a.metrics()).toMatchObject({
+      leaseConflicts: 1,
+      conflictedUsers: 1,
+    });
+  });
+
+  it('ends the episode when this instance stops serving the user', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    await a.claim(U1, T0);
+    await a.reconcile(() => new Set(), T0 + 10_000);
+    expect(a.metrics().conflictedUsers).toBe(0);
+    // A later conflict is a new episode.
+    await a.claim(U1, T0 + 20_000);
+    expect(a.metrics().leaseConflicts).toBe(2);
+  });
+
+  it('ends the episode when this instance takes the user over', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    await a.claim(U1, T0);
+    await a.claim(U1, T0 + LEASE_MS + 1);
+    expect(a.metrics()).toMatchObject({
+      conflictedUsers: 0,
+      homeUsers: 1,
+      leaseTakeovers: 1,
+    });
+  });
+});
+
+describe('HomeService.reconcile — user returns mid-release', () => {
+  it('keeps the lease of a user whose arena was rebuilt during the release', async () => {
+    const a = instance('a');
+    await a.claim(U1, T0);
+    // owners() reports no arenas when the pass decides to release, and the
+    // rebuilt arena by the time the delete has gone through.
+    let calls = 0;
+    const owners = () => (calls++ === 0 ? new Set<string>() : new Set([U1]));
+    await a.reconcile(owners, T0 + 10_000);
+    expect(await holder(U1)).toMatchObject({ instanceId: 'a' });
     expect(a.metrics().homeUsers).toBe(1);
   });
 });
@@ -155,7 +211,7 @@ describe('HomeService.releaseAll', () => {
     expect(await holder(U2)).toMatchObject({ instanceId: 'b' });
 
     expect(await a.claim(U1, T0 + 1000)).toBeNull();
-    expect(await a.reconcile(new Set([U1]), T0 + 1000)).toEqual([]);
+    expect(await a.reconcile(() => new Set([U1]), T0 + 1000)).toEqual([]);
     expect(await holder(U1)).toBeNull();
   });
 });

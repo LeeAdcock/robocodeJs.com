@@ -53,10 +53,12 @@ describe('EnvironmentService user homes', () => {
 
     await environmentService.reconcileHomes(1234);
 
-    expect(homeService.reconcile).toHaveBeenCalledWith(
-      new Set(['user-1', 'user-2']),
-      1234
-    );
+    const [owners, now] = vi.mocked(homeService.reconcile).mock.calls[0];
+    expect(now).toBe(1234);
+    // A live view of the store, not a snapshot: it is re-read mid-pass.
+    expect(owners()).toEqual(new Set(['user-1', 'user-2']));
+    store()['a4'] = fakeEnv('user-3');
+    expect(owners()).toEqual(new Set(['user-1', 'user-2', 'user-3']));
   });
 
   it("keeps serving a user whose home was lost; it's only counted", async () => {

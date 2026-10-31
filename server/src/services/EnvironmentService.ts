@@ -4,7 +4,7 @@ import arenaMemberService from './ArenaMemberService';
 import homeService from './HomeService';
 import { logger, LogEvent } from '../util/logger';
 import { recordSandboxStats } from '../util/awardAchievements';
-import { DEMO_USER_ID } from '../types/user';
+import { DEMO_USER_ID, UserId } from '../types/user';
 
 // How long a running arena may go with no viewers and no access before it is
 // paused (see pauseIdle). `0` disables idle pausing.
@@ -47,14 +47,15 @@ export class EnvironmentService {
     if (this.reconciling) return;
     this.reconciling = true;
     try {
-      const owners = new Set(
-        Object.values(this.store).map((env) => env.getArena().getUserId())
-      );
-      await homeService.reconcile(owners, now);
+      await homeService.reconcile(this.owners, now);
     } finally {
       this.reconciling = false;
     }
   };
+
+  // Users with at least one arena held on this instance.
+  owners = (): Set<UserId> =>
+    new Set(Object.values(this.store).map((env) => env.getArena().getUserId()));
 
   // Dispose environments that have been stopped for thirty minutes. Only a
   // stopped arena qualifies: stoppedAt is stamped at construction and on each

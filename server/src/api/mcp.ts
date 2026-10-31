@@ -1219,9 +1219,11 @@ export const buildServer = (user: User): McpServer => {
         'for (it holds their lease)\n' +
         '- `metrics.leaseTakeovers` / `metrics.leaseConflicts` / ' +
         '`metrics.leasesLost` — counts since this instance started: expired ' +
-        'homes it took over, users it found already homed on another instance ' +
-        '(normal briefly during a deploy), and homes another instance took ' +
-        'from it\n' +
+        'homes it took over, times it found a user it serves already homed on ' +
+        'another instance (normal briefly during a deploy), and homes another ' +
+        'instance took from it\n' +
+        '- `metrics.conflictedUsers` — users this instance serves right now ' +
+        'whose home is another instance\n' +
         '- `metrics.rssMB` / `metrics.heapUsedMB` — the whole server process’s ' +
         'resident and heap memory, in MB, for this instance',
       inputSchema: {},
