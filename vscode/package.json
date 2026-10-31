@@ -2,7 +2,7 @@
   "name": "robocodejs",
   "displayName": "RobocodeJs",
   "description": "Write, check and run your RobocodeJs tank apps from VS Code.",
-  "version": "1.2.142",
+  "version": "1.2.143",
   "publisher": "robocode-js",
   "icon": "media/icon.png",
   "private": true,
