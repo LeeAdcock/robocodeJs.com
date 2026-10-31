@@ -44,12 +44,12 @@ export const isAdmin = (user: User | undefined): boolean => {
 // would have handled an unknown path, so the admin API is indistinguishable
 // from a route that doesn't exist.
 //
-// Non-admin hits are deliberately NOT logged as auth.forbidden. The UI's
-// navbar asks /api/admin/me on every page load for every signed-in user, so
-// that event would fire constantly and trip the robocodejs-auth-forbidden
-// alarm (>= 5 in 5 min), burying the real cross-user-probing signal it exists
-// for. A debug line with no `event` field keeps it visible locally without
-// feeding any metric filter.
+// Non-admin hits are deliberately NOT logged as auth.forbidden. That event
+// (and its robocodejs-auth-forbidden alarm, >= 5 in 5 min) means one user
+// acting on another user's resource; a signed-in user opening /admin, or a
+// scanner trying the path, is not that, and would only bury the real signal.
+// A debug line with no `event` field keeps it visible locally without feeding
+// any metric filter.
 export const requireAdmin = (
   req: Request,
   _res: Response,

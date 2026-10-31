@@ -8,9 +8,10 @@ import OverviewTab from './overviewTab';
 import UsersTab from './usersTab';
 import LadderTab from './ladderTab';
 
-// The admin control panel (GitHub #469). Lazy-loaded, so none of this ships in
-// the bundle ordinary visitors download, and left out of the server's SEO pages
-// and sitemap.
+// The admin control panel (GitHub #469). Reached only by typing /admin: nothing
+// in the app links here. Lazy-loaded, so none of this ships in the bundle
+// ordinary visitors download, and left out of the server's SEO pages and
+// sitemap.
 //
 // To anyone who isn't an admin it's the ordinary "Page not found" page: the
 // server answers a non-admin's /api/admin/me exactly like an unknown path, and

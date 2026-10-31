@@ -12,7 +12,6 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 import axios from 'axios';
 import AdminPage from '../src/page/admin/adminPage';
-import NavBar from '../src/components/navbar';
 import { fetchIsAdmin, timeAgo } from '../src/util/admin';
 
 // The admin panel (GitHub #469). The server never tells a non-admin "no": it
@@ -331,57 +330,6 @@ describe('AdminPage tabs', () => {
       screen.getAllByText('Broken (crashed in a ranked match)').length
     ).toBeGreaterThan(0);
     expect(screen.getByText('stopped')).toBeTruthy();
-  });
-});
-
-describe('NavBar admin link', () => {
-  const baseProps: any = {
-    apps: [],
-    user: { id: 'u1', name: 'Ada', picture: '', email: '', apps: [] },
-    arena: { clock: { time: 0 }, apps: [] },
-    isPaused: true,
-    doPause: () => undefined,
-    doResume: () => undefined,
-    doRestart: () => undefined,
-    doSave: () => undefined,
-    doCreateApp: () => undefined,
-  };
-  const open = () =>
-    fireEvent.click(document.getElementById('user-nav-dropdown')!);
-
-  it('appears once the server confirms an admin', async () => {
-    serve('json');
-    render(
-      <MemoryRouter>
-        <NavBar {...baseProps} />
-      </MemoryRouter>
-    );
-    await waitFor(() => expect(get).toHaveBeenCalledWith('/api/admin/me'));
-    open();
-    expect(await screen.findByText('Admin')).toBeTruthy();
-  });
-
-  it('stays hidden for a non-admin', async () => {
-    serve('shell');
-    render(
-      <MemoryRouter>
-        <NavBar {...baseProps} />
-      </MemoryRouter>
-    );
-    await waitFor(() => expect(get).toHaveBeenCalledWith('/api/admin/me'));
-    open();
-    expect(await screen.findByText('Your badges')).toBeTruthy();
-    expect(screen.queryByText('Admin')).toBeNull();
-  });
-
-  it('never probes while signed out', () => {
-    serve('json');
-    render(
-      <MemoryRouter>
-        <NavBar {...baseProps} user={null} />
-      </MemoryRouter>
-    );
-    expect(get).not.toHaveBeenCalledWith('/api/admin/me');
   });
 });
 

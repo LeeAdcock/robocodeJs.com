@@ -160,8 +160,8 @@ describe('admin gate', () => {
   });
 
   it('never logs a non-admin as auth.forbidden (it would page the security alarm)', async () => {
-    // The navbar probes /api/admin/me on every signed-in page load, so a
-    // security event here would trip robocodejs-auth-forbidden (>= 5 in 5 min).
+    // auth.forbidden feeds the robocodejs-auth-forbidden alarm (>= 5 in 5 min),
+    // which is for cross-user access; a non-admin opening /admin isn't that.
     const spies = (['warn', 'error', 'info'] as const).map((l) =>
       vi.spyOn(logger, l)
     );

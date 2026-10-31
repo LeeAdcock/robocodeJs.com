@@ -22,25 +22,6 @@ export const fetchIsAdmin = async (): Promise<boolean> => {
   }
 };
 
-// Probe once per signed-in user; false while signed out or still checking.
-export const useIsAdmin = (userId: string | undefined | null): boolean => {
-  const [admin, setAdmin] = useState(false);
-  useEffect(() => {
-    if (!userId) {
-      setAdmin(false);
-      return;
-    }
-    let cancelled = false;
-    void fetchIsAdmin().then((ok) => {
-      if (!cancelled) setAdmin(ok);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-  return admin;
-};
-
 // GET an admin endpoint, rejecting anything that isn't a JSON object (see above).
 export const adminGet = async <T>(
   path: string,
