@@ -47,8 +47,6 @@ Each lesson is short and builds on the one before it. By the end you'll be able 
 17. [Build an app with AI](/learn/mcp-build): creating, checking, and improving an app through MCP
 18. [Test your app with AI](/learn/mcp-test): running matches, comparing versions with seeds, and debugging losses
 
-> **Part 5 is optional.** It's for after you can write a bot yourself: the AI is a faster pair of hands, and you'll get far more out of it once you understand the code it writes.
-
 ---
 
 When you finish, the [full reference docs](/learn/docs) and the [example bots](/examples) are great places to keep growing. That's all ahead of you, though. For now, take the first step: [start Lesson 1 →](/learn/hello)
