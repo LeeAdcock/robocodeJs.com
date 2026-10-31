@@ -47,13 +47,14 @@ export default function TournamentsPanel(props: { signedIn: boolean }) {
   };
 
   return (
-    <section style={{ marginTop: 32 }}>
-      <h2 style={{ fontSize: '1.3em' }}>Personal tournaments</h2>
+    // Its own .markdown block (outside the board's padded container) so the
+    // heading gets the same grass-tile h1 treatment as the page title and the
+    // prose lines up with the intro above.
+    <section className="markdown" style={{ marginTop: 32 }}>
+      <h1>Personal tournaments</h1>
       <p>
-        Rank your bots against just your friends, class, or club. A personal
-        tournament uses the same global ratings shown above, filtered to the
-        bots of the people who join. Create one and share its link. Anyone with
-        the link can view it, and joining adds all of your bots.
+        Rank your bots against just your friends, class, or club. Create a
+        tournament, then share its link to invite others.
       </p>
 
       {!props.signedIn && <p>Sign in (top right) to create or join one.</p>}
@@ -75,7 +76,13 @@ export default function TournamentsPanel(props: { signedIn: boolean }) {
 
       {props.signedIn && (
         <form
-          style={{ display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 520 }}
+          style={{
+            display: 'flex',
+            gap: 8,
+            flexWrap: 'wrap',
+            maxWidth: 540,
+            paddingLeft: 20,
+          }}
           onSubmit={(e) => {
             e.preventDefault();
             void create();
