@@ -36,6 +36,12 @@
     "summary": "The sandbox is sealed, and yet the bot turns. The bridge that lets a bot’s requests through the wall without letting anything else through."
   },
   {
+    "slug": "personal-tournaments",
+    "title": "A leaderboard of your own",
+    "date": "2026-11-24",
+    "summary": "Personal tournaments are live: a named, link-shared leaderboard that ranks only the bots of the people you invite. How they work, why they run no matches of their own, and how to set one up for a class, a club, or a group chat."
+  },
+  {
     "slug": "running-strangers-code",
     "title": "How do you let strangers run code on your server?",
     "date": "2026-11-10",
