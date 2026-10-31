@@ -77,6 +77,12 @@ export default function CodeEditor(props: CodeEditorProps) {
   const compileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
+  // react-ace binds `commands` once, on mount, and never re-binds them, so a
+  // command closing over `props` would run the FIRST render's handlers forever.
+  // For save that meant Ctrl-S persisted the initial empty buffer over the
+  // user's code. Commands therefore read the latest props through this ref.
+  const latest = useRef(props);
+  latest.current = props;
 
   // Mark a server-reported crash line in the gutter (same shape as the local
   // syntax-error annotation) and scroll to it. Editing clears the fault upstream,
@@ -140,40 +146,40 @@ export default function CodeEditor(props: CodeEditorProps) {
         {
           name: 'save',
           bindKey: { win: 'Ctrl-S', mac: 'Cmd-S' },
-          exec: () => props.doExecute(),
+          exec: () => latest.current.doExecute(),
         },
         {
           // Shift-save: save and reboot (re-run START) in one keystroke.
           name: 'saveAndReboot',
           bindKey: { win: 'Ctrl-Shift-S', mac: 'Cmd-Shift-S' },
-          exec: () => props.doReboot(),
+          exec: () => latest.current.doReboot(),
         },
         {
           name: 'clean',
           bindKey: { win: 'Ctrl-R', mac: 'Cmd-R' },
-          exec: () => props.doClean(),
+          exec: () => latest.current.doClean(),
         },
         {
           // Dry-run compile / check for errors.
           name: 'check',
           bindKey: { win: 'Ctrl-Enter', mac: 'Cmd-Enter' },
-          exec: () => props.doCheck(),
+          exec: () => latest.current.doCheck(),
         },
         {
           name: 'zoomIn',
           // Both '=' and '+' so it works with and without Shift.
           bindKey: { win: 'Ctrl-=|Ctrl-+', mac: 'Cmd-=|Cmd-+' },
-          exec: () => props.doZoomIn(),
+          exec: () => latest.current.doZoomIn(),
         },
         {
           name: 'zoomOut',
           bindKey: { win: 'Ctrl--', mac: 'Cmd--' },
-          exec: () => props.doZoomOut(),
+          exec: () => latest.current.doZoomOut(),
         },
         {
           name: 'zoomReset',
           bindKey: { win: 'Ctrl-0', mac: 'Cmd-0' },
-          exec: () => props.doZoomReset(),
+          exec: () => latest.current.doZoomReset(),
         },
       ]}
       onChange={(source) => {
