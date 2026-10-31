@@ -90,4 +90,32 @@ describe('rate limiting', () => {
       200
     );
   });
+
+  it('an edgeOnly limiter skips requests forwarded by another instance (#444)', async () => {
+    const { makeLimiter } = await import('../src/middleware/rateLimit');
+    const { markForwarded } = await import('../src/util/forwarded');
+    const limiter = makeLimiter('test-edge', {
+      windowMs: 60_000,
+      limit: 1,
+      edgeOnly: true,
+    });
+
+    const app = express();
+    app.use((req, _res, next) => {
+      if (req.headers['x-test-forwarded']) markForwarded(req, 'edge');
+      next();
+    });
+    app.get('/ping', limiter, (_req, res) => {
+      res.status(200).send('ok');
+    });
+    const agent = request(app);
+
+    expect((await agent.get('/ping')).status).toBe(200);
+    // Over budget for a direct request...
+    expect((await agent.get('/ping')).status).toBe(429);
+    // ...but a forwarded one was already counted at the edge.
+    expect((await agent.get('/ping').set('x-test-forwarded', '1')).status).toBe(
+      200
+    );
+  });
 });

@@ -1,5 +1,6 @@
 import environmentService from '../services/EnvironmentService';
 import homeService from '../services/HomeService';
+import { forwardMetrics } from './forwarded';
 
 // Point-in-time operational gauges shared by the /health endpoint and the
 // periodic metrics log heartbeat. Deliberately cheap — one O(arenas)
@@ -13,6 +14,7 @@ export const collectMetrics = () => {
   return {
     ...environmentService.metrics(),
     ...homeService.metrics(),
+    ...forwardMetrics(),
     rssMB: Math.round(mem.rss / MB),
     heapUsedMB: Math.round(mem.heapUsed / MB),
   };

@@ -11,7 +11,11 @@ vi.mock('../src/util/db', async () => {
 });
 
 import pool from '../src/util/db';
-import { HomeService, LEASE_MS } from '../src/services/HomeService';
+import {
+  HomeService,
+  LEASE_MS,
+  REMOTE_CACHE_MS,
+} from '../src/services/HomeService';
 
 const U1 = '11111111-1111-1111-1111-111111111111';
 const U2 = '22222222-2222-2222-2222-222222222222';
@@ -197,6 +201,59 @@ describe('HomeService.reconcile — user returns mid-release', () => {
     await a.reconcile(owners, T0 + 10_000);
     expect(await holder(U1)).toMatchObject({ instanceId: 'a' });
     expect(a.metrics().homeUsers).toBe(1);
+  });
+});
+
+describe('HomeService.resolve', () => {
+  it('answers from memory for a user homed here', async () => {
+    const a = instance('a');
+    await a.claim(U1, T0);
+    const spy = vi.spyOn(pool, 'query');
+    expect(await a.resolve(U1, T0 + 1000)).toMatchObject({
+      instanceId: 'a',
+      local: true,
+    });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('claims a user nobody holds', async () => {
+    const a = instance('a');
+    expect(await a.resolve(U1, T0)).toMatchObject({ local: true });
+    expect(await holder(U1)).toMatchObject({ instanceId: 'a' });
+  });
+
+  it('caches a remote home briefly, and forget drops it', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    expect(await a.resolve(U1, T0)).toMatchObject({
+      instanceId: 'b',
+      address: 'http://b:8080',
+      local: false,
+    });
+
+    const spy = vi.spyOn(pool, 'query');
+    await a.resolve(U1, T0 + REMOTE_CACHE_MS - 1);
+    expect(spy).not.toHaveBeenCalled();
+    a.forget(U1);
+    await a.resolve(U1, T0 + REMOTE_CACHE_MS - 1);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('looks again once the cache expires, and follows a takeover', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    const c = instance('c');
+    await b.claim(U1, T0);
+    await a.resolve(U1, T0);
+    // b dies; c takes the user over after the lease lapses.
+    await c.claim(U1, T0 + LEASE_MS + 1);
+    expect(await a.resolve(U1, T0 + LEASE_MS + 2)).toMatchObject({
+      instanceId: 'c',
+      epoch: 2,
+    });
   });
 });
 

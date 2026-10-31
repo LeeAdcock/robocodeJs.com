@@ -61,15 +61,29 @@ describe('EnvironmentService user homes', () => {
     expect(owners()).toEqual(new Set(['user-1', 'user-2', 'user-3']));
   });
 
-  it("keeps serving a user whose home was lost; it's only counted", async () => {
-    const mine = fakeEnv('user-1');
-    store()['a1'] = mine;
+  it("drops every arena of a user whose home was lost, and no one else's", async () => {
+    const mine1 = fakeEnv('user-1');
+    const mine2 = fakeEnv('user-1');
+    const other = fakeEnv('user-2');
+    store()['a1'] = mine1;
+    store()['a2'] = mine2;
+    store()['a3'] = other;
     vi.mocked(homeService.reconcile).mockResolvedValueOnce(['user-1']);
 
     await environmentService.reconcileHomes();
 
-    expect(mine.dispose).not.toHaveBeenCalled();
-    expect(Object.keys(store())).toEqual(['a1']);
+    expect(mine1.dispose).toHaveBeenCalledOnce();
+    expect(mine2.dispose).toHaveBeenCalledOnce();
+    expect(other.dispose).not.toHaveBeenCalled();
+    expect(Object.keys(store())).toEqual(['a3']);
+  });
+
+  it('a disposed arena tells its SSE streams to end', async () => {
+    const env = await environmentService.get(new Arena('arena-9', 'user-9'));
+    const end = vi.fn();
+    env.addListener('disposed', end);
+    await environmentService.dispose('arena-9');
+    expect(end).toHaveBeenCalledOnce();
   });
 
   it('skips a pass while the previous one is still waiting on the database', async () => {

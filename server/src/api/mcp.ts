@@ -1224,6 +1224,11 @@ export const buildServer = (user: User): McpServer => {
         'instance took from it\n' +
         '- `metrics.conflictedUsers` — users this instance serves right now ' +
         'whose home is another instance\n' +
+        '- `metrics.forwardedRequests` / `metrics.forwardFailures` / ' +
+        '`metrics.misdirectedRequests` — counts since this instance started: ' +
+        'requests it passed to a user’s home instance, forwards that failed ' +
+        '(the client got a 503 and should retry), and forwarded requests it ' +
+        'turned away because the user had moved\n' +
         '- `metrics.rssMB` / `metrics.heapUsedMB` — the whole server process’s ' +
         'resident and heap memory, in MB, for this instance',
       inputSchema: {},

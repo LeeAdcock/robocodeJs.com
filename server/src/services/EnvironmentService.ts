@@ -38,16 +38,19 @@ export class EnvironmentService {
   }
 
   // Keep this instance's home leases (GitHub #444) matching the users it holds
-  // arenas for: renew them, and release users whose last arena the GC just
-  // collected. A user whose home another instance took over is only counted and
-  // logged (by HomeService) and keeps being served here: with nothing routed on
-  // the leases yet, dropping their arenas would just rebuild them on the next
-  // request. Skipped while a previous pass is still waiting on the database.
+  // arenas for: renew them, release users whose last arena the GC just
+  // collected, and drop the arenas of any user whose home another instance took
+  // over. Their requests are forwarded to the new home from then on, so the
+  // copies here would only keep stale SSE viewers on a match nobody is
+  // driving; dropping them closes those streams and the browsers reconnect
+  // through the new home. Skipped while a previous pass is still waiting on
+  // the database.
   reconcileHomes = async (now = Date.now()): Promise<void> => {
     if (this.reconciling) return;
     this.reconciling = true;
     try {
-      await homeService.reconcile(this.owners, now);
+      const lost = await homeService.reconcile(this.owners, now);
+      lost.forEach((userId) => this.disposeUser(userId));
     } finally {
       this.reconciling = false;
     }
@@ -196,6 +199,19 @@ export class EnvironmentService {
       env.dispose();
     }
     return Promise.resolve();
+  };
+
+  // Tears down every arena a user owns on this instance. Used when another
+  // instance has taken over the user's home, so it holds their arenas now.
+  disposeUser = (userId: UserId): number => {
+    const arenaIds = (Object.entries(this.store) as [ArenaId, Environment][])
+      .filter(([, env]) => env.getArena().getUserId() === userId)
+      .map(([arenaId]) => arenaId);
+    arenaIds.forEach((arenaId) => {
+      this.store[arenaId].pause();
+      void this.dispose(arenaId);
+    });
+    return arenaIds.length;
   };
 
   // Tears down every live environment (pausing its tick loop first, then

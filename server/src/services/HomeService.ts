@@ -32,6 +32,10 @@ Promise.resolve(
 ).catch(() => undefined);
 
 export const LEASE_MS = 30_000;
+// How long an edge trusts a looked-up remote home before asking again. A stale
+// entry costs one misdirected forward (421, then a fresh lookup), so this only
+// bounds how often an edge hits the database for a user homed elsewhere.
+export const REMOTE_CACHE_MS = 5_000;
 
 export interface Home {
   userId: UserId;
@@ -51,6 +55,8 @@ export class HomeService {
   // logged once when it starts, not on every 10 s pass while it lasts, and ends
   // when this instance claims the user or stops holding arenas for them.
   private conflicted: Set<UserId> = new Set();
+  // Homes found on other instances, cached briefly for forwarding decisions.
+  private remote: Map<UserId, { home: Home; until: number }> = new Map();
   private takeovers = 0;
   private conflicts = 0;
   private lost = 0;
@@ -138,6 +144,40 @@ export class HomeService {
     }
   };
 
+  // Where should a request for this user be served? Local if this instance
+  // holds the lease (no database round trip); a recently seen remote home from
+  // the cache; otherwise claim, which takes the home if it's free or expired
+  // and reports the holder if not. Resolves to null when the database couldn't
+  // say, which callers treat as "serve locally".
+  resolve = async (userId: UserId, now = Date.now()): Promise<Home | null> => {
+    const epoch = this.held.get(userId);
+    if (epoch !== undefined) {
+      const me = await this.identity();
+      return {
+        userId,
+        instanceId: me.id,
+        address: me.address,
+        epoch,
+        local: true,
+      };
+    }
+    const cached = this.remote.get(userId);
+    if (cached && cached.until > now) return cached.home;
+    const home = await this.claim(userId, now);
+    if (home && !home.local) {
+      this.remote.set(userId, { home, until: now + REMOTE_CACHE_MS });
+    } else {
+      this.remote.delete(userId);
+    }
+    return home;
+  };
+
+  // Drop a cached remote home, after it answered 421 (it no longer holds the
+  // user) or couldn't be reached.
+  forget = (userId: UserId): void => {
+    this.remote.delete(userId);
+  };
+
   // Bring the leases in line with the users this instance has arenas for:
   // renew those, claim any it doesn't hold yet, and release the rest.
   // `owners` is a function rather than a snapshot because a user can come back
@@ -145,8 +185,8 @@ export class HomeService {
   // and again before renewing, so an arena rebuilt mid-pass keeps (or re-takes)
   // its lease instead of running unleased until the next pass. Resolves
   // to the users whose home was taken by another instance since the last
-  // reconcile (counted and logged; nothing acts on it until forwarding lands).
-  // A database error keeps every
+  // reconcile; the caller drops their local arenas, since requests for them
+  // now go to the new home. A database error keeps every
   // lease as it was and reports nothing lost, because no other instance can
   // claim without the database either.
   reconcile = async (
@@ -205,7 +245,7 @@ export class HomeService {
           lost.push(userId);
           logger.warn(
             { event: LogEvent.HOME_LOST, userId, home: home.instanceId },
-            'user home was taken by another instance; still serving locally'
+            'user home was taken by another instance'
           );
         }
       }
@@ -244,7 +284,7 @@ export class HomeService {
   //   leaseConflicts  times a user was found homed on another instance (once
   //                   per episode, not per pass)
   //   conflictedUsers users homed elsewhere that this instance also serves now
-  //   leasesLost      leases another instance took from this one (still served here)
+  //   leasesLost      leases another instance took from this one
   metrics = () => ({
     homeUsers: this.held.size,
     leaseTakeovers: this.takeovers,

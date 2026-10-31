@@ -54,6 +54,8 @@ export const LogEvent = {
   HOME_TAKEOVER: 'home.takeover', // this instance took over a user home whose lease had expired
   HOME_LOST: 'home.lost', // another instance took a user home this one held; its local arenas are dropped
   HOME_ERROR: 'home.error', // a home lease claim/renew/release failed (served locally regardless)
+  FORWARD_FAILED: 'forward.failed', // proxying a request to the user's home instance failed (unreachable, or died mid-request)
+  FORWARD_REJECTED: 'forward.rejected', // a request carried a forwarding marker whose signature didn't verify (forged, stale, or a secret mismatch)
   ASSET_MISSING: 'asset.missing', // a subresource 404'd — usually a browser on a previous deploy asking for a stale hashed chunk
 } as const;
 
