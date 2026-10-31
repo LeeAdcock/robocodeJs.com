@@ -284,3 +284,65 @@ describe('parseIdlePauseMs', () => {
     expect(parseIdlePauseMs('60000')).toBe(60000);
   });
 });
+
+// The 30-minute GC. stoppedAt is stamped at construction and on each stop but
+// never cleared on resume, so the GC must check that an arena is actually
+// stopped — it used to dispose arenas played continuously for 30 minutes.
+describe('EnvironmentService.collectGarbage', () => {
+  const MIN = 60 * 1000;
+  const store = () =>
+    environmentService.store as unknown as Record<string, unknown>;
+  const clear = () => Object.keys(store()).forEach((k) => delete store()[k]);
+  const fake = (state: {
+    running: boolean;
+    looping?: boolean;
+    stoppedMinsAgo: number;
+  }) => ({
+    isRunning: () => state.running,
+    isLooping: () => state.looping ?? false,
+    isIdlePaused: () => false,
+    stoppedAt: new Date(Date.now() - state.stoppedMinsAgo * MIN),
+    dispose: vi.fn(),
+  });
+
+  beforeEach(clear);
+
+  it('disposes an arena stopped for over thirty minutes', () => {
+    const env = fake({ running: false, stoppedMinsAgo: 31 });
+    store()['stale'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).toHaveBeenCalledOnce();
+    expect(environmentService.has('stale')).toBe(false);
+  });
+
+  it('keeps an arena stopped more recently', () => {
+    const env = fake({ running: false, stoppedMinsAgo: 29 });
+    store()['recent'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).not.toHaveBeenCalled();
+    expect(environmentService.has('recent')).toBe(true);
+  });
+
+  it('never disposes a running arena, however old its stoppedAt', () => {
+    const env = fake({ running: true, stoppedMinsAgo: 120 });
+    store()['live'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).not.toHaveBeenCalled();
+    expect(environmentService.has('live')).toBe(true);
+  });
+
+  it('waits for a paused arena’s in-flight tick to drain', () => {
+    const env = fake({ running: false, looping: true, stoppedMinsAgo: 31 });
+    store()['draining'] = env;
+
+    environmentService.collectGarbage();
+
+    expect(env.dispose).not.toHaveBeenCalled();
+  });
+});

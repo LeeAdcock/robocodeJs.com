@@ -33,12 +33,21 @@ export class EnvironmentService {
     }, 10000);
   }
 
-  // Dispose environments that have been stopped for thirty minutes.
+  // Dispose environments that have been stopped for thirty minutes. Only a
+  // stopped arena qualifies: stoppedAt is stamped at construction and on each
+  // stop but never cleared on resume, so without the running/looping guard an
+  // arena played continuously for thirty minutes was disposed mid-match — its
+  // isolates released under a live tick loop, every bot faulting, and the next
+  // request rebuilding a fresh, paused arena in its place.
   collectGarbage = (now = Date.now()) => {
     const threshold = now - 30 * 60 * 1000; // thirty minutes ago
     (Object.entries(this.store) as [ArenaId, Environment][]).forEach(
       ([arenaId, env]) => {
-        if (env.stoppedAt && threshold > env.stoppedAt.getTime()) {
+        if (
+          !env.isRunning() &&
+          !env.isLooping() &&
+          threshold > env.stoppedAt.getTime()
+        ) {
           logger.debug({ arenaId }, 'disposing idle isolate (GC)');
           if (env.isIdlePaused()) this.wakeOnLoad.add(arenaId);
           delete this.store[arenaId];

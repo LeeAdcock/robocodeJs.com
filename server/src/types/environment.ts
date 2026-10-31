@@ -763,6 +763,9 @@ export default class Environment {
         type: 'arenaPaused',
       });
       this.running = false;
+      // Start the GC's 30-minute clock now, so a finished match stays viewable
+      // rather than being collected at once on the construction-time stamp.
+      this.stoppedAt = new Date();
       // The one moment a sandbox match actually ends, so bank its totals now
       // rather than waiting for a restart or the idle GC.
       this.flushStats();
