@@ -1,0 +1,274 @@
+{
+  "name": "robocodejs",
+  "displayName": "RobocodeJs",
+  "description": "Write, check and run your RobocodeJs tank apps from VS Code.",
+  "version": "0.2.0",
+  "publisher": "robocode-js",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeeAdcock/robocodeJs.com.git",
+    "directory": "vscode"
+  },
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Education"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "configuration": {
+      "title": "RobocodeJs",
+      "properties": {
+        "robocodejs.serverUrl": {
+          "type": "string",
+          "default": "https://robocodejs.com",
+          "description": "The RobocodeJs server to connect to. Use http://localhost:5000 for local development."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "robocodejs",
+          "title": "RobocodeJs",
+          "icon": "media/tank.svg"
+        }
+      ]
+    },
+    "views": {
+      "robocodejs": [
+        {
+          "id": "robocodejs.apps",
+          "name": "Apps"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "robocodejs.apps",
+        "contents": "Sign in to RobocodeJs to edit your apps here.\n[Sign in](command:robocodejs.signIn)",
+        "when": "!robocodejs.signedIn"
+      },
+      {
+        "view": "robocodejs.apps",
+        "contents": "You have no apps yet.\n[New app](command:robocodejs.newApp)",
+        "when": "robocodejs.signedIn"
+      }
+    ],
+    "commands": [
+      {
+        "command": "robocodejs.signIn",
+        "title": "Sign In",
+        "category": "RobocodeJs"
+      },
+      {
+        "command": "robocodejs.signOut",
+        "title": "Sign Out",
+        "category": "RobocodeJs"
+      },
+      {
+        "command": "robocodejs.refresh",
+        "title": "Refresh Apps",
+        "category": "RobocodeJs",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "robocodejs.newApp",
+        "title": "New App",
+        "category": "RobocodeJs",
+        "icon": "$(add)"
+      },
+      {
+        "command": "robocodejs.openApp",
+        "title": "Open App",
+        "category": "RobocodeJs"
+      },
+      {
+        "command": "robocodejs.check",
+        "title": "Check App",
+        "category": "RobocodeJs",
+        "icon": "$(check)"
+      },
+      {
+        "command": "robocodejs.format",
+        "title": "Format App",
+        "category": "RobocodeJs"
+      },
+      {
+        "command": "robocodejs.compile",
+        "title": "Compile App",
+        "category": "RobocodeJs",
+        "icon": "$(play)"
+      },
+      {
+        "command": "robocodejs.reboot",
+        "title": "Reboot App",
+        "category": "RobocodeJs",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "robocodejs.watchArena",
+        "title": "Watch Arena",
+        "category": "RobocodeJs",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "robocodejs.showLogs",
+        "title": "Show Bot Logs",
+        "category": "RobocodeJs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "robocodejs.runMatch",
+        "title": "Run Match",
+        "category": "RobocodeJs",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "robocodejs.watchArenaInBrowser",
+        "title": "Watch Arena in Browser",
+        "category": "RobocodeJs",
+        "icon": "$(link-external)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "robocodejs.runMatch",
+          "when": "view == robocodejs.apps && robocodejs.signedIn",
+          "group": "navigation@0"
+        },
+        {
+          "command": "robocodejs.watchArena",
+          "when": "view == robocodejs.apps && robocodejs.signedIn",
+          "group": "navigation@1"
+        },
+        {
+          "command": "robocodejs.newApp",
+          "when": "view == robocodejs.apps && robocodejs.signedIn",
+          "group": "navigation@2"
+        },
+        {
+          "command": "robocodejs.refresh",
+          "when": "view == robocodejs.apps && robocodejs.signedIn",
+          "group": "navigation@3"
+        },
+        {
+          "command": "robocodejs.signOut",
+          "when": "view == robocodejs.apps && robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.showLogs",
+          "when": "view == robocodejs.apps && robocodejs.signedIn"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "robocodejs.compile",
+          "when": "view == robocodejs.apps && viewItem == app",
+          "group": "inline@1"
+        },
+        {
+          "command": "robocodejs.reboot",
+          "when": "view == robocodejs.apps && viewItem == app",
+          "group": "inline@2"
+        },
+        {
+          "command": "robocodejs.check",
+          "when": "view == robocodejs.apps && viewItem == app"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "robocodejs.compile",
+          "when": "robocodejs.appEditor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "robocodejs.reboot",
+          "when": "robocodejs.appEditor",
+          "group": "navigation@2"
+        },
+        {
+          "command": "robocodejs.showLogs",
+          "when": "robocodejs.appEditor",
+          "group": "navigation@3"
+        },
+        {
+          "command": "robocodejs.watchArenaInBrowser",
+          "when": "activeWebviewPanelId == 'robocodejs.arena'",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "robocodejs.openApp",
+          "when": "false"
+        },
+        {
+          "command": "robocodejs.check",
+          "when": "robocodejs.appEditor"
+        },
+        {
+          "command": "robocodejs.format",
+          "when": "robocodejs.appEditor"
+        },
+        {
+          "command": "robocodejs.compile",
+          "when": "robocodejs.appEditor"
+        },
+        {
+          "command": "robocodejs.reboot",
+          "when": "robocodejs.appEditor"
+        },
+        {
+          "command": "robocodejs.showLogs",
+          "when": "robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.runMatch",
+          "when": "robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.watchArenaInBrowser",
+          "when": "robocodejs.signedIn"
+        }
+      ]
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "robocodejs",
+        "label": "RobocodeJs"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc --noEmit && node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "lint": "prettier --write src test && eslint --fix src test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "tsc --noEmit && node esbuild.mjs --production && cp ../LICENSE . && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@types/vscode": "~1.101.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.0"
+  }
+}

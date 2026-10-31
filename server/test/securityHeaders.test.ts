@@ -13,6 +13,9 @@ describe('security headers', () => {
   app.get('/x', (_req, res) => {
     res.send('ok');
   });
+  app.get('/watch/:arenaId', (_req, res) => {
+    res.send('arena');
+  });
 
   it('sets the core hardening headers', async () => {
     const res = await request(app).get('/x');
@@ -51,5 +54,64 @@ describe('security headers', () => {
       .find((d) => d.startsWith('script-src'));
     expect(scriptSrc).toBeDefined();
     expect(scriptSrc).not.toContain("'unsafe-inline'");
+  });
+});
+
+// The spectator page is framed by the VS Code extension's arena panel. Only
+// that page, and only by VS Code's own origins.
+describe('security headers on /watch', () => {
+  const app = express();
+  app.use(securityHeaders);
+  app.get('/x', (_req, res) => {
+    res.send('ok');
+  });
+  app.get('/watch/:arenaId', (_req, res) => {
+    res.send('arena');
+  });
+  app.get('/watchlist', (_req, res) => {
+    res.send('not the watch page');
+  });
+
+  const frameAncestors = (csp: string) =>
+    csp
+      .split(';')
+      .map((d) => d.trim())
+      .find((d) => d.startsWith('frame-ancestors'));
+
+  it('lets VS Code (webview and workbench origins) frame the watch page', async () => {
+    const res = await request(app).get('/watch/abc');
+    const fa = frameAncestors(res.headers['content-security-policy']);
+    for (const origin of [
+      "'self'",
+      'vscode-webview:',
+      'vscode-file:',
+      'https://*.vscode-cdn.net',
+      'https://*.github.dev',
+      'https://vscode.dev',
+    ]) {
+      expect(fa).toContain(origin);
+    }
+    expect(fa).not.toContain('*.robocodejs.com');
+    expect(fa).not.toMatch(/frame-ancestors .*\s\*(\s|$)/);
+    expect(res.headers['x-frame-options']).toBeUndefined();
+  });
+
+  it('keeps every other hardening header on the watch page', async () => {
+    const res = await request(app).get('/watch/abc');
+    const csp = res.headers['content-security-policy'];
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['strict-transport-security']).toBeDefined();
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain('frame-src https://accounts.google.com/gsi/');
+  });
+
+  it('leaves the rest of the site unframeable', async () => {
+    for (const path of ['/x', '/watchlist']) {
+      const res = await request(app).get(path);
+      expect(frameAncestors(res.headers['content-security-policy'])).toBe(
+        "frame-ancestors 'self'"
+      );
+      expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+    }
   });
 });

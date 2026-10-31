@@ -11,6 +11,9 @@ import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/
 import { z } from 'zod';
 
 import { AuthenticatedRequest, ensureDevUser } from '../middleware/auth';
+import { ErrorCodes } from '../types/ErrorCodes';
+import { isUuid } from '../util/uuid';
+import { streamArenaLogs } from '../util/logStream';
 import { mcpRateLimit } from '../middleware/rateLimit';
 import { isLocalDev } from '../util/devMode';
 import userService from '../services/UserService';
@@ -1767,6 +1770,32 @@ const methodNotAllowed = (_req: express.Request, res: express.Response) => {
   });
 };
 app.get('/api/mcp', mcpAuth, methodNotAllowed);
+
+// Live bot console logs for one of the token owner's arenas, as SSE: the
+// bearer-token counterpart of the cookie-authed GET .../arena/logs, for clients
+// such as the VS Code extension that hold an MCP OAuth token but no browser
+// session. It lives under the /api/mcp resource path so the token is only ever
+// honoured at the resource it was issued for, never on the cookie-only REST
+// API. It grants nothing new — the same token already reads these logs through
+// the recent_logs tool — but streams them instead of polling a 1,500-entry
+// buffer against the per-user MCP rate limit. Owner-only, like the REST route.
+app.get('/api/mcp/arenas/:arenaId/logs', mcpAuth, async (req, res) => {
+  const { arenaId } = req.params;
+  if (!isUuid(arenaId)) {
+    res.status(400).json({
+      code: ErrorCodes.E028,
+      error: 'Invalid arena id: expected a UUID.',
+    });
+    return;
+  }
+  const user = (req as AuthenticatedRequest).user;
+  const arena = await ownedArena(user, arenaId);
+  if (!arena) {
+    res.status(404).json({ error: 'No such arena, or it is not yours.' });
+    return;
+  }
+  await streamArenaLogs(req, res, arena);
+});
 app.delete('/api/mcp', mcpAuth, methodNotAllowed);
 
 export default app;

@@ -15,6 +15,7 @@ import {
 } from '../middleware/resource';
 import { writeRateLimit } from '../middleware/rateLimit';
 import { openSseStream } from '../util/sse';
+import { streamArenaLogs } from '../util/logStream';
 import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
 import { awardEdgeAchievement } from '../util/awardAchievements';
@@ -436,26 +437,8 @@ app.get(dual('/events'), loadUser, resolveArena, events);
 // (which are open so any signed-in user can spectate a match), console output is
 // the author's private debug channel — a bot may print strategy or diagnostic
 // data — so this stream is owner-only via requireOwner.
-const logs = async (req: Request, res: Response) => {
-  const stream = openSseStream(req, res);
-
-  function listener(event: unknown) {
-    stream.send(event);
-  }
-
-  const arena = scopedArena(req);
-  return environmentService.get(arena).then((env) => {
-    // The live log stream is not replayable, so a page that opens mid-match would
-    // otherwise start blank. Replay the recent-logs buffer first, then stream live.
-    env.getRecentLogs().forEach((entry) => listener(entry));
-    env.addListener('log', listener);
-
-    req.on('close', () => {
-      env.removeListener('log', listener);
-      stream.close();
-    });
-  });
-};
+const logs = (req: Request, res: Response) =>
+  streamArenaLogs(req, res, scopedArena(req));
 app.get(dual('/logs'), loadUser, requireOwner, resolveArena, logs);
 
 export default app;

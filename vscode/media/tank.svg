@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Top-down RobocodeJs tank (traced from the site icon): two tracks, the
+       hull, and a barrel pointing down with a wider muzzle. VS Code paints
+       activity-bar icons as a one-colour mask, so a gap cut around the barrel
+       keeps it readable against the hull. -->
+  <defs>
+    <mask id="hull">
+      <rect width="24" height="24" fill="#fff"/>
+      <path d="M9.75 8h4.5v9h2v7h-8.5v-7h2z" fill="#000"/>
+    </mask>
+  </defs>
+  <g fill="#000">
+    <g mask="url(#hull)">
+      <rect x="0.75" y="2" width="3.75" height="17" rx="1.25"/>
+      <rect x="19.5" y="2" width="3.75" height="17" rx="1.25"/>
+      <rect x="5.25" y="0.5" width="13.5" height="20" rx="1"/>
+    </g>
+    <rect x="10.5" y="8.75" width="3" height="9.5" rx="0.5"/>
+    <rect x="8.5" y="17.75" width="7" height="5.75" rx="0.75"/>
+  </g>
+</svg>
