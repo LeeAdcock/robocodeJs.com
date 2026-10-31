@@ -340,7 +340,7 @@ export const createForwarding = ({
         // The home may have died. If its lease has lapsed, take the user over
         // and serve here; a request with a body has already been read, so the
         // client retries it (Retry-After) and the retry lands locally.
-        const claimed = await homes.claim(userId);
+        const claimed = await homes.claim(userId, undefined, false);
         if (claimed?.local && body.length === 0) return next();
         return unavailable(res);
       }

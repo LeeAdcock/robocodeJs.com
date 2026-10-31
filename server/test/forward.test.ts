@@ -308,7 +308,7 @@ describe('forwardToHome', () => {
       });
       expect(res.status).toBe(503);
       // The retry lands here, since the edge now holds the home.
-      expect(edgeHomes.claim).toHaveBeenCalledWith(USER);
+      expect(edgeHomes.claim).toHaveBeenCalledWith(USER, undefined, false);
     });
   });
 });
