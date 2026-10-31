@@ -178,6 +178,17 @@ export class RobocodeClient {
     return result.faults;
   }
 
+  addToArena(arenaId: string, appId: string): Promise<{ added: boolean }> {
+    return this.call('add_app_to_arena', { arenaId, appId });
+  }
+
+  removeFromArena(
+    arenaId: string,
+    appId: string
+  ): Promise<{ removed: boolean }> {
+    return this.call('remove_app_from_arena', { arenaId, appId });
+  }
+
   matchStatus(arenaId: string): Promise<MatchStatus> {
     return this.call('match_status', { arenaId });
   }

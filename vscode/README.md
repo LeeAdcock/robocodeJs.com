@@ -14,6 +14,7 @@ Write, check and run your [RobocodeJs](https://robocodejs.com) tank apps from VS
 - **Watch Arena** opens your arena's live spectator page in the browser.
 - **Bot Logs.** A _RobocodeJs Bot Logs_ output channel streams your arena's bot console output live, labelled with the tick, app name and bot number. It starts when you open an app; **Show Bot Logs** brings it up.
 - **Crashes in the editor.** When a bot crashes at runtime, the error is underlined on the failing line of that app, and a notification offers to jump there. Crashes from before you connected are left out, and saving, compiling or rebooting the app clears them.
+- **Set up your default arena by dragging.** A **Default Arena** list under **Apps** shows the apps in your arena. Drag apps from **Apps** into it to add them, or drag them back out to remove them (right-click works too). Other players' apps that you added by share link appear there as well and can be removed the same way. The extension manages only your default arena.
 - **The arena, live, in an editor panel.** **Watch Arena** opens your arena beside your code: the same spectator view as the website's share link. **Watch Arena in Browser** (in the panel's title bar) opens it full size.
 - **Arena status bar.** The tick and how many apps are still alive, or the winner once the match is decided. Click it to open the arena panel.
 - **Run Match** restarts your arena and runs a match to a decision, then tells you who won.
