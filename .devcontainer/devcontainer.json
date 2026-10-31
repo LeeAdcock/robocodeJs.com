@@ -20,10 +20,15 @@
   // the /workspaces volume, which is the only location guaranteed to survive
   // a Codespaces container rebuild. The symlink is re-established on every
   // rebuild, so session state and project memory carry over automatically.
-  "postCreateCommand": "mkdir -p /workspaces/.claude-persist && if [ ! -L /home/node/.claude ]; then if [ -e /home/node/.claude ]; then cp -an /home/node/.claude/. /workspaces/.claude-persist/ 2>/dev/null || true; rm -rf /home/node/.claude; fi; ln -s /workspaces/.claude-persist /home/node/.claude; fi"
+  "postCreateCommand": "mkdir -p /workspaces/.claude-persist && if [ ! -L /home/node/.claude ]; then if [ -e /home/node/.claude ]; then cp -an /home/node/.claude/. /workspaces/.claude-persist/ 2>/dev/null || true; rm -rf /home/node/.claude; fi; ln -s /workspaces/.claude-persist /home/node/.claude; fi",
 
-  // Configure tool-specific properties.
-  // "customizations": {},
+  // Configure tool-specific properties. The RobocodeJs extension lets you edit
+  // and run apps against the server from this editor (see vscode/).
+  "customizations": {
+    "vscode": {
+      "extensions": ["robocode-js.robocodejs"]
+    }
+  }
 
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root"

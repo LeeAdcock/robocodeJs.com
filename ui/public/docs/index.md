@@ -18,6 +18,7 @@ See that arena? It's a live demo: real bots battling right now. In a few minutes
 - **Coming from classic Robocode?** Read **[Coming from classic Robocode](/classic)** for a quick map of what's the same, what's different, and how to port your instincts.
 - **Want the details?** Keep the **[API reference](/learn/docs)**, **[game rules & physics](/rules)**, and **[FAQ](/faq)** handy, and browse the **[example bots](/examples)**.
 - **Want an AI to help?** Connect Claude (or any MCP client) to write, run, and watch your bots for you. See **[Connect an AI (MCP)](/mcp)**.
+- **Prefer your own editor?** Write, check, and run your bots from Visual Studio Code, with autocomplete, live bot logs, and the arena beside your code. See **[RobocodeJs for VS Code](/vscode)**.
 
 # Coding your first JavaScript bot
 

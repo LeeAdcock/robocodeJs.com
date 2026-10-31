@@ -89,6 +89,15 @@ describe('GET /api/ask', () => {
     expect(await ask('how do I connect claude?')).toBe('/mcp');
   });
 
+  it('routes VS Code / editor-extension searches to the extension guide', async () => {
+    expect(await ask('vscode')).toBe('/vscode');
+    expect(await ask('vs code')).toBe('/vscode');
+    expect(await ask('is there a visual studio code extension?')).toBe(
+      '/vscode'
+    );
+    expect(await ask('can I write my bot in my own editor?')).toBe('/vscode');
+  });
+
   it('routes getting-started searches to the learn course', async () => {
     expect(await ask('getting started')).toBe('/learn');
     expect(await ask('tutorial')).toBe('/learn');
