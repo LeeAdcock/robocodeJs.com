@@ -20,6 +20,7 @@ import {
   scopedApp,
 } from '../middleware/resource';
 import { computeRateLimit, writeRateLimit } from '../middleware/rateLimit';
+import { MAX_APPS_PER_USER } from '../util/limits';
 
 const app = express();
 
@@ -36,11 +37,6 @@ app.get('/api/app/:appId', loadApp, (req, res) => {
     userId: target.getUserId(),
   });
 });
-
-// Caps the number of apps (bots) a single user can own. Each app compiles into
-// an 8 MB isolate per arena it runs in, so this bounds a user's isolate/memory
-// footprint alongside MAX_ARENAS_PER_USER (see api/arena.ts).
-const MAX_APPS_PER_USER = 20;
 
 // Get user apps
 app.get('/api/user/:userId/apps', loadUser, async (req, res) => {

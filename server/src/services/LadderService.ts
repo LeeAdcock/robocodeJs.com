@@ -28,7 +28,7 @@ const LADDER_ARENA_OWNER = 'ladder';
 // Resolved background-loop configuration. Defaults are deliberately conservative
 // — a single worker with a gap between matches — because a ranked match is real
 // isolate compute and the prod box is small (see GitHub #151 compute notes).
-interface LadderLoopConfig {
+export interface LadderLoopConfig {
   concurrency: number; // matches run at once
   matchIntervalMs: number; // pause after a completed match, per worker
   idleMs: number; // backoff when there's no pair or we're load-gated
@@ -69,6 +69,24 @@ interface LadderSide {
   ratingAfter: number;
   delta: number;
   broken: boolean;
+}
+
+// The admin panel's read-only view of the ladder (see adminSnapshot). No
+// source: pool members carry only what the matchmaker ranks them by.
+export interface LadderAdminSnapshot {
+  enabled: boolean; // LADDER_ENABLED on this instance
+  loopRunning: boolean; // the background loop is running on this instance
+  config: LadderLoopConfig; // effective config (started loop's, else env defaults)
+  pool: {
+    appId: AppId;
+    userId: string;
+    rating: number;
+    ratingGames: number;
+    updatedTimestamp: Date;
+  }[];
+  // Every unordered pairing in the pool, with its count against the cap.
+  pairs: { appA: AppId; appB: AppId; matches: number; saturated: boolean }[];
+  claimedAppIds: AppId[]; // apps under a live cross-instance claim right now
 }
 
 export interface LadderMatchResult {
@@ -358,7 +376,18 @@ class LadderService {
   ): Promise<LadderCandidate[]> => {
     const others = pool.filter((c) => c.appId !== anchor.appId);
     if (cap <= 0) return others;
+    const counts = await this.pairCounts(anchor, others);
+    return others.filter((c) => (counts.get(c.appId) ?? 0) < cap);
+  };
 
+  // How many times `anchor` has met each of `others` since the LATER of the two
+  // apps' last edits — the count the pair cap is measured against. Shared by
+  // pickPair (via unsaturatedOpponents) and the admin ladder view, so the panel
+  // reports saturation by exactly the rule the matchmaker enforces.
+  private pairCounts = async (
+    anchor: LadderCandidate,
+    others: LadderCandidate[]
+  ): Promise<Map<AppId, number>> => {
     // Anchor's own edit time is the floor for every pairing, so filter by it in
     // SQL and apply each opponent's (later or earlier) edit time in JS.
     const history = await rankedMatchService.matchesForApp(
@@ -373,19 +402,83 @@ class LadderService {
       else played.set(h.opponentId, [h.at]);
     }
 
-    return others.filter((c) => {
+    const counts = new Map<AppId, number>();
+    for (const c of others) {
       const times = played.get(c.appId);
-      if (!times) return true;
+      if (!times) continue;
       const since = Math.max(
         anchor.updatedTimestamp.getTime(),
         c.updatedTimestamp.getTime()
       );
-      const count = times.reduce(
-        (n, t) => (t.getTime() > since ? n + 1 : n),
-        0
+      counts.set(
+        c.appId,
+        times.reduce((n, t) => (t.getTime() > since ? n + 1 : n), 0)
       );
-      return count < cap;
-    });
+    }
+    return counts;
+  };
+
+  // Read-only view of the ladder for the admin panel (GitHub #469): the
+  // effective configuration, the eligible pool, every pairing's count against
+  // the cap, and the live cross-instance claims. Built from the same pieces the
+  // matchmaker uses — getLadderCandidates, the untouched-starter filter,
+  // pairCounts, the claim lease — so it can't drift from what pickPair would
+  // actually do. Unlike pickPair it does NOT drop in-flight or claimed apps
+  // from the pool: those are still eligible, just busy right now, and the panel
+  // lists the claims separately.
+  //
+  // Costs one matchesForApp query per pool member (the same as one fully
+  // saturated pickPair poll), which is fine for an on-demand admin page.
+  adminSnapshot = async (): Promise<LadderAdminSnapshot> => {
+    const timeoutMs = this.matchTimeoutMs();
+    const cap = this.pairMatchCap();
+    const pool = (await appService.getLadderCandidates()).filter(
+      (c) => !isUntouchedStarter(c.source)
+    );
+
+    const pairs: LadderAdminSnapshot['pairs'] = [];
+    for (let i = 0; i < pool.length; i++) {
+      const later = pool.slice(i + 1);
+      if (later.length === 0) break;
+      const counts = await this.pairCounts(pool[i], later);
+      for (const other of later) {
+        const matches = counts.get(other.appId) ?? 0;
+        pairs.push({
+          appA: pool[i].appId,
+          appB: other.appId,
+          matches,
+          saturated: cap > 0 && matches >= cap,
+        });
+      }
+    }
+
+    const claimed = await ladderClaimService.claimedApps(
+      new Date(Date.now() - claimTtlMs(timeoutMs))
+    );
+
+    return {
+      enabled: process.env.LADDER_ENABLED === 'true',
+      loopRunning: this.running,
+      config: this.config ?? {
+        concurrency: Math.max(1, envInt('LADDER_CONCURRENCY', 1)),
+        matchIntervalMs: envInt('LADDER_MATCH_INTERVAL_MS', 3000),
+        idleMs: envInt('LADDER_IDLE_MS', 60000),
+        maxLiveIsolates: envInt('LADDER_MAX_LIVE_ISOLATES', 40),
+        timeoutMs,
+        matchSpeed: envInt('LADDER_MATCH_SPEED', 20),
+        retentionDays: envInt('LADDER_MATCH_RETENTION_DAYS', 90),
+        pairMatchCap: cap,
+      },
+      pool: pool.map((c) => ({
+        appId: c.appId,
+        userId: c.userId,
+        rating: c.rating,
+        ratingGames: c.ratingGames,
+        updatedTimestamp: c.updatedTimestamp,
+      })),
+      pairs,
+      claimedAppIds: [...claimed],
+    };
   };
 
   // Resolved pair cap and match timeout: the started loop's config, else the env

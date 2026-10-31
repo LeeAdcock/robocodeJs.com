@@ -131,6 +131,33 @@ class RankedMatchService {
       .then((res) => res?.rowCount ?? 0);
   };
 
+  // Match throughput since `since`, for the admin ladder view (GitHub #469): how
+  // many matches were recorded, and how many produced no rating. An unrated
+  // match (a timeout, or both apps crashing) is recorded with no winner and zero
+  // deltas; a rated draw also has no winner but moves the ratings, so the deltas
+  // are what tell them apart. Note this reads the retained rows, and a pairing's
+  // pre-edit rows are retired as soon as it plays again (see deleteStaleForPair),
+  // so right after an edit the counts can run slightly low.
+  outcomesSince = (
+    since: Date
+  ): Promise<{ total: number; unrated: number }> => {
+    return pool
+      .query({
+        text:
+          'SELECT COUNT(*)::int as "total", ' +
+          'SUM(CASE WHEN winnerId IS NULL AND deltaA = 0 AND deltaB = 0 THEN 1 ELSE 0 END)::int as "unrated" ' +
+          'FROM ranked_match WHERE createdTimestamp >= $1',
+        values: [since],
+      })
+      .then((res) => {
+        const row = res?.rows?.[0] ?? {};
+        return {
+          total: Number(row.total ?? 0),
+          unrated: Number(row.unrated ?? 0),
+        };
+      });
+  };
+
   // Every match this app played since `since`, as (opponent, when) pairs — the
   // raw input to LadderService's per-pair saturation cap. One query per anchor
   // instead of one per candidate pair, folded per opponent in JS (the same

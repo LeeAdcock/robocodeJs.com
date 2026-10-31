@@ -20,13 +20,9 @@ import { buildArenaStatus } from '../util/arenaStatus';
 import { buildMatchSummary, buildMatchStatus } from '../util/matchSummary';
 import { awardEdgeAchievement } from '../util/awardAchievements';
 import { ACCOUNT_SHARED, ACCOUNT_BORROWED } from '../util/achievements';
+import { MAX_ARENAS_PER_USER } from '../util/limits';
 
 const app = express();
-
-// Caps the number of arenas a single user can create. Each arena is an
-// in-memory, isolate-backed Environment, so this bounds EnvironmentService's
-// store; idle arenas are also GC'd 30 minutes after they stop.
-const MAX_ARENAS_PER_USER = 10;
 
 // A global ceiling on the total number of arenas across ALL users. Each arena
 // can materialize into an 8 MB isolate-backed Environment, so without a
