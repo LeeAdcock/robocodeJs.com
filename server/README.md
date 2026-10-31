@@ -45,6 +45,7 @@ PostgreSQL connection (see `src/util/db.ts`):
 | `RDS_SSL` / `RDS_SSL_NO_VERIFY` | TLS to Postgres — verified against the vendored RDS CA bundle (`certs/rds-global-bundle.pem`) by default. `RDS_SSL_NO_VERIFY=true` encrypts without verifying the CA (old behaviour, for a non-RDS cert); `RDS_SSL=false` disables TLS. |
 | `PG_POOL_MAX` / `PG_POOL_CONNECT_TIMEOUT_MS` / `PG_POOL_IDLE_TIMEOUT_MS` | Postgres pool sizing (defaults `20` / `5000` / `30000`). `max` is per instance, sized so 4 instances still fit the `db.t3.micro`'s ~112 `max_connections`. The connect timeout makes an exhausted pool fail fast instead of queueing forever, and each timeout is logged as `event=db.error`. Invalid values fall back to the default with a warning. See `src/util/db.ts`. |
 | `MAX_TOTAL_ARENAS` | global ceiling on concurrently-created arenas across **all** users (default `1000`); creation past it returns `503` |
+| `ARENA_IDLE_PAUSE_MS` | pause a running arena after this long with no open event/log stream and no access (default `300000`, 5 min; `0` disables). The next access resumes it, so it is invisible to players; it is what keeps CPU proportional to players online rather than to arenas touched since the last deploy |
 
 Global bot ladder (GitHub #151 — `src/services/LadderService.ts`; the background matchmaking loop is **off unless `LADDER_ENABLED=true`**, and never runs under test):
 

@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import useLogsStream, { addLogMarker } from '../src/util/useLogsStream';
+import useLogsStream, {
+  addLogMarker,
+  clearLogs,
+} from '../src/util/useLogsStream';
 
 // The server replays its whole recent-logs buffer on every reconnect, so the
 // store dedupes by record id. That id is a per-arena counter (it rides every
@@ -101,5 +104,48 @@ describe('useLogsStream id handling', () => {
     push({ id: 1, msg: 'kept' });
 
     expect(messages(result.current.logs)).toEqual(['kept']);
+  });
+
+  it('clears the console and keeps cleared lines out of a reconnect replay', () => {
+    const { result } = renderHook(() => useLogsStream('u-clear'));
+
+    push({ id: 1, msg: 'old 1' });
+    act(() => addLogMarker('restart', 'Match restarted', 0));
+    push({ id: 2, msg: 'old 2' });
+    const indexBefore = result.current.index;
+    act(() => clearLogs());
+
+    expect(messages(result.current.logs)).toEqual([]);
+    // The write index doesn't move, so index-delta consumers (unread badge,
+    // "N new lines") don't read the clear as a burst of arrivals.
+    expect(result.current.index).toBe(indexBefore);
+
+    // The server replays its whole buffer on reconnect: the cleared lines must
+    // stay gone, while genuinely new ones still land.
+    push({ id: 1, msg: 'old 1' });
+    push({ id: 2, msg: 'old 2' });
+    push({ id: 3, msg: 'new' });
+    expect(messages(result.current.logs)).toEqual(['new']);
+  });
+
+  it('clears only one app’s lines when scoped, keeping others and dividers', () => {
+    const { result } = renderHook(() => useLogsStream('u-clear-scoped'));
+
+    push({ id: 1, appId: 'a1', msg: 'mine 1' });
+    push({ id: 2, appId: 'a2', msg: 'theirs' });
+    act(() => addLogMarker('restart', 'Match restarted', 0));
+    push({ id: 3, appId: 'a1', msg: 'mine 2' });
+    act(() => clearLogs('a1'));
+
+    expect(messages(result.current.logs)).toEqual([
+      'theirs',
+      'Match restarted',
+    ]);
+
+    // Survivors sit just behind the write index, so the next line follows them.
+    push({ id: 4, appId: 'a1', msg: 'mine 3' });
+    const { logs, index } = result.current;
+    const ordered = [...logs.slice(index), ...logs.slice(0, index)];
+    expect(messages(ordered)).toEqual(['theirs', 'Match restarted', 'mine 3']);
   });
 });

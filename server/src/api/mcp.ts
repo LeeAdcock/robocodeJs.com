@@ -1207,6 +1207,9 @@ export const buildServer = (user: User): McpServer => {
         '- `metrics.arenas` — arena environments held in memory right now, running ' +
         'or paused (each is disposed ~30 min after it stops)\n' +
         '- `metrics.runningArenas` — of those, how many are actively ticking\n' +
+        '- `metrics.idlePausedArenas` — of those, how many were paused ' +
+        'automatically because nobody was watching or using them; they resume on ' +
+        'the next access\n' +
         '- `metrics.isolates` — total bot sandboxes live across all arenas (one ' +
         '8 MB V8 isolate per app); the main resource-pressure signal for the box\n' +
         '- `metrics.maxAvgTickMs` — the busiest arena’s average wall-clock time to ' +
