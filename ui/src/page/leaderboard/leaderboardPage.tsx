@@ -71,9 +71,9 @@ export default function LeaderboardPage(props: { signedIn: boolean }) {
         {entries !== null && entries.length > 0 && (
           <LeaderboardTable entries={entries} />
         )}
-
-        <TournamentsPanel signedIn={props.signedIn} />
       </div>
+
+      <TournamentsPanel signedIn={props.signedIn} />
     </div>
   );
 }
