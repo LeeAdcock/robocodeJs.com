@@ -4,7 +4,7 @@ import arenaMemberService from './ArenaMemberService';
 import homeService from './HomeService';
 import { logger, LogEvent } from '../util/logger';
 import { recordSandboxStats } from '../util/awardAchievements';
-import { DEMO_USER_ID, UserId } from '../types/user';
+import { DEMO_USER_ID } from '../types/user';
 
 // How long a running arena may go with no viewers and no access before it is
 // paused (see pauseIdle). `0` disables idle pausing.
@@ -38,9 +38,11 @@ export class EnvironmentService {
   }
 
   // Keep this instance's home leases (GitHub #444) matching the users it holds
-  // arenas for: renew them, release users whose last arena the GC just
-  // collected, and drop the arenas of any user whose home another instance took
-  // over. Skipped while a previous pass is still waiting on the database.
+  // arenas for: renew them, and release users whose last arena the GC just
+  // collected. A user whose home another instance took over is only counted and
+  // logged (by HomeService) and keeps being served here: with nothing routed on
+  // the leases yet, dropping their arenas would just rebuild them on the next
+  // request. Skipped while a previous pass is still waiting on the database.
   reconcileHomes = async (now = Date.now()): Promise<void> => {
     if (this.reconciling) return;
     this.reconciling = true;
@@ -48,8 +50,7 @@ export class EnvironmentService {
       const owners = new Set(
         Object.values(this.store).map((env) => env.getArena().getUserId())
       );
-      const lost = await homeService.reconcile(owners, now);
-      lost.forEach((userId) => this.disposeUser(userId));
+      await homeService.reconcile(owners, now);
     } finally {
       this.reconciling = false;
     }
@@ -194,19 +195,6 @@ export class EnvironmentService {
       env.dispose();
     }
     return Promise.resolve();
-  };
-
-  // Tears down every arena a user owns on this instance. Used when another
-  // instance has taken over the user's home, so it holds their arenas now.
-  disposeUser = (userId: UserId): number => {
-    const arenaIds = (Object.entries(this.store) as [ArenaId, Environment][])
-      .filter(([, env]) => env.getArena().getUserId() === userId)
-      .map(([arenaId]) => arenaId);
-    arenaIds.forEach((arenaId) => {
-      this.store[arenaId].pause();
-      void this.dispose(arenaId);
-    });
-    return arenaIds.length;
   };
 
   // Tears down every live environment (pausing its tick loop first, then

@@ -59,21 +59,15 @@ describe('EnvironmentService user homes', () => {
     );
   });
 
-  it("drops every arena of a user whose home was lost, and no one else's", async () => {
-    const mine1 = fakeEnv('user-1');
-    const mine2 = fakeEnv('user-1');
-    const other = fakeEnv('user-2');
-    store()['a1'] = mine1;
-    store()['a2'] = mine2;
-    store()['a3'] = other;
+  it("keeps serving a user whose home was lost; it's only counted", async () => {
+    const mine = fakeEnv('user-1');
+    store()['a1'] = mine;
     vi.mocked(homeService.reconcile).mockResolvedValueOnce(['user-1']);
 
     await environmentService.reconcileHomes();
 
-    expect(mine1.dispose).toHaveBeenCalledOnce();
-    expect(mine2.dispose).toHaveBeenCalledOnce();
-    expect(other.dispose).not.toHaveBeenCalled();
-    expect(Object.keys(store())).toEqual(['a3']);
+    expect(mine.dispose).not.toHaveBeenCalled();
+    expect(Object.keys(store())).toEqual(['a1']);
   });
 
   it('skips a pass while the previous one is still waiting on the database', async () => {

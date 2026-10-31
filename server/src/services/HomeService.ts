@@ -135,7 +135,8 @@ export class HomeService {
   // Bring the leases in line with the users this instance has arenas for:
   // renew those, claim any it doesn't hold yet, and release the rest. Resolves
   // to the users whose home was taken by another instance since the last
-  // reconcile; the caller drops their local arenas. A database error keeps every
+  // reconcile (counted and logged; nothing acts on it until forwarding lands).
+  // A database error keeps every
   // lease as it was and reports nothing lost, because no other instance can
   // claim without the database either.
   reconcile = async (
@@ -188,7 +189,7 @@ export class HomeService {
           lost.push(userId);
           logger.warn(
             { event: LogEvent.HOME_LOST, userId, home: home.instanceId },
-            'user home was taken by another instance'
+            'user home was taken by another instance; still serving locally'
           );
         }
       }
@@ -221,7 +222,7 @@ export class HomeService {
   //   homeUsers       users whose home lease this instance holds
   //   leaseTakeovers  expired homes this instance took from another
   //   leaseConflicts  claims that found another instance's live lease
-  //   leasesLost      leases another instance took from this one
+  //   leasesLost      leases another instance took from this one (still served here)
   metrics = () => ({
     homeUsers: this.held.size,
     leaseTakeovers: this.takeovers,
