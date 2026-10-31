@@ -15,6 +15,7 @@ import {
   FaMoon,
   FaSignOutAlt,
   FaMedal,
+  FaChartBar,
 } from 'react-icons/fa';
 import { colors } from '../util/colors';
 import { useDarkMode, toggleDarkMode } from '../util/theme';
@@ -26,6 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { titleCase } from '../util/titleCase';
 import ArenaRoster from './arenaRoster';
+import { useIsAdmin } from '../util/admin';
 
 interface AppLinkProps {
   arena: Arena;
@@ -182,6 +184,8 @@ export default function NavBar(props: NavBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const darkMode = useDarkMode();
+  // Admin link (GitHub #469): shown only once the server confirms it.
+  const isAdmin = useIsAdmin(props.user?.id);
   const [showRoster, setShowRoster] = useState(false);
   // Control the collapsed (hamburger) menu ourselves so we can close it on
   // navigation. react-bootstrap otherwise keeps this state internally, and none
@@ -375,6 +379,11 @@ export default function NavBar(props: NavBarProps) {
                 <NavDropdown.Item onClick={() => navigate('/profile')}>
                   <FaMedal /> Your badges
                 </NavDropdown.Item>
+                {isAdmin && (
+                  <NavDropdown.Item onClick={() => navigate('/admin')}>
+                    <FaChartBar /> Admin
+                  </NavDropdown.Item>
+                )}
                 <NavDropdown.Item onClick={() => props.doLogout?.()}>
                   <FaSignOutAlt /> Sign out
                 </NavDropdown.Item>

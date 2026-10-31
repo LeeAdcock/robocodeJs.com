@@ -121,6 +121,18 @@ This makes `app.updatedTimestamp` load-bearing as the "**this app's code changed
 
 The public top-20 is `GET /api/leaderboard` (`api/leaderboard.ts`, unauthenticated, no source) + the MCP `leaderboard` tool, rendered at the UI `/leaderboard` route (main-nav "Rankings", visible logged-out). `account.lastActiveAt` (bumped, throttled, in `middleware/auth.ts`) feeds the owner-activity eligibility gate.
 
+### Admin control panel (GitHub #469)
+
+A read-only, UI-only admin panel at `/admin` (tabs: Overview, Users, Ladder) over `/api/admin/*` (`api/admin.ts`, queries in `services/AdminService.ts`). **There are deliberately no admin MCP tools** and no admin capability on bearer tokens.
+
+- **Who is an admin is config, not data:** `ADMIN_EMAILS` (comma-separated, case-insensitive) in the EB environment, checked by `middleware/admin.ts` `isAdmin`. Unset means nobody. Local-dev mode makes the dev user an admin, with the same production re-check as the auth bypass.
+- **A non-admin can't tell it exists.** The router runs `auth(false)` + `requireAdmin`, and a non-admin (anonymous, signed in, or holding a bearer token) leaves the router via `next('router')` and gets the SPA fallback, exactly like an unknown path. That's why the UI's probe (`util/admin.ts` `fetchIsAdmin`) accepts only the admin API's JSON and treats an HTML 200 as "not an admin". A signed-in non-admin's probe is logged as `auth.forbidden` with `admin: true`. `/admin` stays out of `STATIC_PAGES` and the sitemap (so it's `noindex`), and the page is its own lazy chunk.
+- **Metadata only.** `AdminService` compares app source in SQL (against the starter seeds and the empty string) and returns booleans; it never selects token hashes, and it reads only `client_name` from an OAuth client's info JSON (which can hold a secret). `adminService.test.ts` asserts none of these leak.
+- **Global vs per-instance.** Everything comes from the database except the Overview's live gauges and the ladder loop's running flag, which describe only the instance that answered and are labelled with its hostname. A live per-arena view was deliberately left out for that reason (it would show one instance's arenas as if they were all of them). Revisit after #444.
+- **The ladder view reuses the matchmaker's own rules:** `LadderService.adminSnapshot` counts pairs with the same `pairCounts` helper `pickPair` uses, so the panel can't drift from what's enforced. The "why isn't this app in the pool?" reasons in `api/admin.ts` mirror `getLadderCandidates` by hand; an `unknown` reason means they've drifted.
+- Per-user caps now live in `util/limits.ts`, shared by the REST routes, the MCP tools and the panel's "near a cap" filter.
+- **pg-mem quirk (local dev only):** pg-mem evaluates `DEFAULT CURRENT_TIMESTAMP` once at `CREATE TABLE`, not per insert, so locally every new `ranked_match` row looks older than the apps' last edit and is retired right after it's recorded. The panel's local match counts therefore read 0. Real Postgres is unaffected.
+
 ### SEO (public pages)
 
 The UI is a client-rendered SPA, so the server injects per-page SEO metadata into the shell for the **public** routes (homepage, docs, lessons, examples, rankings, about, mcp, classic, blog). Keep this maintained when adding or renaming public pages:
