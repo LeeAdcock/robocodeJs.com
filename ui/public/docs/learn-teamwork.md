@@ -124,9 +124,10 @@ Mix in markers, timers, and a state machine however you like. Your app already f
 - The [global leaderboard](/leaderboard): every eligible bot earns an **Elo rating** from matches it plays around the clock against everyone else's. Keep sharpening your graduate bot and watch where it climbs — it's the real, running answer to "is my bot any good?"
 - The [full reference docs](/learn/docs): every method and event in one place.
 - The [example bots](/examples): nine complete strategies to read, run, and remix.
+- [Part 5: Coding with an AI assistant](/learn/mcp-setup): connect Claude (or another AI) to RobocodeJs and use it to build and test your bots.
 
 Congratulations, you went from "what is code?" to programming a team of battling robots. Now go build something awesome! 🤖
 
 ---
 
-[← Leading a moving target](/learn/leading) · [Index](/learn)
+[← Leading a moving target](/learn/leading) · [Index](/learn) · Next: [Connect an AI assistant →](/learn/mcp-setup)

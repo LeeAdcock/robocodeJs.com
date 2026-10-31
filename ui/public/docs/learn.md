@@ -41,6 +41,14 @@ Each lesson is short and builds on the one before it. By the end you'll be able 
 14. [Leading a moving target](/learn/leading): hitting movers by aiming ahead of them
 15. [Teamwork and graduation](/learn/teamwork): talking to teammates + your final challenge
 
+**Part 5: Coding with an AI assistant**
+
+16. [Connect an AI assistant](/learn/mcp-setup): hooking Claude (or any MCP client) up to your account
+17. [Build an app with AI](/learn/mcp-build): creating, checking, and improving an app through MCP
+18. [Test your app with AI](/learn/mcp-test): running matches, comparing versions with seeds, and debugging losses
+
+> **Part 5 is optional.** It's for after you can write a bot yourself: the AI is a faster pair of hands, and you'll get far more out of it once you understand the code it writes.
+
 ---
 
 When you finish, the [full reference docs](/learn/docs) and the [example bots](/examples) are great places to keep growing. That's all ahead of you, though. For now, take the first step: [start Lesson 1 →](/learn/hello)
