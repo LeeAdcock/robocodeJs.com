@@ -23,13 +23,16 @@ import { rootIconRouter } from './util/rootIcons';
 
 import auth from './middleware/auth';
 import securityHeaders from './middleware/securityHeaders';
+import { createForwarding } from './middleware/forward';
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit';
 import { isLocalDev } from './util/devMode';
 import { logger, LogEvent } from './util/logger';
 import { collectMetrics } from './util/metrics';
+import { PORT } from './util/instance';
 import pool from './util/db';
 import environmentService from './services/EnvironmentService';
 import ladderService from './services/LadderService';
+import homeService from './services/HomeService';
 
 import healthEndpoints from './api/health';
 import sessionEndpoints from './api/session';
@@ -73,6 +76,35 @@ app.use(
   })
 );
 
+// Rate limiting (A07). Strict IP-keyed limits on the unauthenticated sign-in and
+// token routes; a broad backstop over the rest of the API. The expensive
+// per-route limiters (isolate spawns, resource creation) are attached inside the
+// app/arena routers. Refusals return 429 + error code E022.
+//
+// Forwarding (GitHub #444) sets the order here. acceptForwarded runs first, so
+// a request another instance forwarded is recognised (and its client IP
+// restored) before the IP-keyed limiters, which skip it because the edge
+// already counted it. forwardToHome runs after them, so the edge counts a
+// request before proxying it, and before the body parsers, so the body is
+// still unread when it's proxied. The per-user limiters live inside the
+// routers and so run on the user's home, which sees all their traffic.
+const { acceptForwarded, forwardToHome } = createForwarding();
+if (
+  !process.env.INTERNAL_FORWARD_SECRET &&
+  process.env.NODE_ENV === 'production'
+) {
+  logger.error(
+    'INTERNAL_FORWARD_SECRET is not set: this instance will not forward ' +
+      "requests to users' home instances, so arenas may be served from more " +
+      'than one instance at once'
+  );
+}
+app.use(acceptForwarded);
+app.use('/api/session', authRateLimit);
+app.use('/api/oauth', authRateLimit);
+app.use('/api', apiRateLimit);
+app.use(forwardToHome);
+
 app.use('/api', [
   // Bound request body sizes: JSON covers the auth credential and small
   // payloads; the octet-stream body is bot source code. The octet-stream limit
@@ -84,14 +116,6 @@ app.use('/api', [
   bodyParser.raw({ type: 'application/octet-stream', limit: '512kb' }),
   cookieParser(),
 ]);
-
-// Rate limiting (A07). Strict IP-keyed limits on the unauthenticated sign-in and
-// token routes; a broad backstop over the rest of the API. The expensive
-// per-route limiters (isolate spawns, resource creation) are attached inside the
-// app/arena routers. Refusals return 429 + error code E022.
-app.use('/api/session', authRateLimit);
-app.use('/api/oauth', authRateLimit);
-app.use('/api', apiRateLimit);
 
 // The built UI: `ui build` writes into server/dist/public, and this file runs
 // from server/dist.
@@ -292,7 +316,7 @@ process.on('uncaughtException', (err) => {
   );
 });
 
-const port = 8080;
+const port = PORT;
 const server = app.listen(port, () => {
   logger.info({ port }, `server started at http://localhost:${port}`);
   if (isLocalDev) {
@@ -361,12 +385,19 @@ const shutdown = (signal: NodeJS.Signals) => {
   // Stop scheduling new ranked matches before tearing down isolates.
   ladderService.stop();
 
+  // Hand back this instance's user homes (GitHub #444) straight away, so users
+  // can be placed on the replacement instance without waiting out the lease.
+  // Started before server.close, which can wait on open SSE streams until the
+  // failsafe fires; awaited below before the pool closes.
+  const homesReleased = homeService.releaseAll();
+
   server.close(async () => {
     try {
+      const homesHandedBack = await homesReleased;
       const isolatesDisposed = environmentService.disposeAll();
       await pool.end();
       logger.info(
-        { event: LogEvent.SHUTDOWN, signal, isolatesDisposed },
+        { event: LogEvent.SHUTDOWN, signal, isolatesDisposed, homesHandedBack },
         'graceful shutdown complete'
       );
     } catch (err) {

@@ -1215,6 +1215,22 @@ export const buildServer = (user: User): McpServer => {
         '- `metrics.maxAvgTickMs` — the busiest arena’s average wall-clock time to ' +
         'compute one tick; single digits are healthy, a steadily rising value ' +
         'means an arena is struggling to keep up\n' +
+        '- `metrics.homeUsers` — users whose arenas this instance is the home ' +
+        'for (it holds their lease)\n' +
+        '- `metrics.leaseTakeovers` / `metrics.leaseConflicts` / ' +
+        '`metrics.leasesLost` — counts since this instance started: expired ' +
+        'homes it took over, times it found a user it serves already homed on ' +
+        'another instance (normal briefly during a deploy), and homes another ' +
+        'instance took from it\n' +
+        '- `metrics.conflictedUsers` — users this instance serves right now ' +
+        'whose home is another instance\n' +
+        '- `metrics.leaseQueries` — database queries the home-lease layer has ' +
+        'issued since this instance started\n' +
+        '- `metrics.forwardedRequests` / `metrics.forwardFailures` / ' +
+        '`metrics.misdirectedRequests` — counts since this instance started: ' +
+        'requests it passed to a user’s home instance, forwards that failed ' +
+        '(the client got a 503 and should retry), and forwarded requests it ' +
+        'turned away because the user had moved\n' +
         '- `metrics.rssMB` / `metrics.heapUsedMB` — the whole server process’s ' +
         'resident and heap memory, in MB, for this instance',
       inputSchema: {},
