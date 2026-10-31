@@ -187,6 +187,17 @@ export class RobocodeClient {
     return this.call('match_status', { arenaId });
   }
 
+  pause(arenaId: string): Promise<{ paused: boolean }> {
+    return this.call('pause_arena', { arenaId });
+  }
+
+  // Resume at normal speed, so Play never picks up a max speed left behind by
+  // an earlier run_match or a speed change elsewhere.
+  async resume(arenaId: string): Promise<{ resumed: boolean }> {
+    await this.call('set_arena_speed', { arenaId, speed: 1 });
+    return this.call('resume_arena', { arenaId });
+  }
+
   // Start a fresh match at normal speed (1x, ~10 ticks/s) so it can be
   // watched as it plays. Not run_match: that runs flat out to a decision and
   // leaves the arena paused, and a real-time match (up to ~12.5 min, with

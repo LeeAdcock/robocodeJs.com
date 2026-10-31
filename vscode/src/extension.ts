@@ -49,6 +49,18 @@ export async function activate(context: vscode.ExtensionContext) {
   const arenaStatus = new ArenaStatus(client, log, (status) => {
     arenaTree.setStatus(status);
     tree.setInArena(status?.standings.map((s) => s.id) ?? []);
+    // Drive the Arena Apps title bar: Pause while running, Play while paused
+    // (hidden once the match is decided; Restart Match is the next step).
+    void vscode.commands.executeCommand(
+      'setContext',
+      'robocodejs.arenaRunning',
+      status?.running ?? false
+    );
+    void vscode.commands.executeCommand(
+      'setContext',
+      'robocodejs.matchDecided',
+      status?.match.decided ?? false
+    );
   });
   const arenaPanel = new ArenaPanel(serverUrl, context.extensionUri);
   context.subscriptions.push(
@@ -457,22 +469,32 @@ export async function activate(context: vscode.ExtensionContext) {
       guarded(async () => botLogs.show())
     ),
     vscode.commands.registerCommand(
-      'robocodejs.runMatch',
+      'robocodejs.playArena',
       guarded(async () => {
-        const arena = await client.defaultArena();
+        await client.resume(await arenaStatus.defaultArenaId());
+        await arenaStatus.refresh();
+      })
+    ),
+    vscode.commands.registerCommand(
+      'robocodejs.pauseArena',
+      guarded(async () => {
+        await client.pause(await arenaStatus.defaultArenaId());
+        await arenaStatus.refresh();
+      })
+    ),
+    vscode.commands.registerCommand(
+      'robocodejs.restartMatch',
+      guarded(async () => {
+        const arenaId = await arenaStatus.defaultArenaId();
         // A match restarts the arena with every app's saved code; push any
         // unsaved app edits first so the match runs what's on screen.
         for (const doc of vscode.workspace.textDocuments)
           if (workspace.appIdFor(doc.uri) && doc.isDirty) await doc.save();
         // A fresh match at normal speed, opened where it can be watched; the
         // status bar names the winner once it's decided.
-        await client.startMatch(arena.arenaId);
-        await arenaPanel.show(arena.arenaId);
-        void arenaStatus.refresh();
-        vscode.window.setStatusBarMessage(
-          '$(play) New match started at normal speed',
-          4000
-        );
+        await client.startMatch(arenaId);
+        await arenaPanel.show(arenaId);
+        await arenaStatus.refresh();
       })
     ),
 

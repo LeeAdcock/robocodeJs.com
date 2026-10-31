@@ -17,7 +17,7 @@ Write, check and run your [RobocodeJs](https://robocodejs.com) tank apps from VS
 - **Set up your arena by dragging.** An **Arena Apps** list under **Apps** shows the apps in your arena. Drag apps from **Apps** into it to add them, or drag them back out to remove them (right-click works too). Other players' apps that you added by share link appear there as well and can be removed the same way. Each app shows in exactly one of the two lists. Your own apps in **Arena Apps** have **Compile** (re-run the saved code) and **Reboot** (restart them) buttons; click one to open it. The extension manages only your default arena.
 - **The arena, live, in an editor panel.** **Watch Arena** opens your arena beside your code: the same spectator view as the website's share link. **Watch Arena in Browser** (in the panel's title bar) opens it full size.
 - **Arena status bar.** The tick and how many apps are still alive, or the winner once the match is decided. Click it to open the arena panel.
-- **Run Match** starts a fresh match at normal speed and opens the arena panel so you can watch it; the status bar names the winner.
+- **Play, Pause and Restart Match** in the **Arena Apps** title bar. Play and Pause swap as the match starts and stops; Play resumes at normal speed. **Restart Match** starts a fresh match at normal speed and opens the arena panel so you can watch it; the status bar names the winner.
 - **Copilot and other chat tools.** The extension registers RobocodeJs as an MCP server, so VS Code's agent mode can use the same tools AI assistants do.
 
 If an app was changed in the browser since you opened it in VS Code, saving asks whether to overwrite the server copy or reload it, rather than silently clobbering one side.
