@@ -16,6 +16,14 @@ const EMPTY_VERSION = sourceVersion('');
 export const sourceFromText = (text: string, version: string): string =>
   version === EMPTY_VERSION && sourceVersion(text) !== version ? '' : text;
 
+// True when pushing `local` would replace real code on the server (fingerprint
+// `serverVersion`) with an empty file. The server keeps no source history, so
+// that push is unrecoverable and must be confirmed rather than silent.
+export const erasesServerCode = (
+  local: string,
+  serverVersion: string
+): boolean => local.trim() === '' && serverVersion !== EMPTY_VERSION;
+
 // A filesystem-safe file name for an app, so the editor tab reads as the app's
 // name. Bot names are already sanitized server-side; this only guards path
 // separators and characters some filesystems reject.

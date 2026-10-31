@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { appFileName, sourceFromText, sourceVersion } from '../src/source';
+import {
+  appFileName,
+  erasesServerCode,
+  sourceFromText,
+  sourceVersion,
+} from '../src/source';
 
 describe('sourceVersion', () => {
   it('matches the server fingerprint (first 16 hex of SHA-256)', () => {
@@ -35,5 +40,27 @@ describe('appFileName', () => {
 
   it('falls back for an empty name', () => {
     expect(appFileName('  ')).toBe('app.js');
+  });
+});
+
+describe('erasesServerCode', () => {
+  const code = sourceVersion('bot.turn(10);');
+  const empty = sourceVersion('');
+
+  it('flags an empty file pushed over real server code', () => {
+    expect(erasesServerCode('', code)).toBe(true);
+  });
+
+  it('treats a whitespace-only file as empty', () => {
+    expect(erasesServerCode('  \n\t\n', code)).toBe(true);
+  });
+
+  it('allows an empty file when the server copy is already empty', () => {
+    expect(erasesServerCode('', empty)).toBe(false);
+  });
+
+  it('allows any non-empty push', () => {
+    expect(erasesServerCode('bot.turn(20);', code)).toBe(false);
+    expect(erasesServerCode('bot.turn(20);', empty)).toBe(false);
   });
 });
