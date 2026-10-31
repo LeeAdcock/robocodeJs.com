@@ -14,7 +14,7 @@ import { ArenaStatus } from './arenaStatus';
 import { ArenaPanel } from './arenaPanel';
 import { ArenaTree } from './arenaTree';
 import { Fault, faultToProblem, toProblems } from './problems';
-import { sourceFromText, sourceVersion } from './source';
+import { erasesServerCode, sourceFromText, sourceVersion } from './source';
 
 export async function activate(context: vscode.ExtensionContext) {
   const serverUrl = vscode.workspace
@@ -280,6 +280,15 @@ export async function activate(context: vscode.ExtensionContext) {
     const server = (await client.listApps()).find((a) => a.appId === appId);
     if (!server) throw new Error('This app no longer exists on the server.');
     if (server.version === local) return; // Nothing to push.
+    if (erasesServerCode(source, server.version)) {
+      const choice = await vscode.window.showWarningMessage(
+        `This file is empty. Saving it will erase "${server.name}"'s code on ` +
+          'RobocodeJs, and it cannot be recovered.',
+        { modal: true },
+        'Erase Server Code'
+      );
+      if (choice !== 'Erase Server Code') return;
+    }
     if (base && server.version !== base) {
       const choice = await vscode.window.showWarningMessage(
         `"${server.name}" was changed on RobocodeJs since you opened it, ` +
