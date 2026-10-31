@@ -2,7 +2,7 @@
   "name": "robocodejs",
   "displayName": "RobocodeJs",
   "description": "Write, check and run your RobocodeJs tank apps from VS Code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "robocode-js",
   "private": true,
   "license": "MIT",
@@ -128,6 +128,12 @@
         "title": "Run Match",
         "category": "RobocodeJs",
         "icon": "$(run-all)"
+      },
+      {
+        "command": "robocodejs.watchArenaInBrowser",
+        "title": "Watch Arena in Browser",
+        "category": "RobocodeJs",
+        "icon": "$(link-external)"
       }
     ],
     "menus": {
@@ -192,6 +198,11 @@
           "command": "robocodejs.showLogs",
           "when": "robocodejs.appEditor",
           "group": "navigation@3"
+        },
+        {
+          "command": "robocodejs.watchArenaInBrowser",
+          "when": "activeWebviewPanelId == 'robocodejs.arena'",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -221,6 +232,10 @@
         },
         {
           "command": "robocodejs.runMatch",
+          "when": "robocodejs.signedIn"
+        },
+        {
+          "command": "robocodejs.watchArenaInBrowser",
           "when": "robocodejs.signedIn"
         }
       ]

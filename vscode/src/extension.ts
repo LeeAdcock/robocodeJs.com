@@ -11,6 +11,7 @@ import { AppsTree } from './appsTree';
 import { AppWorkspace } from './workspace';
 import { BotLogs } from './botLogs';
 import { ArenaStatus } from './arenaStatus';
+import { ArenaPanel } from './arenaPanel';
 import { Fault, faultToProblem, toProblems } from './problems';
 import { sourceFromText, sourceVersion } from './source';
 
@@ -39,12 +40,14 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.languages.createDiagnosticCollection('robocodejs-runtime');
   const log = (line: string) => output.appendLine(line);
   const arenaStatus = new ArenaStatus(client, log);
+  const arenaPanel = new ArenaPanel(serverUrl, context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('robocodejs.apps', tree),
     diagnostics,
     runtime,
     output,
-    arenaStatus
+    arenaStatus,
+    arenaPanel
   );
 
   // Everything live (bot logs, the arena status) runs only while signed in.
@@ -369,7 +372,16 @@ export async function activate(context: vscode.ExtensionContext) {
       'robocodejs.watchArena',
       guarded(async () => {
         const arena = await client.defaultArena();
-        await vscode.env.openExternal(vscode.Uri.parse(arena.watchUrl));
+        await arenaPanel.show(arena.arenaId);
+      })
+    ),
+    vscode.commands.registerCommand(
+      'robocodejs.watchArenaInBrowser',
+      guarded(async () => {
+        const arena = await client.defaultArena();
+        await vscode.env.openExternal(
+          vscode.Uri.parse(await arenaPanel.watchUrl(arena.arenaId))
+        );
       })
     ),
     vscode.commands.registerCommand(
@@ -402,8 +414,7 @@ export async function activate(context: vscode.ExtensionContext) {
           'Watch Arena',
           'Bot Logs'
         );
-        if (choice === 'Watch Arena')
-          await vscode.env.openExternal(vscode.Uri.parse(result.watchUrl));
+        if (choice === 'Watch Arena') await arenaPanel.show(arena.arenaId);
         else if (choice === 'Bot Logs') botLogs.show();
       })
     ),

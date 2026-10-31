@@ -82,7 +82,7 @@ export class ArenaStatus implements vscode.Disposable {
             .join('  \n')
         : 'No apps in the arena.'
     );
-    tooltip.appendMarkdown('\n\nClick to watch the arena.');
+    tooltip.appendMarkdown('\n\nClick to open the arena panel.');
     this.item.tooltip = tooltip;
     this.item.show();
   }
