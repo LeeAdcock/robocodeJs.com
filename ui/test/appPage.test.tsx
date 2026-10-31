@@ -36,7 +36,7 @@ vi.mock('../src/page/app/appEditor', () => ({
   EDITOR_FONT_DEFAULT: 12,
 }));
 import axios from 'axios';
-import AppPage from '../src/page/app/appPage';
+import AppPage, { EMPTY_SAVE_PROMPT } from '../src/page/app/appPage';
 
 const emitter = { addListener: vi.fn(), removeListener: vi.fn() } as any;
 const arena = { clock: { time: 0 }, apps: [] } as any;
@@ -314,5 +314,126 @@ describe('AppPage (bot editor)', () => {
     expect(await screen.findByText('No errors found.')).toBeTruthy();
     expect(screen.queryByText(/E017:/)).toBeNull();
     expect(editor.getAttribute('data-clear-markers')).not.toBe(markersBefore);
+  });
+
+  describe('never silently saves an empty buffer over saved code', () => {
+    // The stub is an uncontrolled textarea whose DOM value starts at '', and
+    // React ignores a change to the value the node already holds, so type
+    // something first and then clear it (select-all + delete).
+    const clearEditor = () => {
+      const editor = screen.getByTestId('editor');
+      fireEvent.change(editor, { target: { value: 'x' } });
+      fireEvent.change(editor, { target: { value: '' } });
+    };
+    const sourcePuts = () =>
+      vi
+        .mocked(axios.put)
+        .mock.calls.filter(([url]) => url === '/api/user/u1/app/a1/source');
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('does not auto-save a cleared editor over the stored code', async () => {
+      const confirm = vi.spyOn(window, 'confirm');
+      vi.useFakeTimers();
+      try {
+        renderPage();
+        await vi.advanceTimersByTimeAsync(0);
+        clearEditor();
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(axios.put).not.toHaveBeenCalled();
+        // Auto-save skips quietly; it never pops a prompt on its own.
+        expect(confirm).not.toHaveBeenCalled();
+        expect(screen.getByRole('status').textContent).toBe('Unsaved changes');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('asks before Deploy erases the code, and declining saves and compiles nothing', async () => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      renderPage();
+      await screen.findByTestId('editor');
+      await act(async () => undefined);
+      clearEditor();
+
+      fireEvent.click(screen.getByLabelText('Deploy bot'));
+      await act(async () => undefined);
+
+      expect(confirm).toHaveBeenCalledWith(EMPTY_SAVE_PROMPT);
+      expect(sourcePuts()).toHaveLength(0);
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Could not save/)).toBeNull();
+    });
+
+    it('declining on Reboot saves nothing and does not reboot', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      renderPage();
+      await screen.findByTestId('editor');
+      await act(async () => undefined);
+      clearEditor();
+
+      fireEvent.click(screen.getByLabelText('Reboot bot'));
+      await act(async () => undefined);
+
+      expect(sourcePuts()).toHaveLength(0);
+      expect(axios.post).not.toHaveBeenCalled();
+    });
+
+    it('saves the empty app and deploys once the user confirms', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderPage();
+      await screen.findByTestId('editor');
+      await act(async () => undefined);
+      clearEditor();
+
+      fireEvent.click(screen.getByLabelText('Deploy bot'));
+
+      expect(
+        await screen.findByText('Saved. The arena is running your latest code.')
+      ).toBeTruthy();
+      expect(sourcePuts()).toEqual([
+        [
+          '/api/user/u1/app/a1/source',
+          '',
+          { headers: { 'content-type': 'application/octet-stream' } },
+        ],
+      ]);
+      expect(axios.post).toHaveBeenCalledWith('/api/user/u1/app/a1/compile');
+    });
+
+    it('does not prompt for an ordinary non-empty save', async () => {
+      const confirm = vi.spyOn(window, 'confirm');
+      renderPage();
+      await screen.findByTestId('editor');
+      fireEvent.change(screen.getByTestId('editor'), {
+        target: { value: 'bot.turn(90)' },
+      });
+
+      fireEvent.click(screen.getByLabelText('Deploy bot'));
+
+      expect(
+        await screen.findByText('Saved. The arena is running your latest code.')
+      ).toBeTruthy();
+      expect(confirm).not.toHaveBeenCalled();
+    });
+
+    it('does not prompt when the app was already empty (nothing to erase)', async () => {
+      const confirm = vi.spyOn(window, 'confirm');
+      vi.mocked(axios.get).mockImplementation((url: string) =>
+        url.endsWith('/source')
+          ? (Promise.resolve({ data: '' }) as never)
+          : (Promise.resolve({ data: { id: 'a1', name: 'New' } }) as never)
+      );
+      renderPage();
+      await screen.findByTestId('editor');
+      await act(async () => undefined);
+
+      fireEvent.click(screen.getByLabelText('Deploy bot'));
+
+      expect(
+        await screen.findByText('Saved. The arena is running your latest code.')
+      ).toBeTruthy();
+      expect(confirm).not.toHaveBeenCalled();
+    });
   });
 });

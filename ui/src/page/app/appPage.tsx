@@ -5,7 +5,7 @@ import Editor, {
 } from './appEditor';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Toolbar from './appEditorToolbar';
 import SaveIndicator, { SaveState } from './appSaveIndicator';
 import AppLogsDock from './appLogsDock';
@@ -29,7 +29,19 @@ interface AppPageProps {
   emitter: Emitter;
 }
 
+export const EMPTY_SAVE_PROMPT =
+  "The editor is empty. Saving will erase this app's code, and it cannot be recovered. Save anyway?";
+
+// One editor instance per app. Keying by appId remounts on an app switch, so
+// a buffer (and its pending auto-save) can never outlive the app it was loaded
+// from: without it, the previous app's code sat in state until the next app's
+// source arrived, and a save in that window wrote it into the wrong app.
 export default function AppPage(props: AppPageProps) {
+  const { appId } = useParams();
+  return <AppEditorPage key={appId} {...props} />;
+}
+
+function AppEditorPage(props: AppPageProps) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [code, setCode] = useState('');
@@ -129,11 +141,27 @@ export default function AppPage(props: AppPageProps) {
       .then((res) => setApp(res.data));
   }, [userId, appId]);
 
+  // True when `source` would erase code that is currently saved.
+  const isWipe = (source: string) =>
+    source.trim() === '' && !!savedCode && savedCode.trim() !== '';
+
   // The one path that persists source. `savedCode` only advances once the PUT
   // resolves, so a failed save leaves the indicator reading "Unsaved changes"
   // — the point of the indicator is that it never claims the arena has code it
   // doesn't have.
   const saveSource = (source: string) => {
+    // Until this app's source has loaded the buffer isn't its code (it's the
+    // initial ''), so there is nothing safe to write.
+    if (savedCode === undefined) {
+      return Promise.reject(new Error('source not loaded'));
+    }
+    // Never silently replace saved code with an empty buffer: the server keeps
+    // no history, so that write is unrecoverable. (A stale-closure Ctrl-S once
+    // did exactly this.) An explicit save asks first; a decline rejects like a
+    // failed save so the follow-up compile/reboot doesn't run.
+    if (isWipe(source) && !window.confirm(EMPTY_SAVE_PROMPT)) {
+      return Promise.reject(new Error('empty save declined'));
+    }
     setSaving(true);
     return axios
       .put(`/api/user/${userId}/app/${appId}/source`, source, {
@@ -156,6 +184,9 @@ export default function AppPage(props: AppPageProps) {
     // Nothing changed since the last save/load, or the load hasn't landed yet
     // — skip the pointless PUT.
     if (savedCode === undefined || code === savedCode) return;
+    // Clearing the editor (e.g. select-all before a paste) must not autosave
+    // over the stored code; only an explicit, confirmed save can do that.
+    if (isWipe(code)) return;
     const timer = setTimeout(() => {
       saveSource(code)
         .then(() => {
@@ -168,6 +199,36 @@ export default function AppPage(props: AppPageProps) {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, savedCode, userId, appId]);
+
+  // Leaving the editor (another app, another page) must not drop edits the
+  // debounce hasn't saved yet: flush them on unmount. The ref carries the
+  // latest buffer into the cleanup; a deleted app is skipped.
+  const pendingSave = useRef({ code, savedCode, deleted: false });
+  pendingSave.current = { ...pendingSave.current, code, savedCode };
+  useEffect(
+    () => () => {
+      const { code, savedCode, deleted } = pendingSave.current;
+      if (deleted || savedCode === undefined || code === savedCode) return;
+      if (code.trim() === '' && savedCode.trim() !== '') return;
+      axios
+        .put(`/api/user/${userId}/app/${appId}/source`, code, {
+          headers: { 'content-type': 'application/octet-stream' },
+        })
+        .catch(() => undefined);
+    },
+    // userId/appId are fixed for this instance (it is keyed by appId).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  // Closing or reloading the tab can't be flushed reliably, so warn instead.
+  const unsaved = saveState === 'unsaved';
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [unsaved]);
 
   const doExecute = () => {
     saveSource(code)
@@ -193,13 +254,18 @@ export default function AppPage(props: AppPageProps) {
   };
 
   const doDelete = () => {
+    pendingSave.current.deleted = true;
     axios
       .delete(`/api/user/${userId}/app/${appId}`)
       .then(props.doDelete)
       // The just-deleted app's editor route no longer points at anything, so
       // return to the homepage (the arena stays in the right pane; the navbar's
       // app list is refreshed by props.doDelete).
-      .then(() => navigate(`/`));
+      .then(() => navigate(`/`))
+      // Still here with the app intact: edits must flush on leave again.
+      .catch(() => {
+        pendingSave.current.deleted = false;
+      });
   };
 
   // Copy a share link for this app to the clipboard. The link points at the
