@@ -1267,6 +1267,8 @@ export const buildServer = (user: User): McpServer => {
         'instance took from it\n' +
         '- `metrics.conflictedUsers` — users this instance serves right now ' +
         'whose home is another instance\n' +
+        '- `metrics.leaseQueries` — database queries the home-lease layer has ' +
+        'issued since this instance started\n' +
         '- `metrics.forwardedRequests` / `metrics.forwardFailures` / ' +
         '`metrics.misdirectedRequests` — counts since this instance started: ' +
         'requests it passed to a user’s home instance, forwards that failed ' +

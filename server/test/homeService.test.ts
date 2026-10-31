@@ -257,6 +257,67 @@ describe('HomeService.resolve', () => {
   });
 });
 
+describe('HomeService lookups (read before claim)', () => {
+  it("finds another instance's live lease with one read and no write", async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    const before = a.metrics().leaseQueries;
+    expect(await a.resolve(U1, T0 + 1000)).toMatchObject({
+      instanceId: 'b',
+      local: false,
+    });
+    expect(a.metrics().leaseQueries - before).toBe(1);
+    expect(await holder(U1)).toEqual({ instanceId: 'b', epoch: 1 });
+  });
+
+  it('a lookup that forwards elsewhere is not a conflict', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    await a.resolve(U1, T0 + 1000);
+    expect(a.metrics()).toMatchObject({
+      leaseConflicts: 0,
+      conflictedUsers: 0,
+    });
+  });
+
+  it('claims straight away when the lease has expired', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    expect(await a.resolve(U1, T0 + LEASE_MS + 1)).toMatchObject({
+      instanceId: 'a',
+      epoch: 2,
+      local: true,
+    });
+  });
+
+  it('claim(…, serving = false) never counts a conflict', async () => {
+    const a = instance('a');
+    const b = instance('b');
+    await b.claim(U1, T0);
+    expect(await a.claim(U1, T0 + 1000, false)).toMatchObject({
+      local: false,
+    });
+    expect(a.metrics().leaseConflicts).toBe(0);
+    // A claim while actually serving still does.
+    await a.claim(U1, T0 + 2000);
+    expect(a.metrics().leaseConflicts).toBe(1);
+  });
+
+  it('counts every lease query', async () => {
+    const a = instance('a');
+    expect(a.metrics().leaseQueries).toBe(0);
+    await a.claim(U1, T0); // upsert + read-back
+    expect(a.metrics().leaseQueries).toBe(2);
+    await a.resolve(U1, T0 + 1000); // held: answered from memory
+    expect(a.metrics().leaseQueries).toBe(2);
+    await a.reconcile(() => new Set([U1]), T0 + 10_000); // renew + read
+    expect(a.metrics().leaseQueries).toBe(4);
+  });
+});
+
 describe('HomeService.releaseAll', () => {
   it("deletes only this instance's rows and claims nothing afterwards", async () => {
     const a = instance('a');

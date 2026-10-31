@@ -360,7 +360,7 @@ export const createForwarding = ({
         // The home may have died. If its lease has lapsed, take the user over
         // and serve here; an unparsed body has already been read off the
         // socket, so that client retries (Retry-After) and lands here.
-        const claimed = await homes.claim(userId);
+        const claimed = await homes.claim(userId, undefined, false);
         if (claimed?.local && canServeHere) return next();
         return unavailable(res);
       }
@@ -467,7 +467,7 @@ export const createForwarding = ({
       }
       homes.forget(ownerId);
       if (result === 'unreachable') {
-        const claimed = await homes.claim(ownerId);
+        const claimed = await homes.claim(ownerId, undefined, false);
         if (claimed?.local) return undefined;
         metrics.failures++;
         throw new HomeUnavailableError();
