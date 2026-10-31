@@ -16,7 +16,8 @@ vi.mock('vscode', () => {
   class ThemeIcon {
     constructor(readonly id: string) {}
   }
-  return { EventEmitter, DataTransferItem, TreeItem, ThemeIcon };
+  const commands = { executeCommand: async () => undefined };
+  return { EventEmitter, DataTransferItem, TreeItem, ThemeIcon, commands };
 });
 
 import { APPS_MIME, ArenaTree } from '../src/arenaTree';
@@ -115,5 +116,24 @@ describe('Apps to Default Arena drag and drop', () => {
     apps.handleDrag([app('b')], fromApps);
     await apps.handleDrop(undefined, fromApps);
     expect(apps.onRemoveFromArena).not.toHaveBeenCalled();
+  });
+});
+
+describe('each app shows in exactly one list', () => {
+  it('leaves arena apps out of the Apps list but can still find them', () => {
+    const apps = new AppsTree();
+    apps.setApps([app('a'), app('b'), app('c')]);
+    apps.setInArena(['b']);
+    expect(apps.getChildren().map((a) => a.appId)).toEqual(['a', 'c']);
+    expect(apps.find('b')?.appId).toBe('b');
+  });
+
+  it('puts an app back in the Apps list when it leaves the arena', () => {
+    const apps = new AppsTree();
+    apps.setApps([app('a'), app('b')]);
+    apps.setInArena(['a', 'b']);
+    expect(apps.getChildren()).toEqual([]);
+    apps.setInArena([]);
+    expect(apps.getChildren().map((a) => a.appId)).toEqual(['a', 'b']);
   });
 });

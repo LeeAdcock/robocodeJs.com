@@ -40,15 +40,16 @@ export async function activate(context: vscode.ExtensionContext) {
   const runtime =
     vscode.languages.createDiagnosticCollection('robocodejs-runtime');
   const log = (line: string) => output.appendLine(line);
-  // The Default Arena list adds/removes through these, defined below once the
+  // The Arena Apps list adds/removes through these, defined below once the
   // error reporting they use exists.
   const arenaTree = new ArenaTree(
     (appId) => tree.find(appId),
     (appIds) => addToArena(appIds)
   );
-  const arenaStatus = new ArenaStatus(client, log, (status) =>
-    arenaTree.setStatus(status)
-  );
+  const arenaStatus = new ArenaStatus(client, log, (status) => {
+    arenaTree.setStatus(status);
+    tree.setInArena(status?.standings.map((s) => s.id) ?? []);
+  });
   const arenaPanel = new ArenaPanel(serverUrl, context.extensionUri);
   context.subscriptions.push(
     vscode.window.createTreeView('robocodejs.apps', {
@@ -210,8 +211,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const appId = doc && workspace.appIdFor(doc.uri);
     return appId && doc ? { appId, doc } : undefined;
   };
-  const appIdArg = (arg?: AppSummary): string | undefined =>
-    arg?.appId ?? activeApp()?.appId;
+  // Commands run from the Apps list get an AppSummary, from the Arena Apps
+  // list a match standing (`id`), from the palette or editor title nothing.
+  const appIdArg = (arg?: AppSummary | { id: string }): string | undefined =>
+    (arg && ('appId' in arg ? arg.appId : arg.id)) ?? activeApp()?.appId;
 
   const checkDocument = async (doc: vscode.TextDocument) => {
     const problems = toProblems(await client.check(doc.getText()));
@@ -405,7 +408,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       'robocodejs.compile',
-      guarded(async (arg?: AppSummary) => {
+      guarded(async (arg?: AppSummary | { id: string }) => {
         const appId = appIdArg(arg);
         if (!appId) throw new Error('Open an app to compile it.');
         await saveFirst(appId);
@@ -420,7 +423,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       'robocodejs.reboot',
-      guarded(async (arg?: AppSummary) => {
+      guarded(async (arg?: AppSummary | { id: string }) => {
         const appId = appIdArg(arg);
         if (!appId) throw new Error('Open an app to reboot it.');
         await saveFirst(appId);
@@ -461,26 +464,15 @@ export async function activate(context: vscode.ExtensionContext) {
         // unsaved app edits first so the match runs what's on screen.
         for (const doc of vscode.workspace.textDocuments)
           if (workspace.appIdFor(doc.uri) && doc.isDirty) await doc.save();
-        const result = await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: 'Running a match in your arena…',
-          },
-          () => client.runMatch(arena.arenaId)
-        );
+        // A fresh match at normal speed, opened where it can be watched; the
+        // status bar names the winner once it's decided.
+        await client.startMatch(arena.arenaId);
+        await arenaPanel.show(arena.arenaId);
         void arenaStatus.refresh();
-        const outcome = result.timedOut
-          ? 'The match was not decided in time.'
-          : result.match.winner
-            ? `${result.match.winner.name ?? 'An app'} won the match.`
-            : 'The match ended without a winner.';
-        const choice = await vscode.window.showInformationMessage(
-          outcome,
-          'Watch Arena',
-          'Bot Logs'
+        vscode.window.setStatusBarMessage(
+          '$(play) New match started at normal speed',
+          4000
         );
-        if (choice === 'Watch Arena') await arenaPanel.show(arena.arenaId);
-        else if (choice === 'Bot Logs') botLogs.show();
       })
     ),
 
