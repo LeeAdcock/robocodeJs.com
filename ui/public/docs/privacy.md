@@ -32,7 +32,7 @@ RobocodeJs is a competitive game, so some things are visible to others by design
 - **Spectating.** If you share your arena's watch link, anyone with the link can watch your matches live: bot names, positions, and battle events.
 - **Sharing a bot.** If you share a bot's add-link, other players can field your bot in their own arenas.
 
-Your bot's **source code is private to you unless you make it public**. Spectators and players who add your bot see only its behavior in the arena, never the code. If you switch an app to public (the toggle on its toolbar), anyone can read its source from the rankings page, from an arena it was added to, or through the API, until you switch it back. Your email address is never shown publicly.
+Your bot's **source code is private to you unless you make it public**. Spectators and players who add your bot see only its behavior in the arena, never the code. If you make an app public (the eye button on its toolbar), anyone can read its source from the rankings page, from an arena it was added to, or through the API, until you switch it back. Your email address is never shown publicly.
 
 Your display name comes from your Google account, which for many people is their real name. If you'd rather compete under a different name, change the display name on your Google account.
 

@@ -83,7 +83,9 @@ describe('PublicAppPage', () => {
     expect(axios.get).toHaveBeenCalledWith('/api/public/app/a2');
     expect(screen.getByText('Skirmisher')).toBeTruthy();
     expect(screen.getByText(/by Dana K\./)).toBeTruthy();
-    expect(screen.getByText(/rating 1655/)).toBeTruthy();
+    // The header is name + author only; the record stays on the rankings page.
+    expect(screen.queryByText(/rating/)).toBeNull();
+    expect(screen.queryByText(/ranked wins/)).toBeNull();
     // Signed out: no roster lookup, and the actions explain why they're off.
     expect(axios.get).not.toHaveBeenCalledWith(
       expect.stringContaining('/arena/members')

@@ -166,6 +166,41 @@ describe('tournament board', () => {
     expect(mine.map((e: { appId: string }) => e.appId)).toEqual([a1]);
   });
 
+  it('carries an app’s public flag (and so its id) through both boards', async () => {
+    // GitHub #478 regression: the candidate SQL once omitted the isPublic
+    // column, so every board row read as private and the rankings never linked
+    // a public bot to its source, even though the flag was stored. This runs
+    // the real query, where a mocked pool can't notice a missing column.
+    const a1 = await addApp(ALICE, 'Open', 1800);
+    await addApp(BOB, 'Closed', 1650);
+    const app = await appService.get(a1);
+    await app!.setPublic(true);
+
+    const board = await appService.getLeaderboard(20); // anonymous viewer
+    expect(
+      board.map((e) => [e.name, e.public, e.appId ?? null, e.own])
+    ).toEqual([
+      ['Open', true, a1, false],
+      ['Closed', false, null, false],
+    ]);
+
+    const t = await tournamentService.create(ALICE, 'Club');
+    await tournamentService.join(t.id, BOB);
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(
+      res.body.entries.map(
+        (e: { name: string; public: boolean; appId?: string }) => [
+          e.name,
+          e.public,
+          e.appId ?? null,
+        ]
+      )
+    ).toEqual([
+      ['Open', true, a1],
+      ['Closed', false, null],
+    ]);
+  });
+
   it('400s a malformed id and 404s an unknown one', async () => {
     expect((await api().get('/api/tournaments/not-a-uuid')).status).toBe(400);
     expect((await api().get(`/api/tournaments/${MISSING}`)).status).toBe(404);

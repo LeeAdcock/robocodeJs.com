@@ -195,8 +195,7 @@ export default function PublicAppPage(props: PublicAppPageProps) {
                   {title}
                 </h1>
                 <span style={{ color: '#888', marginLeft: '8px' }}>
-                  by {app.ownerName} · rating {app.rating} · {app.wins}/
-                  {app.games} ranked wins · read-only
+                  by {app.ownerName}
                 </span>
               </>
             )}

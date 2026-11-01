@@ -66,26 +66,46 @@ describe('EditorToolbar labels', () => {
   });
 });
 
-describe('EditorToolbar visibility switch', () => {
-  it('shows the current state as its label and flips through the handler', () => {
+describe('EditorToolbar visibility button', () => {
+  it('is an icon-only toolbar button that reports private and flips through the handler', () => {
     const doToggleVisibility = vi.fn();
     renderToolbar(noop, { isPublic: false, doToggleVisibility });
 
-    // A switch, not a button: the state is the point. Private by default.
-    const toggle = screen.getByLabelText('Public source') as HTMLInputElement;
-    expect(toggle.checked).toBe(false);
-    expect(screen.getByText('Private')).toBeTruthy();
+    // Same style as its neighbours (icon-only), with the state on aria-pressed
+    // rather than a text label, so the toolbar keeps its single row.
+    const toggle = screen.getByLabelText('Public source');
+    expect(toggle.tagName).toBe('BUTTON');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.textContent).toBe('');
 
     fireEvent.click(toggle);
     expect(doToggleVisibility).toHaveBeenCalledTimes(1);
   });
 
-  it('reads Public when the app is public', () => {
+  it('tells the share tooltip what the link grants in each state', async () => {
+    renderToolbar(noop, { isPublic: false });
+    fireEvent.mouseOver(screen.getByLabelText('Copy share link'));
+    expect(
+      await screen.findByText(
+        /private, so anyone who follows the link can add it to their arena and watch its bots play, but cannot read its source/
+      )
+    ).toBeTruthy();
+    cleanup();
+
     renderToolbar(noop, { isPublic: true });
-    const toggle = screen.getByLabelText('Public source') as HTMLInputElement;
-    expect(toggle.checked).toBe(true);
-    expect(screen.getByText('Public')).toBeTruthy();
-    expect(screen.queryByText('Private')).toBeNull();
+    fireEvent.mouseOver(screen.getByLabelText('Copy share link'));
+    expect(
+      await screen.findByText(
+        /public, so anyone who follows the link can add it to their arena and read its source/
+      )
+    ).toBeTruthy();
+  });
+
+  it('reports pressed when the app is public', () => {
+    renderToolbar(noop, { isPublic: true });
+    expect(
+      screen.getByLabelText('Public source').getAttribute('aria-pressed')
+    ).toBe('true');
   });
 });
 
