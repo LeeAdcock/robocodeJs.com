@@ -33,7 +33,7 @@ const LEADERBOARD_SCAN_LIMIT = 500;
 // board can never disagree with the global one about who is ranked above whom.
 const leaderboardCandidateSql = (memberJoin = '') =>
   `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
-                app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins"
+                app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.isPublic as "isPublic"
          FROM app JOIN account ON account.id = app.userId${memberJoin}
          WHERE NOT app.deleted
            AND NOT COALESCE(app.broken, false)

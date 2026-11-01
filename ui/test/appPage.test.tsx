@@ -166,10 +166,8 @@ describe('AppPage (bot editor)', () => {
     // state and only then shows Public (and says what public means).
     renderPage();
     await screen.findByTestId('editor');
-    const toggle = (await screen.findByLabelText(
-      'Public source'
-    )) as HTMLInputElement;
-    expect(toggle.checked).toBe(false);
+    const toggle = await screen.findByLabelText('Public source');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
 
     fireEvent.click(toggle);
     expect(axios.put).toHaveBeenCalledWith('/api/user/u1/app/a1/visibility', {
@@ -177,8 +175,8 @@ describe('AppPage (bot editor)', () => {
     });
     expect(await screen.findByText(/This app is now public/)).toBeTruthy();
     expect(
-      (screen.getByLabelText('Public source') as HTMLInputElement).checked
-    ).toBe(true);
+      screen.getByLabelText('Public source').getAttribute('aria-pressed')
+    ).toBe('true');
   });
 
   it('a failed visibility change leaves the switch where it was', async () => {
@@ -190,8 +188,8 @@ describe('AppPage (bot editor)', () => {
       await screen.findByText(/Could not change the app’s visibility/)
     ).toBeTruthy();
     expect(
-      (screen.getByLabelText('Public source') as HTMLInputElement).checked
-    ).toBe(false);
+      screen.getByLabelText('Public source').getAttribute('aria-pressed')
+    ).toBe('false');
   });
 
   it('does NOT re-save the just-loaded source when the debounce elapses', async () => {
