@@ -109,6 +109,11 @@ describe('PublicAppPage', () => {
   it('"Add to my arena" hands a signed-in viewer to the share-link page', async () => {
     renderAt({ user });
     await screen.findByTestId('source');
+    // Its tooltip wrapper is a nested btn-group, so the button keeps grouped
+    // corners next to Download instead of rendering as a lone rounded pill.
+    expect(
+      screen.getByLabelText('Add to my arena').parentElement?.className
+    ).toContain('btn-group');
     await waitFor(() =>
       expect(
         (screen.getByLabelText('Add to my arena') as HTMLButtonElement).disabled
