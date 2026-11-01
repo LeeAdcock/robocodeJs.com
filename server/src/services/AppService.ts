@@ -3,9 +3,7 @@ import App, { AppId } from '../types/app';
 import pool from '../util/db';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_RATING } from '../util/elo';
-import { abbreviateName } from '../util/displayName';
-import { sanitizeBotName } from '../util/botName';
-import { isNameProfane } from '../util/nameFilter';
+import { publicOwnerName } from '../util/displayName';
 import rankedMatchService from './RankedMatchService';
 
 // Tank sprite color names, mirroring the UI palette (ui/src/util/colors.ts;
@@ -108,12 +106,18 @@ export interface LadderCandidate {
 // `color` is the tank sprite color for the row (derived from the real app id),
 // present on EVERY row — the UI renders it directly and never learns the real
 // id. `appId` is the REAL app id and is present ONLY on rows the viewer owns
-// (undefined otherwise), so the board never leaks other users' app ids while
-// the viewer can still recognize and act on their own bots.
+// or whose owner made the app public (undefined otherwise), so the board never
+// leaks a private app's id while the viewer can still recognize and act on
+// their own bots and follow a public bot to its source. `public` marks the
+// rows whose source anyone can read at the public app route (GitHub #117).
 export interface LeaderboardEntry {
   rank: number;
   color: string;
   appId?: AppId;
+  // True on the viewer's own rows (false for an anonymous viewer). Was implied
+  // by `appId` until public apps also carried one; the UI bolds these.
+  own: boolean;
+  public: boolean;
   name: string;
   ownerName: string;
   rating: number;
@@ -139,14 +143,15 @@ pool.query(`
     ratingWins integer default 0,
     lastRankedAt timestamp,
     broken boolean default false,
+    isPublic boolean default false,
     createdTimestamp timestamp default CURRENT_TIMESTAMP,
     updatedTimestamp timestamp default CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
   )
 `);
-// Backfill the global-ladder columns (GitHub #151) on databases whose `app`
-// table predates them. No-ops where the CREATE above already added them (fresh
-// pg-mem in dev/test). Wrapped like ArenaMemberService so a mocked pool.query is
+// Backfill the global-ladder columns (GitHub #151) and the source-visibility
+// flag (GitHub #117) on databases whose `app` table predates them. No-ops where
+// the CREATE above already added them (fresh pg-mem in dev/test). Wrapped like ArenaMemberService so a mocked pool.query is
 // safe and an engine lacking `ADD COLUMN IF NOT EXISTS` can't crash boot.
 Promise.resolve(
   pool.query(`
@@ -155,6 +160,7 @@ Promise.resolve(
     ALTER TABLE app ADD COLUMN IF NOT EXISTS ratingWins integer default 0;
     ALTER TABLE app ADD COLUMN IF NOT EXISTS lastRankedAt timestamp;
     ALTER TABLE app ADD COLUMN IF NOT EXISTS broken boolean default false;
+    ALTER TABLE app ADD COLUMN IF NOT EXISTS isPublic boolean default false;
   `)
 ).catch(() => undefined);
 
@@ -177,7 +183,7 @@ export class AppService {
   get = (appId: AppId): Promise<App | undefined> => {
     return pool
       .query({
-        text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source", app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.broken as "broken" FROM app WHERE id=$1 AND NOT deleted',
+        text: 'SELECT app.userId as "userId", app.name as "name", app.source as "source", app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.broken as "broken", app.isPublic as "isPublic" FROM app WHERE id=$1 AND NOT deleted',
         values: [appId],
       })
       .then((res) => {
@@ -188,6 +194,7 @@ export class AppService {
           ratingGames: row.ratingGames,
           ratingWins: row.ratingWins,
           broken: row.broken,
+          isPublic: row.isPublic,
         });
       });
   };
@@ -299,23 +306,21 @@ export class AppService {
 
       const games = (row.ratingGames as number | null) ?? 0;
       const wins = (row.ratingWins as number | null) ?? 0;
-      // The owner name comes from Google (account.name); apply the same
-      // precautions bot names get before showing it publicly. We can't
-      // reject a sign-in, so a profane owner name falls back to Anonymous
-      // (their real name is untouched elsewhere, e.g. their own avatar).
-      const owner = sanitizeBotName(row.ownerName as string | null);
+      const isPublic = (row.isPublic as boolean | null) ?? false;
+      const own = ownerId === viewerUserId;
       entries.push({
         rank,
         // Sprite color for every row, derived from the app id (the id itself
-        // never leaves the server).
+        // never leaves the server for a private app).
         color: colorForAppId(row.appId as string),
-        // Real app id ONLY on the viewer's own rows; omitted for others so
-        // the public board never leaks foreign app ids.
-        appId: ownerId === viewerUserId ? (row.appId as AppId) : undefined,
+        // Real app id ONLY on the viewer's own rows and on public apps (the
+        // id is what the public source link needs); omitted for a private
+        // app someone else owns, so the board never leaks a private app id.
+        appId: own || isPublic ? (row.appId as AppId) : undefined,
+        own,
+        public: isPublic,
         name: (row.name as string | null) ?? 'Unnamed',
-        // Abbreviate to "First L." so the public endpoint never exposes a
-        // full surname.
-        ownerName: isNameProfane(owner) ? 'Anonymous' : abbreviateName(owner),
+        ownerName: publicOwnerName(row.ownerName as string | null),
         rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
         games,
         wins,
@@ -423,7 +428,7 @@ export class AppService {
   getForUser = (userId: UserId): Promise<App[]> => {
     return pool
       .query({
-        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source", app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.broken as "broken" FROM app WHERE userId=$1 AND NOT deleted ORDER BY app.id',
+        text: 'SELECT app.id as "appId", app.name as "name", app.source as "source", app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.broken as "broken", app.isPublic as "isPublic" FROM app WHERE userId=$1 AND NOT deleted ORDER BY app.id',
         values: [userId],
       })
       .then((res) =>
@@ -433,6 +438,7 @@ export class AppService {
             ratingGames: row.ratingGames,
             ratingWins: row.ratingWins,
             broken: row.broken,
+            isPublic: row.isPublic,
           })
         )
       );

@@ -68,7 +68,9 @@ To enter the background ladder an app must have real (non-empty) source, not be 
 
 ## Can other players see my source code?
 
-No. Your source is private to your account. Sharing an arena watch link lets others spectate your bots, and sharing an app link lets another player add your app to their arena, but in both cases they only ever see your bots _behaving_, never the code behind them.
+Not unless you choose to. Every app starts **private**: sharing an arena watch link lets others spectate your bots, and sharing an app link lets another player add your app to their arena, but in both cases they only ever see your bots _behaving_, never the code behind them.
+
+If you want other players to learn from your code, switch the **Public** toggle on the app's toolbar. A public app's source can be read by anyone: its name on the [rankings](/leaderboard) page becomes a link to a read-only view, players who added it to their arena get the same link in their arena's app list, and AI assistants connected over [MCP](/mcp) can read it too. Nobody but you can edit it, and switching the toggle back makes it private again.
 
 ## How do I replay the exact same match?
 

@@ -28,13 +28,16 @@ const app = express();
 // "add existing bot by UUID" / share-link flow, where the caller has only the
 // bot's id and not its owner's userId. Gated to any signed-in user by the
 // `app.use('/api/app', auth(true))` line in index.ts. Returns NO source — source
-// stays behind the owner-gated /user/:userId/app/:appId/source route.
+// stays behind the owner-gated /user/:userId/app/:appId/source route, or, for
+// an app whose owner made it public, the anonymous GET /api/public/app/:appId
+// (api/publicApp.ts); `public` tells the share-link page whether that exists.
 app.get('/api/app/:appId', loadApp, (req, res) => {
   const target = scopedApp(req);
   res.json({
     id: target.getId(),
     name: target.getName(),
     userId: target.getUserId(),
+    public: target.isPublic(),
   });
 });
 
@@ -74,8 +77,37 @@ app.get('/api/user/:userId/app/:appId', loadUser, loadApp, (req, res) => {
   res.json({
     id: app.getId(),
     name: app.getName(),
+    // Whether the owner has made the source public (GitHub #117) — drives the
+    // editor toolbar's visibility toggle.
+    public: app.isPublic(),
   });
 });
+
+// Set whether the app's source is public (GitHub #117). Owner-only, like every
+// other write: making an app public widens exactly one thing — who may READ its
+// source (the public app route, the rankings link, an arena roster it was added
+// to) — and never who may edit, compile, reboot, or delete it. Body:
+// `{ public: boolean }`; anything else is a 400. Toggling visibility is not a
+// code change, so App.setPublic leaves updatedTimestamp (the ladder's edit
+// signal) alone.
+app.put(
+  '/api/user/:userId/app/:appId/visibility',
+  writeRateLimit,
+  loadUser,
+  requireOwner,
+  loadApp,
+  requireAppOwner,
+  async (req, res) => {
+    const isPublic = (req.body as { public?: unknown } | undefined)?.public;
+    if (typeof isPublic !== 'boolean') {
+      res.status(400).json({ error: 'Expected { public: boolean }.' });
+      return;
+    }
+    const app = scopedApp(req);
+    await app.setPublic(isPublic);
+    res.status(200).json({ public: isPublic });
+  }
+);
 
 // Put app source code
 app.put(

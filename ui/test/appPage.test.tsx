@@ -161,6 +161,39 @@ describe('AppPage (bot editor)', () => {
     ).toBeTruthy();
   });
 
+  it('the visibility switch publishes the app and reflects the server-confirmed state', async () => {
+    // GitHub #117: the app loads private; flipping the switch PUTs the new
+    // state and only then shows Public (and says what public means).
+    renderPage();
+    await screen.findByTestId('editor');
+    const toggle = (await screen.findByLabelText(
+      'Public source'
+    )) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+
+    fireEvent.click(toggle);
+    expect(axios.put).toHaveBeenCalledWith('/api/user/u1/app/a1/visibility', {
+      public: true,
+    });
+    expect(await screen.findByText(/This app is now public/)).toBeTruthy();
+    expect(
+      (screen.getByLabelText('Public source') as HTMLInputElement).checked
+    ).toBe(true);
+  });
+
+  it('a failed visibility change leaves the switch where it was', async () => {
+    vi.mocked(axios.put).mockRejectedValueOnce(new Error('offline'));
+    renderPage();
+    await screen.findByTestId('editor');
+    fireEvent.click(await screen.findByLabelText('Public source'));
+    expect(
+      await screen.findByText(/Could not change the app’s visibility/)
+    ).toBeTruthy();
+    expect(
+      (screen.getByLabelText('Public source') as HTMLInputElement).checked
+    ).toBe(false);
+  });
+
   it('does NOT re-save the just-loaded source when the debounce elapses', async () => {
     vi.useFakeTimers();
     try {

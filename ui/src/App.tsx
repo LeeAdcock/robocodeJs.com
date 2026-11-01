@@ -51,6 +51,9 @@ const LeaderboardPage = lazy(
 );
 const TournamentPage = lazy(() => import('./page/leaderboard/tournamentPage'));
 const ProfilePage = lazy(() => import('./page/profile/profilePage'));
+// Read-only source of an app its owner made public (GitHub #117), linked from
+// the rankings and arena rosters. Public like /leaderboard.
+const PublicAppPage = lazy(() => import('./page/app/publicAppPage'));
 // Admin control panel (GitHub #469): its own chunk, so ordinary visitors never
 // download it. The page gates itself and renders "Page not found" to anyone
 // the server doesn't confirm as an admin.
@@ -626,6 +629,20 @@ function App() {
                   <Route
                     path="user/:userId/arena/logs"
                     element={<ArenaLogPage />}
+                  />
+                  <Route
+                    path="/app/:appId"
+                    element={
+                      <PublicAppPage
+                        user={user}
+                        onCloned={() =>
+                          user &&
+                          axios
+                            .get(`/api/user/${user.id}`)
+                            .then((res) => setUser(res.data))
+                        }
+                      />
+                    }
                   />
                   <Route
                     path="/add-app/:appId"

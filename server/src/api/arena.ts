@@ -236,7 +236,9 @@ const setEnabled = async (req: Request, res: Response) => {
 
 // The arena's full bot roster — INCLUDING disabled bots, which the live status
 // omits (they have no Process). Source of truth for the UI roster panel. Returns
-// metadata only (name + owner), never source. Owner-gated on the arena.
+// metadata only (name + owner), never source — `public` says whether the app's
+// owner opened its source to everyone (GitHub #117), in which case the roster
+// can link to the public app page. Owner-gated on the arena.
 const listMembers = async (req: Request, res: Response) => {
   const arena = scopedArena(req);
   const ownerId = scopedUser(req).getId();
@@ -266,6 +268,7 @@ const listMembers = async (req: Request, res: Response) => {
         enabled: member.getEnabled(),
         addedTimestamp: member.getTimestamp(),
         isOwn: appOwnerId === ownerId,
+        public: app?.isPublic() ?? false,
       };
     })
   );

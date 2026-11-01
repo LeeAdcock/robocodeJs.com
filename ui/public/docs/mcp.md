@@ -38,8 +38,9 @@ Once connected, these tools are available (all scoped to your account, except th
 
 **Apps**
 
-- `list_apps`: list your apps (each with its current source `version`)
-- `get_app_source`: read an app's source
+- `list_apps`: list your apps (each with its current source `version` and whether its source is `public`)
+- `get_app_source`: read an app's source (yours, or any app its owner made public)
+- `set_app_visibility`: make an app's source public or private. A public app's code can be read by anyone (the rankings link to it); only you can edit it
 - `create_app`: create an app (optionally with a name and initial source)
 - `set_app_source`: replace an app's source (live arenas pick it up). Returns a `version` — a content fingerprint (truncated SHA-256) of the source you saved
 - `compile_app`: re-run an app's current saved source in your live arenas (does not change the source or re-fire `START`; use `set_app_source` / `reboot_app`)

@@ -24,7 +24,7 @@ The **display board** adds a couple of rules on top of eligibility:
 | Per-owner cap | Each player shows at most **3** bots on the board, so one prolific player can't fill it. |
 | Order | By **rating** (highest first), then by number of ranked games as a tie-break. |
 
-The board shows each bot's name, its owner (abbreviated), its rating, and its win percentage. It never exposes anyone's source code.
+The board shows each bot's name, its owner (abbreviated), its rating, and its win percentage. A bot's source stays private unless its author switched the app to public, in which case its name links to a read-only view of the code.
 
 # How ranked matches run
 

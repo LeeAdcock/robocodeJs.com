@@ -7,13 +7,16 @@ vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 import axios from 'axios';
 import LeaderboardPage from '../src/page/leaderboard/leaderboardPage';
 
-// Wire shape: every row has a sprite `color`; only the viewer's own rows carry
-// a real `appId` (server-authoritative). Row 1 is the viewer's, row 2 isn't.
+// Wire shape: every row has a sprite `color`; `own` marks the viewer's rows and
+// a real `appId` rides along on own and public rows (server-authoritative). Row
+// 1 is the viewer's (private), row 2 is someone else's private bot.
 const rows = [
   {
     rank: 1,
     color: 'blue',
     appId: 'a1',
+    own: true,
+    public: false,
     name: 'Overlord',
     ownerName: 'Lee A.',
     rating: 1712,
@@ -24,6 +27,8 @@ const rows = [
   {
     rank: 2,
     color: 'red',
+    own: false,
+    public: false,
     name: 'Skirmisher',
     ownerName: 'Dana K.',
     rating: 1655,
@@ -62,8 +67,8 @@ describe('LeaderboardPage', () => {
   });
 
   it('bolds rows for bots the viewer owns and leaves others normal', async () => {
-    // Ownership is server-authoritative now: a row is the viewer's iff the
-    // server included its real appId (row 1 here), so no client prop is needed.
+    // Ownership is server-authoritative: the `own` flag (row 1 here), so no
+    // client prop is needed.
     vi.mocked(axios.get).mockResolvedValue({ data: rows } as never);
     render(
       <MemoryRouter>
@@ -74,6 +79,25 @@ describe('LeaderboardPage', () => {
     const otherRow = screen.getByText('Skirmisher').closest('tr')!;
     expect(ownRow.style.fontWeight).toBe('700');
     expect(otherRow.style.fontWeight).toBe('400');
+  });
+
+  it('links a public bot to its read-only source and leaves private bots plain', async () => {
+    // GitHub #117: a public row carries the appId its link needs; a private
+    // row (even the viewer's own) has no source page to link to.
+    const withPublic = [rows[0], { ...rows[1], appId: 'a2', public: true }];
+    vi.mocked(axios.get).mockResolvedValue({ data: withPublic } as never);
+    render(
+      <MemoryRouter>
+        <LeaderboardPage />
+      </MemoryRouter>
+    );
+    const link = (await screen.findByText('Skirmisher')).closest('a');
+    expect(link?.getAttribute('href')).toBe('/app/a2');
+    expect(screen.getByText('Overlord').closest('a')).toBeNull();
+    // Public does not make a foreign row read as the viewer's own.
+    expect(screen.getByText('Skirmisher').closest('tr')!.style.fontWeight).toBe(
+      '400'
+    );
   });
 
   it('renders movement: rank change plus new-and-winning, nothing otherwise', async () => {

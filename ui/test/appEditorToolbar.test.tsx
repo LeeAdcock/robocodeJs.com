@@ -19,13 +19,18 @@ vi.mock('../src/page/app/appEditor', () => ({
 import EditorToolbar from '../src/page/app/appEditorToolbar';
 
 const noop = () => undefined;
-const renderToolbar = (doDelete: () => void) =>
+const renderToolbar = (
+  doDelete: () => void,
+  opts: { isPublic?: boolean; doToggleVisibility?: () => void } = {}
+) =>
   render(
     <EditorToolbar
       code="bot.setName('x')"
       appName="My Bot"
       doDelete={doDelete}
       doShare={noop}
+      isPublic={opts.isPublic ?? false}
+      doToggleVisibility={opts.doToggleVisibility ?? noop}
       doClean={noop}
       doCheck={noop}
       doExecute={noop}
@@ -58,6 +63,29 @@ describe('EditorToolbar labels', () => {
     expect(screen.getByLabelText('Check for errors').textContent).toBe('');
     expect(screen.getByLabelText('Reformat code').textContent).toBe('');
     expect(screen.getByLabelText('Copy share link').textContent).toBe('');
+  });
+});
+
+describe('EditorToolbar visibility switch', () => {
+  it('shows the current state as its label and flips through the handler', () => {
+    const doToggleVisibility = vi.fn();
+    renderToolbar(noop, { isPublic: false, doToggleVisibility });
+
+    // A switch, not a button: the state is the point. Private by default.
+    const toggle = screen.getByLabelText('Public source') as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    expect(screen.getByText('Private')).toBeTruthy();
+
+    fireEvent.click(toggle);
+    expect(doToggleVisibility).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads Public when the app is public', () => {
+    renderToolbar(noop, { isPublic: true });
+    const toggle = screen.getByLabelText('Public source') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    expect(screen.getByText('Public')).toBeTruthy();
+    expect(screen.queryByText('Private')).toBeNull();
   });
 });
 

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import LeaderboardEntry from '../../types/leaderboardEntry';
 
 // The ranked table shared by the global board (leaderboardPage) and personal
@@ -101,9 +102,12 @@ export default function LeaderboardTable({
       <tbody>
         {entries.map((e) => {
           const top3 = e.rank <= 3;
-          // The server includes the real appId only on the viewer's own
-          // rows, so its presence is the authoritative "is mine" signal.
-          const isOwn = e.appId != null;
+          // Server-authoritative: the viewer's own rows are bolded.
+          const isOwn = e.own;
+          // A bot its owner made public (GitHub #117) links to the read-only
+          // view of its source; the server includes the appId exactly when
+          // there is such a page to link to.
+          const sourceLink = e.public && e.appId ? `/app/${e.appId}` : null;
           const first = top3 ? goldFirstCell(numCell) : numCell;
           const c = top3 ? goldCell(cell) : cell;
           const n = top3 ? goldCell(numCell) : numCell;
@@ -140,7 +144,17 @@ export default function LeaderboardTable({
                   }}
                   alt=""
                 />
-                {e.name}
+                {sourceLink ? (
+                  <Link
+                    to={sourceLink}
+                    title="Public bot: read its source"
+                    aria-label={`${e.name}: read its source`}
+                  >
+                    {e.name}
+                  </Link>
+                ) : (
+                  e.name
+                )}
               </td>
               <td style={{ ...c, color: '#888' }}>{e.ownerName}</td>
               <td style={n}>{e.rating}</td>

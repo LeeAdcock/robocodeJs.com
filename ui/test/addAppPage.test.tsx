@@ -43,6 +43,23 @@ describe('AddAppPage', () => {
     expect(axios.get).not.toHaveBeenCalled();
   });
 
+  it('links to the read-only source when the app is public', async () => {
+    // GitHub #117: the metadata lookup says whether the owner opened the
+    // source, so the confirm page can offer it alongside "Add".
+    vi.mocked(axios.get).mockResolvedValue({
+      data: { name: 'shared bot', public: true },
+    } as never);
+    renderAt({ user });
+    const link = await screen.findByText(/read its source/i);
+    expect(link.closest('a')?.getAttribute('href')).toBe('/app/xyz');
+  });
+
+  it('offers no source link for a private app', async () => {
+    renderAt({ user });
+    await screen.findByText(/Shared Bot/i);
+    expect(screen.queryByText(/read its source/i)).toBeNull();
+  });
+
   it('previews the app name and adds it on confirm', async () => {
     renderAt({ user });
     // Metadata resolved for the confirm prompt.

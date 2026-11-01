@@ -107,6 +107,7 @@ describe('mcp tools', () => {
         getSource: () => 'CODE',
         getRating: () => 1500,
         getRatingGames: () => 0,
+        isPublic: () => false,
       },
     ] as never);
     const client = await connect();
@@ -122,6 +123,7 @@ describe('mcp tools', () => {
         version: sourceVersion('CODE'),
         rating: 1500,
         ratingGames: 0,
+        public: false,
       },
     ]);
   });
@@ -234,6 +236,7 @@ describe('mcp tools', () => {
     vi.mocked(appService.get).mockResolvedValue({
       getUserId: () => 'someone-else',
       getSource: () => 'SECRET',
+      isPublic: () => false,
     } as never);
     const client = await connect();
     const res = (await client.callTool({
@@ -243,6 +246,62 @@ describe('mcp tools', () => {
 
     expect(res.isError).toBe(true);
     expect(textOf(res)).not.toContain('SECRET');
+  });
+
+  it("get_app_source reads another user's app once its owner made it public", async () => {
+    // GitHub #117: a public app's source is readable by anyone, including over
+    // MCP — the counterpart of the anonymous GET /api/public/app/:appId.
+    vi.mocked(appService.get).mockResolvedValue({
+      getUserId: () => 'someone-else',
+      getName: () => 'Shared',
+      getSource: () => 'PUBLIC CODE',
+      isPublic: () => true,
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'get_app_source',
+      arguments: { appId: 'a1' },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(res.isError).toBeFalsy();
+    expect(textOf(res)).toBe('PUBLIC CODE');
+  });
+
+  it('set_app_visibility publishes an owned app and reports the new state', async () => {
+    const setPublic = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(appService.get).mockResolvedValue({
+      getId: () => 'a1',
+      getUserId: () => 'u1',
+      setPublic,
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_app_visibility',
+      arguments: { appId: 'a1', public: true },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(res.isError).toBeFalsy();
+    expect(setPublic).toHaveBeenCalledWith(true);
+    expect(JSON.parse(textOf(res))).toEqual({ appId: 'a1', public: true });
+  });
+
+  it("set_app_visibility refuses another user's app (public is the owner's call)", async () => {
+    const setPublic = vi.fn();
+    vi.mocked(appService.get).mockResolvedValue({
+      getId: () => 'a1',
+      getUserId: () => 'someone-else',
+      // Even an already-public app can't be flipped by a non-owner.
+      isPublic: () => true,
+      setPublic,
+    } as never);
+    const client = await connect();
+    const res = (await client.callTool({
+      name: 'set_app_visibility',
+      arguments: { appId: 'a1', public: false },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(res.isError).toBe(true);
+    expect(setPublic).not.toHaveBeenCalled();
   });
 
   it('set_app_source persists + propagates via the shared helper', async () => {

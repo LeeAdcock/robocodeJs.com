@@ -5,6 +5,7 @@ import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 import Modal from 'react-bootstrap/Modal';
+import Form from 'react-bootstrap/Form';
 
 import {
   FaCode,
@@ -25,6 +26,9 @@ interface EditorToolbarProps {
   appName: string;
   doDelete: () => void;
   doShare: () => void;
+  // Whether this app's source is public (GitHub #117) and the toggle for it.
+  isPublic: boolean;
+  doToggleVisibility: () => void;
   doClean: () => void;
   doCheck: () => void;
   doExecute: () => void;
@@ -165,13 +169,51 @@ export default function EditorToolbar(props: EditorToolbarProps) {
           </OverlayTrigger>
         </ButtonGroup>
 
+        {/* Public/private switch (GitHub #117). A switch rather than another
+            icon button: its state is the whole point, and "Public"/"Private"
+            as the visible label says it without a tooltip. Public widens only
+            who can READ the source — the rankings link to it, an arena roster
+            it was added to links to it — never who can edit. */}
+        <OverlayTrigger
+          placement={'bottom'}
+          overlay={
+            <Tooltip id={`app-visibility`}>
+              {props.isPublic
+                ? 'Public: anyone can read this app’s source from the rankings or from an arena it was added to. Only you can edit it. Switch off to make it private again.'
+                : 'Private: only you can read this app’s source. Switch on to make it public so other players can learn from it.'}
+            </Tooltip>
+          }
+        >
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              marginRight: '10px',
+              fontSize: '0.875rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Form.Check
+              type="switch"
+              id="app-visibility"
+              label={props.isPublic ? 'Public' : 'Private'}
+              checked={props.isPublic}
+              onChange={() => props.doToggleVisibility()}
+              aria-label="Public source"
+            />
+          </span>
+        </OverlayTrigger>
+
         <ButtonGroup>
           <OverlayTrigger
             placement={'bottom'}
             overlay={
               <Tooltip id={`share-app`}>
                 Copy a share link. Anyone who follows it can add this app to
-                their own arena (your source stays private).
+                their own arena
+                {props.isPublic
+                  ? ' and, because this app is public, read its source.'
+                  : ' (your source stays private).'}
               </Tooltip>
             }
           >

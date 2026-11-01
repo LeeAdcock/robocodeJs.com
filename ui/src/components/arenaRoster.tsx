@@ -263,6 +263,15 @@ export default function ArenaRoster(props: ArenaRosterProps) {
           <div>
             {orderedMembers.map((member) => {
               const isBusy = busy.has(member.appId);
+              // Your own app opens in the editor; another player's app opens
+              // the read-only view of its source when its owner made it
+              // public (GitHub #117), and is inert otherwise.
+              const canOpen = member.isOwn || !!member.public;
+              const open = () => {
+                if (member.isOwn)
+                  navigate(`/user/${userId}/app/${member.appId}`);
+                else if (member.public) navigate(`/app/${member.appId}`);
+              };
               return (
                 <div
                   key={member.appId}
@@ -277,15 +286,17 @@ export default function ArenaRoster(props: ArenaRosterProps) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        cursor: member.isOwn ? 'pointer' : 'default',
+                        cursor: canOpen ? 'pointer' : 'default',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                       }}
-                      onClick={() =>
-                        member.isOwn &&
-                        navigate(`/user/${userId}/app/${member.appId}`)
+                      title={
+                        !member.isOwn && member.public
+                          ? 'Public app: read its source'
+                          : undefined
                       }
+                      onClick={open}
                     >
                       {titleCase(member.name || 'Unknown')}
                     </div>
@@ -293,6 +304,7 @@ export default function ArenaRoster(props: ArenaRosterProps) {
                       {member.isOwn
                         ? 'you'
                         : member.ownerName || 'another user'}
+                      {!member.isOwn && member.public && ' · source is public'}
                     </div>
                   </div>
                   <OverlayTrigger

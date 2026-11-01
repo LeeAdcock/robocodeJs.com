@@ -153,6 +153,16 @@ const ownedApp = async (user: User, appId: string): Promise<App | null> => {
   return app && app.getUserId() === user.getId() ? app : null;
 };
 
+// Resolve an app whose SOURCE the user may read: their own, or one whose owner
+// made it public (GitHub #117) — the MCP counterpart of the anonymous
+// GET /api/public/app/:appId. Read-only callers only; every write still goes
+// through ownedApp.
+const readableApp = async (user: User, appId: string): Promise<App | null> => {
+  const app = await appService.get(appId);
+  if (!app) return null;
+  return app.getUserId() === user.getId() || app.isPublic() ? app : null;
+};
+
 // Resolve the arena to act on: the given id must belong to the user. Every MCP
 // tool requires arenaId explicitly (no silent default-arena fallback — logs and
 // state are arena-specific, so the caller must name the arena deliberately);
@@ -343,9 +353,11 @@ export const buildServer = (user: User): McpServer => {
       title: 'List apps',
       description:
         "List the authenticated user's apps (appId, name, current source " +
-        '`version`, and global-ladder rating). `version` is the content ' +
-        'fingerprint of the app’s saved source — the same value set_app_source ' +
-        'returns — so you can match a listed app to a specific source revision.',
+        '`version`, global-ladder rating, and whether the source is `public`). ' +
+        '`version` is the content fingerprint of the app’s saved source — the ' +
+        'same value set_app_source returns — so you can match a listed app to ' +
+        'a specific source revision. `public` means anyone can read the ' +
+        'source (see set_app_visibility).',
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -358,6 +370,7 @@ export const buildServer = (user: User): McpServer => {
           version: sourceVersion(a.getSource()),
           rating: a.getRating(),
           ratingGames: a.getRatingGames(),
+          public: a.isPublic(),
         }))
       );
     }
@@ -370,8 +383,9 @@ export const buildServer = (user: User): McpServer => {
       description:
         'The global bot ladder: the top-rated bots across all users by Elo ' +
         '(bot name, owner, rating, games, win rate). Not user-scoped — public ' +
-        "ranking data, no source. Only the calling user's own bots include an " +
-        '`appId`; every row carries an opaque `id`.',
+        'ranking data, no source. A row includes an `appId` only when the bot ' +
+        'is the calling user’s own or its owner made it `public`; a public ' +
+        'bot’s source can then be read with get_app_source.',
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -384,13 +398,16 @@ export const buildServer = (user: User): McpServer => {
     'get_app_source',
     {
       title: 'Get app source',
-      description: "Return an app's JavaScript source code.",
+      description:
+        "Return an app's JavaScript source code. Works for your own apps and " +
+        'for any app whose owner made it public (e.g. one on the leaderboard ' +
+        'with an `appId`); another user’s private app is refused.',
       inputSchema: { appId: z.string().describe('The app id') },
       annotations: READ_ONLY,
     },
     async ({ appId }) => {
-      const app = await ownedApp(user, appId);
-      if (!app) return fail('No such app, or it is not yours.');
+      const app = await readableApp(user, appId);
+      if (!app) return fail('No such app, or it is not yours and not public.');
       const source = app.getSource();
       // An empty string reads as ambiguous to a model (error? blank app?). Be
       // explicit that the app simply has no source yet.
@@ -609,6 +626,33 @@ export const buildServer = (user: User): McpServer => {
       if (!app) return fail('No such app, or it is not yours.');
       await rebootInUserArenas(user.getId(), app.getId());
       return ok({ appId, rebooted: true });
+    }
+  );
+
+  server.registerTool(
+    'set_app_visibility',
+    {
+      title: 'Set app visibility',
+      description:
+        'Make an app’s source public or private. A public app’s code can be ' +
+        'read by anyone — from the rankings, from any arena it was added to, ' +
+        'and via get_app_source — while only you can still edit it. Apps are ' +
+        'private by default. Not a code change: it does not affect the ' +
+        'app’s rating or ladder standing.',
+      inputSchema: {
+        appId: z.string().describe('The app id'),
+        public: z
+          .boolean()
+          .describe('true to publish the source, false to make it private'),
+      },
+      outputSchema: { appId: z.string(), public: z.boolean() },
+      annotations: IDEMPOTENT,
+    },
+    async ({ appId, public: isPublic }) => {
+      const app = await ownedApp(user, appId);
+      if (!app) return fail('No such app, or it is not yours.');
+      await app.setPublic(isPublic);
+      return ok({ appId, public: isPublic });
     }
   );
 
