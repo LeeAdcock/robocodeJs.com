@@ -100,6 +100,9 @@ const mockApp = (id: string) => ({
   // propagateSource reads this before saving, to spot a ladder-benched app being
   // put back in the running (the Field Repair badge, GitHub #121).
   isBroken: () => false,
+  // Source visibility (GitHub #117): private unless a test says otherwise.
+  isPublic: () => false,
+  setPublic: vi.fn().mockResolvedValue(undefined),
   delete: vi.fn().mockResolvedValue(undefined),
 });
 
@@ -292,6 +295,7 @@ describe('app endpoints', () => {
       id: 'aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
       name: 'App aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1',
       userId: '11111111-1111-4111-8111-111111111111',
+      public: false,
     });
     // Never leaks source through the by-id metadata route.
     expect(res.text).not.toContain('bot code');
@@ -447,6 +451,79 @@ describe('app endpoints', () => {
     expect(res.body).toMatchObject({ code: 'E025' });
     // The isolate is never spun up for an oversized dry-run.
     expect(compiler.check).not.toHaveBeenCalled();
+  });
+
+  // Source visibility toggle (GitHub #117).
+  it('GET /api/user/:userId/app/:appId reports whether the source is public', async () => {
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue({
+      ...mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'),
+      isPublic: () => true,
+    } as never);
+    const res = await request(makeApp(appRouter)).get(
+      '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1'
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.public).toBe(true);
+    // Metadata only, even for a public app — source has its own routes.
+    expect(res.body).not.toHaveProperty('source');
+  });
+
+  it('PUT .../app/:appId/visibility lets the owner publish the source', async () => {
+    const app = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1');
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .put(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/visibility'
+      )
+      .send({ public: true });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ public: true });
+    expect(app.setPublic).toHaveBeenCalledWith(true);
+  });
+
+  it('PUT .../app/:appId/visibility rejects a body without a boolean', async () => {
+    const app = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1');
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('11111111-1111-4111-8111-111111111111') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    const res = await request(
+      makeApp(appRouter, mockUser('11111111-1111-4111-8111-111111111111'))
+    )
+      .put(
+        '/api/user/11111111-1111-4111-8111-111111111111/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/visibility'
+      )
+      .send({ public: 'yes' });
+    expect(res.status).toBe(400);
+    expect(app.setPublic).not.toHaveBeenCalled();
+  });
+
+  it("PUT .../app/:appId/visibility cannot publish another user's app", async () => {
+    // Attacker 2222 owns the :userId they pass, but the app belongs to 1111 —
+    // the same IDOR shape requireAppOwner exists for. Flipping a victim's bot
+    // public would leak its source through the public route.
+    const app = mockApp('aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1');
+    vi.mocked(userService.get).mockResolvedValue(
+      mockUser('22222222-2222-4222-8222-222222222222') as never
+    );
+    vi.mocked(appService.get).mockResolvedValue(app as never);
+    const res = await request(
+      makeApp(appRouter, mockUser('22222222-2222-4222-8222-222222222222'))
+    )
+      .put(
+        '/api/user/22222222-2222-4222-8222-222222222222/app/aaaaaaa1-1111-4111-8111-aaaaaaaaaaa1/visibility'
+      )
+      .send({ public: true });
+    expect(res.status).toBe(401);
+    expect(app.setPublic).not.toHaveBeenCalled();
   });
 
   // Object-level access control (A01-1). requireAppOwner must reject a caller
@@ -906,6 +983,9 @@ describe('arena endpoints', () => {
     expect(res.body[1]).toMatchObject({
       appId: 'aaaaaaa2-2222-4222-8222-aaaaaaaaaaa2',
       enabled: false,
+      // The roster says whether a member's source is public (so the UI can
+      // link to it), but still never carries the source itself.
+      public: false,
     });
     // Roster is metadata only — never source.
     expect(JSON.stringify(res.body)).not.toContain('bot code');

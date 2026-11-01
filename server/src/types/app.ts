@@ -7,14 +7,15 @@ import { isNameProfane, NameRejectedError } from '../util/nameFilter';
 
 export type AppId = string & {};
 
-// The subset of ladder fields hydrated from persistence (GitHub #151). Optional
-// so callers that only loaded name/source (or a legacy row predating the ladder
-// columns) get sensible defaults.
+// The subset of ladder fields hydrated from persistence (GitHub #151), plus the
+// visibility flag (GitHub #117). Optional so callers that only loaded
+// name/source (or a legacy row predating these columns) get sensible defaults.
 export interface AppRatingFields {
   rating?: number | null;
   ratingGames?: number | null;
   ratingWins?: number | null;
   broken?: boolean | null;
+  isPublic?: boolean | null;
 }
 
 export default class App {
@@ -29,6 +30,12 @@ export default class App {
   private ratingGames = 0;
   private ratingWins = 0;
   private broken = false;
+  // Whether the owner has opted this app's SOURCE into public view (GitHub
+  // #117). Default private: source is owner-only unless this is set. A public
+  // app's code is readable by anyone — from the rankings, from an arena roster
+  // it was added to, and over the public app route — but it is still only
+  // editable by its owner (visibility never widens any write path).
+  private publicSource = false;
 
   constructor(id: AppId, userId: UserId) {
     this.id = id;
@@ -52,6 +59,7 @@ export default class App {
     this.ratingGames = ratings?.ratingGames ?? 0;
     this.ratingWins = ratings?.ratingWins ?? 0;
     this.broken = ratings?.broken ?? false;
+    this.publicSource = ratings?.isPublic ?? false;
     return this;
   };
 
@@ -106,6 +114,21 @@ export default class App {
       .query({
         text: 'UPDATE app SET broken=$2 WHERE id=$1',
         values: [this.getId(), broken],
+      })
+      .then(() => undefined);
+  };
+
+  isPublic = () => this.publicSource;
+  // Toggle the app's source between public and private. Deliberately does NOT
+  // bump updatedTimestamp: that column is the ladder's "this app's code
+  // changed" signal (see setName), and flipping visibility changes no code, so
+  // it must not reset pair saturation or re-run ranked matches.
+  setPublic = (isPublic: boolean): Promise<undefined> => {
+    this.publicSource = isPublic;
+    return pool
+      .query({
+        text: 'UPDATE app SET isPublic=$2 WHERE id=$1',
+        values: [this.getId(), isPublic],
       })
       .then(() => undefined);
   };

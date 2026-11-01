@@ -44,6 +44,7 @@ import watchArenaEndpoints from './api/watchArena';
 import leaderboardEndpoints from './api/leaderboard';
 import tournamentEndpoints from './api/tournament';
 import profileEndpoints from './api/profile';
+import publicAppEndpoints from './api/publicApp';
 import adminEndpoints from './api/admin';
 
 const app = express();
@@ -171,6 +172,12 @@ app.use(demoEndpoints);
 // share-link visitors can watch a match. Read-only; logs and mutations stay
 // owner-gated under /api/user.
 app.use(watchArenaEndpoints);
+// Public app source (/api/public/app/:appId, GitHub #117): the read-only view
+// of an app whose owner made it public, linked from the rankings and arena
+// rosters. Anonymous like the watch routes above; private apps 404 here, and
+// `/api/public` is outside the `/api/app` gate so the route is reachable
+// logged-out.
+app.use(publicAppEndpoints);
 app.use(helpEndpoints);
 app.use(userEndpoints);
 app.use(appEndpoints);

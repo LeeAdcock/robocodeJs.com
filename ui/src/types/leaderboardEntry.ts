@@ -5,14 +5,17 @@
 //
 // `color` is the tank sprite color for the row (a sprite palette name like
 // 'blue'), present on every row — the UI renders /sprites/tank_<color>.png
-// directly and never learns the real app id. `appId` is the REAL app id and is
-// present ONLY on rows the viewer owns (undefined otherwise), so the board
-// never leaks other users' app ids; its presence is the server-authoritative
-// signal that a row is the viewer's own.
+// directly and never learns a private app's real id. `appId` is the REAL app
+// id and is present only on rows the viewer owns or whose owner made the app
+// `public` (undefined otherwise), so the board never leaks a private app's id.
+// `own` is the server-authoritative "this row is the viewer's" signal; `public`
+// means anyone may read the source at /app/:appId (GitHub #117).
 export default interface LeaderboardEntry {
   rank: number;
   color: string;
   appId?: string;
+  own: boolean;
+  public: boolean;
   name: string;
   ownerName: string;
   rating: number;

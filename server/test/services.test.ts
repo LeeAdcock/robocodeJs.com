@@ -127,6 +127,46 @@ describe('AppService', () => {
     expect(app?.isBroken()).toBe(false);
   });
 
+  it('get() hydrates the source-visibility flag, defaulting legacy NULL to private', async () => {
+    query.mockResolvedValue({
+      rows: [
+        { userId: 'u1', name: 'Open Bot', source: '// code', isPublic: true },
+      ],
+      rowCount: 1,
+    } as never);
+    expect((await appService.get('a1'))?.isPublic()).toBe(true);
+
+    query.mockResolvedValue({
+      rows: [
+        { userId: 'u1', name: 'Old Bot', source: '// code', isPublic: null },
+      ],
+      rowCount: 1,
+    } as never);
+    expect((await appService.get('a1'))?.isPublic()).toBe(false);
+  });
+
+  it('setPublic() persists the flag without bumping updatedTimestamp', async () => {
+    query.mockResolvedValue({
+      rows: [{ userId: 'u1', name: 'Bot', source: 's', isPublic: false }],
+      rowCount: 1,
+    } as never);
+    const app = await appService.get('a1');
+
+    query.mockClear();
+    await app!.setPublic(true);
+    expect(app!.isPublic()).toBe(true);
+    expect(query).toHaveBeenCalledTimes(1);
+    const [{ text, values }] = query.mock.calls[0] as [
+      { text: string; values: unknown[] },
+    ];
+    expect(text).toContain('isPublic=$2');
+    expect(values).toEqual(['a1', true]);
+    // Visibility is not a code change: updatedTimestamp is the ladder's edit
+    // signal (pair saturation, activity gate), so flipping public must not
+    // reset it.
+    expect(text).not.toContain('updatedTimestamp');
+  });
+
   it('applyRatingResult() writes increments and syncs to the returned row', async () => {
     query.mockResolvedValue({
       rows: [{ userId: 'u1', name: 'N', source: 's' }],
@@ -233,10 +273,50 @@ describe('AppService', () => {
     // Viewer u1 sees their own app id, but not the other owner's.
     const board = await appService.getLeaderboard(20, 'u1' as never);
     expect(board[0].appId).toBe('a1');
+    expect(board[0].own).toBe(true);
     expect(board[1].appId).toBeUndefined();
+    expect(board[1].own).toBe(false);
+    expect(board[1].public).toBe(false);
     // Colors are still present on every row regardless of ownership.
     expect(PALETTE).toContain(board[0].color);
     expect(PALETTE).toContain(board[1].color);
+  });
+
+  it('getLeaderboard() exposes the appId of a public app to any viewer', async () => {
+    // GitHub #117: the id is what the board's "view source" link needs, and
+    // the owner opted in — a private foreign app still shows no id.
+    query.mockResolvedValue({
+      rows: [
+        {
+          appId: 'a1',
+          ownerUserId: 'u1',
+          name: 'Open',
+          ownerName: 'Lee',
+          rating: 1700,
+          ratingGames: 10,
+          ratingWins: 6,
+          isPublic: true,
+        },
+        {
+          appId: 'a2',
+          ownerUserId: 'u2',
+          name: 'Closed',
+          ownerName: 'Dana',
+          rating: 1600,
+          ratingGames: 10,
+          ratingWins: 4,
+          isPublic: false,
+        },
+      ],
+      rowCount: 2,
+    } as never);
+    const board = await appService.getLeaderboard(20); // anonymous viewer
+    // Public exposes the id but does not make the row the viewer's own.
+    expect(board[0]).toMatchObject({ appId: 'a1', public: true, own: false });
+    expect(board[1].appId).toBeUndefined();
+    expect(board[1].public).toBe(false);
+    // Still never source.
+    expect(JSON.stringify(board)).not.toContain('source');
   });
 
   it('getLeaderboard() caps each owner at 3 bots and re-ranks', async () => {

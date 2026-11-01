@@ -7,7 +7,7 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 vi.mock('axios', () => ({
   default: {
@@ -102,6 +102,55 @@ describe('ArenaRoster', () => {
 
     const names = screen.getAllByText(/Alpha|Zeta/).map((el) => el.textContent);
     expect(names).toEqual(['Alpha', 'Zeta']);
+  });
+
+  it("opens a public foreign app's source view, and leaves a private one inert", async () => {
+    // GitHub #117: Bob made beta public, so its roster row links to the
+    // read-only source page; Cat's gamma is private and does nothing.
+    const withPublic = [
+      members[0],
+      { ...members[1], public: true },
+      {
+        appId: 'a3',
+        name: 'gamma',
+        ownerName: 'Cat',
+        ownerUserId: 'u3',
+        enabled: true,
+        addedTimestamp: 3,
+        isOwn: false,
+        public: false,
+      },
+    ];
+    setApi({ members: withPublic });
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ArenaRoster
+                show={true}
+                onHide={() => undefined}
+                userId="u1"
+                arena={arena}
+              />
+            }
+          />
+          <Route path="/app/:appId" element={<div>public source page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText('Beta')).toBeTruthy());
+    expect(screen.getByText(/source is public/)).toBeTruthy();
+
+    // The private foreign app's name is not clickable: still on the roster.
+    fireEvent.click(screen.getByText('Gamma'));
+    expect(screen.queryByText('public source page')).toBeNull();
+
+    fireEvent.click(screen.getByText('Beta'));
+    await waitFor(() =>
+      expect(screen.getByText('public source page')).toBeTruthy()
+    );
   });
 
   it('toggling an enabled bot disables it via the enabled endpoint', async () => {

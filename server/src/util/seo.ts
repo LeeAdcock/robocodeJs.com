@@ -358,6 +358,22 @@ export const createSeoResolver = (deps: SeoDeps) => {
       };
     }
 
+    // Public read-only source of an app its owner made public (/app/:appId,
+    // GitHub #117). User-generated and revocable (the owner can flip it back to
+    // private, after which the page is a not-found), so keep it out of the
+    // index like /watch; the explicit entry just gives a shared link a real
+    // title instead of the soft-404 one.
+    if (/^\/app\/[^/]+$/.test(path)) {
+      return {
+        title: `${SITE} | Bot source`,
+        description:
+          'Read the source code of a RobocodeJs bot its author made public.',
+        canonical,
+        ogType: 'website',
+        noindex: true,
+      };
+    }
+
     // Public "watch" spectator page (/watch/:arenaId). A per-arena, ephemeral
     // view — give it a friendly brand title for the browser tab / link preview,
     // but keep it out of the index (it's transient and has no stable content).

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import Button from 'react-bootstrap/Button';
 import Spinner from 'react-bootstrap/Spinner';
 import axios from 'axios';
@@ -9,8 +9,9 @@ import { titleCase } from '../../util/titleCase';
 // Landing page for an app share link (`/add-app/:appId`). The share reference IS
 // the app's id; a signed-in visitor confirms and the app is linked into their
 // arena (add-by-reference — the app is never copied and its source stays
-// owner-private; only its live bots are visible). If not signed in, prompt to
-// sign in first.
+// owner-private unless the owner made the app public, in which case the page
+// also links to the read-only source view). If not signed in, prompt to sign
+// in first.
 interface AddAppPageProps {
   user: User;
   // Refresh the parent after a successful add (so the navbar Apps/arena reflect).
@@ -22,6 +23,7 @@ export default function AddAppPage(props: AddAppPageProps) {
   const navigate = useNavigate();
 
   const [name, setName] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -38,7 +40,10 @@ export default function AddAppPage(props: AddAppPageProps) {
     setLoading(true);
     axios
       .get(`/api/app/${appId}`)
-      .then((res) => setName(res.data.name || 'Unnamed app'))
+      .then((res) => {
+        setName(res.data.name || 'Unnamed app');
+        setIsPublic(res.data.public === true);
+      })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [appId, props.user]);
@@ -108,6 +113,12 @@ export default function AddAppPage(props: AddAppPageProps) {
         other apps. You can remove it any time from the Arena → Manage apps
         menu.
       </p>
+      {isPublic && appId && (
+        <p style={{ color: '#888' }}>
+          Its author made this app public, so you can also{' '}
+          <Link to={`/app/${appId}`}>read its source</Link>.
+        </p>
+      )}
       {error && <div className="text-danger">{error}</div>}
       <div style={{ marginTop: '12px' }}>
         <Button variant="primary" onClick={add} disabled={adding}>

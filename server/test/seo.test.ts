@@ -125,6 +125,12 @@ describe('seo resolver', () => {
     expect(m.title).toContain('Watch');
   });
 
+  it('noindexes a public app source page but gives it a friendly title', () => {
+    const m = resolver().resolve('/app/3f2504e0-4f89-41d3-9a0c-0305e82c3301');
+    expect(m.noindex).toBe(true);
+    expect(m.title).toContain('Bot source');
+  });
+
   it('noindexes a personal tournament board but titles it', () => {
     const m = resolver().resolve(
       '/leaderboard/3f2504e0-4f89-41d3-9a0c-0305e82c3301'

@@ -268,9 +268,35 @@ function AppEditorPage(props: AppPageProps) {
       });
   };
 
+  // Flip the app's source between public and private (GitHub #117). The server
+  // is the source of truth; the local app record is updated once the PUT lands
+  // so the switch never shows a state the server didn't accept.
+  const doToggleVisibility = () => {
+    if (!app) return;
+    const next = !app.public;
+    axios
+      .put(`/api/user/${userId}/app/${appId}/visibility`, { public: next })
+      .then(() => {
+        setApp((current) => (current ? { ...current, public: next } : current));
+        setError('');
+        setNotice(
+          next
+            ? 'This app is now public. Anyone can read its source from the rankings or from an arena it was added to.'
+            : 'This app is now private. Only you can read its source.'
+        );
+        setTimeout(() => setNotice(''), 6000);
+      })
+      .catch(() => {
+        setNotice('');
+        setError('Could not change the app’s visibility. Please try again.');
+        setTimeout(() => setError(''), 15000);
+      });
+  };
+
   // Copy a share link for this app to the clipboard. The link points at the
   // /add-app/:appId landing page, which lets whoever follows it add this app to
-  // their own arena by reference (its source stays owner-private). Uses the
+  // their own arena by reference (its source stays owner-private unless the
+  // app is public — see doToggleVisibility). Uses the
   // async Clipboard API where available (needs a secure context), with a
   // legacy execCommand fallback for plain-http / older browsers.
   const doShare = () => {
@@ -443,6 +469,8 @@ function AppEditorPage(props: AppPageProps) {
               code={code}
               doDelete={doDelete}
               doShare={doShare}
+              isPublic={app?.public ?? false}
+              doToggleVisibility={doToggleVisibility}
               doExecute={doExecute}
               doReboot={doReboot}
               doClean={doClean}
