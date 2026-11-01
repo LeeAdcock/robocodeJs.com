@@ -203,11 +203,11 @@ export default function EditorToolbar(props: EditorToolbarProps) {
             placement={'bottom'}
             overlay={
               <Tooltip id={`share-app`}>
-                Copy a share link. Anyone who follows it can add this app to
-                their own arena
+                {/* Spell out what the link grants in each state, so "share"
+                    is never read as "share my code" when the app is private. */}
                 {props.isPublic
-                  ? ' and, because this app is public, read its source.'
-                  : ' (your source stays private).'}
+                  ? 'Copy a share link. This app is public, so anyone who follows the link can add it to their arena and read its source.'
+                  : 'Copy a share link. This app is private, so anyone who follows the link can add it to their arena and watch its bots play, but cannot read its source.'}
               </Tooltip>
             }
           >

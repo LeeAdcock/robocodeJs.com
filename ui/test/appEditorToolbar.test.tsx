@@ -82,6 +82,25 @@ describe('EditorToolbar visibility button', () => {
     expect(doToggleVisibility).toHaveBeenCalledTimes(1);
   });
 
+  it('tells the share tooltip what the link grants in each state', async () => {
+    renderToolbar(noop, { isPublic: false });
+    fireEvent.mouseOver(screen.getByLabelText('Copy share link'));
+    expect(
+      await screen.findByText(
+        /private, so anyone who follows the link can add it to their arena and watch its bots play, but cannot read its source/
+      )
+    ).toBeTruthy();
+    cleanup();
+
+    renderToolbar(noop, { isPublic: true });
+    fireEvent.mouseOver(screen.getByLabelText('Copy share link'));
+    expect(
+      await screen.findByText(
+        /public, so anyone who follows the link can add it to their arena and read its source/
+      )
+    ).toBeTruthy();
+  });
+
   it('reports pressed when the app is public', () => {
     renderToolbar(noop, { isPublic: true });
     expect(
