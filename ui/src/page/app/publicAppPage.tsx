@@ -288,7 +288,13 @@ export default function PublicAppPage(props: PublicAppPageProps) {
                     </Tooltip>
                   }
                 >
-                  <span>
+                  {/* The span keeps the tooltip working while the button is
+                      disabled, but it also sits between the ButtonGroup and
+                      the Button, so Bootstrap's grouped-corner rules skipped
+                      it and the button drew fully rounded beside Download.
+                      As a nested btn-group it gets the group's corner and
+                      -1px border treatment like a direct child would. */}
+                  <span className="btn-group">
                     <Button
                       size="sm"
                       variant="secondary"
