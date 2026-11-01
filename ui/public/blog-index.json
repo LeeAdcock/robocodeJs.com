@@ -30,6 +30,12 @@
     "summary": "Nobody can read your bot’s source but you. On share links, open spectating, and the difference between sharing the fighter and sharing the blueprint."
   },
   {
+    "slug": "the-part-that-doesnt-go-away",
+    "title": "The part of the job that doesn’t go away",
+    "date": "2026-12-22",
+    "summary": "The typing is getting cheap and the judgment isn’t. Why the Learn course now ends with three lessons on coding with an AI assistant, why they come after you can write a bot yourself, and the four skills no tool is going to make optional."
+  },
+  {
     "slug": "crossing-the-wall",
     "title": "How bot.turn() crosses the wall",
     "date": "2026-12-08",
