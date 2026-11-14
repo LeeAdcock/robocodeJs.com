@@ -38,6 +38,13 @@ export const sourceSizeError = (source: string): string | null => {
 // Persist new source, then re-run it in every *live* arena the bot belongs to so
 // a running bot picks up the change. Saving deliberately does NOT re-fire START
 // (see Environment.execute) — use reboot for that.
+//
+// "Live" means live on THIS instance (getByArenaId reads the local store). The
+// app's owner is homed here, so their own arenas are all covered; an arena of
+// another user who added this app by reference may be homed on a different
+// instance, and it picks the new source up on its next restart instead
+// (Environment.restart reloads every app from the database). Deliberate:
+// GitHub #444 section 5 weighed LISTEN/NOTIFY for this and dropped it.
 export const propagateSource = async (
   app: App,
   source: string
@@ -127,7 +134,10 @@ export const rebootInUserArenas = async (
 };
 
 // Remove a bot from every arena it's in (tearing it out of any live environment),
-// then soft-delete the app.
+// then soft-delete the app. As with propagateSource, only arenas live on this
+// instance are torn down immediately; one homed elsewhere finishes its current
+// match and drops the app on its next restart (the membership row is gone, and
+// appService.get skips deleted apps). See GitHub #444 section 5.
 export const deleteAppEverywhere = async (app: App): Promise<void> => {
   const memberships = await arenaMemberService.getForApp(app.getId());
   await Promise.all(

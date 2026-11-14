@@ -303,6 +303,11 @@ export default class Environment {
     // Last chance: this runs on the 30-minute idle GC, on arena delete, and on
     // shutdown, and the bots (with their stats) are gone immediately after.
     this.flushStats();
+    // Tell open SSE streams the arena is gone so they end rather than sit on a
+    // dead emitter: the browser's EventSource then reconnects and lands on
+    // wherever the arena lives now (rebuilt here, or on the user's new home
+    // instance after a lease takeover, GitHub #444).
+    this.emitter.emit('disposed');
     this.processes.forEach((process) => process.dispose());
   };
 

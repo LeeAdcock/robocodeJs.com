@@ -25,10 +25,13 @@ export const streamArenaLogs = async (
   // The live log stream is not replayable, so a page that opens mid-match would
   // otherwise start blank. Replay the recent-logs buffer first, then stream live.
   env.getRecentLogs().forEach((entry) => listener(entry));
+  const end = () => stream.close();
   env.addListener('log', listener);
+  env.addListener('disposed', end);
 
   req.on('close', () => {
     env.removeListener('log', listener);
+    env.removeListener('disposed', end);
     stream.close();
   });
 };
