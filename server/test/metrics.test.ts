@@ -13,6 +13,19 @@ vi.mock('../src/services/EnvironmentService', () => ({
   },
 }));
 
+// The lease gauges come from HomeService (GitHub #444); mock it so the pool
+// isn't loaded either.
+vi.mock('../src/services/HomeService', () => ({
+  default: {
+    metrics: vi.fn(() => ({
+      homeUsers: 2,
+      leaseTakeovers: 1,
+      leaseConflicts: 0,
+      leasesLost: 0,
+    })),
+  },
+}));
+
 import { collectMetrics } from '../src/util/metrics';
 import environmentService from '../src/services/EnvironmentService';
 
@@ -25,6 +38,13 @@ describe('collectMetrics', () => {
       runningArenas: 2,
       isolates: 5,
       maxAvgTickMs: 4.2,
+    });
+    // So do the home lease gauges.
+    expect(m).toMatchObject({
+      homeUsers: 2,
+      leaseTakeovers: 1,
+      leaseConflicts: 0,
+      leasesLost: 0,
     });
     // Memory gauges are added as whole megabytes.
     expect(typeof m.rssMB).toBe('number');

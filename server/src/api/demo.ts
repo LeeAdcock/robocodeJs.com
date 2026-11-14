@@ -14,9 +14,12 @@ app.get('/api/demo/events', async (req, res) => {
   }
 
   return demoService.getDemoEnvironment().then((env) => {
+    const end = () => stream.close();
     env.addListener('event', listener);
+    env.addListener('disposed', end);
     req.on('close', () => {
       env.removeListener('event', listener);
+      env.removeListener('disposed', end);
       stream.close();
     });
   });

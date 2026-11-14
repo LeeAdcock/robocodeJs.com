@@ -4,6 +4,7 @@ import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import type { AuthenticatedRequest } from './auth';
 import { ErrorCodes } from '../types/ErrorCodes';
 import { logger, LogEvent } from '../util/logger';
+import { isForwarded } from '../util/forwarded';
 
 // Request rate limiting (OWASP A07). Protects the unauthenticated sign-in
 // endpoint from credential stuffing/brute force, and the compute- and
@@ -60,6 +61,10 @@ type LimiterOpts = {
   windowMs: number;
   limit: number;
   keyGenerator?: (req: Request) => string;
+  // IP-keyed limiters count at the edge, the instance the client connected
+  // to. A request another instance forwarded here (GitHub #444) was already
+  // counted there, so these skip it rather than count it twice.
+  edgeOnly?: boolean;
 };
 
 // Factory so tests can build a low-limit limiter with the same behavior as the
@@ -72,7 +77,7 @@ export const makeLimiter = (name: string, opts: LimiterOpts) =>
     legacyHeaders: false,
     keyGenerator: opts.keyGenerator ?? userOrIpKey,
     handler: rejected(name),
-    skip: () => disabled,
+    skip: (req) => disabled || (!!opts.edgeOnly && isForwarded(req)),
   });
 
 // Sign-in / token minting: strict, IP-keyed (the sign-in request has no user
@@ -82,6 +87,7 @@ export const authRateLimit = makeLimiter('auth', {
   windowMs: 10 * 60 * 1000,
   limit: num('RATE_LIMIT_AUTH_MAX', 20),
   keyGenerator: ipKey,
+  edgeOnly: true,
 });
 
 // Isolate-spawning routes (check / compile / reboot): each spins up an 8 MB
@@ -115,4 +121,5 @@ export const apiRateLimit = makeLimiter('api', {
   windowMs: 60 * 1000,
   limit: num('RATE_LIMIT_GENERAL_MAX', 600),
   keyGenerator: ipKey,
+  edgeOnly: true,
 });
