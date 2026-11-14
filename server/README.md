@@ -47,6 +47,7 @@ PostgreSQL connection (see `src/util/db.ts`):
 | `MAX_TOTAL_ARENAS` | global ceiling on concurrently-created arenas across **all** users (default `1000`); creation past it returns `503` |
 | `ADMIN_EMAILS` | comma-separated, case-insensitive allowlist of the Google account emails that may use the admin control panel (`/admin`, `src/api/admin.ts`). Unset or empty means nobody; in local-dev mode the fixed dev user is always an admin |
 | `ARENA_IDLE_PAUSE_MS` | pause a running arena after this long with no open event/log stream and no access (default `300000`, 5 min; `0` disables). The next access resumes it, so it is invisible to players; it is what keeps CPU proportional to players online rather than to arenas touched since the last deploy |
+| `INTERNAL_FORWARD_SECRET` | shared secret that signs requests one instance forwards to a user's home instance (GitHub #444, used from phase 3). **Never commit it**: it is an Elastic Beanstalk environment property set out-of-band, like `RDS_PASSWORD`, so a recreate from `.ebextensions` alone won't carry it. Generate with `openssl rand -hex 32`; every instance must share the same value. Unset means the instance never forwards and serves everything locally. Instances reach each other on node's port 8080 through a self-referencing security-group rule (`.ebextensions/instance-forwarding.config`). |
 
 Global bot ladder (GitHub #151 — `src/services/LadderService.ts`; the background matchmaking loop is **off unless `LADDER_ENABLED=true`**, and never runs under test):
 
