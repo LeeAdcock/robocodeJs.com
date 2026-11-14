@@ -50,6 +50,10 @@ export const LogEvent = {
   HELP_UNANSWERED: 'help.unanswered', // a navbar search matched nothing (docs/routing gap)
   ARENA_IDLE_PAUSE: 'arena.idle_pause', // a running arena with no viewers/access was paused to free CPU
   ARENA_IDLE_WAKE: 'arena.idle_wake', // an idle-paused arena was resumed by a new access
+  HOME_CONFLICT: 'home.conflict', // a user's home lease is held by another instance, so two instances serve them (GitHub #444)
+  HOME_TAKEOVER: 'home.takeover', // this instance took over a user home whose lease had expired
+  HOME_LOST: 'home.lost', // another instance took a user home this one held; its local arenas are dropped
+  HOME_ERROR: 'home.error', // a home lease claim/renew/release failed (served locally regardless)
   ASSET_MISSING: 'asset.missing', // a subresource 404'd — usually a browser on a previous deploy asking for a stale hashed chunk
 } as const;
 

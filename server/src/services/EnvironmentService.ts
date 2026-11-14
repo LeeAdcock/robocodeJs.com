@@ -1,9 +1,10 @@
 import Arena from '../types/arena';
 import Environment, { ArenaId, Process } from '../types/environment';
 import arenaMemberService from './ArenaMemberService';
+import homeService from './HomeService';
 import { logger, LogEvent } from '../util/logger';
 import { recordSandboxStats } from '../util/awardAchievements';
-import { DEMO_USER_ID } from '../types/user';
+import { DEMO_USER_ID, UserId } from '../types/user';
 
 // How long a running arena may go with no viewers and no access before it is
 // paused (see pauseIdle). `0` disables idle pausing.
@@ -26,12 +27,35 @@ export class EnvironmentService {
   // returning user on a paused arena. Just ids, so it costs nothing to keep.
   private wakeOnLoad: Set<ArenaId> = new Set();
 
+  private reconciling = false;
+
   constructor() {
     setInterval(() => {
       this.pauseIdle();
       this.collectGarbage();
+      void this.reconcileHomes();
     }, 10000);
   }
+
+  // Keep this instance's home leases (GitHub #444) matching the users it holds
+  // arenas for: renew them, and release users whose last arena the GC just
+  // collected. A user whose home another instance took over is only counted and
+  // logged (by HomeService) and keeps being served here: with nothing routed on
+  // the leases yet, dropping their arenas would just rebuild them on the next
+  // request. Skipped while a previous pass is still waiting on the database.
+  reconcileHomes = async (now = Date.now()): Promise<void> => {
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+      await homeService.reconcile(this.owners, now);
+    } finally {
+      this.reconciling = false;
+    }
+  };
+
+  // Users with at least one arena held on this instance.
+  owners = (): Set<UserId> =>
+    new Set(Object.values(this.store).map((env) => env.getArena().getUserId()));
 
   // Dispose environments that have been stopped for thirty minutes. Only a
   // stopped arena qualifies: stoppedAt is stamped at construction and on each
@@ -130,6 +154,10 @@ export class EnvironmentService {
     }
 
     this.store[arena.getId()] = env;
+    // Take the owner's home lease now rather than at the next reconcile, so
+    // the lease is in place as soon as their first arena is. Fire-and-forget:
+    // claim never throws, and nothing routes on the result yet.
+    void homeService.claim(ownerId);
     return arenaMemberService
       .getForArena(arena.getId())
       .then((members) =>
