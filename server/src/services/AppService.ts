@@ -56,8 +56,8 @@ const TOURNAMENT_CANDIDATE_SQL = leaderboardCandidateSql(
 // badge for an app sitting at #34).
 //
 // `cap` defaults to the global board's per-owner cap. A personal tournament
-// passes Infinity: it is a small group that wants to see every entry, and no
-// badge depends on a tournament rank.
+// passes its own (Infinity unless the creator set one): it is a small group that
+// usually wants to see every entry, and no badge depends on a tournament rank.
 export const rankWithOwnerCap = (
   ordered: { appId: string; ownerId: string }[],
   cap: number = MAX_APPS_PER_OWNER_ON_BOARD
@@ -214,11 +214,13 @@ export class AppService {
   //
   // `tournamentId` scopes the board to one personal tournament's members (GitHub
   // #119): same ratings, same ordering, ranks renumbered 1..N within the group,
-  // no per-owner cap, and movement rewound within the group too.
+  // and movement rewound within the group too. A tournament has no per-owner cap
+  // unless its creator set one (`ownerCap`, the tournament's maxAppsPerMember);
+  // the global board ignores `ownerCap` and always applies its own.
   getLeaderboard = async (
     limit = 20,
     viewerUserId?: UserId,
-    opts: { tournamentId?: string } = {}
+    opts: { tournamentId?: string; ownerCap?: number } = {}
   ): Promise<LeaderboardEntry[]> => {
     // How far back "movement" looks: the up/down arrow compares each app's
     // current rank to where it stood this long ago. A rolling day is stable
@@ -227,7 +229,9 @@ export class AppService {
 
     const { tournamentId } = opts;
     const ownerCap =
-      tournamentId === undefined ? MAX_APPS_PER_OWNER_ON_BOARD : Infinity;
+      tournamentId === undefined
+        ? MAX_APPS_PER_OWNER_ON_BOARD
+        : (opts.ownerCap ?? Infinity);
     const res = await pool.query(
       tournamentId === undefined
         ? {

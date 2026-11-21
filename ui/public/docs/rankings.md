@@ -73,7 +73,7 @@ Ratings are stored and shown as **whole numbers** (they're rounded after each up
 
 A personal tournament ranks just the bots of a group you choose, like your friends, a class, or a club. Create one from the bottom of the [Global Rankings](/leaderboard) page, then share its link. Anyone with the link can view the board; signing in lets them join.
 
-There are no separate tournament matches. A tournament shows the same global Elo ratings, filtered to the bots of its members and numbered from 1. Joining adds **all** of your rated bots, including ones you write later, and leaving takes them out. Unlike the global board, a tournament shows every member bot rather than capping each player at three. A bot appears once it has played a ranked match on the global ladder.
+There are no separate tournament matches. A tournament shows the same global Elo ratings, filtered to the bots of its members and numbered from 1. Joining adds **all** of your rated bots, including ones you write later, and leaving takes them out. Unlike the global board, a tournament shows every member bot by default rather than capping each player at three. The creator can change that from the board's **Settings**: cap how many bots each member shows (their highest-rated ones, so "3" is each player's top three) and cap how many rows the board shows in total (say, a top 10). Ranks are renumbered over what is shown, and the board says which rules are in effect. A bot appears once it has played a ranked match on the global ladder.
 
 The creator can rename or delete a tournament. Deleting it only removes the board and its link; nobody's bots or ratings change.
 

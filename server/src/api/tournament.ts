@@ -4,8 +4,9 @@ import appService from '../services/AppService';
 import tournamentService, {
   MAX_TOURNAMENT_MEMBERS,
   Tournament,
+  TournamentSettings,
 } from '../services/TournamentService';
-import { MAX_TOURNAMENTS_PER_USER } from '../util/limits';
+import { MAX_APPS_PER_USER, MAX_TOURNAMENTS_PER_USER } from '../util/limits';
 import auth from '../middleware/auth';
 import { writeRateLimit } from '../middleware/rateLimit';
 import { ErrorCodes } from '../types/ErrorCodes';
@@ -36,8 +37,17 @@ import type User from '../types/user';
 const app = express();
 
 // The board is a small group's, but a member brings up to MAX_APPS_PER_USER apps,
-// so show more rows than the global top 20.
+// so show more rows than the global top 20. Also the ceiling on the creator's
+// own `maxEntries` setting.
 const TOURNAMENT_BOARD_LIMIT = 100;
+
+// The most each creator-set board rule may be. A per-member cap above
+// MAX_APPS_PER_USER could never bite, and a row cap above the board limit would
+// be silently clipped — so neither is accepted rather than stored meaninglessly.
+const SETTINGS_LIMITS = {
+  maxAppsPerMember: MAX_APPS_PER_USER,
+  maxEntries: TOURNAMENT_BOARD_LIMIT,
+} as const;
 
 type MaybeUserRequest = Request & { user?: User };
 type TournamentRequest = Request & { user?: User; tournament: Tournament };
@@ -61,6 +71,28 @@ const cleanName = (raw: unknown): { name: string } | { error: string } => {
   if (isNameProfane(name)) return { error: 'Please choose a different name.' };
   return { name };
 };
+
+// Validate one creator-set board rule from a PATCH body. `undefined` (absent)
+// leaves the stored value alone; `null` clears it; otherwise it must be an
+// integer from 1 to `max`. Anything else — a string, 0, a float, too large — is
+// rejected rather than coerced, so a typo never quietly becomes a rule.
+const parseCap = (
+  raw: unknown,
+  max: number,
+  label: string
+): { value: number | null | undefined } | { error: string } => {
+  if (raw === undefined) return { value: undefined };
+  if (raw === null) return { value: null };
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > max)
+    return { error: `${label} must be a whole number from 1 to ${max}.` };
+  return { value: raw };
+};
+
+// The settings the board reports and the PATCH route accepts.
+const settingsOf = (t: Tournament): TournamentSettings => ({
+  maxAppsPerMember: t.maxAppsPerMember,
+  maxEntries: t.maxEntries,
+});
 
 const fail = (res: Response, err: unknown, msg: string) => {
   logger.error({ event: LogEvent.HTTP_ERROR, err }, msg);
@@ -157,9 +189,20 @@ app.get(
       const viewerId = actorId(req);
       const [members, entries] = await Promise.all([
         tournamentService.members(tournament.id),
-        appService.getLeaderboard(TOURNAMENT_BOARD_LIMIT, viewerId, {
-          tournamentId: tournament.id,
-        }),
+        // The creator's rules ride the same machinery as the global board's:
+        // the per-member cap is the rank function's owner cap (so ranks are
+        // renumbered over the kept rows), and the row cap is the display limit.
+        appService.getLeaderboard(
+          Math.min(
+            tournament.maxEntries ?? TOURNAMENT_BOARD_LIMIT,
+            TOURNAMENT_BOARD_LIMIT
+          ),
+          viewerId,
+          {
+            tournamentId: tournament.id,
+            ownerCap: tournament.maxAppsPerMember ?? Infinity,
+          }
+        ),
       ]);
       const owner = members.find((m) => m.userId === tournament.ownerUserId);
       const isOwner =
@@ -176,6 +219,11 @@ app.get(
           viewerId !== undefined && members.some((m) => m.userId === viewerId),
         memberCount: members.length,
         maxMembers: MAX_TOURNAMENT_MEMBERS,
+        // Everyone sees the rules the board was built under (a viewer should
+        // know they're looking at each member's top 3), and the ceilings the
+        // creator's settings form may offer.
+        settings: settingsOf(tournament),
+        settingsLimits: SETTINGS_LIMITS,
         // The member roster is the creator's alone: other viewers see the
         // ranked bots (which already carry owner names) but not who has joined
         // without a ranked bot yet. Display names only — member user ids never
@@ -191,6 +239,11 @@ app.get(
   }
 );
 
+// Rename and/or change the board rules. Every field is optional and only the
+// fields present change: `name` renames, `maxAppsPerMember` / `maxEntries` set a
+// rule (an integer) or clear it (`null`). A body naming none of them is a 400
+// rather than a silent no-op. Everything is validated before anything is
+// written, so a bad name can't land half an update.
 app.patch(
   '/api/tournaments/:tournamentId',
   auth(true),
@@ -199,15 +252,54 @@ app.patch(
   async (req, res) => {
     try {
       const { tournament } = req as TournamentRequest;
-      const parsed = cleanName(req.body?.name);
-      if ('error' in parsed) {
-        res.status(400).json({ error: parsed.error });
-        return;
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const reject = (error: string) => res.status(400).json({ error });
+
+      const perMember = parseCap(
+        body.maxAppsPerMember,
+        SETTINGS_LIMITS.maxAppsPerMember,
+        'Bots per member'
+      );
+      if ('error' in perMember) return reject(perMember.error);
+      const entries = parseCap(
+        body.maxEntries,
+        SETTINGS_LIMITS.maxEntries,
+        'Bots shown'
+      );
+      if ('error' in entries) return reject(entries.error);
+
+      let name: string | undefined;
+      if (body.name !== undefined) {
+        const parsed = cleanName(body.name);
+        if ('error' in parsed) return reject(parsed.error);
+        name = parsed.name;
       }
-      await tournamentService.rename(tournament.id, parsed.name);
-      res.json({ id: tournament.id, name: parsed.name, updated: true });
+
+      const settings = settingsOf(tournament);
+      let settingsChanged = false;
+      if (perMember.value !== undefined) {
+        settings.maxAppsPerMember = perMember.value;
+        settingsChanged = true;
+      }
+      if (entries.value !== undefined) {
+        settings.maxEntries = entries.value;
+        settingsChanged = true;
+      }
+      if (name === undefined && !settingsChanged)
+        return reject('Nothing to update.');
+
+      if (name !== undefined)
+        await tournamentService.rename(tournament.id, name);
+      if (settingsChanged)
+        await tournamentService.updateSettings(tournament.id, settings);
+      res.json({
+        id: tournament.id,
+        name: name ?? tournament.name,
+        settings,
+        updated: true,
+      });
     } catch (err) {
-      fail(res, err, 'failed to rename tournament');
+      fail(res, err, 'failed to update tournament');
     }
   }
 );

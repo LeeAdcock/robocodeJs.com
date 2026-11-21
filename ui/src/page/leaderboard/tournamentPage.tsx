@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import Button from 'react-bootstrap/Button';
-import { TournamentBoard } from '../../types/tournament';
+import { TournamentBoard, TournamentSettings } from '../../types/tournament';
 import LeaderboardTable from './leaderboardTable';
 import { brandTitle, useDocumentTitle } from '../../util/useDocumentTitle';
 import { copyText } from '../../util/copyText';
@@ -10,9 +10,39 @@ import { copyText } from '../../util/copyText';
 // A personal tournament board (GitHub #119) at /leaderboard/:tournamentId. The
 // URL is the join link: anyone holding it can view the board (signed in or not),
 // and a signed-in viewer can join (adding all of their rated apps to it) or
-// leave. The creator can also rename or delete it. Rankings are the global Elo
-// ratings, filtered to members' apps, so nothing here starts a match.
+// leave. The creator can also rename or delete it, and set the board's rules:
+// how many of each member's bots show and how many rows the board has.
+// Rankings are the global Elo ratings, filtered to members' apps, so nothing
+// here starts a match.
 const REFRESH_MS = 30000;
+
+// One sentence describing the creator's board rules for every viewer, so a
+// visitor knows they're looking at (say) each member's top three. Empty when
+// the board is unrestricted — the default needs no explanation.
+const describeSettings = (s: TournamentSettings): string => {
+  const parts: string[] = [];
+  if (s.maxAppsPerMember !== null)
+    parts.push(
+      s.maxAppsPerMember === 1
+        ? 'each member’s best bot'
+        : `each member’s top ${s.maxAppsPerMember} bots`
+    );
+  if (s.maxEntries !== null) parts.push(`the top ${s.maxEntries} overall`);
+  return parts.length ? `Showing ${parts.join(', ')}.` : '';
+};
+
+// A settings input holds the typed text; blank means "no limit".
+const capText = (n: number | null) => (n === null ? '' : String(n));
+const capValue = (text: string): number | null =>
+  text.trim() === '' ? null : Number(text);
+
+const fieldStyle: React.CSSProperties = {
+  padding: '4px 8px',
+  background: 'var(--bg)',
+  color: 'var(--fg)',
+  border: '1px solid var(--rule)',
+  borderRadius: 4,
+};
 
 const apiError = (err: unknown, fallback: string): string => {
   const data = (err as { response?: { data?: { error?: string } } })?.response
@@ -30,6 +60,9 @@ export default function TournamentPage(props: { signedIn: boolean }) {
   const [notice, setNotice] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [perMemberText, setPerMemberText] = useState('');
+  const [entriesText, setEntriesText] = useState('');
   useDocumentTitle(brandTitle(board ? board.name : 'Tournament'));
 
   const load = useCallback(async () => {
@@ -85,6 +118,20 @@ export default function TournamentPage(props: { signedIn: boolean }) {
       await axios.patch(`/api/tournaments/${tournamentId}`, { name: newName });
       setRenaming(false);
     }, 'Could not rename the tournament.');
+  const saveSettings = () =>
+    act(async () => {
+      const settings: TournamentSettings = {
+        maxAppsPerMember: capValue(perMemberText),
+        maxEntries: capValue(entriesText),
+      };
+      // A non-number would serialize as null and silently clear the rule.
+      if (
+        Object.values(settings).some((v) => v !== null && !Number.isFinite(v))
+      )
+        throw new Error('Each limit must be a whole number, or blank.');
+      await axios.patch(`/api/tournaments/${tournamentId}`, settings);
+      setEditingSettings(false);
+    }, 'Each limit must be a whole number, or blank.');
   const remove = async () => {
     if (
       !window.confirm(
@@ -138,7 +185,8 @@ export default function TournamentPage(props: { signedIn: boolean }) {
         <p>
           A personal tournament
           {board.ownerName ? ` created by ${board.ownerName}` : ''}, ranked by{' '}
-          <Link to="/leaderboard">global rating</Link>.
+          <Link to="/leaderboard">global rating</Link>.{' '}
+          {describeSettings(board.settings)}
         </p>
         {/* The roster and the sharing/management controls below are the
           creator's; the server only sends `members` to them. */}
@@ -166,15 +214,7 @@ export default function TournamentPage(props: { signedIn: boolean }) {
               value={link}
               aria-label="Join link"
               onFocus={(e) => e.currentTarget.select()}
-              style={{
-                flex: '1 1 260px',
-                minWidth: 0,
-                padding: '4px 8px',
-                background: 'var(--bg)',
-                color: 'var(--fg)',
-                border: '1px solid var(--rule)',
-                borderRadius: 4,
-              }}
+              style={{ ...fieldStyle, flex: '1 1 260px', minWidth: 0 }}
             />
           )}
           {board.isOwner && (
@@ -215,6 +255,20 @@ export default function TournamentPage(props: { signedIn: boolean }) {
               Rename
             </Button>
           )}
+          {board.isOwner && !editingSettings && (
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              disabled={busy}
+              onClick={() => {
+                setPerMemberText(capText(board.settings.maxAppsPerMember));
+                setEntriesText(capText(board.settings.maxEntries));
+                setEditingSettings(true);
+              }}
+            >
+              Settings
+            </Button>
+          )}
           {board.isOwner && (
             <Button
               size="sm"
@@ -226,6 +280,71 @@ export default function TournamentPage(props: { signedIn: boolean }) {
             </Button>
           )}
         </div>
+
+        {editingSettings && (
+          <form
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 12,
+              alignItems: 'end',
+              marginBottom: 12,
+            }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveSettings();
+            }}
+          >
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span>Bots per member</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={board.settingsLimits.maxAppsPerMember}
+                step={1}
+                value={perMemberText}
+                placeholder="All"
+                aria-describedby="tournament-settings-help"
+                onChange={(e) => setPerMemberText(e.target.value)}
+                style={{ ...fieldStyle, width: 110 }}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span>Bots shown</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={board.settingsLimits.maxEntries}
+                step={1}
+                value={entriesText}
+                placeholder="All"
+                aria-describedby="tournament-settings-help"
+                onChange={(e) => setEntriesText(e.target.value)}
+                style={{ ...fieldStyle, width: 110 }}
+              />
+            </label>
+            <Button size="sm" type="submit" disabled={busy}>
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => setEditingSettings(false)}
+            >
+              Cancel
+            </Button>
+            <p
+              id="tournament-settings-help"
+              style={{ flexBasis: '100%', margin: 0, color: '#888' }}
+            >
+              Leave a field blank for no limit. A per-member cap keeps each
+              member’s highest-rated bots; ranks are renumbered over what is
+              shown.
+            </p>
+          </form>
+        )}
 
         {renaming && (
           <form
@@ -240,15 +359,7 @@ export default function TournamentPage(props: { signedIn: boolean }) {
               maxLength={50}
               aria-label="Tournament name"
               onChange={(e) => setNewName(e.target.value)}
-              style={{
-                flex: '1 1 auto',
-                minWidth: 0,
-                padding: '4px 8px',
-                background: 'var(--bg)',
-                color: 'var(--fg)',
-                border: '1px solid var(--rule)',
-                borderRadius: 4,
-              }}
+              style={{ ...fieldStyle, flex: '1 1 auto', minWidth: 0 }}
             />
             <Button size="sm" type="submit" disabled={busy || !newName.trim()}>
               Save

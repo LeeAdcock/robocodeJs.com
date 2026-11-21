@@ -207,6 +207,151 @@ describe('tournament board', () => {
   });
 });
 
+describe('tournament settings', () => {
+  const names = (res: {
+    body: { entries: { rank: number; name: string }[] };
+  }) => res.body.entries.map((e) => [e.rank, e.name]);
+
+  // Alice has four rated apps, Bob two; Carol is not a member.
+  const seed = async () => {
+    await addApp(ALICE, 'A1', 1800);
+    await addApp(ALICE, 'A2', 1700);
+    await addApp(ALICE, 'A3', 1600);
+    await addApp(ALICE, 'A4', 1550);
+    await addApp(BOB, 'B1', 1650);
+    await addApp(BOB, 'B2', 1500);
+    await addApp(CAROL, 'C1', 1900);
+    const t = await tournamentService.create(ALICE, 'Club');
+    await tournamentService.join(t.id, BOB);
+    return t;
+  };
+
+  it('defaults to no limits and reports them with their ceilings', async () => {
+    const t = await seed();
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.settings).toEqual({
+      maxAppsPerMember: null,
+      maxEntries: null,
+    });
+    expect(res.body.settingsLimits).toEqual({
+      maxAppsPerMember: 20,
+      maxEntries: 100,
+    });
+    expect(res.body.entries).toHaveLength(6);
+  });
+
+  it('a per-member cap keeps each member’s highest-rated bots and renumbers', async () => {
+    const t = await seed();
+    const patched = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      maxAppsPerMember: 2,
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toMatchObject({
+      name: 'Club',
+      settings: { maxAppsPerMember: 2, maxEntries: null },
+      updated: true,
+    });
+
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.settings.maxAppsPerMember).toBe(2);
+    expect(names(res)).toEqual([
+      [1, 'A1'],
+      [2, 'A2'],
+      [3, 'B1'],
+      [4, 'B2'],
+    ]);
+  });
+
+  it('a row cap truncates the ranked board', async () => {
+    const t = await seed();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { maxEntries: 3 });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(names(res)).toEqual([
+      [1, 'A1'],
+      [2, 'A2'],
+      [3, 'B1'],
+    ]);
+  });
+
+  it('applies both caps together, and null clears one', async () => {
+    const t = await seed();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      maxAppsPerMember: 1,
+      maxEntries: 1,
+    });
+    expect(names(await api().get(`/api/tournaments/${t.id}`))).toEqual([
+      [1, 'A1'],
+    ]);
+
+    // Clearing the row cap leaves the per-member cap in place.
+    const cleared = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      maxEntries: null,
+    });
+    expect(cleared.body.settings).toEqual({
+      maxAppsPerMember: 1,
+      maxEntries: null,
+    });
+    expect(names(await api().get(`/api/tournaments/${t.id}`))).toEqual([
+      [1, 'A1'],
+      [2, 'B1'],
+    ]);
+  });
+
+  it('renames and changes settings in one request, or either alone', async () => {
+    const t = await seed();
+    const both = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      name: 'Top Two',
+      maxAppsPerMember: 2,
+    });
+    expect(both.body).toMatchObject({
+      name: 'Top Two',
+      settings: { maxAppsPerMember: 2 },
+    });
+    // A settings-only PATCH leaves the name alone.
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { maxEntries: 5 });
+    const stored = await tournamentService.get(t.id);
+    expect(stored).toMatchObject({
+      name: 'Top Two',
+      maxAppsPerMember: 2,
+      maxEntries: 5,
+    });
+  });
+
+  it('rejects out-of-range, non-integer, and empty updates', async () => {
+    const t = await seed();
+    for (const body of [
+      { maxAppsPerMember: 0 },
+      { maxAppsPerMember: 21 },
+      { maxAppsPerMember: 2.5 },
+      { maxAppsPerMember: '3' },
+      { maxEntries: 0 },
+      { maxEntries: 101 },
+      {},
+      { unrelated: true },
+    ]) {
+      const res = await api(ALICE).patch(`/api/tournaments/${t.id}`, body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    // A bad name rejects the whole request — the valid cap beside it is not
+    // written.
+    const half = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      name: '   ',
+      maxEntries: 3,
+    });
+    expect(half.status).toBe(400);
+    expect((await tournamentService.get(t.id))?.maxEntries).toBeNull();
+  });
+
+  it('lets only the creator change settings', async () => {
+    const t = await seed();
+    const res = await api(BOB).patch(`/api/tournaments/${t.id}`, {
+      maxAppsPerMember: 1,
+    });
+    expect(res.status).toBe(403);
+    expect((await tournamentService.get(t.id))?.maxAppsPerMember).toBeNull();
+  });
+});
+
 describe('tournament membership', () => {
   it('join adds all the member’s apps; leave removes them', async () => {
     await addApp(ALICE, 'A1', 1800);

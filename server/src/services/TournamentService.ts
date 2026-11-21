@@ -15,15 +15,25 @@ import { UserId } from '../types/user';
 // Tournaments are unlisted rather than private: anyone holding the id/link can
 // view the board (a spectating surface, like /watch), and joining needs sign-in.
 //
+// The creator can shape how the board reads (GitHub #119 follow-up): cap how
+// many of each member's bots show (their highest-rated ones) and how many rows
+// the board shows in total. Both are NULL by default — "no limit" — so a
+// tournament made before the columns existed keeps showing every member bot.
+//
 // Same lazy-DDL idiom as the other services (see the accepted "lazy DDL startup"
 // risk in CLAUDE.md); Promise.resolve tolerates a mocked pool.query. The member
-// table is chained off the tournament table so the order is fixed.
+// table and the settings backfill are chained off the tournament table so the
+// order is fixed; the backfill is a no-op where the CREATE already added the
+// columns (fresh pg-mem in dev/test) and is last so an engine that lacks
+// `ADD COLUMN IF NOT EXISTS` can't take the member table down with it.
 Promise.resolve(
   pool.query(`
     CREATE TABLE IF NOT EXISTS tournament (
       id UUID PRIMARY KEY,
       name text,
       ownerUserId UUID,
+      maxAppsPerMember integer,
+      maxEntries integer,
       createdTimestamp timestamp default CURRENT_TIMESTAMP
     )
   `)
@@ -38,6 +48,12 @@ Promise.resolve(
       )
     `)
   )
+  .then(() =>
+    pool.query(`
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS maxAppsPerMember integer;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS maxEntries integer;
+    `)
+  )
   .catch(() => undefined);
 
 // How many users may join one tournament. Bounds the board query (each member
@@ -46,7 +62,15 @@ export const MAX_TOURNAMENT_MEMBERS = Number(
   process.env.MAX_TOURNAMENT_MEMBERS ?? 100
 );
 
-export interface Tournament {
+// The creator-set board rules. `null` = no limit (the default).
+export interface TournamentSettings {
+  // Show at most this many bots per member — their highest-rated ones.
+  maxAppsPerMember: number | null;
+  // Show at most this many rows on the board.
+  maxEntries: number | null;
+}
+
+export interface Tournament extends TournamentSettings {
   id: string;
   name: string;
   ownerUserId: UserId;
@@ -72,8 +96,13 @@ const toTournament = (row: Record<string, unknown>): Tournament => ({
   id: row.id as string,
   name: (row.name as string | null) ?? 'Tournament',
   ownerUserId: row.ownerUserId as UserId,
+  maxAppsPerMember: (row.maxAppsPerMember as number | null) ?? null,
+  maxEntries: (row.maxEntries as number | null) ?? null,
   createdTimestamp: new Date(row.createdTimestamp as string | Date),
 });
+
+const TOURNAMENT_COLUMNS =
+  'id, name, ownerUserId as "ownerUserId", maxAppsPerMember as "maxAppsPerMember", maxEntries as "maxEntries", createdTimestamp as "createdTimestamp"';
 
 export type JoinResult = 'joined' | 'already' | 'full';
 
@@ -92,7 +121,7 @@ class TournamentService {
 
   get = async (id: string): Promise<Tournament | undefined> => {
     const res = await pool.query({
-      text: 'SELECT id, name, ownerUserId as "ownerUserId", createdTimestamp as "createdTimestamp" FROM tournament WHERE id=$1',
+      text: `SELECT ${TOURNAMENT_COLUMNS} FROM tournament WHERE id=$1`,
       values: [id],
     });
     return res.rows.length ? toTournament(res.rows[0]) : undefined;
@@ -110,6 +139,18 @@ class TournamentService {
     await pool.query({
       text: 'UPDATE tournament SET name=$2 WHERE id=$1',
       values: [id, name],
+    });
+  };
+
+  // Replace both board rules at once; the route merges a partial PATCH onto the
+  // stored values first, so this never has to express "leave this one alone".
+  updateSettings = async (
+    id: string,
+    settings: TournamentSettings
+  ): Promise<void> => {
+    await pool.query({
+      text: 'UPDATE tournament SET maxAppsPerMember=$2, maxEntries=$3 WHERE id=$1',
+      values: [id, settings.maxAppsPerMember, settings.maxEntries],
     });
   };
 
