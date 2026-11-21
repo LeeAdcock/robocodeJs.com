@@ -33,7 +33,8 @@ const LEADERBOARD_SCAN_LIMIT = 500;
 // board can never disagree with the global one about who is ranked above whom.
 const leaderboardCandidateSql = (memberJoin = '') =>
   `SELECT app.id as "appId", app.userId as "ownerUserId", app.name as "name", account.name as "ownerName",
-                app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.isPublic as "isPublic"
+                app.rating as "rating", app.ratingGames as "ratingGames", app.ratingWins as "ratingWins", app.isPublic as "isPublic",
+                app.updatedTimestamp as "updatedTimestamp"
          FROM app JOIN account ON account.id = app.userId${memberJoin}
          WHERE NOT app.deleted
            AND NOT COALESCE(app.broken, false)
@@ -119,7 +120,9 @@ export interface LeaderboardEntry {
   own: boolean;
   public: boolean;
   name: string;
-  ownerName: string;
+  // Omitted when a tournament's creator hides owner names (hideOwners); always
+  // present on the global board.
+  ownerName?: string;
   rating: number;
   games: number;
   wins: number;
@@ -130,6 +133,67 @@ export interface LeaderboardEntry {
   // the app wasn't on the board 24h ago (a new entrant), which the UI marks as new.
   previousRank?: number;
 }
+
+// One ranked row BEFORE viewer-specific redaction: the real app id and owner id
+// on every row. Server-internal — this is what a personal tournament stores as
+// its final standings (see api/tournament.ts), and what presentBoardRow turns
+// into a LeaderboardEntry for a particular viewer. Never sent over the wire.
+export interface BoardRow {
+  rank: number;
+  appId: AppId;
+  ownerUserId: UserId;
+  color: string;
+  isPublic: boolean;
+  name: string;
+  // Already the public form ("First L.", or Anonymous): the raw account name
+  // doesn't need to survive past the query.
+  ownerName: string;
+  rating: number;
+  games: number;
+  wins: number;
+  previousRank?: number;
+}
+
+// The knobs a personal tournament can turn on its board (GitHub #119). The
+// global board uses none of them; see getLeaderboard.
+export interface BoardOptions {
+  tournamentId?: string;
+  // Per-owner cap for a tournament (Infinity = none). Ignored by the global board.
+  ownerCap?: number;
+  // Hide apps with fewer ranked games than this.
+  minGames?: number;
+  // Keep only apps whose source is public.
+  publicOnly?: boolean;
+  // Keep only apps edited at or after this instant.
+  editedSince?: Date;
+  // Leave `ownerName` off every presented row.
+  hideOwners?: boolean;
+}
+
+// Redact one ranked row for `viewerUserId`: the real app id leaves the server
+// only on the viewer's own rows and on public apps, so a private app's id never
+// leaks; the owner name is dropped when the board hides owners.
+export const presentBoardRow = (
+  row: BoardRow,
+  viewerUserId: UserId | undefined,
+  opts: { hideOwners?: boolean } = {}
+): LeaderboardEntry => {
+  const own = row.ownerUserId === viewerUserId;
+  return {
+    rank: row.rank,
+    color: row.color,
+    appId: own || row.isPublic ? row.appId : undefined,
+    own,
+    public: row.isPublic,
+    name: row.name,
+    ...(opts.hideOwners ? {} : { ownerName: row.ownerName }),
+    rating: row.rating,
+    games: row.games,
+    wins: row.wins,
+    winRate: row.games > 0 ? row.wins / row.games : 0,
+    previousRank: row.previousRank,
+  };
+};
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS app (
@@ -216,12 +280,24 @@ export class AppService {
   // #119): same ratings, same ordering, ranks renumbered 1..N within the group,
   // and movement rewound within the group too. A tournament has no per-owner cap
   // unless its creator set one (`ownerCap`, the tournament's maxAppsPerMember);
-  // the global board ignores `ownerCap` and always applies its own.
+  // the global board ignores `ownerCap` and always applies its own. The other
+  // BoardOptions are the tournament creator's filters (see BoardOptions).
   getLeaderboard = async (
     limit = 20,
     viewerUserId?: UserId,
-    opts: { tournamentId?: string; ownerCap?: number } = {}
-  ): Promise<LeaderboardEntry[]> => {
+    opts: BoardOptions = {}
+  ): Promise<LeaderboardEntry[]> =>
+    (await this.rankBoard(limit, opts)).map((row) =>
+      presentBoardRow(row, viewerUserId, opts)
+    );
+
+  // The ranked board before viewer redaction (see BoardRow). getLeaderboard is
+  // this plus presentBoardRow; a tournament that has reached its end date stores
+  // these rows as its final standings and presents them later.
+  rankBoard = async (
+    limit = 20,
+    opts: BoardOptions = {}
+  ): Promise<BoardRow[]> => {
     // How far back "movement" looks: the up/down arrow compares each app's
     // current rank to where it stood this long ago. A rolling day is stable
     // enough to be meaningful (vs. per-match jitter) yet fresh for daily movers.
@@ -232,7 +308,18 @@ export class AppService {
       tournamentId === undefined
         ? MAX_APPS_PER_OWNER_ON_BOARD
         : (opts.ownerCap ?? Infinity);
-    const res = await pool.query(
+    // A tournament's eligibility filters, applied to the candidate rows before
+    // EITHER ranking (live and rewound) so the two stay on one scale. The games
+    // floor is applied to the rewound game count too, so a bot that crossed it
+    // inside the window reads as a new entrant rather than as a climber.
+    const minGames = Math.max(1, opts.minGames ?? 1);
+    const editedSince = opts.editedSince?.getTime();
+    const eligible = (row: Record<string, unknown>) =>
+      (!opts.publicOnly || ((row.isPublic as boolean | null) ?? false)) &&
+      (editedSince === undefined ||
+        new Date(row.updatedTimestamp as string | Date).getTime() >=
+          editedSince);
+    const scan = await pool.query(
       tournamentId === undefined
         ? {
             text: LEADERBOARD_CANDIDATE_SQL,
@@ -243,6 +330,12 @@ export class AppService {
             values: [LEADERBOARD_SCAN_LIMIT, DEMO_USER_ID, tournamentId],
           }
     );
+    const res = {
+      rows: scan.rows.filter(
+        (row) =>
+          eligible(row) && ((row.ratingGames as number | null) ?? 0) >= minGames
+      ),
+    };
 
     // Reconstruct the board as of MOVEMENT_WINDOW_MS ago: rewind each app's
     // rating by the deltas it earned inside the window, then re-rank with the
@@ -279,7 +372,7 @@ export class AppService {
           prevGames: currentGames - (w?.matches ?? 0),
         };
       })
-      .filter((r) => r.prevGames > 0)
+      .filter((r) => r.prevGames >= minGames)
       .sort((a, b) =>
         b.prevRating !== a.prevRating
           ? b.prevRating - a.prevRating
@@ -300,40 +393,31 @@ export class AppService {
       ownerCap
     );
 
-    const entries: LeaderboardEntry[] = [];
+    const rows: BoardRow[] = [];
     for (const row of res.rows) {
-      if (entries.length >= limit) break;
-      const ownerId = row.ownerUserId as string;
+      if (rows.length >= limit) break;
       const rank = rankByApp.get(row.appId as string);
       // Undefined = the owner cap skipped this row.
       if (rank === undefined) continue;
 
-      const games = (row.ratingGames as number | null) ?? 0;
-      const wins = (row.ratingWins as number | null) ?? 0;
-      const isPublic = (row.isPublic as boolean | null) ?? false;
-      const own = ownerId === viewerUserId;
-      entries.push({
+      rows.push({
         rank,
+        appId: row.appId as AppId,
+        ownerUserId: row.ownerUserId as UserId,
         // Sprite color for every row, derived from the app id (the id itself
-        // never leaves the server for a private app).
+        // never leaves the server for a private app — see presentBoardRow).
         color: colorForAppId(row.appId as string),
-        // Real app id ONLY on the viewer's own rows and on public apps (the
-        // id is what the public source link needs); omitted for a private
-        // app someone else owns, so the board never leaks a private app id.
-        appId: own || isPublic ? (row.appId as AppId) : undefined,
-        own,
-        public: isPublic,
+        isPublic: (row.isPublic as boolean | null) ?? false,
         name: (row.name as string | null) ?? 'Unnamed',
         ownerName: publicOwnerName(row.ownerName as string | null),
         rating: Math.round((row.rating as number | null) ?? DEFAULT_RATING),
-        games,
-        wins,
-        winRate: games > 0 ? wins / games : 0,
+        games: (row.ratingGames as number | null) ?? 0,
+        wins: (row.ratingWins as number | null) ?? 0,
         // Where this app sat 24h ago; undefined for a new entrant (no game then).
         previousRank: previousRankByApp.get(row.appId as string),
       });
     }
-    return entries;
+    return rows;
   };
 
   // Current board rank for each of `appIds` (GitHub #121, the rank badges). Uses

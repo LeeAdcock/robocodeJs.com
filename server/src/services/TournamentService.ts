@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pool from '../util/db';
 import { UserId } from '../types/user';
+import type { BoardRow } from './AppService';
 
 // Personal tournaments: a named, shareable *view* over the global Elo ladder
 // (GitHub #119). A tournament plays no matches of its own — its board is the
@@ -15,10 +16,11 @@ import { UserId } from '../types/user';
 // Tournaments are unlisted rather than private: anyone holding the id/link can
 // view the board (a spectating surface, like /watch), and joining needs sign-in.
 //
-// The creator can shape how the board reads (GitHub #119 follow-up): cap how
-// many of each member's bots show (their highest-rated ones) and how many rows
-// the board shows in total. Both are NULL by default — "no limit" — so a
-// tournament made before the columns existed keeps showing every member bot.
+// The creator can shape how the board reads (GitHub #119 follow-up) — see
+// TournamentSettings. Every rule's column defaults to "off" (NULL / false /
+// 'bots'), so a tournament made before the columns existed is unchanged.
+// `finalBoard` is the frozen standings once `endsAt` has passed (JSON of
+// BoardRow[], written once by the first board read after the deadline).
 //
 // Same lazy-DDL idiom as the other services (see the accepted "lazy DDL startup"
 // risk in CLAUDE.md); Promise.resolve tolerates a mocked pool.query. The member
@@ -34,6 +36,14 @@ Promise.resolve(
       ownerUserId UUID,
       maxAppsPerMember integer,
       maxEntries integer,
+      minGames integer,
+      rankBy text default 'bots',
+      hideOwners boolean default false,
+      publicOnly boolean default false,
+      joinLocked boolean default false,
+      endsAt timestamp,
+      editedSince timestamp,
+      finalBoard text,
       createdTimestamp timestamp default CURRENT_TIMESTAMP
     )
   `)
@@ -52,6 +62,14 @@ Promise.resolve(
     pool.query(`
       ALTER TABLE tournament ADD COLUMN IF NOT EXISTS maxAppsPerMember integer;
       ALTER TABLE tournament ADD COLUMN IF NOT EXISTS maxEntries integer;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS minGames integer;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS rankBy text default 'bots';
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS hideOwners boolean default false;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS publicOnly boolean default false;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS joinLocked boolean default false;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS endsAt timestamp;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS editedSince timestamp;
+      ALTER TABLE tournament ADD COLUMN IF NOT EXISTS finalBoard text;
     `)
   )
   .catch(() => undefined);
@@ -62,20 +80,56 @@ export const MAX_TOURNAMENT_MEMBERS = Number(
   process.env.MAX_TOURNAMENT_MEMBERS ?? 100
 );
 
-// The creator-set board rules. `null` = no limit (the default).
+// The creator-set board rules. Each defaults to "off": `null` for a limit or a
+// date, `false` for a switch, 'bots' for the ranking mode.
 export interface TournamentSettings {
   // Show at most this many bots per member — their highest-rated ones.
   maxAppsPerMember: number | null;
   // Show at most this many rows on the board.
   maxEntries: number | null;
+  // Hide bots with fewer ranked games than this (a fresh rating is noise).
+  minGames: number | null;
+  // 'members' ranks players — one row per member, their best bot — instead of
+  // every bot (it is a per-member cap of 1 with a player-first table).
+  rankBy: 'bots' | 'members';
+  // Leave owner names off the board (classroom privacy).
+  hideOwners: boolean;
+  // Show only bots whose source is public (a code-reading exercise).
+  publicOnly: boolean;
+  // Close the roster: no one can join until it is reopened.
+  joinLocked: boolean;
+  // When the tournament ends. The first board read after this instant stores
+  // the standings as final, and the board stops moving.
+  endsAt: Date | null;
+  // Count only bots edited at or after this instant (so pre-existing bots don't
+  // count toward work done during the tournament).
+  editedSince: Date | null;
 }
+
+export const DEFAULT_SETTINGS: TournamentSettings = {
+  maxAppsPerMember: null,
+  maxEntries: null,
+  minGames: null,
+  rankBy: 'bots',
+  hideOwners: false,
+  publicOnly: false,
+  joinLocked: false,
+  endsAt: null,
+  editedSince: null,
+};
 
 export interface Tournament extends TournamentSettings {
   id: string;
   name: string;
   ownerUserId: UserId;
   createdTimestamp: Date;
+  // The frozen standings, present once the board has been read after `endsAt`.
+  finalBoard: BoardRow[] | null;
 }
+
+// Has the tournament's end date passed? (No end date = never.)
+export const hasEnded = (t: Tournament, now = new Date()): boolean =>
+  t.endsAt !== null && t.endsAt.getTime() <= now.getTime();
 
 // A tournament as seen by one user in their own list: the ones they created or
 // joined.
@@ -92,17 +146,41 @@ export interface TournamentMember {
   name: string | null;
 }
 
+const toDate = (v: unknown): Date | null =>
+  v === null || v === undefined ? null : new Date(v as string | Date);
+
+const parseFinalBoard = (v: unknown): BoardRow[] | null => {
+  if (typeof v !== 'string') return null;
+  try {
+    const parsed: unknown = JSON.parse(v);
+    return Array.isArray(parsed) ? (parsed as BoardRow[]) : null;
+  } catch {
+    return null;
+  }
+};
+
 const toTournament = (row: Record<string, unknown>): Tournament => ({
   id: row.id as string,
   name: (row.name as string | null) ?? 'Tournament',
   ownerUserId: row.ownerUserId as UserId,
   maxAppsPerMember: (row.maxAppsPerMember as number | null) ?? null,
   maxEntries: (row.maxEntries as number | null) ?? null,
+  minGames: (row.minGames as number | null) ?? null,
+  rankBy: row.rankBy === 'members' ? 'members' : 'bots',
+  hideOwners: (row.hideOwners as boolean | null) ?? false,
+  publicOnly: (row.publicOnly as boolean | null) ?? false,
+  joinLocked: (row.joinLocked as boolean | null) ?? false,
+  endsAt: toDate(row.endsAt),
+  editedSince: toDate(row.editedSince),
+  finalBoard: parseFinalBoard(row.finalBoard),
   createdTimestamp: new Date(row.createdTimestamp as string | Date),
 });
 
-const TOURNAMENT_COLUMNS =
-  'id, name, ownerUserId as "ownerUserId", maxAppsPerMember as "maxAppsPerMember", maxEntries as "maxEntries", createdTimestamp as "createdTimestamp"';
+const TOURNAMENT_COLUMNS = `id, name, ownerUserId as "ownerUserId",
+  maxAppsPerMember as "maxAppsPerMember", maxEntries as "maxEntries", minGames as "minGames",
+  rankBy as "rankBy", hideOwners as "hideOwners", publicOnly as "publicOnly", joinLocked as "joinLocked",
+  endsAt as "endsAt", editedSince as "editedSince", finalBoard as "finalBoard",
+  createdTimestamp as "createdTimestamp"`;
 
 export type JoinResult = 'joined' | 'already' | 'full';
 
@@ -142,16 +220,48 @@ class TournamentService {
     });
   };
 
-  // Replace both board rules at once; the route merges a partial PATCH onto the
+  // Replace every board rule at once; the route merges a partial PATCH onto the
   // stored values first, so this never has to express "leave this one alone".
+  // Moving or clearing the end date discards any final standings, so the board
+  // goes live again (and will freeze afresh when the new date passes).
   updateSettings = async (
     id: string,
-    settings: TournamentSettings
+    settings: TournamentSettings,
+    opts: { clearFinalBoard?: boolean } = {}
   ): Promise<void> => {
     await pool.query({
-      text: 'UPDATE tournament SET maxAppsPerMember=$2, maxEntries=$3 WHERE id=$1',
-      values: [id, settings.maxAppsPerMember, settings.maxEntries],
+      text: `UPDATE tournament SET maxAppsPerMember=$2, maxEntries=$3, minGames=$4, rankBy=$5,
+               hideOwners=$6, publicOnly=$7, joinLocked=$8, endsAt=$9, editedSince=$10
+             WHERE id=$1`,
+      values: [
+        id,
+        settings.maxAppsPerMember,
+        settings.maxEntries,
+        settings.minGames,
+        settings.rankBy,
+        settings.hideOwners,
+        settings.publicOnly,
+        settings.joinLocked,
+        settings.endsAt,
+        settings.editedSince,
+      ],
     });
+    if (opts.clearFinalBoard)
+      await pool.query({
+        text: 'UPDATE tournament SET finalBoard=NULL WHERE id=$1',
+        values: [id],
+      });
+  };
+
+  // Record the final standings. Write-once: two instances reading the board in
+  // the same moment both compute it, but only the first write lands, so every
+  // later read serves one agreed snapshot. Returns the rows now stored.
+  setFinalBoard = async (id: string, rows: BoardRow[]): Promise<BoardRow[]> => {
+    await pool.query({
+      text: 'UPDATE tournament SET finalBoard=$2 WHERE id=$1 AND finalBoard IS NULL',
+      values: [id, JSON.stringify(rows)],
+    });
+    return (await this.get(id))?.finalBoard ?? rows;
   };
 
   // Members first, so a failure part-way leaves a tournament with no members

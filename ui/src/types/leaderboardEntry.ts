@@ -17,7 +17,9 @@ export default interface LeaderboardEntry {
   own: boolean;
   public: boolean;
   name: string;
-  ownerName: string;
+  // Absent when a tournament's creator hides owner names; always present on
+  // the global board.
+  ownerName?: string;
   rating: number;
   games: number;
   wins: number;
