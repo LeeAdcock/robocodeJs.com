@@ -4,7 +4,9 @@ import LeaderboardEntry from '../../types/leaderboardEntry';
 // The ranked table shared by the global board (leaderboardPage) and personal
 // tournament boards (tournamentPage, GitHub #119). Both are the same Elo ratings
 // in the same order; a tournament just filters and renumbers the rows, so they
-// render identically.
+// render identically — up to two tournament options: `rankBy: 'members'` puts
+// the player first (one row per member, their best bot beside them), and a board
+// whose rows carry no `ownerName` (the creator hid them) drops the owner column.
 
 // Podium markers for the top three (shown in the far-left column). 1st gets a
 // trophy, 2nd/3rd the silver/bronze medals.
@@ -82,9 +84,15 @@ const goldFirstCell = (base: React.CSSProperties): React.CSSProperties => ({
 
 export default function LeaderboardTable({
   entries,
+  rankBy = 'bots',
 }: {
   entries: LeaderboardEntry[];
+  rankBy?: 'bots' | 'members';
 }) {
+  // The server omits ownerName on every row of a board that hides owners.
+  const showOwners = entries.some((e) => e.ownerName !== undefined);
+  const players = rankBy === 'members';
+  const botHeader = players ? 'Best bot' : 'Bot';
   return (
     <table style={{ borderCollapse: 'collapse', width: '100%' }}>
       <thead>
@@ -94,8 +102,9 @@ export default function LeaderboardTable({
           <th style={cell} title="Rank, with change over the last 24h">
             #
           </th>
-          <th style={cell}>Bot</th>
-          <th style={cell}>Owner</th>
+          {players && showOwners && <th style={cell}>Player</th>}
+          <th style={cell}>{botHeader}</th>
+          {!players && showOwners && <th style={cell}>Owner</th>}
           <th style={numCell}>Rating</th>
         </tr>
       </thead>
@@ -112,6 +121,11 @@ export default function LeaderboardTable({
           const c = top3 ? goldCell(cell) : cell;
           const n = top3 ? goldCell(numCell) : numCell;
           const mv = movement(e);
+          const ownerCell = showOwners && (
+            <td style={{ ...c, color: players ? undefined : '#888' }}>
+              {e.ownerName}
+            </td>
+          );
           return (
             <tr key={e.rank} style={{ fontWeight: isOwn ? 700 : 400 }}>
               <td style={first} aria-label={placeLabel(e.rank)}>
@@ -134,6 +148,7 @@ export default function LeaderboardTable({
                   </span>
                 )}
               </td>
+              {players && ownerCell}
               <td style={c}>
                 <img
                   src={`/sprites/tank_${e.color}.png`}
@@ -156,7 +171,7 @@ export default function LeaderboardTable({
                   e.name
                 )}
               </td>
-              <td style={{ ...c, color: '#888' }}>{e.ownerName}</td>
+              {!players && ownerCell}
               <td style={n}>{e.rating}</td>
             </tr>
           );

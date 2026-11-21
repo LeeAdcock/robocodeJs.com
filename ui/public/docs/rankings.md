@@ -73,7 +73,18 @@ Ratings are stored and shown as **whole numbers** (they're rounded after each up
 
 A personal tournament ranks just the bots of a group you choose, like your friends, a class, or a club. Create one from the bottom of the [Global Rankings](/leaderboard) page, then share its link. Anyone with the link can view the board; signing in lets them join.
 
-There are no separate tournament matches. A tournament shows the same global Elo ratings, filtered to the bots of its members and numbered from 1. Joining adds **all** of your rated bots, including ones you write later, and leaving takes them out. Unlike the global board, a tournament shows every member bot rather than capping each player at three. A bot appears once it has played a ranked match on the global ladder.
+There are no separate tournament matches. A tournament shows the same global Elo ratings, filtered to the bots of its members and numbered from 1. Joining adds **all** of your rated bots, including ones you write later, and leaving takes them out. Unlike the global board, a tournament shows every member bot by default rather than capping each player at three. A bot appears once it has played a ranked match on the global ladder.
+
+The creator can change how the board reads from its **Settings**. Ranks are always renumbered over what is shown, and the board says which rules are in effect:
+
+- **Rank** every bot, or rank **players**: one row per member, showing their best bot.
+- **Bots per member** caps each member at their highest-rated bots, so "3" is each player's top three. **Bots shown** caps the whole board, say at a top 10.
+- **Minimum ranked games** hides bots that have barely played yet, since a fresh rating is mostly luck.
+- **Count bots edited since** a date leaves out bots nobody has touched since then, so a semester board reflects work done during the semester.
+- **Public bots only** shows just the bots whose code is shared, which makes a class board a code-reading exercise.
+- **Hide owner names** keeps the board anonymous. You still see your own rows in bold.
+- **Close joining** stops anyone new from joining until you reopen it; members can still leave.
+- **Ends** sets a deadline. Once it passes, the standings freeze as the final result and nobody new can join. Move or clear the date to reopen the board.
 
 The creator can rename or delete a tournament. Deleting it only removes the board and its link; nobody's bots or ratings change.
 

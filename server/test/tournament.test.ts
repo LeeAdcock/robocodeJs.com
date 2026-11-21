@@ -34,7 +34,9 @@ vi.mock('../src/middleware/auth', () => ({
 
 import pool from '../src/util/db';
 import tournamentRouter from '../src/api/tournament';
-import tournamentService from '../src/services/TournamentService';
+import tournamentService, {
+  DEFAULT_SETTINGS,
+} from '../src/services/TournamentService';
 import { MAX_TOURNAMENTS_PER_USER } from '../src/util/limits';
 import appService from '../src/services/AppService';
 
@@ -204,6 +206,336 @@ describe('tournament board', () => {
   it('400s a malformed id and 404s an unknown one', async () => {
     expect((await api().get('/api/tournaments/not-a-uuid')).status).toBe(400);
     expect((await api().get(`/api/tournaments/${MISSING}`)).status).toBe(404);
+  });
+});
+
+describe('tournament settings', () => {
+  const names = (res: {
+    body: { entries: { rank: number; name: string }[] };
+  }) => res.body.entries.map((e) => [e.rank, e.name]);
+
+  // Alice has four rated apps, Bob two; Carol is not a member.
+  const seed = async () => {
+    await addApp(ALICE, 'A1', 1800);
+    await addApp(ALICE, 'A2', 1700);
+    await addApp(ALICE, 'A3', 1600);
+    await addApp(ALICE, 'A4', 1550);
+    await addApp(BOB, 'B1', 1650);
+    await addApp(BOB, 'B2', 1500);
+    await addApp(CAROL, 'C1', 1900);
+    const t = await tournamentService.create(ALICE, 'Club');
+    await tournamentService.join(t.id, BOB);
+    return t;
+  };
+
+  it('defaults to no limits and reports them with their ceilings', async () => {
+    const t = await seed();
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.settings).toEqual(DEFAULT_SETTINGS);
+    expect(res.body.settingsLimits).toEqual({
+      maxAppsPerMember: 20,
+      maxEntries: 100,
+      minGames: 10000,
+    });
+    expect(res.body.ended).toBe(false);
+    expect(res.body.joinClosed).toBeUndefined();
+    expect(res.body.entries).toHaveLength(6);
+    // Owner names show by default.
+    expect(res.body.entries[0].ownerName).toBe('Alice A.');
+  });
+
+  it('a per-member cap keeps each member’s highest-rated bots and renumbers', async () => {
+    const t = await seed();
+    const patched = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      maxAppsPerMember: 2,
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toMatchObject({
+      name: 'Club',
+      settings: { ...DEFAULT_SETTINGS, maxAppsPerMember: 2 },
+      updated: true,
+    });
+
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.settings.maxAppsPerMember).toBe(2);
+    expect(names(res)).toEqual([
+      [1, 'A1'],
+      [2, 'A2'],
+      [3, 'B1'],
+      [4, 'B2'],
+    ]);
+  });
+
+  it('a row cap truncates the ranked board', async () => {
+    const t = await seed();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { maxEntries: 3 });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(names(res)).toEqual([
+      [1, 'A1'],
+      [2, 'A2'],
+      [3, 'B1'],
+    ]);
+  });
+
+  it('applies both caps together, and null clears one', async () => {
+    const t = await seed();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      maxAppsPerMember: 1,
+      maxEntries: 1,
+    });
+    expect(names(await api().get(`/api/tournaments/${t.id}`))).toEqual([
+      [1, 'A1'],
+    ]);
+
+    // Clearing the row cap leaves the per-member cap in place.
+    const cleared = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      maxEntries: null,
+    });
+    expect(cleared.body.settings).toEqual({
+      ...DEFAULT_SETTINGS,
+      maxAppsPerMember: 1,
+    });
+    expect(names(await api().get(`/api/tournaments/${t.id}`))).toEqual([
+      [1, 'A1'],
+      [2, 'B1'],
+    ]);
+  });
+
+  it('renames and changes settings in one request, or either alone', async () => {
+    const t = await seed();
+    const both = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      name: 'Top Two',
+      maxAppsPerMember: 2,
+    });
+    expect(both.body).toMatchObject({
+      name: 'Top Two',
+      settings: { maxAppsPerMember: 2 },
+    });
+    // A settings-only PATCH leaves the name alone.
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { maxEntries: 5 });
+    const stored = await tournamentService.get(t.id);
+    expect(stored).toMatchObject({
+      name: 'Top Two',
+      maxAppsPerMember: 2,
+      maxEntries: 5,
+    });
+  });
+
+  it('rejects out-of-range, non-integer, and empty updates', async () => {
+    const t = await seed();
+    for (const body of [
+      { maxAppsPerMember: 0 },
+      { maxAppsPerMember: 21 },
+      { maxAppsPerMember: 2.5 },
+      { maxAppsPerMember: '3' },
+      { maxEntries: 0 },
+      { maxEntries: 101 },
+      { minGames: 0 },
+      { minGames: 10001 },
+      { rankBy: 'owners' },
+      { hideOwners: 'yes' },
+      { publicOnly: 1 },
+      { joinLocked: null },
+      { endsAt: 'tomorrow-ish' },
+      { endsAt: 1700000000 },
+      { editedSince: '' },
+      {},
+      { unrelated: true },
+    ]) {
+      const res = await api(ALICE).patch(`/api/tournaments/${t.id}`, body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    // A bad name rejects the whole request — the valid cap beside it is not
+    // written.
+    const half = await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      name: '   ',
+      maxEntries: 3,
+    });
+    expect(half.status).toBe(400);
+    expect((await tournamentService.get(t.id))?.maxEntries).toBeNull();
+  });
+
+  it('lets only the creator change settings', async () => {
+    const t = await seed();
+    const res = await api(BOB).patch(`/api/tournaments/${t.id}`, {
+      maxAppsPerMember: 1,
+    });
+    expect(res.status).toBe(403);
+    expect((await tournamentService.get(t.id))?.maxAppsPerMember).toBeNull();
+  });
+
+  it('a games floor hides lightly-played bots', async () => {
+    const t = await seed();
+    // B2 has only 2 games; everyone else has the default 10.
+    await pool.query(
+      `UPDATE app SET ratingGames = 2, ratingWins = 1 WHERE name = 'B2'`
+    );
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { minGames: 5 });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(names(res).map(([, n]) => n)).toEqual([
+      'A1',
+      'A2',
+      'B1',
+      'A3',
+      'A4',
+    ]);
+  });
+
+  it('ranking players shows one row per member, their best bot', async () => {
+    const t = await seed();
+    // Any per-member cap is moot in players mode.
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      rankBy: 'members',
+      maxAppsPerMember: 3,
+    });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.settings.rankBy).toBe('members');
+    expect(names(res)).toEqual([
+      [1, 'A1'],
+      [2, 'B1'],
+    ]);
+  });
+
+  it('hiding owners leaves ownerName off every row, including the creator’s', async () => {
+    const t = await seed();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { hideOwners: true });
+    const res = await api(BOB).get(`/api/tournaments/${t.id}`);
+    expect(res.body.entries).toHaveLength(6);
+    for (const e of res.body.entries) expect(e).not.toHaveProperty('ownerName');
+    // The viewer still recognises their own rows.
+    expect(
+      res.body.entries
+        .filter((e: { own: boolean }) => e.own)
+        .map((e: { name: string }) => e.name)
+    ).toEqual(['B1', 'B2']);
+    expect(JSON.stringify(res.body.entries)).not.toContain('Alice');
+  });
+
+  it('public-only keeps just the bots whose source is public', async () => {
+    const t = await seed();
+    await pool.query(
+      `UPDATE app SET isPublic = true WHERE name IN ('A2', 'B2')`
+    );
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { publicOnly: true });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(names(res)).toEqual([
+      [1, 'A2'],
+      [2, 'B2'],
+    ]);
+    // Every row shown is public, so every row carries its id.
+    expect(res.body.entries.every((e: { appId?: string }) => e.appId)).toBe(
+      true
+    );
+  });
+
+  it('edited-since counts only bots touched at or after the date', async () => {
+    const t = await seed();
+    await pool.query(
+      `UPDATE app SET updatedTimestamp = '2026-01-01T00:00:00Z' WHERE name IN ('A1', 'B1')`
+    );
+    await pool.query(
+      `UPDATE app SET updatedTimestamp = '2026-03-01T00:00:00Z' WHERE name NOT IN ('A1', 'B1')`
+    );
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      editedSince: '2026-02-01T00:00:00Z',
+    });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.settings.editedSince).toBe('2026-02-01T00:00:00.000Z');
+    expect(names(res).map(([, n]) => n)).toEqual(['A2', 'A3', 'A4', 'B2']);
+  });
+
+  it('closing joining turns newcomers away but not members', async () => {
+    const t = await seed();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { joinLocked: true });
+    const board = await api(CAROL).get(`/api/tournaments/${t.id}`);
+    expect(board.body.joinClosed).toMatch(/not accepting/);
+
+    const refused = await api(CAROL).put(`/api/tournaments/${t.id}/members/me`);
+    expect(refused.status).toBe(409);
+    expect(await tournamentService.isMember(t.id, CAROL)).toBe(false);
+    // Re-joining as an existing member stays idempotent, and leaving works.
+    expect(
+      (await api(BOB).put(`/api/tournaments/${t.id}/members/me`)).status
+    ).toBe(200);
+    expect(
+      (await api(BOB).delete(`/api/tournaments/${t.id}/members/me`)).status
+    ).toBe(200);
+
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { joinLocked: false });
+    expect(
+      (await api(CAROL).put(`/api/tournaments/${t.id}/members/me`)).status
+    ).toBe(200);
+  });
+
+  it('an end date freezes the standings once it passes', async () => {
+    const t = await seed();
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { endsAt: future });
+    let res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.ended).toBe(false);
+    expect(res.body.joinClosed).toBeUndefined();
+    expect(res.body.settings.endsAt).toBe(future);
+
+    // Deadline passes: the next read records the final standings...
+    const past = new Date(Date.now() - 1000).toISOString();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { endsAt: past });
+    res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.ended).toBe(true);
+    expect(res.body.joinClosed).toMatch(/ended/);
+    const finalNames = names(res);
+    expect(finalNames[0]).toEqual([1, 'A1']);
+    expect((await tournamentService.get(t.id))?.finalBoard).toHaveLength(6);
+
+    // ...and the board no longer follows the live ratings or the roster.
+    await pool.query(`UPDATE app SET rating = 2500 WHERE name = 'B2'`);
+    await tournamentService.leave(t.id, ALICE);
+    res = await api().get(`/api/tournaments/${t.id}`);
+    expect(names(res)).toEqual(finalNames);
+    // Frozen rows show no movement.
+    expect(
+      res.body.entries.every(
+        (e: { rank: number; previousRank?: number }) =>
+          e.previousRank === e.rank
+      )
+    ).toBe(true);
+    // Nobody new can join an ended tournament.
+    expect(
+      (await api(CAROL).put(`/api/tournaments/${t.id}/members/me`)).status
+    ).toBe(409);
+    // The viewer's own rows are still theirs on a frozen board.
+    const asBob = await api(BOB).get(`/api/tournaments/${t.id}`);
+    expect(
+      asBob.body.entries.filter((e: { own: boolean }) => e.own)
+    ).toHaveLength(2);
+
+    // Clearing the end date reopens the board: live ratings again.
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { endsAt: null });
+    res = await api().get(`/api/tournaments/${t.id}`);
+    expect(res.body.ended).toBe(false);
+    expect(names(res)).toEqual([
+      [1, 'B2'],
+      [2, 'B1'],
+    ]);
+    expect((await tournamentService.get(t.id))?.finalBoard).toBeNull();
+  });
+
+  it('a settings change other than the end date leaves final standings alone', async () => {
+    const t = await seed();
+    const past = new Date(Date.now() - 1000).toISOString();
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { endsAt: past });
+    await api().get(`/api/tournaments/${t.id}`);
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, {
+      name: 'Done',
+      maxEntries: 2,
+    });
+    const res = await api().get(`/api/tournaments/${t.id}`);
+    // Still the six frozen rows, not a re-ranked top two.
+    expect(res.body.entries).toHaveLength(6);
+    expect(res.body.name).toBe('Done');
+    // Hiding owners is presentation, so it does apply to a frozen board.
+    await api(ALICE).patch(`/api/tournaments/${t.id}`, { hideOwners: true });
+    const hidden = await api().get(`/api/tournaments/${t.id}`);
+    expect(hidden.body.entries[0]).not.toHaveProperty('ownerName');
   });
 });
 
